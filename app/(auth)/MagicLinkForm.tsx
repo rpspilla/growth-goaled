@@ -29,11 +29,11 @@ export function MagicLinkForm({ mode }: { mode: "sign-in" | "sign-up" }) {
 
     setState({ status: "sending" });
     const { email, name } = parsed.data;
-    // "/" routes the signed-in user to their home by role. Origin must be a Neon Auth trusted domain.
+    // /auth/callback finishes the session in the browser. Origin must be a Neon Auth trusted domain.
     const { error } = await authClient.signIn.magicLink({
       email,
       name,
-      callbackURL: `${window.location.origin}/`,
+      callbackURL: `${window.location.origin}/auth/callback`,
     });
     if (error) {
       setState({ status: "error", message: error.message || "We couldn't send your sign-in link. Try again." });
