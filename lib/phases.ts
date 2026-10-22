@@ -5,7 +5,7 @@ type Phase = Company["phase"];
 /** Founder sidebar steps, numbered as in the prototype. */
 export const FOUNDER_NAV = [
   { href: "/dashboard", label: "Overview", step: 0 },
-  { href: "/intake/company", match: "/intake", label: "Company Profile", step: 1 },
+  { href: "/intake", match: "/intake", label: "Company Profile", step: 1 },
   { href: "/upload", label: "Intake", step: 2 },
   { href: "/benchmark", label: "Benchmark", step: 3 },
   { href: "/baseline", label: "Baseline", step: 4 },
