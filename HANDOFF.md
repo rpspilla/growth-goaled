@@ -8,11 +8,11 @@
 
 - [x] GitHub repo `growth-goaled` created (private), this file committed at the root.
 - [x] Prototype core files in `/prototype` (tokens, Layout, mock data). Claude Code pulls the remaining view files at the start of M1 — see `prototype/README.md`. Reference only — not deployed.
-- [ ] Vercel project imported from the repo (framework: Next.js).
-- [ ] Neon linked to the Vercel project (Neon Console → Integrations → Vercel). Confirm `DATABASE_URL` appears in Vercel → Settings → Environment Variables.
+- [x] Vercel project `growth-goaled` (`prj_eBPPjZ3YjzhXtF7kp38mCPIYtFfY`) linked to the repo; framework Next.js; functions region `iad1`.
+- [x] Neon wired to Vercel by env vars (no marketplace integration): Production → Neon `main`; Preview and Development → Neon `dev`. `DATABASE_URL` (pooled) and `DATABASE_URL_UNPOOLED` (direct, for migrations) set; `APP_URL` set per environment.
 - [ ] `ANTHROPIC_API_KEY` from the Anthropic Console added in Vercel for Production and Preview.
-- [ ] Vercel Blob store created and connected to the project (`BLOB_READ_WRITE_TOKEN`).
-- [ ] DNS for growthgoaled.com: CNAME `app` and `dev` → `cname.vercel-dns.com` (Vercel shows exact records when domains are added). `www` is untouched.
+- [x] Private Vercel Blob store `growth-goaled-uploads` (iad1) connected; `BLOB_READ_WRITE_TOKEN` set for all environments.
+- [ ] DNS for growthgoaled.com: CNAME `app` and `dev` → `cname.vercel-dns.com`. Domains already added in Vercel (`dev` domain bound to the `dev` branch). `www` is untouched.
 
 ---
 
