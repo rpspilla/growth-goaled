@@ -63,7 +63,7 @@ Enforce permissions **on the server** (route handlers / server actions / data-ac
 | Git branch | `main` | `dev` |
 | URL | https://app.growthgoaled.com | https://dev.growthgoaled.com |
 | Vercel env | Production | Preview (domain assigned to `dev` branch) |
-| Database | Neon `main` branch | Neon branch for `dev` (created by the integration or manually as `dev`) |
+| Database | Neon project `growth-goaled` (`young-poetry-10785743`, aws-us-east-1, db `growth_goaled`), branch `main` | Same project, branch `dev` (`br-still-firefly-b7418xev`) |
 | Seed data | Acme AI sample company only | Acme AI + full fake portfolio (7 companies) + test users for each role |
 
 **Workflow:** all work happens on `dev` (or feature branches merged into `dev`). Check it on dev.growthgoaled.com. Merge `dev` → `main` to release. Never commit directly to `main`.
