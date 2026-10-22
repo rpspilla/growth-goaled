@@ -51,11 +51,16 @@ Neon Auth is configured **per Neon branch**, so `NEON_AUTH_BASE_URL` differs bet
 
 ### Auth and roles
 
-Sign-in is a passwordless magic link (Neon Auth). On first sign-in a row is created in `users` with role `founder`.
-Promote someone (they must have signed in once):
+Sign-in is a passwordless magic link (Neon Auth). Links return to `/auth/callback`, which finishes the session in the browser.
+
+On first sign-in a row is created in `users` with role `founder`, and the user is sent to `/welcome` until they finish it:
+- **Founders** give their name, title, company name, website and stage. This creates the company in the unassigned queue with them as owner.
+- **Advisors and admins** give their name and title.
+
+Nobody can choose their own role. Admins change roles on **Users** (`/advisor/users`). To create the first admin (or from a terminal):
 
 ```bash
-npm run user:role -- someone@example.com advisor   # or admin / founder
+npm run user:role -- someone@example.com admin   # or advisor / founder; they must have signed in once
 ```
 
 Founders land on `/dashboard` with the founder sidebar; advisors and admins land on `/advisor/portfolio`.

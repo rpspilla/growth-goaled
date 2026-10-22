@@ -6,6 +6,7 @@ import { sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getAuth } from "@/lib/auth/server";
 import { homePathFor } from "@/lib/access";
+import { needsOnboarding } from "@/lib/onboarding";
 import type { Role, User } from "@/lib/db/schema";
 
 /**
@@ -29,9 +30,14 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
   return user ?? null;
 });
 
-export async function requireUser(): Promise<User> {
+/**
+ * Signed-in user, or a redirect to /sign-in. Users who have not finished the
+ * first-sign-in form are sent to /welcome unless `allowIncomplete` is set.
+ */
+export async function requireUser({ allowIncomplete = false } = {}): Promise<User> {
   const user = await getCurrentUser();
   if (!user) redirect("/sign-in");
+  if (!allowIncomplete && needsOnboarding(user)) redirect("/welcome");
   return user;
 }
 

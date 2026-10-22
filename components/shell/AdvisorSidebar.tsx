@@ -14,6 +14,8 @@ const ADVISOR_NAV = [
   { href: "/advisor/settings", label: "Settings" },
 ] as const;
 
+const ADMIN_NAV = [{ href: "/advisor/users", label: "Users" }] as const;
+
 export type AdvisorBadges = { unassigned: number; review: number };
 
 export function AdvisorSidebar({
@@ -30,7 +32,7 @@ export function AdvisorSidebar({
   return (
     <>
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
-        {ADVISOR_NAV.map((item) => {
+        {[...ADVISOR_NAV, ...(role === "admin" ? ADMIN_NAV : [])].map((item) => {
           const badge = "badgeKey" in item ? badges[item.badgeKey] : 0;
           return (
             <NavLink key={item.href} href={item.href}>

@@ -87,7 +87,10 @@ export const users = pgTable(
     id: id(),
     email: text("email").notNull(),
     name: text("name"),
+    title: text("title"),
     role: userRole("role").notNull().default("founder"),
+    // Set when the first-sign-in profile (and, for founders, company) form is completed
+    onboardedAt: timestamp("onboarded_at", { withTimezone: true }),
     // Neon Auth (Better Auth) user id from neon_auth.user
     authUserId: text("auth_user_id").notNull(),
     ...timestamps,
