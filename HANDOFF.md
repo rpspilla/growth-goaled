@@ -12,7 +12,7 @@
 - [x] Neon wired to Vercel by env vars (no marketplace integration): Production → Neon `main`; Preview and Development → Neon `dev`. `DATABASE_URL` (pooled) and `DATABASE_URL_UNPOOLED` (direct, for migrations) set; `APP_URL` set per environment.
 - [ ] `ANTHROPIC_API_KEY` from the Anthropic Console added in Vercel for Production and Preview.
 - [x] Private Vercel Blob store `growth-goaled-uploads` (iad1) connected; `BLOB_READ_WRITE_TOKEN` set for all environments.
-- [ ] DNS for growthgoaled.com: CNAME `app` and `dev` → `cname.vercel-dns.com`. Domains already added in Vercel (`dev` domain bound to the `dev` branch). `www` is untouched.
+- [x] DNS for growthgoaled.com: CNAME `app` and `dev` → `cname.vercel-dns.com`. Domains already added in Vercel (`dev` domain bound to the `dev` branch). `www` is untouched.
 
 ---
 
