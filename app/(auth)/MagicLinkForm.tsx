@@ -1,14 +1,46 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
-import { sendMagicLink, type MagicLinkState } from "./actions";
+import { useState, type FormEvent } from "react";
+import { z } from "zod";
+import { authClient } from "@/lib/auth/client";
+
+type State = { status: "idle" | "sending" } | { status: "sent"; email: string } | { status: "error"; message: string };
+
+const input = z.object({
+  email: z.email("Enter a valid email address.").trim().toLowerCase(),
+  name: z.string().trim().max(120).optional(),
+});
 
 const inputClass = "w-full px-3 py-2.5 rounded-lg border text-sm outline-none focus:ring-2";
 const inputStyle = { background: "var(--muted)", borderColor: "var(--border)", color: "var(--foreground)" };
 
 export function MagicLinkForm({ mode }: { mode: "sign-in" | "sign-up" }) {
-  const [state, action, pending] = useActionState<MagicLinkState, FormData>(sendMagicLink, { status: "idle" });
+  const [state, setState] = useState<State>({ status: "idle" });
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const parsed = input.safeParse({ email: form.get("email"), name: form.get("name") || undefined });
+    if (!parsed.success) {
+      setState({ status: "error", message: parsed.error.issues[0]?.message ?? "Check your details and try again." });
+      return;
+    }
+
+    setState({ status: "sending" });
+    const { email, name } = parsed.data;
+    // "/" routes the signed-in user to their home by role. Origin must be a Neon Auth trusted domain.
+    const { error } = await authClient.signIn.magicLink({
+      email,
+      name,
+      callbackURL: `${window.location.origin}/`,
+    });
+    if (error) {
+      setState({ status: "error", message: error.message || "We couldn't send your sign-in link. Try again." });
+      return;
+    }
+    setState({ status: "sent", email });
+  }
 
   if (state.status === "sent") {
     return (
@@ -22,8 +54,10 @@ export function MagicLinkForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     );
   }
 
+  const pending = state.status === "sending";
+
   return (
-    <form action={action} className="space-y-4">
+    <form onSubmit={onSubmit} className="space-y-4">
       {mode === "sign-up" && (
         <div>
           <label htmlFor="name" className="text-xs font-medium block mb-1.5" style={{ color: "var(--muted-foreground)" }}>
