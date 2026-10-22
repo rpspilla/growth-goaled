@@ -31,7 +31,7 @@ export async function completeOnboarding(_prev: OnboardingState, formData: FormD
   if (user.role === "founder") {
     const parsed = founderOnboardingSchema.safeParse(raw);
     if (!parsed.success) return { errors: fieldErrors(parsed.error.issues) };
-    const { name, title, companyName, website, stage } = parsed.data;
+    const { name, title, companyName, website, revenueBand } = parsed.data;
 
     // A founder attached to a company (e.g. via invite) keeps it; otherwise the
     // new company goes to the unassigned queue for an advisor to claim.
@@ -40,7 +40,7 @@ export async function completeOnboarding(_prev: OnboardingState, formData: FormD
     } else {
       const companyId = randomUUID();
       await db.batch([
-        db.insert(schema.companies).values({ id: companyId, name: companyName, website, stage, advisorId: null }),
+        db.insert(schema.companies).values({ id: companyId, name: companyName, website, revenueBand, advisorId: null }),
         db.insert(schema.companyMembers).values({ companyId, userId: user.id, memberRole: "owner" }),
         profileUpdate(name, title),
       ]);

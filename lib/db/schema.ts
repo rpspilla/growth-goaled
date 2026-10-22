@@ -41,6 +41,7 @@ export const companyPhase = pgEnum("company_phase", [
   "hiring",
   "complete",
 ]);
+export const revenueBand = pgEnum("revenue_band", ["lt_1m", "1m_3m", "3m_10m", "10m_20m", "20m_50m"]);
 export const companyHealth = pgEnum("company_health", ["good", "watch", "critical"]);
 export const memberRole = pgEnum("member_role", ["owner", "member"]);
 export const intakeSection = pgEnum("intake_section", ["company", "customers", "gtm", "icp", "hiring"]);
@@ -107,6 +108,8 @@ export const companies = pgTable(
     industry: text("industry"),
     stage: text("stage"),
     arr: numeric("arr", { mode: "number" }),
+    // Self-reported annual revenue band from onboarding; exact ARR comes from intake / data points
+    revenueBand: revenueBand("revenue_band"),
     growthPct: numeric("growth_pct", { mode: "number" }),
     funding: numeric("funding", { mode: "number" }),
     employees: integer("employees"),
@@ -280,6 +283,8 @@ export const benchmarkCohorts = pgTable("benchmark_cohorts", {
   criteria: jsonb("criteria").$type<CohortCriteria>().notNull(),
   description: text("description"),
   companyCount: integer("company_count"),
+  // Illustrative demo cohort for the /sample company; never matched to real companies.
+  isSample: boolean("is_sample").notNull().default(false),
   ...timestamps,
 });
 

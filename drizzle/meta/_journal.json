@@ -15,6 +15,20 @@
       "when": 1792687205286,
       "tag": "0001_user_onboarding",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792687702529,
+      "tag": "0002_sample_cohort",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792687993802,
+      "tag": "0003_revenue_band",
+      "breakpoints": true
     }
   ]
 }

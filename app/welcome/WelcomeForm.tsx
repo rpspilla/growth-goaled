@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { STAGES } from "@/lib/onboarding";
+import { REVENUE_BANDS } from "@/lib/onboarding";
 import { completeOnboarding, type OnboardingState } from "./actions";
 
 const inputClass = "w-full px-3 py-2.5 rounded-lg border text-sm outline-none focus:ring-2";
@@ -67,11 +67,11 @@ export function WelcomeForm({ isFounder, defaultName }: { isFounder: boolean; de
             <Field id="website" label="Website" error={e.website}>
               <input id="website" name="website" placeholder="acme.com" autoComplete="url" className={inputClass} style={inputStyle} />
             </Field>
-            <Field id="stage" label="Stage" error={e.stage}>
-              <select id="stage" name="stage" defaultValue="" required className={inputClass} style={inputStyle}>
+            <Field id="revenueBand" label="Annual revenue" error={e.revenueBand}>
+              <select id="revenueBand" name="revenueBand" defaultValue="" required className={inputClass} style={inputStyle}>
                 <option value="" disabled>Select…</option>
-                {STAGES.map((s) => (
-                  <option key={s}>{s}</option>
+                {REVENUE_BANDS.map((b) => (
+                  <option key={b.value} value={b.value}>{b.label}</option>
                 ))}
               </select>
             </Field>

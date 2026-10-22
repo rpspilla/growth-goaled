@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 export function AuthCard({ title, subtitle, children }: { title: ReactNode; subtitle: string; children: ReactNode }) {
@@ -10,7 +11,12 @@ export function AuthCard({ title, subtitle, children }: { title: ReactNode; subt
       <div className="rounded-xl p-6" style={{ background: "var(--card)" }}>
         {children}
       </div>
-      <p className="text-xs text-center mt-8" style={{ color: "#5A7A96" }}>
+      <div className="text-center mt-6">
+        <Link href="/sample" className="text-sm" style={{ color: "#7A98B4" }}>
+          Explore a sample company →
+        </Link>
+      </div>
+      <p className="text-xs text-center mt-6" style={{ color: "#5A7A96" }}>
         Know where you stand. Know what to fix. Know what comes next.
       </p>
     </>

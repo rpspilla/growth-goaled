@@ -8,14 +8,16 @@ import type { ReactNode } from "react";
 export function NavLink({
   href,
   match = href,
+  exact = false,
   children,
 }: {
   href: string;
   match?: string;
+  exact?: boolean;
   children: (active: boolean) => ReactNode;
 }) {
   const pathname = usePathname();
-  const active = pathname === match || pathname.startsWith(`${match}/`);
+  const active = pathname === match || (exact ? false : pathname.startsWith(`${match}/`));
   return (
     <Link
       href={href}

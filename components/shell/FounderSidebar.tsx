@@ -5,7 +5,19 @@ import { NavLink } from "./NavLink";
 import { FOUNDER_NAV, PROGRESS_PHASES, currentStep, progressIndex } from "@/lib/phases";
 import type { Company } from "@/lib/db/schema";
 
-export function FounderSidebar({ phase }: { phase: Company["phase"] }) {
+/**
+ * `basePath` re-roots links (the public demo lives under /sample); items whose
+ * app path isn't in `available` render greyed out instead of as links.
+ */
+export function FounderSidebar({
+  phase,
+  basePath = "",
+  available,
+}: {
+  phase: Company["phase"];
+  basePath?: string;
+  available?: readonly string[];
+}) {
   const activeStep = currentStep(phase);
   const progress = progressIndex(phase);
   const complete = progress >= PROGRESS_PHASES.length;
@@ -16,8 +28,28 @@ export function FounderSidebar({ phase }: { phase: Company["phase"] }) {
         {FOUNDER_NAV.map((item) => {
           const completed = item.step < activeStep;
           const isCurrent = item.step === activeStep;
+          const href = basePath ? (item.href === "/dashboard" ? basePath : `${basePath}${item.href}`) : item.href;
+          if (available && !available.includes(item.href)) {
+            return (
+              <div
+                key={item.href}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm"
+                style={{ color: "#3E5A74", cursor: "default" }}
+                title="Not part of the sample yet"
+              >
+                <span
+                  className="w-4 h-4 rounded-full flex items-center justify-center shrink-0"
+                  style={{ background: "rgba(255,255,255,0.05)", fontSize: "8px" }}
+                >
+                  {item.step}
+                </span>
+                <span className="font-medium">{item.label}</span>
+              </div>
+            );
+          }
+          const match = basePath ? href : "match" in item ? item.match : item.href;
           return (
-            <NavLink key={item.href} href={item.href} match={"match" in item ? item.match : item.href}>
+            <NavLink key={item.href} href={href} match={match} exact={href === basePath}>
               {(active) => (
                 <>
                   <span

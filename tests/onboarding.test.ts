@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { founderOnboardingSchema, needsOnboarding, staffProfileSchema } from "@/lib/onboarding";
 
-const valid = { name: "Sam Ahmed", title: "CEO", companyName: "Acme AI", website: "acme-ai.com", stage: "Series A" };
+const valid = { name: "Sam Ahmed", title: "CEO", companyName: "Acme AI", website: "acme-ai.com", revenueBand: "3m_10m" };
 
 describe("founderOnboardingSchema", () => {
   it("accepts company basics and normalises the website", () => {
@@ -15,10 +15,10 @@ describe("founderOnboardingSchema", () => {
   });
 
   it("rejects bad input with a field-specific message", () => {
-    const r = founderOnboardingSchema.safeParse({ ...valid, companyName: " ", website: "not a site", stage: "IPO" });
+    const r = founderOnboardingSchema.safeParse({ ...valid, companyName: " ", website: "not a site", revenueBand: "100m_plus" });
     expect(r.success).toBe(false);
     const fields = r.error!.issues.map((i) => i.path[0]);
-    expect(fields).toEqual(expect.arrayContaining(["companyName", "website", "stage"]));
+    expect(fields).toEqual(expect.arrayContaining(["companyName", "website", "revenueBand"]));
   });
 });
 

@@ -1,6 +1,16 @@
 import { z } from "zod";
 
-export const STAGES = ["Pre-seed", "Seed", "Series A", "Series B+"] as const;
+/** Annual revenue bands asked at onboarding (values match the revenue_band enum). */
+export const REVENUE_BANDS = [
+  { value: "lt_1m", label: "<$1M" },
+  { value: "1m_3m", label: "$1M–$3M" },
+  { value: "3m_10m", label: "$3M–$10M" },
+  { value: "10m_20m", label: "$10M–$20M" },
+  { value: "20m_50m", label: "$20M–$50M" },
+] as const;
+
+type RevenueBand = (typeof REVENUE_BANDS)[number]["value"];
+const bandValues = REVENUE_BANDS.map((b) => b.value) as [RevenueBand, ...RevenueBand[]];
 
 const name = z.string().trim().min(1, "Enter your name.").max(120);
 const title = z.string().trim().min(1, "Enter your title.").max(120);
@@ -27,7 +37,7 @@ export const staffProfileSchema = z.object({ name, title });
 export const founderOnboardingSchema = staffProfileSchema.extend({
   companyName: z.string().trim().min(1, "Enter your company name.").max(160),
   website,
-  stage: z.enum(STAGES, { error: "Choose your stage." }),
+  revenueBand: z.enum(bandValues, { error: "Choose your annual revenue." }),
 });
 
 export type FounderOnboarding = z.infer<typeof founderOnboardingSchema>;
