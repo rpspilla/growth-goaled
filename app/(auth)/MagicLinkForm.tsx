@@ -15,7 +15,19 @@ const input = z.object({
 const inputClass = "w-full px-3 py-2.5 rounded-lg border text-sm outline-none focus:ring-2";
 const inputStyle = { background: "var(--muted)", borderColor: "var(--border)", color: "var(--foreground)" };
 
-export function MagicLinkForm({ mode }: { mode: "sign-in" | "sign-up" }) {
+/**
+ * `next` is where to land after the link is clicked; `lockedEmail` pre-fills
+ * and fixes the address (used by invites, which only work for the invited email).
+ */
+export function MagicLinkForm({
+  mode,
+  next,
+  lockedEmail,
+}: {
+  mode: "sign-in" | "sign-up";
+  next?: string;
+  lockedEmail?: string;
+}) {
   const [state, setState] = useState<State>({ status: "idle" });
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -33,7 +45,7 @@ export function MagicLinkForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     const { error } = await authClient.signIn.magicLink({
       email,
       name,
-      callbackURL: `${window.location.origin}/auth/callback`,
+      callbackURL: `${window.location.origin}/auth/callback${next ? `?next=${encodeURIComponent(next)}` : ""}`,
     });
     if (error) {
       setState({ status: "error", message: error.message || "We couldn't send your sign-in link. Try again." });
@@ -70,7 +82,17 @@ export function MagicLinkForm({ mode }: { mode: "sign-in" | "sign-up" }) {
         <label htmlFor="email" className="text-xs font-medium block mb-1.5" style={{ color: "var(--muted-foreground)" }}>
           Work email
         </label>
-        <input id="email" name="email" type="email" autoComplete="email" required className={inputClass} style={inputStyle} />
+        <input
+          id="email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          required
+          defaultValue={lockedEmail}
+          readOnly={!!lockedEmail}
+          className={inputClass}
+          style={inputStyle}
+        />
       </div>
 
       {state.status === "error" && (
@@ -88,13 +110,15 @@ export function MagicLinkForm({ mode }: { mode: "sign-in" | "sign-up" }) {
         {pending ? "Sending link…" : mode === "sign-in" ? "Email me a sign-in link" : "Create account"}
       </button>
 
-      <p className="text-xs text-center" style={{ color: "var(--muted-foreground)" }}>
-        {mode === "sign-in" ? (
-          <>New to Growth Goaled? <Link href="/sign-up" style={{ color: "var(--green)" }}>Create an account</Link></>
-        ) : (
-          <>Already have an account? <Link href="/sign-in" style={{ color: "var(--green)" }}>Sign in</Link></>
-        )}
-      </p>
+      {!lockedEmail && (
+        <p className="text-xs text-center" style={{ color: "var(--muted-foreground)" }}>
+          {mode === "sign-in" ? (
+            <>New to Growth Goaled? <Link href="/sign-up" style={{ color: "var(--green)" }}>Create an account</Link></>
+          ) : (
+            <>Already have an account? <Link href="/sign-in" style={{ color: "var(--green)" }}>Sign in</Link></>
+          )}
+        </p>
+      )}
     </form>
   );
 }

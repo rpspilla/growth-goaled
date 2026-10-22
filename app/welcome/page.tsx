@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth/session";
 import { homePathFor } from "@/lib/access";
 import { needsOnboarding } from "@/lib/onboarding";
 import { StagingBadge } from "@/components/shell/Shell";
+import { getFounderCompany } from "@/lib/data/companies";
 import { WelcomeForm } from "./WelcomeForm";
 
 export const metadata: Metadata = { title: "Welcome · Growth Goaled" };
@@ -13,6 +14,8 @@ export default async function WelcomePage() {
   const user = await requireUser({ allowIncomplete: true });
   if (!needsOnboarding(user)) redirect(homePathFor(user.role));
   const isFounder = user.role === "founder";
+  // Invited founders already have a company, so they only complete their profile.
+  const company = isFounder ? await getFounderCompany(user) : null;
 
   return (
     <div className="relative min-h-screen flex flex-col items-center justify-center px-8 py-16 overflow-hidden" style={{ background: "var(--navy)" }}>
@@ -50,11 +53,13 @@ export default async function WelcomePage() {
         </h1>
         <p className="text-sm mb-8 text-center" style={{ color: "#7A98B4" }}>
           {isFounder
-            ? "A few details about you and your company to set up your profile."
+            ? company
+              ? `A few details about you to finish setting up ${company.name}.`
+              : "A few details about you and your company to set up your profile."
             : "Tell founders who's reviewing their analysis."}
         </p>
         <div className="rounded-xl p-6" style={{ background: "var(--card)" }}>
-          <WelcomeForm isFounder={isFounder} defaultName={user.name ?? ""} />
+          <WelcomeForm isFounder={isFounder} askCompany={isFounder && !company} defaultName={user.name ?? ""} />
         </div>
       </div>
     </div>

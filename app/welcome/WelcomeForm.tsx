@@ -29,7 +29,15 @@ function Field({
   );
 }
 
-export function WelcomeForm({ isFounder, defaultName }: { isFounder: boolean; defaultName: string }) {
+export function WelcomeForm({
+  isFounder,
+  askCompany,
+  defaultName,
+}: {
+  isFounder: boolean;
+  askCompany: boolean;
+  defaultName: string;
+}) {
   const [state, action, pending] = useActionState<OnboardingState, FormData>(completeOnboarding, {});
   const e = state.errors ?? {};
 
@@ -55,7 +63,7 @@ export function WelcomeForm({ isFounder, defaultName }: { isFounder: boolean; de
         </Field>
       </div>
 
-      {isFounder && (
+      {askCompany && (
         <>
           <div className="text-xs font-semibold uppercase tracking-wider pt-2" style={{ color: "var(--muted-foreground)" }}>
             Your company

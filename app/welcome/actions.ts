@@ -28,23 +28,18 @@ export async function completeOnboarding(_prev: OnboardingState, formData: FormD
   const profileUpdate = (name: string, title: string) =>
     db.update(schema.users).set({ name, title, onboardedAt: new Date() }).where(eq(schema.users.id, user.id));
 
-  if (user.role === "founder") {
+  // A founder attached to a company (via invite) only completes their profile;
+  // otherwise the new company goes to the unassigned queue for an advisor to claim.
+  if (user.role === "founder" && !(await getFounderCompany(user))) {
     const parsed = founderOnboardingSchema.safeParse(raw);
     if (!parsed.success) return { errors: fieldErrors(parsed.error.issues) };
     const { name, title, companyName, website, revenueBand } = parsed.data;
-
-    // A founder attached to a company (e.g. via invite) keeps it; otherwise the
-    // new company goes to the unassigned queue for an advisor to claim.
-    if (await getFounderCompany(user)) {
-      await profileUpdate(name, title);
-    } else {
-      const companyId = randomUUID();
-      await db.batch([
-        db.insert(schema.companies).values({ id: companyId, name: companyName, website, revenueBand, advisorId: null }),
-        db.insert(schema.companyMembers).values({ companyId, userId: user.id, memberRole: "owner" }),
-        profileUpdate(name, title),
-      ]);
-    }
+    const companyId = randomUUID();
+    await db.batch([
+      db.insert(schema.companies).values({ id: companyId, name: companyName, website, revenueBand, advisorId: null }),
+      db.insert(schema.companyMembers).values({ companyId, userId: user.id, memberRole: "owner" }),
+      profileUpdate(name, title),
+    ]);
   } else {
     const parsed = staffProfileSchema.safeParse(raw);
     if (!parsed.success) return { errors: fieldErrors(parsed.error.issues) };

@@ -4,10 +4,17 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { authClient } from "@/lib/auth/client";
 
+/** Same-site path to continue to after sign-in (e.g. an invite); anything else falls back to "/". */
+function nextPath(): string {
+  const next = new URLSearchParams(window.location.search).get("next");
+  return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/";
+}
+
 /**
  * Magic links land here with ?neon_auth_session_verifier=… . The browser
  * client forwards the verifier to /api/auth/get-session, which sets our
- * session cookies; then a full reload of / routes the user by role.
+ * session cookies; then a full reload of `next` (default /, which routes the
+ * user by role).
  * Must stay outside the auth proxy matcher, or the verifier is dropped.
  */
 export default function AuthCallbackPage() {
@@ -17,7 +24,7 @@ export default function AuthCallbackPage() {
     authClient
       .getSession()
       .then(({ data }) => {
-        if (data?.session) window.location.replace("/");
+        if (data?.session) window.location.replace(nextPath());
         else setFailed(true);
       })
       .catch(() => setFailed(true));
