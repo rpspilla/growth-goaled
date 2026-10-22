@@ -38,7 +38,8 @@ Local development points at the Neon `dev` branch.
 | `NEON_AUTH_COOKIE_SECRET` | 32+ char secret that signs session cookies (`openssl rand -base64 32`) |
 | `APP_URL` | Public URL; magic links return here and the STAGING badge shows when it is `dev.growthgoaled.com` |
 | `RESEND_API_KEY`, `EMAIL_FROM` | Invite emails via Resend (sender must be on a verified domain). Without a key the advisor is shown the invite link to share |
-| `ANTHROPIC_API_KEY`, `BLOB_READ_WRITE_TOKEN` | Used from M5 onwards |
+| `ANTHROPIC_API_KEY` | Claude API (document extraction now; Draft/QA agents from M8). Server-side only |
+| `BLOB_READ_WRITE_TOKEN` | Private Vercel Blob store for uploaded documents |
 
 Each Vercel environment points at its own Neon branch: Production → `main`, Preview and Development → `dev`.
 Neon Auth is configured **per Neon branch**, so `NEON_AUTH_BASE_URL` differs between Production and Preview.
@@ -53,6 +54,12 @@ Neon Auth is configured **per Neon branch**, so `NEON_AUTH_BASE_URL` differs bet
 ### Intake
 
 The five intake sections (Company, Customers, GTM, ICP, Hiring) are defined in `lib/intake.ts`, including which fields are required (that drives % complete). Answers autosave on blur to `intake_responses`. Numeric answers tied to a metric (ARR, growth, NRR, …) are also stored as accepted, company-provided data points, and mapped answers are mirrored onto the company row. When every required field is answered the company moves from the `intake` to the `upload` phase.
+
+### Documents and extraction
+
+Founders upload on `/upload`. The browser sends the file straight to the **private** Blob store using a token from `/api/blob/upload`, which is only issued to founders and only for paths under `companies/<their company id>/`. The upload action then records the document and runs extraction after responding (`after()`, up to 300s).
+
+Extraction (`lib/ai/extract.ts`) sends PDFs as document blocks and `.xlsx` files as CSV text to Claude (model set in `lib/ai/config.ts`), with the metrics dictionary as the allowed output. The JSON reply is validated with Zod and retried once if invalid. Each run is logged in `agent_runs`. Extracted values are stored as **proposed** data points for the founder to accept or reject. A value more than 10% away from an earlier one for the same metric and period opens a `conflict` register item; low-confidence or computed values open an `assumption` item. PowerPoint, `.xls` and Word files aren't read: founders are asked to export them as PDF or `.xlsx`.
 
 ### Seed data and the sample company
 
