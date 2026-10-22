@@ -1,3 +1,6 @@
+"use client";
+
+// Client component: NavLink takes a render function, which cannot cross the server/client boundary.
 import { NavLink } from "./NavLink";
 import { FOUNDER_NAV, PROGRESS_PHASES, currentStep, progressIndex } from "@/lib/phases";
 import type { Company } from "@/lib/db/schema";

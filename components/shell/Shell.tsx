@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { isStaging } from "@/lib/env";
 import { signOut } from "./actions";
+import { initials } from "./initials";
 
 /** Two-column app frame from the prototype: navy sidebar + top bar + scrolling content. */
 export function Shell({ sidebar, topbar, children }: { sidebar: ReactNode; topbar: ReactNode; children: ReactNode }) {
@@ -46,12 +47,6 @@ export function StagingBadge() {
       STAGING
     </span>
   );
-}
-
-export function initials(name: string | null, email: string): string {
-  const source = name?.trim() || email.split("@")[0] || "?";
-  const parts = source.split(/[\s._-]+/).filter(Boolean);
-  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "?";
 }
 
 export function UserMenu({ name, email, color }: { name: string | null; email: string; color: "navy" | "green" }) {

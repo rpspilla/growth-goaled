@@ -1,5 +1,8 @@
+"use client";
+
+// Client component: NavLink takes a render function, which cannot cross the server/client boundary.
 import { NavLink } from "./NavLink";
-import { initials } from "./Shell";
+import { initials } from "./initials";
 
 const ADVISOR_NAV = [
   { href: "/advisor/portfolio", label: "Portfolio" },
