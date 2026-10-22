@@ -9,7 +9,7 @@ File key: `zkGSHSZaiLOJWIZbq0zXIY`
 - `src/components/Layout.tsx` — founder + advisor sidebars and top bar
 - `src/data/mock.ts` — Acme AI and portfolio numbers (seed source for M2)
 
-## Still to pull (Claude Code, at the start of M1)
+## Pulled at the start of M1
 The 19 view files live in the Figma Make file. Pull them into this folder before porting screens:
 
 `src/App.tsx`, `src/imports/pasted_text/growth-goaled-product-brief.md`,
