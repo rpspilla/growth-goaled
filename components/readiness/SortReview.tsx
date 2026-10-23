@@ -5,6 +5,7 @@ import type { DocumentView } from "@/lib/data/documents";
 import { CATEGORIES, getCategory, getItem } from "@/lib/readiness";
 import { confirmFileItems } from "@/app/(founder)/readiness/actions";
 import { AnalyzingDots } from "./DocumentCard";
+import { RemoveFileButton } from "./RemoveFileButton";
 import { useProcessingRefresh } from "./useProcessingRefresh";
 
 const CONF_COLOR = { high: "var(--green)", medium: "var(--amber)", low: "var(--muted-foreground)" } as const;
@@ -32,7 +33,10 @@ function FileSuggestions({ doc }: { doc: DocumentView }) {
 
   return (
     <div className="rounded-xl border p-4" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
-      <div className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>{doc.filename}</div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>{doc.filename}</div>
+        <RemoveFileButton documentId={doc.id} filename={doc.filename} />
+      </div>
       {doc.sortSummary && <p className="text-xs mt-0.5 mb-3" style={{ color: doc.sortStatus === "failed" ? "var(--amber)" : "var(--muted-foreground)" }}>{doc.sortSummary}</p>}
       {keys.length === 0 && <p className="text-xs mb-3" style={{ color: "var(--muted-foreground)" }}>We didn&apos;t find anything that clearly matches the checklist. Pick items yourself below if it covers any.</p>}
       <ul className="space-y-1.5 mb-3">
@@ -108,7 +112,10 @@ export function SortReview({ docs }: { docs: DocumentView[] }) {
       <div className="space-y-3">
         {working.map((d) => (
           <div key={d.id} className="rounded-xl border p-4" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
-            <div className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>{d.filename}</div>
+            <div className="flex items-start justify-between gap-3">
+              <div className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>{d.filename}</div>
+              <RemoveFileButton documentId={d.id} filename={d.filename} />
+            </div>
             <AnalyzingDots label={d.status === "uploaded" || d.status === "analyzing" ? "Reading the file..." : "Working out where it fits..."} />
           </div>
         ))}

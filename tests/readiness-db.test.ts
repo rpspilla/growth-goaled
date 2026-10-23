@@ -39,7 +39,7 @@ vi.mock("@/lib/ai/extract", async () => {
 import { schema } from "@/lib/db";
 import type { Company, User } from "@/lib/db/schema";
 import { getReadiness, markReadyForBenchmark, updateDataItem } from "@/lib/data/readiness";
-import { applySuggestions, companyBlobPrefix, listDocuments, processDocument, processInboxDocument, registerDocument, sortDocument } from "@/lib/data/documents";
+import { applySuggestions, companyBlobPrefix, listDocuments, processDocument, processInboxDocument, registerDocument, removeDocument, sortDocument } from "@/lib/data/documents";
 import { ALL_ITEM_KEYS, getItem } from "@/lib/readiness";
 
 type DB = typeof import("@/lib/db").db;
@@ -371,5 +371,49 @@ describe("upload whatever you have (inbox)", () => {
     const pathname = inboxPut(globex, "g.csv", "text/csv", messy);
     const { doc } = await registerDocument(otherFounder, globex, { pathname, filename: "g.csv", docType: "other" });
     expect((await applySuggestions(founder, acme, doc.id, ["monthly_revenue"])).ok).toBe(false);
+  });
+});
+
+describe("removing a file", () => {
+  it("removes the file and undoes what it added", async () => {
+    const a = put(acme, "wrong.csv", "text/csv", "Customer,Industry\nA,B\n");
+    const { doc } = await registerDocument(founder, acme, { pathname: a, filename: "wrong.csv", docType: "customer_list", category: "customers", itemKeys: ["customer_list", "industry", "company_size"] });
+    const b = put(acme, "right.csv", "text/csv", "Customer,Employees\nA,10\n");
+    await registerDocument(founder, acme, { pathname: b, filename: "right.csv", docType: "customer_list", category: "customers", itemKeys: ["company_size"] });
+    await updateDataItem(founder, acme, "industry", { notes: "Tagged by hand in HubSpot" });
+
+    const [proposed, accepted, intake] = await db()
+      .insert(schema.dataPoints)
+      .values([
+        { companyId: acme.id, metric: "customers", value: 90, unit: "count", confidence: "high", status: "proposed", documentId: doc.id },
+        { companyId: acme.id, metric: "acv", value: 40000, unit: "usd", confidence: "high", status: "accepted", documentId: doc.id },
+        { companyId: acme.id, metric: "customers", value: 87, unit: "count", confidence: "high", status: "accepted" },
+      ])
+      .returning();
+    await db().insert(schema.registerItems).values({ companyId: acme.id, type: "conflict", title: "Conflicting customers", dataPointIds: [intake!.id, proposed!.id], owner: "founder" });
+
+    const r = await removeDocument(founder, acme, doc.id);
+    expect(r).toEqual({ ok: true, itemsReset: 1, valuesRemoved: 2 });
+    expect(h.del).toHaveBeenCalledWith(`https://blob.test/${a}`);
+    expect((await listDocuments(acme)).map((d) => d.filename)).toEqual(["right.csv"]);
+
+    const points = await db().select().from(schema.dataPoints).where(eq(schema.dataPoints.companyId, acme.id));
+    expect(points.find((p) => p.id === proposed!.id)).toBeUndefined();
+    expect(points.find((p) => p.id === accepted!.id)).toMatchObject({ status: "rejected", documentId: null });
+    expect(points.find((p) => p.id === intake!.id)!.status).toBe("accepted");
+    const [conflict] = await db().select().from(schema.registerItems).where(eq(schema.registerItems.companyId, acme.id));
+    expect(conflict).toMatchObject({ status: "resolved" });
+
+    const items = Object.fromEntries((await getReadiness(acme)).items.map((i) => [i.itemKey, i.status]));
+    expect(items.customer_list).toBe("not_reviewed"); // only this file supported it
+    expect(items.industry).toBe("available"); // founder added notes
+    expect(items.company_size).toBe("available"); // another file supports it
+  });
+
+  it("only removes the company's own files", async () => {
+    const g = put(globex, "g.csv", "text/csv", "a\n1\n");
+    const { doc } = await registerDocument(otherFounder, globex, { pathname: g, filename: "g.csv", docType: "other" });
+    expect((await removeDocument(founder, acme, doc.id)).ok).toBe(false);
+    expect(await listDocuments(globex)).toHaveLength(1);
   });
 });

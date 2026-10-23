@@ -71,6 +71,7 @@ The top of `/readiness` has a drop zone: "Upload whatever you have and we'll hel
 
 - Readable files (CSV, XLSX, PDF, text, PNG/JPEG/WebP/GIF images) are profiled and run through metric extraction as usual, then **sorted** (`sortDocument`): spreadsheet columns are matched to each item's expected fields in code (`lib/sorting.ts`), and Claude (`lib/ai/classify.ts`) reads a bounded preview (first rows/columns of each sheet, or the PDF/image) and suggests checklist items per sheet, using only the fixed item keys. Runs are logged in `agent_runs` (`agent = sort`).
 - Other formats (PowerPoint, .xls, Keynote, Word…) are stored for the advisor, never reported as analysed, and get low-confidence suggestions from the file name only.
+- **Remove** (on every file card) deletes the file and its blob and undoes its effects: proposed values deleted, accepted values set aside (published deliverables keep their trail), open questions raised from its values closed, and checklist items only that file made available (no other file, no founder details) reset to "not reviewed".
 - Suggestions are just that: the founder confirms them in "We sorted your files" (high/medium pre-ticked, any item can be added). Only confirmed items are linked to the file and marked available (unverified). If the model fails, the column matches are still offered.
 
 ### Documents and extraction

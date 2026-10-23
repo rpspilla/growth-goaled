@@ -41,6 +41,7 @@ Use two browsers (or a private window): one signed in as **admin** (ryan@growthg
 - [ ] A **.pptx / .xls / .key** file: uploads fine, shows "can't read this format… kept for your advisor", suggestions only from the file name
 - [ ] Re-drop the same file: "already uploaded · using the existing copy"
 - [ ] A file over 25 MB is refused with a clear message
+- [ ] **Remove** a wrong file (from the sort review, the Files tab, and an item's file list): inline confirm, file disappears, values read from it disappear, items only that file supported go back to Not reviewed, items you'd added details to stay as they were
 
 ## Questions and registers (M6)
 - [ ] Upload a file whose figure differs >10% from the profile (e.g. different sales cycle) → a conflict appears on `/questions`

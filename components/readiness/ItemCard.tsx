@@ -14,6 +14,7 @@ import {
 } from "@/lib/readiness";
 import { updateItem } from "@/app/(founder)/readiness/actions";
 import { UploadButton } from "./UploadButton";
+import { RemoveFileButton } from "./RemoveFileButton";
 
 export type ItemRecord = {
   status: ItemStatus;
@@ -285,10 +286,13 @@ export function ItemCard({
             ) : (
               <ul className="space-y-1">
                 {files.map((f) => (
-                  <li key={f.id} className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-                    <span style={{ color: "var(--foreground)" }}>{f.filename}</span> · {FILE_STATUS[f.status]}
-                    {f.dateRange && ` · dates ${f.dateRange.start} to ${f.dateRange.end}`}
-                    {f.status === "failed" && f.error && <span style={{ color: "var(--red)" }}> · {f.error}</span>}
+                  <li key={f.id} className="text-xs flex items-start justify-between gap-3" style={{ color: "var(--muted-foreground)" }}>
+                    <span>
+                      <span style={{ color: "var(--foreground)" }}>{f.filename}</span> · {FILE_STATUS[f.status]}
+                      {f.dateRange && ` · dates ${f.dateRange.start} to ${f.dateRange.end}`}
+                      {f.status === "failed" && f.error && <span style={{ color: "var(--red)" }}> · {f.error}</span>}
+                    </span>
+                    <RemoveFileButton documentId={f.id} filename={f.filename} compact />
                   </li>
                 ))}
               </ul>

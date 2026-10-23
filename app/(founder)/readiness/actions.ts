@@ -12,6 +12,8 @@ import {
   processDocument,
   processInboxDocument,
   registerDocument,
+  removeDocument,
+  type RemoveResult,
   resetFailedDocument,
   reviewDataPoint,
   sortDocument,
@@ -90,6 +92,16 @@ export async function confirmFileItems(documentId: string, itemKeys: string[]): 
   const { user, company } = await founderCompany();
   const result = await applySuggestions(user, company, z.uuid().parse(documentId), z.array(z.string().max(64)).max(80).parse(itemKeys));
   refresh();
+  return result;
+}
+
+/** Removes an uploaded file and undoes what it added (see removeDocument). */
+export async function removeFile(documentId: string): Promise<RemoveResult> {
+  const { user, company } = await founderCompany();
+  const id = z.uuid().safeParse(documentId);
+  if (!id.success) return { ok: false, error: "File not found." };
+  const result = await removeDocument(user, company, id.data);
+  revalidatePath("/", "layout");
   return result;
 }
 

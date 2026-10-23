@@ -487,3 +487,80 @@ export async function applySuggestions(user: User, company: Company, documentId:
   await markItemsSupplied(user, company, [...accept]);
   return { ok: true, linked: accept.size };
 }
+
+// ---------------------------------------------------------------------------
+// Removing a file
+// ---------------------------------------------------------------------------
+
+export type RemoveResult = { ok: true; itemsReset: number; valuesRemoved: number } | { ok: false; error: string };
+
+/**
+ * Removes a file the founder uploaded by mistake, and undoes what it did:
+ * - its proposed values are deleted; accepted ones are set aside (rejected) so
+ *   nothing new uses them, while already-published deliverables keep their trail;
+ * - open questions raised from its values are closed;
+ * - checklist items that were only marked available because of this file
+ *   (no other file, no details added by the founder) go back to "not reviewed".
+ */
+export async function removeDocument(user: User, company: Company, documentId: string): Promise<RemoveResult> {
+  const [doc] = await db
+    .select()
+    .from(schema.documents)
+    .where(and(eq(schema.documents.id, documentId), eq(schema.documents.companyId, company.id)))
+    .limit(1);
+  if (!doc) return { ok: false, error: "File not found." };
+
+  const points = await db
+    .select({ id: schema.dataPoints.id, status: schema.dataPoints.status })
+    .from(schema.dataPoints)
+    .where(and(eq(schema.dataPoints.documentId, doc.id), eq(schema.dataPoints.companyId, company.id)));
+  const pointIds = points.map((p) => p.id);
+  const accepted = points.filter((p) => p.status === "accepted").map((p) => p.id);
+  const others = points.filter((p) => p.status !== "accepted").map((p) => p.id);
+
+  if (pointIds.length) {
+    const open = await db
+      .select()
+      .from(schema.registerItems)
+      .where(and(eq(schema.registerItems.companyId, company.id), eq(schema.registerItems.status, "open")));
+    const raised = open.filter((r) => r.dataPointIds.some((id) => pointIds.includes(id)));
+    for (const r of raised) {
+      await db
+        .update(schema.registerItems)
+        .set({ status: "resolved", resolution: { kind: "note", note: `File removed: ${doc.filename}`, by: user.id, byRole: user.role, at: new Date().toISOString() } })
+        .where(eq(schema.registerItems.id, r.id));
+    }
+  }
+  if (accepted.length) await db.update(schema.dataPoints).set({ status: "rejected", acceptedBy: null }).where(inArray(schema.dataPoints.id, accepted));
+  if (others.length) await db.delete(schema.dataPoints).where(inArray(schema.dataPoints.id, others));
+
+  // Items this file alone made "available", with nothing else the founder recorded.
+  let itemsReset = 0;
+  if (doc.dataItemKeys.length) {
+    const otherDocs = await db
+      .select({ keys: schema.documents.dataItemKeys })
+      .from(schema.documents)
+      .where(and(eq(schema.documents.companyId, company.id), ne(schema.documents.id, doc.id)));
+    const elsewhere = new Set(otherDocs.flatMap((d) => d.keys));
+    const items = await db
+      .select()
+      .from(schema.dataItems)
+      .where(and(eq(schema.dataItems.companyId, company.id), inArray(schema.dataItems.itemKey, doc.dataItemKeys)));
+    for (const i of items) {
+      const onlyFromThisFile =
+        !elsewhere.has(i.itemKey) &&
+        i.status === "available" &&
+        i.collectionMethod === "file_upload" &&
+        i.quality !== "validated" &&
+        !i.sourceSystem && !i.coverageStart && !i.coverageEnd && !i.limitations && !i.notes;
+      if (onlyFromThisFile) {
+        await db.update(schema.dataItems).set({ status: "not_reviewed", collectionMethod: null, lastReviewedAt: new Date(), reviewedBy: user.id }).where(eq(schema.dataItems.id, i.id));
+        itemsReset++;
+      }
+    }
+  }
+
+  await db.delete(schema.documents).where(eq(schema.documents.id, doc.id));
+  await del(doc.blobUrl).catch((err) => console.error(`[documents] Couldn't delete blob for ${doc.id}`, err));
+  return { ok: true, itemsReset, valuesRemoved: pointIds.length };
+}

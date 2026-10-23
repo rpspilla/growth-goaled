@@ -5,6 +5,7 @@ import type { DocumentView } from "@/lib/data/documents";
 import { DOC_TYPES } from "@/lib/documents";
 import { getCategory, getItem } from "@/lib/readiness";
 import { retryDocument, reviewPoint } from "@/app/(founder)/readiness/actions";
+import { RemoveFileButton } from "./RemoveFileButton";
 
 export function AnalyzingDots({ label = "Analyzing document..." }: { label?: string }) {
   return (
@@ -89,6 +90,7 @@ export function DocumentCard({ doc }: { doc: DocumentView }) {
             {open ? "Hide" : toReview > 0 ? `Review ${toReview}` : "Details"}
           </button>
         )}
+        <RemoveFileButton documentId={doc.id} filename={doc.filename} />
       </div>
 
       {open && (
