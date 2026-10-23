@@ -4,6 +4,8 @@ import { z } from "zod";
 import type { QaResults } from "@/lib/db/schema";
 import type { DraftInput, DraftOutput } from "./draft";
 import { AI_MODEL, anthropic } from "./config";
+import { e2eEnabled } from "@/lib/e2e";
+import { fakeQa } from "./fake";
 
 const check = z.object({ result: z.enum(["pass", "fail"]), note: z.string() });
 
@@ -39,6 +41,7 @@ export class QaError extends Error {}
 export type QaResult = { results: QaResults; model: string; tokensIn: number; tokensOut: number };
 
 export async function qaBenchmark(input: DraftInput, draft: DraftOutput): Promise<QaResult> {
+  if (e2eEnabled()) return { results: fakeQa(), model: "e2e-fake", tokensIn: 0, tokensOut: 0 };
   let tokensIn = 0;
   let tokensOut = 0;
   for (let attempt = 1; attempt <= 2; attempt++) {

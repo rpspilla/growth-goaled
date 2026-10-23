@@ -65,6 +65,11 @@ Use two browsers (or a private window): one signed in as **admin** (ryan@growthg
 - [ ] "Required gaps": send a Request → founder sees "Advisor request" on that item in Data Readiness and it drives the "most useful next step"
 - [ ] Open questions and files lists match the founder's
 
+## Analytics and hardening (M10)
+- [ ] Admin `/advisor/analytics`: tiles fill in as you go through the lists above; event counts go up (e.g. open a source trail, then reload)
+- [ ] Advisor (non-admin) can't open `/advisor/analytics` or `/advisor/users`
+- [ ] Automated: `npm run test:e2e` passes locally (already run in development; re-run after changes)
+
 ## Production (before launch)
 - [ ] Neon Auth provisioned on the **main** branch, trusted domain app.growthgoaled.com, magic link enabled
 - [ ] Vercel production env: NEON_AUTH_BASE_URL, NEON_AUTH_COOKIE_SECRET (others already set)

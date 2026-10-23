@@ -2,6 +2,8 @@ import "server-only";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { AI_MODEL, anthropic } from "./config";
+import { e2eEnabled } from "@/lib/e2e";
+import { fakeDraft } from "./fake";
 
 /** What the Draft Agent is given. Every figure is precomputed in code. */
 export type DraftInput = {
@@ -57,6 +59,7 @@ export type DraftResult = { output: DraftOutput; model: string; tokensIn: number
 
 /** One Draft Agent run; the reply is validated and retried once if invalid. */
 export async function draftBenchmark(input: DraftInput): Promise<DraftResult> {
+  if (e2eEnabled()) return { output: fakeDraft(input), model: "e2e-fake", tokensIn: 0, tokensOut: 0 };
   let tokensIn = 0;
   let tokensOut = 0;
   for (let attempt = 1; attempt <= 2; attempt++) {

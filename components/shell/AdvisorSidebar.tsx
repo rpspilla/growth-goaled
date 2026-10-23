@@ -14,7 +14,10 @@ const ADVISOR_NAV = [
   { href: "/advisor/settings", label: "Settings" },
 ] as const;
 
-const ADMIN_NAV = [{ href: "/advisor/users", label: "Users" }] as const;
+const ADMIN_NAV = [
+  { href: "/advisor/users", label: "Users" },
+  { href: "/advisor/analytics", label: "Analytics" },
+] as const;
 
 export type AdvisorBadges = { unassigned: number; review: number };
 

@@ -2,6 +2,7 @@ import "server-only";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { AI_MODEL, anthropic } from "./config";
+import { e2eEnabled } from "@/lib/e2e";
 
 export const gapSummarySchema = z.object({
   headline: z.string(),
@@ -25,6 +26,7 @@ Write for the founder: plain, direct, specific. Rules:
 
 /** Claude's prioritised, founder-friendly rewording of the rule-based gap facts. */
 export async function summarizeGaps(facts: unknown) {
+  if (e2eEnabled()) return { summary: { headline: "Test mode summary.", priorities: [], cannot_calculate_yet: [] }, model: "e2e-fake", tokensIn: 0, tokensOut: 0 };
   const response = await anthropic().beta.messages.parse({
     model: AI_MODEL,
     max_tokens: 4000,

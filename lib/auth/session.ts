@@ -8,6 +8,13 @@ import { getAuth } from "@/lib/auth/server";
 import { homePathFor } from "@/lib/access";
 import { needsOnboarding } from "@/lib/onboarding";
 import type { Role, User } from "@/lib/db/schema";
+import { cookies } from "next/headers";
+import { E2E_COOKIE, e2eEnabled } from "@/lib/e2e";
+
+async function e2eAuthUser(): Promise<{ id: string; email: string; name: string } | null> {
+  const email = (await cookies()).get(E2E_COOKIE)?.value;
+  return email && /^[^@\s]+@[^@\s]+$/.test(email) ? { id: `e2e:${email}`, email, name: "" } : null;
+}
 
 /**
  * The signed-in user's row in our `users` table, created on first sign-in.
@@ -15,8 +22,7 @@ import type { Role, User } from "@/lib/db/schema";
  */
 export const getCurrentUser = cache(async (): Promise<User | null> => {
   await connection(); // per-request: never prerender signed-in pages
-  const { data: session } = await getAuth().getSession();
-  const authUser = session?.user;
+  const authUser = e2eEnabled() ? await e2eAuthUser() : (await getAuth().getSession()).data?.user;
   if (!authUser) return null;
 
   const [user] = await db

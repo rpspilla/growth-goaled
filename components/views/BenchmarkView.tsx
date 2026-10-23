@@ -58,6 +58,16 @@ export function BenchmarkView({
         <p className="text-base" style={{ color: "var(--muted-foreground)" }}>
           We compared {companyName} against companies with similar stage, ARR, business model and GTM characteristics.
         </p>
+        {data.approval && (
+          <div className="mt-3 text-sm flex items-start gap-2" style={{ color: "var(--muted-foreground)" }}>
+            <span style={{ color: "var(--green)" }}>✓</span>
+            <span>
+              Reviewed and approved by {data.approval.reviewerName ?? "your advisor"} on{" "}
+              {new Date(data.approval.at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+              {data.approval.comment && <span style={{ color: "var(--foreground)" }}>: “{data.approval.comment}”</span>}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Cohort badge */}

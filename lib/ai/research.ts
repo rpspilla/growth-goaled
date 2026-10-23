@@ -6,6 +6,7 @@ import { describeCriteria } from "@/lib/benchmarks";
 import type { CohortCriteria } from "@/lib/db/schema";
 import { METRICS, type MetricKey } from "@/lib/metrics";
 import { AI_MODEL, anthropic } from "./config";
+import { e2eEnabled } from "@/lib/e2e";
 
 const metricKeys = Object.keys(METRICS) as [MetricKey, ...MetricKey[]];
 
@@ -81,6 +82,7 @@ const MAX_CONTINUATIONS = 4;
 
 /** Runs one research pass for a cohort. Results are only proposals; an advisor approves each row. */
 export async function researchBenchmarks(cohort: { name: string; criteria: CohortCriteria; description: string | null }): Promise<ResearchResult> {
+  if (e2eEnabled()) return { output: { sources: [], metrics: [], not_found: [] }, searchedUrls: [], dropped: [], model: "e2e-fake", tokensIn: 0, tokensOut: 0 };
   const ask = `Cohort: ${cohort.name}\nCriteria: ${describeCriteria(cohort.criteria)}${cohort.description ? `\nNotes: ${cohort.description}` : ""}\n\nFind published benchmark figures for this cohort.`;
   const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: ask }];
   const searchedUrls = new Set<string>();

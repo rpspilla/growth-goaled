@@ -108,6 +108,27 @@ Founders see progress on `/processing` (status only, never draft content) and th
 
 `/advisor/companies/[id]` shows metrics, score, benchmark position (published, or the current draft), phase, readiness, open questions and files. Advisors set health, keep an internal advisor summary (never shown to founders), and review the founder's data items: **Validate** supplied items and send **follow-up requests**, which the founder sees on the item and in the "most useful next step".
 
+### Analytics
+
+Events are recorded with `track()` (`lib/events.ts`): `intake_section_completed`, `document_uploaded`, `extraction_completed`, `register_item_resolved`, `review_decision`, `deliverable_published`, `deliverable_viewed`, `source_trail_opened`, `invite_sent`, `invite_accepted`. Admins see the derived metrics on `/advisor/analytics` (`lib/analytics.ts`, sample company excluded):
+
+- **Activation**: companies with intake ≥80% and at least one document.
+- **Sign-up to first Benchmark**: median hours from company creation to the first `deliverable_published`.
+- **Source trails opened**: share of companies that viewed a Benchmark and opened a source trail.
+- **Review turnaround**: median hours from QA complete to the advisor's decision.
+- **Approved without changes**: published Benchmarks with no edit or send-back since the previous publish.
+- Pilot → paid isn't tracked (no payments in Phase 1).
+
+### End-to-end tests
+
+`npm run test:e2e` starts a throwaway local Postgres (`e2e/db.sh`, needs Postgres 16 binaries; set `PG_BIN` if they live elsewhere), applies the migrations and runs `next dev` in **test mode** (`E2E_AUTH=1`, `lib/e2e.ts`). Test mode signs users in from a `gg_e2e_user` cookie instead of Neon Auth and replaces model calls with deterministic stubs (`lib/ai/fake.ts`). It only switches on under `next dev`, outside Vercel, with the variable set explicitly, so it can't be active on a deployment (covered by `tests/permissions.test.ts`).
+
+- `e2e/journey.spec.ts`: advisor sets up a cohort (CSV import, approve rows); founder signs up, completes the company profile and Data Readiness, and hands off; the pipeline drafts and QAs; advisor claims, approves and publishes; founder sees the Benchmark with the approval note; portfolio and analytics reflect it.
+- `e2e/access.spec.ts`: signed-out, founder and advisor access across areas, and advisors can't open companies that aren't theirs.
+- File uploads aren't in the browser run (they need the real Blob store); they're covered by the integration tests with a mocked store and by the manual list in `docs/TESTING.md`.
+
+Locally, `lib/db` also accepts a `postgres://…@localhost` URL (node-postgres); Neon's `db.batch` runs its queries in order there.
+
 ### Seed data and the sample company
 
 `scripts/seed.ts` seeds **Acme AI**, the read-only demo at `/sample` (no login), with its published Benchmark, data points, score and open questions. On staging it also seeds a fake advisory portfolio of six more companies. Figures come from `prototype/src/data/mock.ts` and are illustrative. The sample benchmark cohort is flagged `is_sample` so it is never matched to real companies.
@@ -142,5 +163,6 @@ Role checks are enforced on the server (`lib/auth/session.ts`, `lib/access.ts`),
 npm run typecheck
 npm run lint
 npm test          # Vitest (includes an in-memory Postgres suite via PGlite)
+npm run test:e2e  # Playwright: full founder → advisor → founder journey and role access
 npm run build
 ```

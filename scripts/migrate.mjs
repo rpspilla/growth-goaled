@@ -15,11 +15,19 @@ if (!url) {
   process.exit(0);
 }
 
-const pool = new Pool({ connectionString: url });
+// A local Postgres (end-to-end tests) is reached over TCP with node-postgres.
+const local = /^postgres(ql)?:\/\/[^@]*@(localhost|127\.0\.0\.1)[:/]/.test(url);
+const pool = local ? new (await import("pg")).default.Pool({ connectionString: url }) : new Pool({ connectionString: url });
 try {
   const host = new URL(url).hostname;
   console.log(`[migrate] Applying migrations to ${host}…`);
-  await migrate(drizzle(pool), { migrationsFolder: "./drizzle" });
+  if (local) {
+    const { drizzle: drizzlePg } = await import("drizzle-orm/node-postgres");
+    const { migrate: migratePg } = await import("drizzle-orm/node-postgres/migrator");
+    await migratePg(drizzlePg(pool), { migrationsFolder: "./drizzle" });
+  } else {
+    await migrate(drizzle(pool), { migrationsFolder: "./drizzle" });
+  }
   console.log("[migrate] Done.");
 } catch (err) {
   console.error("[migrate] Failed:", err);

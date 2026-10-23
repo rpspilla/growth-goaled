@@ -4,6 +4,7 @@ import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { METRICS, type MetricKey } from "@/lib/metrics";
 import { AI_MODEL, anthropic } from "./config";
+import { e2eEnabled } from "@/lib/e2e";
 
 const metricKeys = Object.keys(METRICS) as [MetricKey, ...MetricKey[]];
 
@@ -81,6 +82,7 @@ export class ExtractionError extends Error {}
  * an invalid response is retried once before failing.
  */
 export async function extractMetrics(input: ExtractionInput): Promise<ExtractionResult> {
+  if (e2eEnabled()) return { points: [], tokensIn: 0, tokensOut: 0, model: "e2e-fake" };
   let tokensIn = 0;
   let tokensOut = 0;
 

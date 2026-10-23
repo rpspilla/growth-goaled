@@ -13,3 +13,7 @@ test-results/
 next-env.d.ts
 *.tsbuildinfo
 !.env.example
+
+# Playwright
+/test-results/
+/playwright-report/
