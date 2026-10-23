@@ -19,16 +19,31 @@ export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
  * spreadsheets and text as CSV/plain text. DOCX is stored and attached to the
  * company but not analysed automatically ("stored").
  */
-export const ACCEPTED_TYPES: Record<string, "pdf" | "xlsx" | "text" | "stored"> = {
+export const ACCEPTED_TYPES: Record<string, "pdf" | "xlsx" | "text" | "image" | "stored"> = {
   "application/pdf": "pdf",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
   "text/csv": "text",
   "text/plain": "text",
   "text/markdown": "text",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "stored",
+  "image/png": "image",
+  "image/jpeg": "image",
+  "image/webp": "image",
+  "image/gif": "image",
 };
 
-export const ACCEPT_ATTR = ".pdf,.xlsx,.csv,.docx,.txt,.md";
+/** Images go to the model as base64 and must stay under its per-image limit. */
+export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+/** The inbox ("upload whatever you have") takes any file; formats we can't read are stored for the advisor. */
+export const INBOX_FOLDER = "inbox/";
+
+/** How a file is handled: read and analysed, or kept for the advisor only. */
+export function handlingFor(mime: string): "pdf" | "xlsx" | "text" | "image" | "stored" {
+  return ACCEPTED_TYPES[mime] ?? "stored";
+}
+
+export const ACCEPT_ATTR = ".pdf,.xlsx,.csv,.docx,.txt,.md,.png,.jpg,.jpeg,.webp";
 
 /** Content type from the file name, for browsers that report an empty or generic type. */
 export function contentTypeFor(filename: string, reported: string): string {
@@ -42,7 +57,12 @@ export function contentTypeFor(filename: string, reported: string): string {
       txt: "text/plain",
       md: "text/markdown",
       docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    }[ext ?? ""] ?? reported
+      png: "image/png",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      webp: "image/webp",
+      gif: "image/gif",
+    }[ext ?? ""] ?? (reported || "application/octet-stream")
   );
 }
 

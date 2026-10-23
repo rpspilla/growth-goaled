@@ -33,6 +33,15 @@ Use two browsers (or a private window): one signed in as **admin** (ryan@growthg
 - [ ] "Summarise gaps" produces an AI summary grounded in the checks (no figures); "data changed" note after edits
 - [ ] "Send to my advisor for the benchmark" stays disabled until blockers are cleared, then goes to `/processing`
 
+## Upload whatever you have (inbox)
+- [ ] Drag several files onto the drop zone at the top of `/readiness` (and also try click-to-choose); each shows uploading → "reading and sorting"
+- [ ] A **messy single spreadsheet** with several tabs (P&L, customers, pipeline…): suggestions name the right items and sheets; confirm some, untick others → only confirmed items become Available (unverified) and the file shows "Supports: …"
+- [ ] "It also covers…" adds an item by hand; "Doesn't cover any" clears the file from the review list
+- [ ] A **PDF** board deck and a **screenshot** (PNG/JPG): suggestions appear and extracted values show on the Files tab
+- [ ] A **.pptx / .xls / .key** file: uploads fine, shows "can't read this format… kept for your advisor", suggestions only from the file name
+- [ ] Re-drop the same file: "already uploaded · using the existing copy"
+- [ ] A file over 25 MB is refused with a clear message
+
 ## Questions and registers (M6)
 - [ ] Upload a file whose figure differs >10% from the profile (e.g. different sales cycle) → a conflict appears on `/questions`
 - [ ] Resolve the conflict by choosing a value → dashboard shows the chosen value

@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { HandoffCard } from "@/components/readiness/HandoffCard";
+import { InboxDropzone } from "@/components/readiness/InboxDropzone";
+import { SortReview } from "@/components/readiness/SortReview";
+import { listDocuments } from "@/lib/data/documents";
 import { ReadinessTabs } from "@/components/readiness/ReadinessTabs";
 import { SummaryCard } from "@/components/readiness/SummaryCard";
 import { gapSummarySchema } from "@/lib/ai/readiness-summary";
@@ -48,9 +51,10 @@ export default async function ReadinessPage() {
       </div>
     );
   }
-  const { company, readiness, missingByCategory } = data;
+  const { company, readiness, missingByCategory, blobPrefix } = data;
   const a = readiness.assessment;
-  const last = await latestAssessment(company);
+  const [last, documents] = await Promise.all([latestAssessment(company), listDocuments(company)]);
+  const inbox = documents.filter((d) => d.inbox || d.suggestions.some((x) => x.status === "suggested"));
   const parsedSummary = last?.summary ? gapSummarySchema.safeParse(last.summary) : null;
   const lastChange = Math.max(0, ...readiness.items.map((i) => i.updatedAt.getTime()), ...readiness.files.map((f) => Date.parse(f.createdAt)));
   const counts = { ready: 0, limited: 0, blocked: 0 };
@@ -69,6 +73,9 @@ export default async function ReadinessPage() {
         subtitle="Tell us what data you have, where it lives and how complete it is. Imperfect data is fine: we'd rather know what's missing."
       />
       <ReadinessTabs missingByCategory={missingByCategory} />
+
+      <InboxDropzone blobPrefix={blobPrefix} />
+      <SortReview docs={inbox} />
 
       <p className="text-xs mb-4" style={{ color: "var(--muted-foreground)" }}>
         These are three separate measures. A high collection score means you&apos;ve shared what we asked for. It doesn&apos;t mean the data

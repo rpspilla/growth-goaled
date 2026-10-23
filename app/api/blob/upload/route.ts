@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getFounderCompany } from "@/lib/data/companies";
 import { companyBlobPrefix } from "@/lib/data/documents";
-import { ACCEPTED_TYPES, MAX_UPLOAD_BYTES } from "@/lib/documents";
+import { ACCEPTED_TYPES, INBOX_FOLDER, MAX_UPLOAD_BYTES } from "@/lib/documents";
 
 /**
  * Issues client-upload tokens for the private Blob store. Only signed-in
@@ -21,8 +21,10 @@ export async function POST(request: Request) {
         if (!user || user.role !== "founder") throw new Error("Not allowed");
         const company = await getFounderCompany(user);
         if (!company || !pathname.startsWith(companyBlobPrefix(company.id))) throw new Error("Not allowed");
+        // The inbox ("upload whatever you have") takes any file type; checklist uploads only readable ones.
+        const inbox = pathname.startsWith(companyBlobPrefix(company.id) + INBOX_FOLDER);
         return {
-          allowedContentTypes: Object.keys(ACCEPTED_TYPES),
+          allowedContentTypes: inbox ? undefined : Object.keys(ACCEPTED_TYPES),
           maximumSizeInBytes: MAX_UPLOAD_BYTES,
           addRandomSuffix: true,
         };

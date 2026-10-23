@@ -7,10 +7,7 @@ import { ACCEPTED_TYPES, contentTypeFor, MAX_UPLOAD_BYTES, unsupportedReason } f
 import type { CategoryId } from "@/lib/readiness";
 import { registerUpload } from "@/app/(founder)/readiness/actions";
 
-async function sha256(file: File): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
+import { sha256 } from "./hash";
 
 /**
  * Uploads a file to the company's private Blob folder and registers it against

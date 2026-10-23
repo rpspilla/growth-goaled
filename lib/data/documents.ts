@@ -3,14 +3,16 @@ import { del, get, head } from "@vercel/blob";
 import ExcelJS from "exceljs";
 import { and, desc, eq, inArray, isNull, ne, or } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import type { Company, FileProfile, User } from "@/lib/db/schema";
+import type { Company, FileProfile, SortSuggestion, User } from "@/lib/db/schema";
 import { track } from "@/lib/events";
 import { formatMetric, METRICS, type MetricKey } from "@/lib/metrics";
-import { ACCEPTED_TYPES, DOC_TYPES, findConflicts, MAX_UPLOAD_BYTES } from "@/lib/documents";
+import { ACCEPTED_TYPES, DOC_TYPES, findConflicts, handlingFor, INBOX_FOLDER, MAX_IMAGE_BYTES, MAX_UPLOAD_BYTES } from "@/lib/documents";
 import { AI_MODEL } from "@/lib/ai/config";
 import { extractMetrics, ExtractionError, type ExtractionInput } from "@/lib/ai/extract";
 import { parseCsv, profileSheets } from "@/lib/file-profile";
 import { getItem, type CategoryId } from "@/lib/readiness";
+import { classifyFile, ClassifyError, type ClassifyInput } from "@/lib/ai/classify";
+import { mergeSuggestions, suggestFromColumns, suggestFromFilename } from "@/lib/sorting";
 import { markItemsSupplied } from "./readiness";
 
 type DocType = (typeof schema.docType.enumValues)[number];
@@ -53,9 +55,11 @@ export async function registerDocument(
   input: RegisterInput,
 ): Promise<{ doc: typeof schema.documents.$inferSelect; duplicate: boolean }> {
   if (!input.pathname.startsWith(companyBlobPrefix(company.id))) throw new Error("That file doesn't belong to your company.");
+  const inbox = input.pathname.startsWith(companyBlobPrefix(company.id) + INBOX_FOLDER);
   const blob = await head(input.pathname);
   if (blob.size > MAX_UPLOAD_BYTES) throw new Error("File is too large.");
-  if (!ACCEPTED_TYPES[blob.contentType]) throw new Error("That file type isn't supported.");
+  // The inbox takes any file (unreadable formats are stored for the advisor); checklist uploads only readable ones.
+  if (!inbox && !ACCEPTED_TYPES[blob.contentType]) throw new Error("That file type isn't supported.");
 
   const itemKeys = [...new Set(input.itemKeys ?? [])].filter((k) => getItem(k)?.category === input.category);
   const hash = input.contentHash && /^[a-f0-9]{64}$/.test(input.contentHash) ? input.contentHash : null;
@@ -87,6 +91,7 @@ export async function registerDocument(
         dataCategory: input.category ?? null,
         dataItemKeys: itemKeys,
         contentHash: hash,
+        inbox,
       })
       .onConflictDoNothing()
       .returning();
@@ -153,6 +158,10 @@ async function buildInput(
     if (bytes.length > MAX_PDF_BYTES) throw new ExtractionError("PDFs can be up to 20 MB. Split or compress the file.");
     return { input: { kind: "pdf", base64: bytes.toString("base64"), filename: doc.filename, docLabel }, sheets: null };
   }
+  if (kind === "image") {
+    if (bytes.length > MAX_IMAGE_BYTES) throw new ExtractionError("Images can be up to 5 MB to be read automatically.");
+    return { input: { kind: "image", base64: bytes.toString("base64"), mediaType: doc.mime as "image/png", filename: doc.filename, docLabel }, sheets: null };
+  }
   if (kind === "xlsx") {
     const sheets = await spreadsheetRows(bytes);
     const text = toCsv(sheets);
@@ -176,7 +185,7 @@ export async function processDocument(documentId: string): Promise<void> {
   if (!doc) return;
 
   // Formats we don't read automatically are kept and attached, but never reported as analysed.
-  if (ACCEPTED_TYPES[doc.mime] === "stored") {
+  if (handlingFor(doc.mime) === "stored") {
     await db.update(schema.documents).set({ status: "stored", error: null }).where(eq(schema.documents.id, doc.id));
     return;
   }
@@ -300,6 +309,11 @@ export type DocumentView = {
   dataPointsFound: number;
   assumptionsFlagged: number;
   createdAt: string;
+  inbox: boolean;
+  sortStatus: "sorting" | "sorted" | "failed" | null;
+  sortSummary: string | null;
+  suggestions: SortSuggestion[];
+  sortReviewed: boolean;
   points: {
     id: string;
     label: string;
@@ -339,6 +353,11 @@ export async function listDocuments(company: Company): Promise<DocumentView[]> {
     dataPointsFound: d.dataPointsFound,
     assumptionsFlagged: d.assumptionsFlagged,
     createdAt: d.createdAt.toISOString(),
+    inbox: d.inbox,
+    sortStatus: d.sortStatus,
+    sortSummary: d.sortSummary,
+    suggestions: d.suggestions ?? [],
+    sortReviewed: d.sortReviewedAt !== null,
     points: points
       .filter((p) => p.documentId === d.id)
       .map((p) => ({
@@ -372,4 +391,99 @@ export async function resetFailedDocument(company: Company, documentId: string):
     .where(and(eq(schema.documents.id, documentId), eq(schema.documents.companyId, company.id), eq(schema.documents.status, "failed")))
     .returning({ id: schema.documents.id });
   return updated.length > 0;
+}
+
+// ---------------------------------------------------------------------------
+// "Upload whatever you have": sorting files into the readiness checklist
+// ---------------------------------------------------------------------------
+
+/** Reads the file for the classifier; null when the format can't be read. */
+async function classifyInputFor(doc: typeof schema.documents.$inferSelect): Promise<ClassifyInput | null> {
+  const kind = handlingFor(doc.mime);
+  if (kind === "stored") return null;
+  const bytes = await readBlob(doc.blobUrl);
+  if (kind === "pdf") return bytes.length > MAX_PDF_BYTES ? null : { kind: "pdf", filename: doc.filename, base64: bytes.toString("base64") };
+  if (kind === "image") return bytes.length > MAX_IMAGE_BYTES ? null : { kind: "image", filename: doc.filename, base64: bytes.toString("base64"), mediaType: doc.mime as "image/png" };
+  if (kind === "xlsx") return { kind: "sheets", filename: doc.filename, sheets: await spreadsheetRows(bytes) };
+  const text = bytes.toString("utf8");
+  return doc.mime === "text/csv" ? { kind: "sheets", filename: doc.filename, sheets: [{ name: doc.filename, rows: parseCsv(text) }] } : { kind: "text", filename: doc.filename, text };
+}
+
+/**
+ * Suggests which readiness items a file covers (columns and file name in code,
+ * content by the model). Nothing is linked until the founder confirms.
+ */
+export async function sortDocument(documentId: string, classify = classifyFile): Promise<void> {
+  const [doc] = await db.select().from(schema.documents).where(eq(schema.documents.id, documentId)).limit(1);
+  if (!doc) return;
+  await db.update(schema.documents).set({ sortStatus: "sorting" }).where(eq(schema.documents.id, doc.id));
+  const rules = mergeSuggestions(suggestFromColumns(doc.profile), suggestFromFilename(doc.filename));
+  const finish = (sortStatus: "sorted" | "failed", sortSummary: string, suggestions: SortSuggestion[]) =>
+    db.update(schema.documents).set({ sortStatus, sortSummary, suggestions }).where(eq(schema.documents.id, doc.id));
+
+  let input: ClassifyInput | null;
+  try {
+    input = await classifyInputFor(doc);
+  } catch {
+    input = null;
+  }
+  if (!input) {
+    await finish("sorted", "We can't read this format automatically, so it's kept for your advisor. Suggestions below are based on the file name.", rules);
+    return;
+  }
+
+  const started = Date.now();
+  const [run] = await db.insert(schema.agentRuns).values({ documentId: doc.id, agent: "sort", model: AI_MODEL, status: "running" }).returning({ id: schema.agentRuns.id });
+  try {
+    const { result, model, tokensIn, tokensOut } = await classify(input);
+    const fromModel: SortSuggestion[] = result.sections.flatMap((s) =>
+      s.items.map((i) => ({ itemKey: i.key, sheet: s.sheet, confidence: i.confidence, reason: i.reason.slice(0, 300), source: "ai" as const, status: "suggested" as const })),
+    );
+    // A file-name guess adds nothing once the content has been read.
+    const suggestions = mergeSuggestions(suggestFromColumns(doc.profile), fromModel);
+    await finish("sorted", result.summary.slice(0, 500), suggestions);
+    await db.update(schema.agentRuns).set({ status: "succeeded", model, output: result, tokensIn, tokensOut, durationMs: Date.now() - started }).where(eq(schema.agentRuns.id, run!.id));
+  } catch (err) {
+    console.error(`[sort] Document ${doc.id} failed`, err);
+    await finish("failed", "We couldn't sort this file automatically. Pick the items it covers below, or ask your advisor.", rules);
+    await db
+      .update(schema.agentRuns)
+      .set({ status: "failed", error: err instanceof ClassifyError ? err.message : String(err), durationMs: Date.now() - started })
+      .where(eq(schema.agentRuns.id, run!.id));
+  }
+}
+
+/** Reads and extracts an inbox file, then sorts it. */
+export async function processInboxDocument(documentId: string): Promise<void> {
+  await processDocument(documentId);
+  await sortDocument(documentId);
+}
+
+/**
+ * Applies the founder's choice: accepted items are linked to the file and
+ * marked supplied (unverified); the rest are dismissed. Extra items the founder
+ * picked by hand can be added too.
+ */
+export async function applySuggestions(user: User, company: Company, documentId: string, acceptKeys: string[]): Promise<{ ok: true; linked: number } | { ok: false; error: string }> {
+  const [doc] = await db
+    .select()
+    .from(schema.documents)
+    .where(and(eq(schema.documents.id, documentId), eq(schema.documents.companyId, company.id)))
+    .limit(1);
+  if (!doc) return { ok: false, error: "File not found." };
+  const accept = new Set(acceptKeys.filter((k) => getItem(k)));
+  const current = doc.suggestions ?? [];
+  const known = new Set(current.map((s) => s.itemKey));
+  const suggestions: SortSuggestion[] = [
+    ...current.map((s) => ({ ...s, status: accept.has(s.itemKey) ? ("accepted" as const) : ("dismissed" as const) })),
+    ...[...accept].filter((k) => !known.has(k)).map((itemKey) => ({ itemKey, sheet: null, confidence: "high" as const, reason: "Picked by you", source: "filename" as const, status: "accepted" as const })),
+  ];
+  const keys = [...new Set([...doc.dataItemKeys, ...accept])];
+  const categories = new Set(keys.map((k) => getItem(k)!.category));
+  await db
+    .update(schema.documents)
+    .set({ suggestions, dataItemKeys: keys, dataCategory: categories.size === 1 ? [...categories][0]! : doc.dataCategory, sortReviewedAt: new Date() })
+    .where(eq(schema.documents.id, doc.id));
+  await markItemsSupplied(user, company, [...accept]);
+  return { ok: true, linked: accept.size };
 }

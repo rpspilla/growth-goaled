@@ -48,6 +48,7 @@ export const companyHealth = pgEnum("company_health", ["good", "watch", "critica
 export const memberRole = pgEnum("member_role", ["owner", "member"]);
 export const intakeSection = pgEnum("intake_section", ["company", "customers", "gtm", "icp", "hiring"]);
 export const valueSource = pgEnum("value_source", ["manual", "extracted"]);
+export const sortStatus = pgEnum("sort_status", ["sorting", "sorted", "failed"]);
 export const docType = pgEnum("doc_type", [
   "board_deck",
   "financial_model",
@@ -81,7 +82,7 @@ export const deliverableStatus = pgEnum("deliverable_status", [
   "failed",
 ]);
 export const claimSourceKind = pgEnum("claim_source_kind", ["data_point", "benchmark_metric", "document", "methodology"]);
-export const agentKind = pgEnum("agent_kind", ["draft", "qa", "extract", "research"]);
+export const agentKind = pgEnum("agent_kind", ["draft", "qa", "extract", "research", "sort"]);
 export const agentRunStatus = pgEnum("agent_run_status", ["running", "succeeded", "failed"]);
 export const reviewDecision = pgEnum("review_decision", ["approve", "request_changes", "send_back"]);
 
@@ -205,6 +206,12 @@ export const documents = pgTable(
     contentHash: text("content_hash"),
     // Spreadsheet/CSV shape (sheets, columns, rows, date range) computed on processing
     profile: jsonb("profile").$type<FileProfile>(),
+    // "Upload whatever you have": files dropped in the inbox get item suggestions to confirm
+    inbox: boolean("inbox").notNull().default(false),
+    sortStatus: sortStatus("sort_status"),
+    sortSummary: text("sort_summary"),
+    suggestions: jsonb("suggestions").$type<SortSuggestion[]>(),
+    sortReviewedAt: timestamp("sort_reviewed_at", { withTimezone: true }),
     ...timestamps,
   },
   (t) => [
@@ -212,6 +219,16 @@ export const documents = pgTable(
     uniqueIndex("documents_company_hash_idx").on(t.companyId, t.contentHash),
   ],
 );
+
+export type SortSuggestion = {
+  itemKey: string;
+  /** Sheet the suggestion is based on, when the file has several. */
+  sheet: string | null;
+  confidence: "high" | "medium" | "low";
+  reason: string;
+  source: "columns" | "ai" | "filename";
+  status: "suggested" | "accepted" | "dismissed";
+};
 
 export type FileProfile = {
   sheets: { name: string; rows: number; columns: string[] }[];

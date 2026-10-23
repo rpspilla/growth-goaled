@@ -6,7 +6,16 @@ import { z } from "zod";
 import { db, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth/session";
 import { getFounderCompany } from "@/lib/data/companies";
-import { DOC_TYPE_FOR_CATEGORY, processDocument, registerDocument, resetFailedDocument, reviewDataPoint } from "@/lib/data/documents";
+import {
+  applySuggestions,
+  DOC_TYPE_FOR_CATEGORY,
+  processDocument,
+  processInboxDocument,
+  registerDocument,
+  resetFailedDocument,
+  reviewDataPoint,
+  sortDocument,
+} from "@/lib/data/documents";
 import { getReadiness, latestAssessment, markReadyForBenchmark, updateDataItem, type ItemPatch, type UpdateResult } from "@/lib/data/readiness";
 import { summarizeGaps } from "@/lib/ai/readiness-summary";
 import { readinessFacts } from "@/lib/readiness-facts";
@@ -52,6 +61,36 @@ export async function registerUpload(input: z.infer<typeof registerInput>): Prom
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Upload failed." };
   }
+}
+
+const inboxInput = z.object({
+  pathname: z.string().min(1).max(1024),
+  filename: z.string().min(1).max(255),
+  contentHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+});
+
+/** "Upload whatever you have": registers an inbox file, then reads, extracts and sorts it after the response. */
+export async function registerInboxUpload(input: z.infer<typeof inboxInput>): Promise<UploadResult> {
+  const { user, company } = await founderCompany();
+  const parsed = inboxInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Invalid upload." };
+  try {
+    const { doc, duplicate } = await registerDocument(user, company, { ...parsed.data, docType: "other" });
+    if (!duplicate) after(() => processInboxDocument(doc.id));
+    else if (!doc.suggestions) after(() => sortDocument(doc.id));
+    refresh();
+    return { ok: true, duplicate };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Upload failed." };
+  }
+}
+
+/** Confirms which checklist items an uploaded file covers. */
+export async function confirmFileItems(documentId: string, itemKeys: string[]): Promise<{ ok: true; linked: number } | { ok: false; error: string }> {
+  const { user, company } = await founderCompany();
+  const result = await applySuggestions(user, company, z.uuid().parse(documentId), z.array(z.string().max(64)).max(80).parse(itemKeys));
+  refresh();
+  return result;
 }
 
 export async function retryDocument(documentId: string): Promise<void> {

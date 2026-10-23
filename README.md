@@ -65,6 +65,14 @@ Step 2 for founders is `/readiness` (`/upload` redirects there). It replaces a g
 - **Assessment** (`lib/readiness-assessment.ts`) is rule-based and reads only recorded statuses, file metadata and open conflicts. It reports three separate measures: collection completeness (required items supplied, partial counts half), data quality (validated/unverified/estimated, limitations, missing fields, short or outdated history, conflicts) and analytical readiness (which growth metrics are ready, limited or blocked, and what blocks them), plus the next most useful request and benchmark blockers. "Send to my advisor for the benchmark" moves the company to the `benchmark` phase only when no required item is unreviewed and no benchmark-critical metric is blocked.
 - **Gap summary** (`lib/ai/readiness-summary.ts`): optional AI rewording of the assessment facts (names and statuses only, no values), saved with the facts in `readiness_assessments`. Throttled to one per two minutes.
 
+### Upload whatever you have
+
+The top of `/readiness` has a drop zone: "Upload whatever you have and we'll help you get organized". Founders can drag or pick up to 25 files at once, in **any format** (25 MB each). These go to the company's `inbox/` folder in Blob, the only place upload tokens allow any content type.
+
+- Readable files (CSV, XLSX, PDF, text, PNG/JPEG/WebP/GIF images) are profiled and run through metric extraction as usual, then **sorted** (`sortDocument`): spreadsheet columns are matched to each item's expected fields in code (`lib/sorting.ts`), and Claude (`lib/ai/classify.ts`) reads a bounded preview (first rows/columns of each sheet, or the PDF/image) and suggests checklist items per sheet, using only the fixed item keys. Runs are logged in `agent_runs` (`agent = sort`).
+- Other formats (PowerPoint, .xls, Keynote, Word…) are stored for the advisor, never reported as analysed, and get low-confidence suggestions from the file name only.
+- Suggestions are just that: the founder confirms them in "We sorted your files" (high/medium pre-ticked, any item can be added). Only confirmed items are linked to the file and marked available (unverified). If the model fails, the column matches are still offered.
+
 ### Documents and extraction
 
 The browser sends the file straight to the **private** Blob store using a token from `/api/blob/upload`, which is only issued to founders and only for paths under `companies/<their company id>/`. The upload action then records the document and runs extraction after responding (`after()`, up to 300s).

@@ -39,7 +39,7 @@ vi.mock("@/lib/ai/extract", async () => {
 import { schema } from "@/lib/db";
 import type { Company, User } from "@/lib/db/schema";
 import { getReadiness, markReadyForBenchmark, updateDataItem } from "@/lib/data/readiness";
-import { companyBlobPrefix, processDocument, registerDocument } from "@/lib/data/documents";
+import { applySuggestions, companyBlobPrefix, listDocuments, processDocument, processInboxDocument, registerDocument, sortDocument } from "@/lib/data/documents";
 import { ALL_ITEM_KEYS, getItem } from "@/lib/readiness";
 
 type DB = typeof import("@/lib/db").db;
@@ -292,5 +292,84 @@ describe("readiness dashboard with realistic data", () => {
     // Globex was untouched.
     const [g] = await db().select().from(schema.companies).where(eq(schema.companies.id, globex.id));
     expect(g!.phase).toBe("intake");
+  });
+});
+
+describe("upload whatever you have (inbox)", () => {
+  const inboxPut = (company: Company, name: string, contentType: string, body: string) => {
+    const pathname = `${companyBlobPrefix(company.id)}inbox/${name}`;
+    h.blobs.set(pathname, { contentType, body });
+    return pathname;
+  };
+  const messy = "Month,Revenue,COGS,Customer,ARR,Industry\n2026-01,100000,20000,Acme,50000,Fintech\n2026-02,110000,21000,Globex,60000,Health\n";
+
+  it("accepts any file type in the inbox, but not in checklist uploads", async () => {
+    const pptx = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+    const inbox = inboxPut(acme, "board.pptx", pptx, "PK...");
+    const { doc } = await registerDocument(founder, acme, { pathname: inbox, filename: "board.pptx", docType: "other" });
+    expect(doc.inbox).toBe(true);
+    const outside = put(acme, "board.pptx", pptx, "PK...");
+    await expect(registerDocument(founder, acme, { pathname: outside, filename: "board.pptx", docType: "other" })).rejects.toThrow(/isn't supported/);
+  });
+
+  it("reads, extracts and suggests items for a messy spreadsheet; nothing is marked until confirmed", async () => {
+    h.extract.mockResolvedValue({ points: [], tokensIn: 1, tokensOut: 1, model: "test" });
+    const pathname = inboxPut(acme, "everything.csv", "text/csv", messy);
+    const { doc } = await registerDocument(founder, acme, { pathname, filename: "everything.csv", docType: "other", contentHash: hash("c") });
+    await processDocument(doc.id);
+    const classify = vi.fn(async () => ({
+      result: { summary: "Monthly P&L plus a customer list.", sections: [{ sheet: null, items: [{ key: "monthly_revenue", confidence: "high" as const, reason: "Revenue by month" }, { key: "revenue_by_customer", confidence: "medium" as const, reason: "ARR per customer" }] }] },
+      model: "m",
+      tokensIn: 1,
+      tokensOut: 1,
+    }));
+    await sortDocument(doc.id, classify);
+
+    const [view] = (await listDocuments(acme)).filter((d) => d.id === doc.id);
+    expect(view).toMatchObject({ sortStatus: "sorted", sortSummary: "Monthly P&L plus a customer list.", sortReviewed: false });
+    const byKey = Object.fromEntries(view!.suggestions.map((x) => [x.itemKey, x]));
+    expect(byKey.monthly_revenue).toMatchObject({ source: "ai", confidence: "high", status: "suggested" });
+    expect(byKey.revenue_by_customer).toBeDefined();
+    expect((await getReadiness(acme)).items.find((i) => i.itemKey === "monthly_revenue")!.status).toBe("not_reviewed");
+
+    const r = await applySuggestions(founder, acme, doc.id, ["monthly_revenue", "industry"]);
+    expect(r).toEqual({ ok: true, linked: 2 });
+    const after = await getReadiness(acme);
+    expect(after.items.find((i) => i.itemKey === "monthly_revenue")).toMatchObject({ status: "available", quality: "unverified", collectionMethod: "file_upload" });
+    expect(after.items.find((i) => i.itemKey === "revenue_by_customer")!.status).toBe("not_reviewed");
+    const [confirmed] = (await listDocuments(acme)).filter((d) => d.id === doc.id);
+    expect(confirmed!.sortReviewed).toBe(true);
+    expect(confirmed!.itemKeys.sort()).toEqual(["industry", "monthly_revenue"]);
+    expect(Object.fromEntries(confirmed!.suggestions.map((x) => [x.itemKey, x.status]))).toMatchObject({ monthly_revenue: "accepted", revenue_by_customer: "dismissed", industry: "accepted" });
+  });
+
+  it("stores unreadable formats and suggests from the file name only", async () => {
+    const pathname = inboxPut(acme, "hubspot_pipeline.xls", "application/vnd.ms-excel", "binary");
+    const { doc } = await registerDocument(founder, acme, { pathname, filename: "hubspot_pipeline.xls", docType: "other" });
+    await processInboxDocument(doc.id);
+    const [view] = await listDocuments(acme);
+    expect(view).toMatchObject({ status: "stored", sortStatus: "sorted" });
+    expect(view!.sortSummary).toMatch(/can't read this format/);
+    expect(view!.suggestions.map((x) => x.itemKey)).toEqual(["opportunities"]);
+    expect(h.extract).not.toHaveBeenCalled();
+  });
+
+  it("falls back to column matches when the model fails", async () => {
+    h.extract.mockResolvedValue({ points: [], tokensIn: 1, tokensOut: 1, model: "test" });
+    const pathname = inboxPut(acme, "data.csv", "text/csv", messy);
+    const { doc } = await registerDocument(founder, acme, { pathname, filename: "data.csv", docType: "other" });
+    await processDocument(doc.id);
+    await sortDocument(doc.id, async () => {
+      throw new Error("boom");
+    });
+    const [view] = await listDocuments(acme);
+    expect(view!.sortStatus).toBe("failed");
+    expect(view!.suggestions.some((x) => x.itemKey === "monthly_revenue" && x.source === "columns")).toBe(true);
+  });
+
+  it("won't apply suggestions to another company's file", async () => {
+    const pathname = inboxPut(globex, "g.csv", "text/csv", messy);
+    const { doc } = await registerDocument(otherFounder, globex, { pathname, filename: "g.csv", docType: "other" });
+    expect((await applySuggestions(founder, acme, doc.id, ["monthly_revenue"])).ok).toBe(false);
   });
 });

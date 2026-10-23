@@ -46,13 +46,15 @@ Rules:
 - raw_text: the exact wording or table cells the figure comes from (under 300 characters), so a person can find it.
 - period: the period the figure describes as written ("Q3 2026", "FY2025", "Sep 2026", "TTM"), or null if none is stated.
 - page: the 1-based page number for PDFs, otherwise null.
+- For images, only read figures that are clearly legible.
 - confidence: high when the figure is stated plainly; medium when labels are ambiguous; low when you had to interpret it.
 - When a metric appears for several periods, include each period once. Do not repeat the same metric and period.
 - Return an empty list if the document has none of these metrics.`;
 
 export type ExtractionInput =
   | { kind: "pdf"; base64: string; filename: string; docLabel: string }
-  | { kind: "text"; text: string; filename: string; docLabel: string };
+  | { kind: "text"; text: string; filename: string; docLabel: string }
+  | { kind: "image"; base64: string; mediaType: "image/png" | "image/jpeg" | "image/webp" | "image/gif"; filename: string; docLabel: string };
 
 export type ExtractionResult = {
   points: ExtractedPoint[];
@@ -67,6 +69,12 @@ function content(input: ExtractionInput): Anthropic.Beta.BetaContentBlockParam[]
     return [
       { type: "document", source: { type: "base64", media_type: "application/pdf", data: input.base64 }, title: input.filename },
       { type: "text", text: ask },
+    ];
+  }
+  if (input.kind === "image") {
+    return [
+      { type: "image", source: { type: "base64", media_type: input.mediaType, data: input.base64 } },
+      { type: "text", text: `${ask} (This is an image, e.g. a screenshot of a dashboard or report.)` },
     ];
   }
   return [

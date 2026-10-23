@@ -51,7 +51,7 @@ export function DocumentCard({ doc }: { doc: DocumentView }) {
           {busy && <AnalyzingDots />}
           {doc.status === "stored" && (
             <div className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>
-              Stored for your advisor · not analysed automatically (Word files aren&apos;t read yet)
+              Stored for your advisor · this format isn&apos;t read automatically
             </div>
           )}
           {doc.status === "done" && (
