@@ -35,9 +35,19 @@ export function anthropic(): Anthropic {
   return client;
 }
 
-/** True when an error means the AI can't be reached with this environment's settings. */
+/** The Anthropic account behind the key has no API credit left (a billing setting, not a code problem). */
+export function isOutOfCredits(err: unknown): boolean {
+  return err instanceof Anthropic.BadRequestError && /credit balance/i.test(err.message);
+}
+
+/** True when an error means the AI can't be used with this environment's settings or account. */
 export function isAiConfigError(err: unknown): boolean {
-  return err instanceof AiConfigError || err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError;
+  return (
+    err instanceof AiConfigError ||
+    err instanceof Anthropic.AuthenticationError ||
+    err instanceof Anthropic.PermissionDeniedError ||
+    isOutOfCredits(err)
+  );
 }
 
 /** Message for founders when automatic reading is unavailable (the details go to the logs and the admin check). */
@@ -48,14 +58,18 @@ export function aiProblemForStaff(err: unknown): string {
   if (err instanceof AiConfigError) return err.message;
   if (err instanceof Anthropic.AuthenticationError) return "The Anthropic API key was rejected. Check ANTHROPIC_API_KEY in the Vercel environment settings.";
   if (err instanceof Anthropic.PermissionDeniedError) return "The Anthropic API key doesn't have access to this model or feature.";
+  if (isOutOfCredits(err)) return "The Anthropic account is out of API credits. Add credits under Plans & Billing in the Anthropic Console, then retry.";
   return "Unexpected error. Try again.";
 }
 
-/** A free request that proves the key works (reads the model's details). */
+/**
+ * Proves the key and account work with a one-token request (a fraction of a
+ * cent): a free lookup would pass even when the account has no credit.
+ */
 export async function checkAiConnection(): Promise<{ ok: true; model: string } | { ok: false; error: string }> {
   try {
-    const model = await anthropic().models.retrieve(AI_MODEL);
-    return { ok: true, model: model.display_name ?? model.id };
+    const response = await anthropic().messages.create({ model: AI_MODEL, max_tokens: 1, messages: [{ role: "user", content: "ping" }] });
+    return { ok: true, model: response.model };
   } catch (err) {
     return { ok: false, error: isAiConfigError(err) ? aiProblemForStaff(err) : err instanceof Error ? err.message : String(err) };
   }

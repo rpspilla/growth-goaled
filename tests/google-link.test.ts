@@ -94,3 +94,17 @@ describe("apiKeyProblem", () => {
     expect(apiKeyProblem("sk-ant-abc")).toMatch(/too short/);
   });
 });
+
+describe("out-of-credit errors", () => {
+  it("are recognised as an account problem, with a fix-it message for staff", async () => {
+    const Anthropic = (await import("@anthropic-ai/sdk")).default;
+    const { isAiConfigError, isOutOfCredits, aiProblemForStaff } = await import("@/lib/ai/config");
+    const body = { type: "error", error: { type: "invalid_request_error", message: "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits." } };
+    const err = Anthropic.APIError.generate(400, body, undefined, new Headers());
+    expect(isOutOfCredits(err)).toBe(true);
+    expect(isAiConfigError(err)).toBe(true);
+    expect(aiProblemForStaff(err)).toMatch(/out of API credits/);
+    const other = Anthropic.APIError.generate(400, { type: "error", error: { type: "invalid_request_error", message: "max_tokens too large" } }, undefined, new Headers());
+    expect(isOutOfCredits(other)).toBe(false);
+  });
+});
