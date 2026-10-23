@@ -208,6 +208,8 @@ export const documents = pgTable(
     profile: jsonb("profile").$type<FileProfile>(),
     // "Upload whatever you have": files dropped in the inbox get item suggestions to confirm
     inbox: boolean("inbox").notNull().default(false),
+    // Set when the file was imported from a Google Sheets / Docs / Slides / Drive link
+    sourceUrl: text("source_url"),
     sortStatus: sortStatus("sort_status"),
     sortSummary: text("sort_summary"),
     suggestions: jsonb("suggestions").$type<SortSuggestion[]>(),

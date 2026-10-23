@@ -70,6 +70,7 @@ Step 2 for founders is `/readiness` (`/upload` redirects there). It replaces a g
 The top of `/readiness` has a drop zone: "Upload whatever you have and we'll help you get organized". Founders can drag or pick up to 25 files at once, in **any format** (25 MB each). These go to the company's `inbox/` folder in Blob, the only place upload tokens allow any content type.
 
 - Readable files (CSV, XLSX, PDF, text, PNG/JPEG/WebP/GIF images) are profiled and run through metric extraction as usual, then **sorted** (`sortDocument`): spreadsheet columns are matched to each item's expected fields in code (`lib/sorting.ts`), and Claude (`lib/ai/classify.ts`) reads a bounded preview (first rows/columns of each sheet, or the PDF/image) and suggests checklist items per sheet, using only the fixed item keys. Runs are logged in `agent_runs` (`agent = sort`).
+- **Google links**: founders can paste a Google Sheets, Docs, Slides or Drive file link shared with "anyone with the link". We read the file id and download Google's own export (Sheets as .xlsx, Docs and Slides as PDF; `lib/google-link.ts`), following redirects only within Google hosts, with a 25 MB cap and timeout, then store a private copy in the inbox (with `source_url`) and process it like a dropped file. Unshared files get a clear message. Later edits in Google aren't synced.
 - Other formats (PowerPoint, .xls, Keynote, Word…) are stored for the advisor, never reported as analysed, and get low-confidence suggestions from the file name only.
 - **Remove** (on every file card) deletes the file and its blob and undoes its effects: proposed values deleted, accepted values set aside (published deliverables keep their trail), open questions raised from its values closed, and checklist items only that file made available (no other file, no founder details) reset to "not reviewed".
 - Suggestions are just that: the founder confirms them in "We sorted your files" (high/medium pre-ticked, any item can be added). Only confirmed items are linked to the file and marked available (unverified). If the model fails, the column matches are still offered.
@@ -116,6 +117,10 @@ Founders see progress on `/processing` (status only, never draft content) and th
 `/advisor/portfolio` shows counts (active, requiring attention, awaiting founder input, in advisor review, complete) and a table of the advisor's companies (admins: all) built from accepted data, open registers, readiness and the latest Benchmark version (`lib/data/portfolio.ts`). A company needs attention when a Benchmark is waiting for review or publishing, a run failed, data conflicts are open, or its health is "at risk".
 
 `/advisor/companies/[id]` shows metrics, score, benchmark position (published, or the current draft), phase, readiness, open questions and files. Advisors set health, keep an internal advisor summary (never shown to founders), and review the founder's data items: **Validate** supplied items and send **follow-up requests**, which the founder sees on the item and in the "most useful next step".
+
+### AI configuration checks
+
+`lib/ai/config.ts` validates `ANTHROPIC_API_KEY` before use (trims whitespace; rejects keys with non-ASCII characters such as "…" from a shortened copy, a wrong prefix, or too short) without echoing the value. When the AI isn't usable, founders see "Automatic reading isn't available right now…" and still get column-match suggestions; advisors see the specific problem on failed runs. Admins can run **Check AI connection** (a free model lookup) under System checks on `/advisor/analytics`.
 
 ### Analytics
 

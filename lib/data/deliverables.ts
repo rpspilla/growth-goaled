@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { and, desc, eq, inArray, isNotNull, max } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { Company, QaResults, User } from "@/lib/db/schema";
-import { AI_MODEL } from "@/lib/ai/config";
+import { AI_MODEL, aiProblemForStaff, isAiConfigError } from "@/lib/ai/config";
 import { draftBenchmark, DraftError, type DraftInput, type DraftOutput } from "@/lib/ai/draft";
 import { qaBenchmark, QaError } from "@/lib/ai/qa";
 import { describeCriteria } from "@/lib/benchmarks";
@@ -273,7 +273,7 @@ async function failRun(runId: string, deliverableId: string, err: unknown, start
   console.error(`[deliverables] ${deliverableId} failed`, err);
   await db
     .update(schema.agentRuns)
-    .set({ status: "failed", error: known ? (err as Error).message : "Unexpected error. Try again.", durationMs: Date.now() - started })
+    .set({ status: "failed", error: known ? (err as Error).message : isAiConfigError(err) ? aiProblemForStaff(err) : "Unexpected error. Try again.", durationMs: Date.now() - started })
     .where(eq(schema.agentRuns.id, runId));
   await db.update(schema.deliverables).set({ status: "failed" }).where(eq(schema.deliverables.id, deliverableId));
 }

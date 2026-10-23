@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import type { DocumentView } from "@/lib/data/documents";
 import { CATEGORIES, getCategory, getItem } from "@/lib/readiness";
-import { confirmFileItems } from "@/app/(founder)/readiness/actions";
+import { confirmFileItems, resortFile, retryDocument } from "@/app/(founder)/readiness/actions";
 import { AnalyzingDots } from "./DocumentCard";
 import { RemoveFileButton } from "./RemoveFileButton";
 import { useProcessingRefresh } from "./useProcessingRefresh";
@@ -37,7 +37,20 @@ function FileSuggestions({ doc }: { doc: DocumentView }) {
         <div className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>{doc.filename}</div>
         <RemoveFileButton documentId={doc.id} filename={doc.filename} />
       </div>
-      {doc.sortSummary && <p className="text-xs mt-0.5 mb-3" style={{ color: doc.sortStatus === "failed" ? "var(--amber)" : "var(--muted-foreground)" }}>{doc.sortSummary}</p>}
+      {doc.sortSummary && <p className="text-xs mt-0.5 mb-2" style={{ color: doc.sortStatus === "failed" ? "var(--amber)" : "var(--muted-foreground)" }}>{doc.sortSummary}</p>}
+      {(doc.status === "failed" || doc.sortStatus === "failed") && (
+        <div className="flex items-center gap-3 mb-3 flex-wrap">
+          {doc.status === "failed" && <span className="text-xs" style={{ color: "var(--red)" }}>Reading failed: {doc.error ?? "unknown error"}</span>}
+          <button
+            disabled={busy}
+            onClick={() => startTransition(() => (doc.status === "failed" ? retryDocument(doc.id) : resortFile(doc.id)))}
+            className="text-xs px-3 py-1 rounded-md font-medium border disabled:opacity-60"
+            style={{ borderColor: "var(--border)", color: "var(--foreground)" }}
+          >
+            {doc.status === "failed" ? "Try reading again" : "Try sorting again"}
+          </button>
+        </div>
+      )}
       {keys.length === 0 && <p className="text-xs mb-3" style={{ color: "var(--muted-foreground)" }}>We didn&apos;t find anything that clearly matches the checklist. Pick items yourself below if it covers any.</p>}
       <ul className="space-y-1.5 mb-3">
         {[...keys, ...added].map((k) => {

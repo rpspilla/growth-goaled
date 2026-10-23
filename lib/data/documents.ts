@@ -1,13 +1,15 @@
 import "server-only";
-import { del, get, head } from "@vercel/blob";
+import { del, get, head, put } from "@vercel/blob";
+import { createHash } from "node:crypto";
 import ExcelJS from "exceljs";
 import { and, desc, eq, inArray, isNull, ne, or } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { Company, FileProfile, SortSuggestion, User } from "@/lib/db/schema";
 import { track } from "@/lib/events";
 import { formatMetric, METRICS, type MetricKey } from "@/lib/metrics";
-import { ACCEPTED_TYPES, DOC_TYPES, findConflicts, handlingFor, INBOX_FOLDER, MAX_IMAGE_BYTES, MAX_UPLOAD_BYTES } from "@/lib/documents";
-import { AI_MODEL } from "@/lib/ai/config";
+import { ACCEPTED_TYPES, contentTypeFor, DOC_TYPES, findConflicts, handlingFor, INBOX_FOLDER, MAX_IMAGE_BYTES, MAX_UPLOAD_BYTES } from "@/lib/documents";
+import { fetchGoogleExport, parseGoogleLink } from "@/lib/google-link";
+import { AI_MODEL, AI_UNAVAILABLE_FOR_FOUNDERS, isAiConfigError } from "@/lib/ai/config";
 import { extractMetrics, ExtractionError, type ExtractionInput } from "@/lib/ai/extract";
 import { parseCsv, profileSheets } from "@/lib/file-profile";
 import { getItem, type CategoryId } from "@/lib/readiness";
@@ -32,6 +34,8 @@ export type RegisterInput = {
   itemKeys?: string[];
   /** SHA-256 of the file computed in the browser; used to reuse an existing record for the same file. */
   contentHash?: string;
+  /** Google link the file was imported from. */
+  sourceUrl?: string;
 };
 
 /** Document type implied by a readiness category (used when uploading from the readiness checklist). */
@@ -92,6 +96,7 @@ export async function registerDocument(
         dataItemKeys: itemKeys,
         contentHash: hash,
         inbox,
+        sourceUrl: input.sourceUrl ?? null,
       })
       .onConflictDoNothing()
       .returning();
@@ -285,7 +290,7 @@ export async function processDocument(documentId: string): Promise<void> {
       props: { documentId: doc.id, dataPoints: inserted.length, conflicts: conflicts.length, assumptions: assumptions.length },
     });
   } catch (err) {
-    const message = err instanceof ExtractionError ? err.message : "Analysis failed. Try again.";
+    const message = err instanceof ExtractionError ? err.message : isAiConfigError(err) ? AI_UNAVAILABLE_FOR_FOUNDERS : "Analysis failed. Try again.";
     console.error(`[extract] Document ${doc.id} failed`, err);
     await db.update(schema.documents).set({ status: "failed", error: message }).where(eq(schema.documents.id, doc.id));
     await db
@@ -310,6 +315,7 @@ export type DocumentView = {
   assumptionsFlagged: number;
   createdAt: string;
   inbox: boolean;
+  sourceUrl: string | null;
   sortStatus: "sorting" | "sorted" | "failed" | null;
   sortSummary: string | null;
   suggestions: SortSuggestion[];
@@ -354,6 +360,7 @@ export async function listDocuments(company: Company): Promise<DocumentView[]> {
     assumptionsFlagged: d.assumptionsFlagged,
     createdAt: d.createdAt.toISOString(),
     inbox: d.inbox,
+    sourceUrl: d.sourceUrl,
     sortStatus: d.sortStatus,
     sortSummary: d.sortSummary,
     suggestions: d.suggestions ?? [],
@@ -383,12 +390,22 @@ export async function reviewDataPoint(user: User, company: Company, dataPointId:
   return updated.length > 0;
 }
 
-/** Re-queues a failed document for extraction. Returns false if it isn't the company's or isn't failed. */
-export async function resetFailedDocument(company: Company, documentId: string): Promise<boolean> {
-  const updated = await db
+/** Re-queues a failed document for extraction. Returns null if it isn't the company's or isn't failed. */
+export async function resetFailedDocument(company: Company, documentId: string): Promise<{ inbox: boolean } | null> {
+  const [updated] = await db
     .update(schema.documents)
     .set({ status: "uploaded", error: null })
     .where(and(eq(schema.documents.id, documentId), eq(schema.documents.companyId, company.id), eq(schema.documents.status, "failed")))
+    .returning({ inbox: schema.documents.inbox });
+  return updated ?? null;
+}
+
+/** Queues a file to be sorted again (e.g. after sorting failed). Returns false if it isn't the company's. */
+export async function resetSorting(company: Company, documentId: string): Promise<boolean> {
+  const updated = await db
+    .update(schema.documents)
+    .set({ sortStatus: "sorting", sortReviewedAt: null })
+    .where(and(eq(schema.documents.id, documentId), eq(schema.documents.companyId, company.id)))
     .returning({ id: schema.documents.id });
   return updated.length > 0;
 }
@@ -445,7 +462,13 @@ export async function sortDocument(documentId: string, classify = classifyFile):
     await db.update(schema.agentRuns).set({ status: "succeeded", model, output: result, tokensIn, tokensOut, durationMs: Date.now() - started }).where(eq(schema.agentRuns.id, run!.id));
   } catch (err) {
     console.error(`[sort] Document ${doc.id} failed`, err);
-    await finish("failed", "We couldn't sort this file automatically. Pick the items it covers below, or ask your advisor.", rules);
+    await finish(
+      "failed",
+      isAiConfigError(err)
+        ? `${AI_UNAVAILABLE_FOR_FOUNDERS} Meanwhile, pick the items it covers below.`
+        : "We couldn't sort this file automatically. Pick the items it covers below, or try again.",
+      rules,
+    );
     await db
       .update(schema.agentRuns)
       .set({ status: "failed", error: err instanceof ClassifyError ? err.message : String(err), durationMs: Date.now() - started })
@@ -563,4 +586,38 @@ export async function removeDocument(user: User, company: Company, documentId: s
   await db.delete(schema.documents).where(eq(schema.documents.id, doc.id));
   await del(doc.blobUrl).catch((err) => console.error(`[documents] Couldn't delete blob for ${doc.id}`, err));
   return { ok: true, itemsReset, valuesRemoved: pointIds.length };
+}
+
+// ---------------------------------------------------------------------------
+// Importing from a Google link
+// ---------------------------------------------------------------------------
+
+export type ImportResult = { ok: true; documentId: string; duplicate: boolean; filename: string } | { ok: false; error: string };
+
+/**
+ * Imports a Google Sheets / Docs / Slides / Drive file shared with "anyone
+ * with the link": downloads Google's export (Sheets as .xlsx, Docs and Slides
+ * as PDF), stores a private copy in the company's inbox and registers it like
+ * a dropped file. Later edits in Google aren't synced.
+ */
+export async function importGoogleLink(user: User, company: Company, rawUrl: string, fetchImpl: typeof fetch = fetch): Promise<ImportResult> {
+  const link = parseGoogleLink(rawUrl);
+  if (!link) return { ok: false, error: "Paste a Google Sheets, Docs, Slides or Drive file link (it starts with https://docs.google.com or https://drive.google.com)." };
+  let file;
+  try {
+    file = await fetchGoogleExport(link, MAX_UPLOAD_BYTES, fetchImpl);
+  } catch (err) {
+    return { ok: false, error: err instanceof Error && err.name !== "TimeoutError" ? err.message : "Google took too long to respond. Try again." };
+  }
+  const contentType = contentTypeFor(file.filename, file.contentType);
+  const contentHash = createHash("sha256").update(file.bytes).digest("hex");
+  const blob = await put(`${companyBlobPrefix(company.id)}${INBOX_FOLDER}${file.filename}`, file.bytes, { access: "private", contentType, addRandomSuffix: true });
+  const { doc, duplicate } = await registerDocument(user, company, {
+    pathname: blob.pathname,
+    filename: file.filename,
+    docType: "other",
+    contentHash,
+    sourceUrl: rawUrl.trim().slice(0, 1000),
+  });
+  return { ok: true, documentId: doc.id, duplicate, filename: file.filename };
 }

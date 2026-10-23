@@ -44,6 +44,11 @@ export function DocumentCard({ doc }: { doc: DocumentView }) {
               {category ? `${category.letter}. ${category.name}` : type?.label} · uploaded {new Date(doc.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
             </span>
           </div>
+          {doc.sourceUrl && (
+            <div className="text-xs mt-0.5">
+              <a href={doc.sourceUrl} target="_blank" rel="noopener noreferrer" style={{ color: "var(--green)" }}>Imported from Google ↗</a>
+            </div>
+          )}
           {doc.itemKeys.length > 0 && (
             <div className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>
               Supports: {doc.itemKeys.map((k) => getItem(k)?.name ?? k).join(", ")}

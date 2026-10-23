@@ -5,6 +5,7 @@ Things that need a person to click through, because they depend on real sign-in,
 Use two browsers (or a private window): one signed in as **admin** (ryan@growthgoaled.com) and one as a **test founder** with a different email.
 
 ## Setup notes
+- **First:** in Vercel, `ANTHROPIC_API_KEY` must be the *full* key (one unbroken string starting `sk-ant-`, no "…"). Then as admin, Analytics → System checks → **Check AI connection** should say "Connected".
 - Each AI step (extraction, gap summary, research, draft, QA) is a paid Claude call.
 - Research needs **web search enabled** for the Anthropic organization (Console → settings).
 - Founder figures entered in the company profile count as *accepted*; figures read from files are *proposed* until accepted.
@@ -40,6 +41,10 @@ Use two browsers (or a private window): one signed in as **admin** (ryan@growthg
 - [ ] A **PDF** board deck and a **screenshot** (PNG/JPG): suggestions appear and extracted values show on the Files tab
 - [ ] A **.pptx / .xls / .key** file: uploads fine, shows "can't read this format… kept for your advisor", suggestions only from the file name
 - [ ] Re-drop the same file: "already uploaded · using the existing copy"
+- [ ] Paste a **Google Sheets** link shared "Anyone with the link can view" → imported as .xlsx, read and sorted, Files tab shows "Imported from Google ↗"
+- [ ] Paste a **Google Doc** and a **Google Slides** link → imported as PDF and read
+- [ ] Paste a link to a file that is **not shared** → clear "set sharing to Anyone with the link" message, nothing added
+- [ ] A failed file shows "Try reading again"; a failed sort shows "Try sorting again"
 - [ ] A file over 25 MB is refused with a clear message
 - [ ] **Remove** a wrong file (from the sort review, the Files tab, and an item's file list): inline confirm, file disappears, values read from it disappear, items only that file supported go back to Not reviewed, items you'd added details to stay as they were
 

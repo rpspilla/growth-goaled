@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
 import { contentTypeFor, INBOX_FOLDER, MAX_UPLOAD_BYTES } from "@/lib/documents";
-import { registerInboxUpload } from "@/app/(founder)/readiness/actions";
+import { importFromLink, registerInboxUpload } from "@/app/(founder)/readiness/actions";
 import { sha256 } from "./hash";
 
 type Row = { key: string; name: string; state: "waiting" | "uploading" | "done" | "duplicate" | "error"; percent: number; error?: string };
@@ -18,6 +18,28 @@ export function InboxDropzone({ blobPrefix }: { blobPrefix: string }) {
   const [over, setOver] = useState(false);
   const [rows, setRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState(false);
+  const [link, setLink] = useState("");
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkMsg, setLinkMsg] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+
+  async function importLink() {
+    if (!link.trim() || linkBusy) return;
+    setLinkBusy(true);
+    setLinkMsg(null);
+    try {
+      const r = await importFromLink(link);
+      if (!r.ok) setLinkMsg({ kind: "error", text: r.error });
+      else {
+        setLinkMsg({ kind: "ok", text: r.duplicate ? `${r.filename} was already uploaded; using the existing copy.` : `Imported ${r.filename}. Reading and sorting it now.` });
+        setLink("");
+      }
+    } catch {
+      setLinkMsg({ kind: "error", text: "Import failed. Try again." });
+    } finally {
+      setLinkBusy(false);
+      router.refresh();
+    }
+  }
   const set = (key: string, patch: Partial<Row>) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
 
   async function send(list: File[]) {
@@ -97,6 +119,38 @@ export function InboxDropzone({ blobPrefix }: { blobPrefix: string }) {
           We read spreadsheets, CSV, PDF and images, and suggest where each piece fits in the checklist. You confirm before anything is marked. Other formats are kept for your advisor. Up to 25 MB per file.
         </p>
       </div>
+      <form
+        className="mt-3 flex gap-2 flex-wrap items-center"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void importLink();
+        }}
+      >
+        <label htmlFor="google-link" className="text-xs font-medium" style={{ color: "var(--muted-foreground)" }}>
+          Or paste a Google link:
+        </label>
+        <input
+          id="google-link"
+          type="url"
+          inputMode="url"
+          value={link}
+          onChange={(e) => setLink(e.target.value)}
+          placeholder="https://docs.google.com/spreadsheets/d/…"
+          className="flex-1 min-w-64 text-sm rounded-md border px-3 py-1.5"
+          style={{ background: "var(--background)", borderColor: "var(--border)", color: "var(--foreground)" }}
+        />
+        <button disabled={linkBusy || !link.trim()} className="text-xs px-3 py-1.5 rounded-md font-semibold disabled:opacity-60" style={{ background: "var(--green)", color: "#fff" }}>
+          {linkBusy ? "Importing..." : "Import"}
+        </button>
+      </form>
+      <p className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>
+        Google Sheets, Docs, Slides or Drive files. Set sharing to “Anyone with the link can view”. We save a copy now; later edits in Google aren&apos;t synced.
+      </p>
+      {linkMsg && (
+        <p role="status" className="text-xs mt-1" style={{ color: linkMsg.kind === "ok" ? "var(--green)" : "var(--red)" }}>
+          {linkMsg.text}
+        </p>
+      )}
       {rows.length > 0 && (
         <ul className="mt-3 space-y-1" aria-live="polite">
           {rows.map((r) => (

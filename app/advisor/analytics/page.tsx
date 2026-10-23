@@ -1,6 +1,9 @@
 import { PageHeader } from "@/components/PageHeader";
 import { requireRole } from "@/lib/auth/session";
 import { loadAnalytics } from "@/lib/data/analytics";
+import { AiCheck } from "@/components/admin/AiCheck";
+import { apiKeyProblem } from "@/lib/ai/config";
+import { testAiConnection } from "./actions";
 
 const EVENTS = [
   "intake_section_completed",
@@ -30,6 +33,22 @@ export default async function AnalyticsPage() {
   return (
     <div className="p-8 max-w-6xl space-y-6">
       <PageHeader title="Analytics" subtitle="Product metrics across real companies (the sample company is excluded)." />
+
+      <div className="rounded-xl border p-5 space-y-3" style={card}>
+        <div className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>System checks</div>
+        {[
+          { label: "Anthropic API key", problem: apiKeyProblem(process.env.ANTHROPIC_API_KEY) },
+          { label: "File storage (Vercel Blob)", problem: process.env.BLOB_READ_WRITE_TOKEN ? null : "BLOB_READ_WRITE_TOKEN isn't set." },
+          { label: "Email (Resend)", problem: process.env.RESEND_API_KEY ? null : "RESEND_API_KEY isn't set; invite emails won't send." },
+        ].map((c) => (
+          <div key={c.label} className="text-sm flex gap-2">
+            <span style={{ color: c.problem ? "var(--red)" : "var(--green)" }}>{c.problem ? "✕" : "✓"}</span>
+            <span style={{ color: "var(--foreground)" }}>{c.label}</span>
+            {c.problem && <span className="text-xs" style={{ color: "var(--red)" }}>{c.problem}</span>}
+          </div>
+        ))}
+        <AiCheck test={testAiConnection} />
+      </div>
       <div className="grid grid-cols-5 gap-4">
         {tiles.map((t) => (
           <div key={t.label} className="rounded-xl border p-4" style={card}>

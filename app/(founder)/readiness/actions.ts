@@ -12,7 +12,9 @@ import {
   processDocument,
   processInboxDocument,
   registerDocument,
+  importGoogleLink,
   removeDocument,
+  resetSorting,
   type RemoveResult,
   resetFailedDocument,
   reviewDataPoint,
@@ -87,6 +89,18 @@ export async function registerInboxUpload(input: z.infer<typeof inboxInput>): Pr
   }
 }
 
+/** Imports a file from a Google link into the inbox; reading and sorting run after the response. */
+export async function importFromLink(url: string): Promise<{ ok: true; duplicate: boolean; filename: string } | { ok: false; error: string }> {
+  const { user, company } = await founderCompany();
+  const raw = z.string().trim().min(1).max(2000).safeParse(url);
+  if (!raw.success) return { ok: false, error: "Paste a link." };
+  const result = await importGoogleLink(user, company, raw.data);
+  if (!result.ok) return result;
+  if (!result.duplicate) after(() => processInboxDocument(result.documentId));
+  refresh();
+  return { ok: true, duplicate: result.duplicate, filename: result.filename };
+}
+
 /** Confirms which checklist items an uploaded file covers. */
 export async function confirmFileItems(documentId: string, itemKeys: string[]): Promise<{ ok: true; linked: number } | { ok: false; error: string }> {
   const { user, company } = await founderCompany();
@@ -107,7 +121,14 @@ export async function removeFile(documentId: string): Promise<RemoveResult> {
 
 export async function retryDocument(documentId: string): Promise<void> {
   const { company } = await founderCompany();
-  if (await resetFailedDocument(company, z.uuid().parse(documentId))) after(() => processDocument(documentId));
+  const reset = await resetFailedDocument(company, z.uuid().parse(documentId));
+  if (reset) after(() => (reset.inbox ? processInboxDocument(documentId) : processDocument(documentId)));
+  refresh();
+}
+
+export async function resortFile(documentId: string): Promise<void> {
+  const { company } = await founderCompany();
+  if (await resetSorting(company, z.uuid().parse(documentId))) after(() => sortDocument(documentId));
   refresh();
 }
 

@@ -2,7 +2,7 @@ import "server-only";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { User } from "@/lib/db/schema";
-import { AI_MODEL } from "@/lib/ai/config";
+import { AI_MODEL, aiProblemForStaff, isAiConfigError } from "@/lib/ai/config";
 import { researchBenchmarks, ResearchError } from "@/lib/ai/research";
 import { type CohortInput, parseBenchmarkCsv, quartileProblem, sourceInputSchema } from "@/lib/benchmarks";
 import { isMetricKey } from "@/lib/metrics";
@@ -247,7 +247,7 @@ export async function runResearch(runId: string, research = researchBenchmarks):
       .update(schema.agentRuns)
       .set({
         status: "failed",
-        error: err instanceof ResearchError ? err.message : "Research failed. Try again.",
+        error: err instanceof ResearchError ? err.message : isAiConfigError(err) ? aiProblemForStaff(err) : "Research failed. Try again.",
         durationMs: Date.now() - started,
       })
       .where(eq(schema.agentRuns.id, runId));

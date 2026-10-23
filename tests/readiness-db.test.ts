@@ -30,6 +30,11 @@ vi.mock("@vercel/blob", () => ({
     return b ? { stream: new Response(b.body).body } : null;
   },
   del: h.del,
+  put: async (pathname: string, body: Buffer, opts: { contentType: string }) => {
+    const finalPath = pathname.replace(/(\.[a-z0-9]+)?$/i, (ext) => `-x1y2z3${ext}`);
+    h.blobs.set(finalPath, { contentType: opts.contentType, body: body.toString() });
+    return { url: `https://blob.test/${finalPath}`, pathname: finalPath };
+  },
 }));
 vi.mock("@/lib/ai/extract", async () => {
   class ExtractionError extends Error {}
@@ -39,7 +44,8 @@ vi.mock("@/lib/ai/extract", async () => {
 import { schema } from "@/lib/db";
 import type { Company, User } from "@/lib/db/schema";
 import { getReadiness, markReadyForBenchmark, updateDataItem } from "@/lib/data/readiness";
-import { applySuggestions, companyBlobPrefix, listDocuments, processDocument, processInboxDocument, registerDocument, removeDocument, sortDocument } from "@/lib/data/documents";
+import { applySuggestions, companyBlobPrefix, importGoogleLink, listDocuments, processDocument, processInboxDocument, registerDocument, removeDocument, sortDocument } from "@/lib/data/documents";
+import { AiConfigError } from "@/lib/ai/config";
 import { ALL_ITEM_KEYS, getItem } from "@/lib/readiness";
 
 type DB = typeof import("@/lib/db").db;
@@ -415,5 +421,45 @@ describe("removing a file", () => {
     const { doc } = await registerDocument(otherFounder, globex, { pathname: g, filename: "g.csv", docType: "other" });
     expect((await removeDocument(founder, acme, doc.id)).ok).toBe(false);
     expect(await listDocuments(globex)).toHaveLength(1);
+  });
+});
+
+describe("Google links and AI availability", () => {
+  const SHEET = "https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit#gid=0";
+  const csvFetch = (async () =>
+    new Response("Month,Revenue\n2026-01,100\n", { headers: { "content-type": "text/csv", "content-disposition": 'attachment; filename="Everything.csv"' } })) as unknown as typeof fetch;
+
+  it("imports a shared Google file into the inbox with its source link", async () => {
+    const r = await importGoogleLink(founder, acme, SHEET, csvFetch);
+    expect(r).toMatchObject({ ok: true, duplicate: false, filename: "Everything.csv" });
+    const [doc] = await listDocuments(acme);
+    expect(doc).toMatchObject({ inbox: true, sourceUrl: SHEET, mime: "text/csv", filename: "Everything.csv" });
+    // Same content again reuses the record.
+    expect(await importGoogleLink(founder, acme, SHEET, csvFetch)).toMatchObject({ ok: true, duplicate: true });
+    expect(await listDocuments(acme)).toHaveLength(1);
+  });
+
+  it("refuses non-Google links and explains unshared files", async () => {
+    expect(await importGoogleLink(founder, acme, "https://example.com/file.xlsx", csvFetch)).toMatchObject({ ok: false, error: expect.stringMatching(/Google Sheets, Docs, Slides or Drive/) });
+    const forbidden = (async () => new Response("no", { status: 403 })) as unknown as typeof fetch;
+    expect(await importGoogleLink(founder, acme, SHEET, forbidden)).toMatchObject({ ok: false, error: expect.stringMatching(/Anyone with the link/) });
+    expect(await listDocuments(acme)).toHaveLength(0);
+  });
+
+  it("tells the founder plainly when the AI isn't available, and still offers column matches", async () => {
+    h.extract.mockRejectedValue(new AiConfigError("ANTHROPIC_API_KEY contains characters a real key can't"));
+    const pathname = `${companyBlobPrefix(acme.id)}inbox/p.csv`;
+    h.blobs.set(pathname, { contentType: "text/csv", body: "Month,Revenue,COGS\n2026-01,100,20\n" });
+    const { doc } = await registerDocument(founder, acme, { pathname, filename: "p.csv", docType: "other" });
+    await processDocument(doc.id);
+    await sortDocument(doc.id, async () => {
+      throw new AiConfigError("bad key");
+    });
+    const [view] = await listDocuments(acme);
+    expect(view!.status).toBe("failed");
+    expect(view!.error).toMatch(/Automatic reading isn't available right now/);
+    expect(view!.error).not.toMatch(/ANTHROPIC_API_KEY/); // config details stay out of the founder's view
+    expect(view!.sortStatus).toBe("failed");
+    expect(view!.suggestions.some((x) => x.itemKey === "monthly_revenue")).toBe(true);
   });
 });
