@@ -87,3 +87,11 @@ export async function listManagedCompanies(actor: User): Promise<Company[]> {
     .where(actor.role === "admin" ? undefined : eq(schema.companies.advisorId, actor.id))
     .orderBy(asc(schema.companies.name));
 }
+
+/** A company the advisor manages (admins: any company), or null. */
+export async function getManagedCompany(actor: User, companyId: string): Promise<Company | null> {
+  if (actor.role !== "advisor" && actor.role !== "admin") return null;
+  const [company] = await db.select().from(schema.companies).where(eq(schema.companies.id, companyId)).limit(1);
+  if (!company) return null;
+  return actor.role === "admin" || company.advisorId === actor.id ? company : null;
+}

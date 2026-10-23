@@ -73,7 +73,8 @@ export async function saveIntakeAnswer(user: User, company: Company, sectionId: 
       if (dataPointId) await db.delete(schema.dataPoints).where(eq(schema.dataPoints.id, dataPointId));
       dataPointId = null;
     } else if (dataPointId) {
-      await db.update(schema.dataPoints).set({ value }).where(eq(schema.dataPoints.id, dataPointId));
+      // A new answer is the founder's current figure again, even if a conflict had set it aside.
+      await db.update(schema.dataPoints).set({ value, status: "accepted", acceptedBy: user.id }).where(eq(schema.dataPoints.id, dataPointId));
     } else {
       const [dp] = await db
         .insert(schema.dataPoints)

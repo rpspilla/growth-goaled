@@ -1,5 +1,21 @@
-import { Placeholder } from "@/components/Placeholder";
+import { PageHeader } from "@/components/PageHeader";
+import { QuestionsView } from "@/components/registers/QuestionsView";
+import { requireRole } from "@/lib/auth/session";
+import { getFounderCompany } from "@/lib/data/companies";
+import { listCompanyFiles, listRegisterItems } from "@/lib/data/registers";
+import { resolveQuestion } from "./actions";
 
-export default function Page() {
-  return <Placeholder title="Questions we need you to answer" subtitle="Resolving these will improve the accuracy of your Growth Intelligence profile." milestone="M6" />;
+export default async function QuestionsPage() {
+  const user = await requireRole(["founder"]);
+  const company = await getFounderCompany(user);
+  const header = <PageHeader title="Questions we need you to answer" subtitle="Resolving these will improve the accuracy of your Growth Intelligence profile." />;
+  if (!company) return <div className="p-8 max-w-4xl">{header}</div>;
+
+  const [items, files] = await Promise.all([listRegisterItems([company.id], { owner: "founder" }), listCompanyFiles(company)]);
+  return (
+    <div className="p-8 max-w-4xl">
+      {header}
+      <QuestionsView items={items} files={files} resolve={resolveQuestion} />
+    </div>
+  );
 }

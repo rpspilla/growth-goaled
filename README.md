@@ -71,6 +71,17 @@ The browser sends the file straight to the **private** Blob store using a token 
 
 Extraction (`lib/ai/extract.ts`) sends PDFs as document blocks and `.xlsx`/`.csv` files as CSV text to Claude (model set in `lib/ai/config.ts`), with the metrics dictionary as the allowed output. The JSON reply is validated with Zod and retried once if invalid. Each run is logged in `agent_runs`. Extracted values are stored as **proposed** data points for the founder to accept or reject. A value more than 10% away from an earlier one for the same metric and period opens a `conflict` register item; low-confidence or computed values open an `assumption` item. PowerPoint, `.xls`, `.doc` and Pages files are rejected with a request to export them as PDF, `.xlsx` or `.docx`.
 
+### Questions and registers
+
+Register items (`register_items`) are opened automatically by extraction (conflicts, assumptions) or by an advisor, and are owned by the founder or the advisor. Founders see their own company's founder-owned items on `/questions`: a Questions tab of open items and a Registers tab grouped by type. Ways to close an item (`lib/data/registers.ts`, validated by `resolveActionSchema` in `lib/registers.ts`):
+
+- **Conflict**: keep one of the values (the chosen data point is accepted, the others rejected), or enter the correct figure (a new accepted data point with the same metric).
+- **Assumption**: confirm the value we read, or enter the actual figure.
+- **Missing / question / follow-up**: answer in words, or point at an uploaded file ("use uploaded data") for the advisor to check.
+- **Mark as unknown**, with an optional note.
+
+Every resolution records who closed it, how and when, and emits `register_item_resolved`. Advisors see items for the companies assigned to them (admins: all) on `/advisor/registers`, filtered by status, type and company. They can resolve any item, reopen closed ones and add new ones. Re-editing an intake answer makes that figure the accepted one again, even if a conflict had set it aside.
+
 ### Seed data and the sample company
 
 `scripts/seed.ts` seeds **Acme AI**, the read-only demo at `/sample` (no login), with its published Benchmark, data points, score and open questions. On staging it also seeds a fake advisory portfolio of six more companies. Figures come from `prototype/src/data/mock.ts` and are illustrative. The sample benchmark cohort is flagged `is_sample` so it is never matched to real companies.
