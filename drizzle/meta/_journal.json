@@ -36,6 +36,13 @@
       "when": 1792762379280,
       "tag": "0004_data_readiness",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792764524399,
+      "tag": "0005_benchmark_research",
+      "breakpoints": true
     }
   ]
 }

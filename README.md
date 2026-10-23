@@ -82,6 +82,15 @@ Register items (`register_items`) are opened automatically by extraction (confli
 
 Every resolution records who closed it, how and when, and emits `register_item_resolved`. Advisors see items for the companies assigned to them (admins: all) on `/advisor/registers`, filtered by status, type and company. They can resolve any item, reopen closed ones and add new ones. Re-editing an intake answer makes that figure the accepted one again, even if a conflict had set it aside.
 
+### Benchmark library
+
+`/advisor/benchmarks` (advisors and admins) manages cohorts, their benchmark rows and sources (`lib/data/benchmarks.ts`, rules in `lib/benchmarks.ts`).
+
+- **Cohorts**: name, criteria (stages, ARR range, business model, GTM motion), company count. The seeded sample cohort is read-only and never matched to real companies.
+- **Rows** are `proposed`, `approved` or `retired`. Only approved rows may be used by agents or shown to founders. Approving needs a source and quartiles in a sensible order, and retires any other approved row for the same cohort, metric and period. Quartiles are direction-aware: `p75` is the *top quartile*, so for lower-is-better metrics (sales cycle, CAC payback, burn multiple) it's the smaller number.
+- **CSV import** of the owner's advisory data: download the template from the page (`/advisor/benchmarks/template`), fill in `metric,p25,median,top_quartile,sample_size,period`, and import it with a source name. Rows arrive as proposed under one `advisory` source; bad rows are listed by line and skipped.
+- **Research public benchmarks** (`lib/ai/research.ts`) runs Claude with the web search tool after the action responds (`after()`, up to 300s), logged in `agent_runs` (`agent = research`). It returns aggregates and citations only. In code, any source whose URL wasn't among the search results is dropped, as are rows pointing at it and rows with quartiles out of order; what was dropped is shown on the page. Everything kept is proposed until an advisor approves it.
+
 ### Seed data and the sample company
 
 `scripts/seed.ts` seeds **Acme AI**, the read-only demo at `/sample` (no login), with its published Benchmark, data points, score and open questions. On staging it also seeds a fake advisory portfolio of six more companies. Figures come from `prototype/src/data/mock.ts` and are illustrative. The sample benchmark cohort is flagged `is_sample` so it is never matched to real companies.

@@ -80,7 +80,7 @@ export const deliverableStatus = pgEnum("deliverable_status", [
   "failed",
 ]);
 export const claimSourceKind = pgEnum("claim_source_kind", ["data_point", "benchmark_metric", "document", "methodology"]);
-export const agentKind = pgEnum("agent_kind", ["draft", "qa", "extract"]);
+export const agentKind = pgEnum("agent_kind", ["draft", "qa", "extract", "research"]);
 export const agentRunStatus = pgEnum("agent_run_status", ["running", "succeeded", "failed"]);
 export const reviewDecision = pgEnum("review_decision", ["approve", "request_changes", "send_back"]);
 
@@ -481,6 +481,9 @@ export const agentRuns = pgTable(
     // Null for extraction runs, which belong to a document rather than a deliverable
     deliverableId: uuid("deliverable_id").references(() => deliverables.id, { onDelete: "cascade" }),
     documentId: uuid("document_id").references(() => documents.id, { onDelete: "cascade" }),
+    // Set for benchmark research runs
+    cohortId: uuid("cohort_id").references(() => benchmarkCohorts.id, { onDelete: "cascade" }),
+    startedBy: uuid("started_by").references(() => users.id, { onDelete: "set null" }),
     agent: agentKind("agent").notNull(),
     model: text("model").notNull(),
     status: agentRunStatus("status").notNull().default("running"),
