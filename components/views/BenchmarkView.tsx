@@ -25,13 +25,20 @@ export function BenchmarkView({
   companyName,
   scoreBreakdown,
   baselineHref,
+  onSourceTrail,
 }: {
   data: BenchmarkData;
   companyName: string;
   scoreBreakdown: { label: string; score: number }[] | null;
   baselineHref?: string;
+  /** Called when a Source Trail is opened (analytics). */
+  onSourceTrail?: (claimKey: string) => void;
 }) {
-  const [openClaim, setOpenClaim] = useState<string | null>(null);
+  const [openClaim, setOpenClaimState] = useState<string | null>(null);
+  const setOpenClaim = (key: string | null) => {
+    setOpenClaimState(key);
+    if (key) onSourceTrail?.(key);
+  };
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const [barsReady, setBarsReady] = useState(false);
 

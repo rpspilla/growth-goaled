@@ -10,6 +10,7 @@ import { DOC_TYPE_FOR_CATEGORY, processDocument, registerDocument, resetFailedDo
 import { getReadiness, latestAssessment, markReadyForBenchmark, updateDataItem, type ItemPatch, type UpdateResult } from "@/lib/data/readiness";
 import { summarizeGaps } from "@/lib/ai/readiness-summary";
 import { readinessFacts } from "@/lib/readiness-facts";
+import { createBenchmarkVersion, runBenchmarkPipeline } from "@/lib/data/deliverables";
 
 /** Every action works on the signed-in founder's own company; the client never supplies a company id. */
 async function founderCompany() {
@@ -65,9 +66,14 @@ export async function reviewPoint(dataPointId: string, decision: "accepted" | "r
   refresh();
 }
 
+/** Hands the data to the advisor and starts drafting the Benchmark (nothing reaches the founder until it's published). */
 export async function sendForBenchmark(): Promise<{ ok: true } | { ok: false; error: string }> {
   const { company } = await founderCompany();
   const result = await markReadyForBenchmark(company);
+  if (result.ok) {
+    const version = await createBenchmarkVersion(company);
+    if (version) after(() => runBenchmarkPipeline(version.id));
+  }
   revalidatePath("/", "layout");
   return result;
 }

@@ -61,8 +61,16 @@ export async function getPublishedBenchmark(companyId: string): Promise<Benchmar
     )
     .orderBy(desc(schema.deliverables.version))
     .limit(1);
-  if (!deliverable) return null;
+  return deliverable ? benchmarkViewFor(deliverable) : null;
+}
 
+/**
+ * Renders any Benchmark deliverable version (drafts included) for the views.
+ * Only staff may be shown unpublished versions; founders go through
+ * getPublishedBenchmark.
+ */
+export async function benchmarkViewFor(deliverable: typeof schema.deliverables.$inferSelect): Promise<BenchmarkView | null> {
+  const companyId = deliverable.companyId;
   const parsed = benchmarkContentSchema.safeParse(deliverable.content);
   if (!parsed.success) {
     console.error(`[benchmark] Deliverable ${deliverable.id} has invalid content`, parsed.error.issues);

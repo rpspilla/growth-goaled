@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { sendForBenchmark } from "@/app/(founder)/readiness/actions";
 
@@ -8,13 +9,15 @@ import { sendForBenchmark } from "@/app/(founder)/readiness/actions";
 export function HandoffCard({ ready, blockers, alreadyMoved }: { ready: boolean; blockers: string[]; alreadyMoved: boolean }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   return (
     <div className="rounded-xl border p-5" style={{ background: "var(--card)", borderColor: ready ? "var(--green)" : "var(--border)" }}>
       <div className="text-sm font-semibold mb-1" style={{ color: "var(--foreground)" }}>Next: Benchmark and Baseline</div>
       {alreadyMoved ? (
         <p className="text-sm mb-3" style={{ color: "var(--muted-foreground)" }}>
-          Your advisor is working from this data. You can keep adding files and details at any time.
+          Your advisor is working from this data. You can keep adding files and details at any time.{" "}
+          <Link href="/processing" style={{ color: "var(--green)" }}>See progress →</Link>
         </p>
       ) : ready ? (
         <p className="text-sm mb-3" style={{ color: "var(--muted-foreground)" }}>
@@ -39,6 +42,7 @@ export function HandoffCard({ ready, blockers, alreadyMoved }: { ready: boolean;
                 setError(null);
                 const r = await sendForBenchmark();
                 if (!r.ok) setError(r.error);
+                else router.push("/processing");
               })
             }
             className="text-xs px-3 py-1.5 rounded-md font-semibold disabled:opacity-50"

@@ -91,6 +91,17 @@ Every resolution records who closed it, how and when, and emits `register_item_r
 - **CSV import** of the owner's advisory data: download the template from the page (`/advisor/benchmarks/template`), fill in `metric,p25,median,top_quartile,sample_size,period`, and import it with a source name. Rows arrive as proposed under one `advisory` source; bad rows are listed by line and skipped.
 - **Research public benchmarks** (`lib/ai/research.ts`) runs Claude with the web search tool after the action responds (`after()`, up to 300s), logged in `agent_runs` (`agent = research`). It returns aggregates and citations only. In code, any source whose URL wasn't among the search results is dropped, as are rows pointing at it and rows with quartiles out of order; what was dropped is shown on the page. Everything kept is proposed until an advisor approves it.
 
+### Benchmark deliverable pipeline
+
+`lib/data/deliverables.ts` runs a Benchmark end to end. It starts when a founder sends their data from Data Readiness, or when an advisor clicks Generate on `/advisor/review`. The work runs after the response (`after()`, up to 300s) and each agent call is logged in `agent_runs`.
+
+1. **Inputs, in code**: the company's latest *accepted* data point per metric; the best-matching cohort among non-sample cohorts with *approved* rows (`lib/cohort-match.ts`, rule-based on stage, ARR band, GTM motion and business model); the comparison rows (company value, cohort median and top quartile, ahead/behind); open register items; and the advisor's feedback when sent back. The methodology text is generated from the match, not by the model.
+2. **Draft Agent** (`lib/ai/draft.ts`) writes only the narrative (headline, insight, strengths, watch areas, priority, missing inputs) and cites the data point / benchmark row IDs it was given. Table rows and their claims are built in code.
+3. **QA Agent** (`lib/ai/qa.ts`) is a separate call that sees the input and the draft output only, and returns the five checks. Code checks (`lib/deliverables/checks.ts`) then verify every figure in the text matches an input value or a simple gap, and every claim cites a valid source; a code failure overrides the model's pass.
+4. **Advisor gate** (`/advisor/review/[id]`): draft preview, QA results and run details side by side. *Approve* → `approved`, then *Publish* → visible to the founder (and phase moves to `baseline`). *Request changes* edits the text into a new version that's QA'd again. *Send back to AI* redrafts with the advisor's comment. Older versions become `changes_requested`.
+
+Founders see progress on `/processing` (status only, never draft content) and the latest *published* version on `/benchmark`. Runs that haven't finished in 10 minutes show as stalled and can be restarted. Events: `review_decision`, `deliverable_published`, `deliverable_viewed`, `source_trail_opened`.
+
 ### Seed data and the sample company
 
 `scripts/seed.ts` seeds **Acme AI**, the read-only demo at `/sample` (no login), with its published Benchmark, data points, score and open questions. On staging it also seeds a fake advisory portfolio of six more companies. Figures come from `prototype/src/data/mock.ts` and are illustrative. The sample benchmark cohort is flagged `is_sample` so it is never matched to real companies.
