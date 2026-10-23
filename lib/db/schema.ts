@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   boolean,
   date,
   index,
@@ -131,6 +132,10 @@ export const companies = pgTable(
     health: companyHealth("health"),
     // Null → company sits in the unassigned queue
     advisorId: uuid("advisor_id").references(() => users.id, { onDelete: "set null" }),
+    // Internal advisor note on the company (never shown to founders)
+    advisorSummary: text("advisor_summary"),
+    advisorSummaryAt: timestamp("advisor_summary_at", { withTimezone: true }),
+    advisorSummaryBy: uuid("advisor_summary_by").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
     isSample: boolean("is_sample").notNull().default(false),
     ...timestamps,
   },

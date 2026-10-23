@@ -102,6 +102,12 @@ Every resolution records who closed it, how and when, and emits `register_item_r
 
 Founders see progress on `/processing` (status only, never draft content) and the latest *published* version on `/benchmark`. Runs that haven't finished in 10 minutes show as stalled and can be restarted. Events: `review_decision`, `deliverable_published`, `deliverable_viewed`, `source_trail_opened`.
 
+### Advisor portfolio and company view
+
+`/advisor/portfolio` shows counts (active, requiring attention, awaiting founder input, in advisor review, complete) and a table of the advisor's companies (admins: all) built from accepted data, open registers, readiness and the latest Benchmark version (`lib/data/portfolio.ts`). A company needs attention when a Benchmark is waiting for review or publishing, a run failed, data conflicts are open, or its health is "at risk".
+
+`/advisor/companies/[id]` shows metrics, score, benchmark position (published, or the current draft), phase, readiness, open questions and files. Advisors set health, keep an internal advisor summary (never shown to founders), and review the founder's data items: **Validate** supplied items and send **follow-up requests**, which the founder sees on the item and in the "most useful next step".
+
 ### Seed data and the sample company
 
 `scripts/seed.ts` seeds **Acme AI**, the read-only demo at `/sample` (no login), with its published Benchmark, data points, score and open questions. On staging it also seeds a fake advisory portfolio of six more companies. Figures come from `prototype/src/data/mock.ts` and are illustrative. The sample benchmark cohort is flagged `is_sample` so it is never matched to real companies.

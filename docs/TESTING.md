@@ -56,6 +56,15 @@ Use two browsers (or a private window): one signed in as **admin** (ryan@growthg
 - [ ] Approve, then Publish → founder `/benchmark` shows it with the approval note; source trail panel opens for rows and insight
 - [ ] Generate with no matching approved cohort → version fails with a clear reason, "Start a new draft" works
 
+## Advisor portfolio and company view (M9)
+- [ ] `/advisor/portfolio`: five counts match reality; table shows ARR, growth, health, phase, data %, questions, benchmark status; red dot on companies needing attention
+- [ ] Click a company → `/advisor/companies/[id]`: metric cards, score, benchmark position (published, or draft labelled "draft"), phase, readiness numbers
+- [ ] Set health (On track / Watch / At risk) → shows in the portfolio table
+- [ ] Write and save the advisor summary; it is **not** visible anywhere on the founder side
+- [ ] "To validate": Validate a founder item → founder's item shows Validated (and founder editing it resets to Unverified)
+- [ ] "Required gaps": send a Request → founder sees "Advisor request" on that item in Data Readiness and it drives the "most useful next step"
+- [ ] Open questions and files lists match the founder's
+
 ## Production (before launch)
 - [ ] Neon Auth provisioned on the **main** branch, trusted domain app.growthgoaled.com, magic link enabled
 - [ ] Vercel production env: NEON_AUTH_BASE_URL, NEON_AUTH_COOKIE_SECRET (others already set)
