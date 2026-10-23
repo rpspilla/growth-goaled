@@ -14,16 +14,21 @@ export const DOC_TYPES: { id: DocType; label: string; icon: string }[] = [
 
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 
-/** File kinds we can send to extraction: PDFs as documents, spreadsheets and text as CSV/plain text. */
-export const ACCEPTED_TYPES: Record<string, "pdf" | "xlsx" | "text"> = {
+/**
+ * Accepted uploads and how each is handled: PDFs go to extraction as documents,
+ * spreadsheets and text as CSV/plain text. DOCX is stored and attached to the
+ * company but not analysed automatically ("stored").
+ */
+export const ACCEPTED_TYPES: Record<string, "pdf" | "xlsx" | "text" | "stored"> = {
   "application/pdf": "pdf",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
   "text/csv": "text",
   "text/plain": "text",
   "text/markdown": "text",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "stored",
 };
 
-export const ACCEPT_ATTR = ".pdf,.xlsx,.csv,.txt,.md";
+export const ACCEPT_ATTR = ".pdf,.xlsx,.csv,.docx,.txt,.md";
 
 /** Content type from the file name, for browsers that report an empty or generic type. */
 export function contentTypeFor(filename: string, reported: string): string {
@@ -36,6 +41,7 @@ export function contentTypeFor(filename: string, reported: string): string {
       csv: "text/csv",
       txt: "text/plain",
       md: "text/markdown",
+      docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     }[ext ?? ""] ?? reported
   );
 }
@@ -44,7 +50,7 @@ export function unsupportedReason(filename: string): string | null {
   const ext = filename.toLowerCase().split(".").pop();
   if (ext === "pptx" || ext === "ppt" || ext === "key") return "Export presentations as PDF, then upload the PDF.";
   if (ext === "xls" || ext === "numbers") return "Save spreadsheets as .xlsx or .csv first.";
-  if (ext === "docx" || ext === "doc" || ext === "pages") return "Export documents as PDF first.";
+  if (ext === "doc" || ext === "pages") return "Save documents as .docx or PDF first.";
   return null;
 }
 

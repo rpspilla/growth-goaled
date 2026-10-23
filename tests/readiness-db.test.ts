@@ -1,0 +1,296 @@
+/**
+ * Founder data-readiness workflow against a real Postgres (PGlite, in memory)
+ * with the committed migrations applied. Blob storage and the model are
+ * stubbed; everything else (persistence, scoping, dedupe, profiling,
+ * assessment) runs for real.
+ */
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { eq } from "drizzle-orm";
+
+const h = vi.hoisted(() => ({
+  db: null as unknown as Record<string | symbol, unknown>,
+  blobs: new Map<string, { contentType: string; body: string }>(),
+  extract: vi.fn(),
+  del: vi.fn(async (url: string) => void url),
+}));
+
+vi.mock("server-only", () => ({}));
+vi.mock("@/lib/db", async () => {
+  const schema = await import("@/lib/db/schema");
+  return { db: new Proxy({}, { get: (_t, p) => Reflect.get(h.db, p) }), schema };
+});
+vi.mock("@vercel/blob", () => ({
+  head: async (pathname: string) => {
+    const b = h.blobs.get(pathname);
+    if (!b) throw new Error("not found");
+    return { url: `https://blob.test/${pathname}`, size: b.body.length, contentType: b.contentType };
+  },
+  get: async (url: string) => {
+    const b = h.blobs.get(url.replace("https://blob.test/", ""));
+    return b ? { stream: new Response(b.body).body } : null;
+  },
+  del: h.del,
+}));
+vi.mock("@/lib/ai/extract", async () => {
+  class ExtractionError extends Error {}
+  return { ExtractionError, extractMetrics: h.extract };
+});
+
+import { schema } from "@/lib/db";
+import type { Company, User } from "@/lib/db/schema";
+import { getReadiness, markReadyForBenchmark, updateDataItem } from "@/lib/data/readiness";
+import { companyBlobPrefix, processDocument, registerDocument } from "@/lib/data/documents";
+import { ALL_ITEM_KEYS, getItem } from "@/lib/readiness";
+
+type DB = typeof import("@/lib/db").db;
+const db = () => h.db as unknown as DB;
+
+let acme: Company;
+let globex: Company;
+let founder: User;
+let otherFounder: User;
+let advisor: User;
+
+beforeAll(async () => {
+  const { PGlite } = await import("@electric-sql/pglite");
+  const { drizzle } = await import("drizzle-orm/pglite");
+  const { migrate } = await import("drizzle-orm/pglite/migrator");
+  const schemaMod = await import("@/lib/db/schema");
+  const instance = drizzle(new PGlite(), { schema: schemaMod });
+  await migrate(instance, { migrationsFolder: "drizzle" });
+  h.db = instance as unknown as Record<string | symbol, unknown>;
+}, 60_000);
+
+beforeEach(async () => {
+  h.blobs.clear();
+  h.extract.mockReset();
+  h.del.mockClear();
+  await db().delete(schema.companies);
+  await db().delete(schema.users);
+  [acme, globex] = await db()
+    .insert(schema.companies)
+    .values([{ name: "Acme Analytics" }, { name: "Globex" }])
+    .returning() as [Company, Company];
+  [founder, otherFounder, advisor] = await db()
+    .insert(schema.users)
+    .values([
+      { email: "maya@acme.test", authUserId: "a1", role: "founder" },
+      { email: "hank@globex.test", authUserId: "a2", role: "founder" },
+      { email: "advisor@growthgoaled.test", authUserId: "a3", role: "advisor" },
+    ])
+    .returning() as [User, User, User];
+});
+
+const put = (company: Company, name: string, contentType: string, body: string) => {
+  const pathname = `${companyBlobPrefix(company.id)}customers/${name}`;
+  h.blobs.set(pathname, { contentType, body });
+  return pathname;
+};
+const hash = (c: string) => c.repeat(64);
+
+describe("data item records", () => {
+  it("creates every requirement for a company as not reviewed", async () => {
+    const r = await getReadiness(acme);
+    expect(r.items).toHaveLength(ALL_ITEM_KEYS.length);
+    expect(r.items.every((i) => i.status === "not_reviewed" && i.quality === "unverified")).toBe(true);
+    await getReadiness(acme); // idempotent
+    expect((await getReadiness(acme)).items).toHaveLength(ALL_ITEM_KEYS.length);
+  });
+
+  it("persists status and details", async () => {
+    const r = await updateDataItem(founder, acme, "monthly_revenue", {
+      status: "partial",
+      collectionMethod: "file_upload",
+      sourceSystem: "QuickBooks",
+      coverageStart: "2025-10",
+      coverageEnd: "2026-09",
+      limitations: "No recurring/one-off split before March",
+      notes: "Board deck numbers differ slightly",
+    });
+    expect(r.ok).toBe(true);
+    const row = (await getReadiness(acme)).items.find((i) => i.itemKey === "monthly_revenue")!;
+    expect(row).toMatchObject({
+      status: "partial",
+      collectionMethod: "file_upload",
+      sourceSystem: "QuickBooks",
+      coverageStart: "2025-10-01",
+      coverageEnd: "2026-09-01",
+      limitations: "No recurring/one-off split before March",
+      quality: "unverified",
+      reviewedBy: founder.id,
+    });
+    expect(row.lastReviewedAt).toBeInstanceOf(Date);
+  });
+
+  it("rejects unknown items, bad dates and reversed coverage", async () => {
+    expect((await updateDataItem(founder, acme, "made_up", { status: "available" })).ok).toBe(false);
+    expect((await updateDataItem(founder, acme, "monthly_revenue", { coverageStart: "Oct 2025" })).ok).toBe(false);
+    expect((await updateDataItem(founder, acme, "monthly_revenue", { coverageStart: "2026-09", coverageEnd: "2025-10" })).ok).toBe(false);
+  });
+
+  it("never lets a founder mark data validated or set follow-ups", async () => {
+    const v = await updateDataItem(founder, acme, "monthly_revenue", { status: "available", quality: "validated" });
+    expect(v).toEqual({ ok: false, error: expect.stringMatching(/advisor/) });
+    expect((await updateDataItem(founder, acme, "monthly_revenue", { followUp: "x" })).ok).toBe(false);
+    expect((await getReadiness(acme)).items.find((i) => i.itemKey === "monthly_revenue")!.quality).toBe("unverified");
+  });
+
+  it("resets an advisor's validation when the founder changes the substance", async () => {
+    await updateDataItem(founder, acme, "current_cash", { status: "available" });
+    expect((await updateDataItem(advisor, acme, "current_cash", { quality: "validated", followUp: "Confirm with Sep bank statement" })).ok).toBe(true);
+    await updateDataItem(founder, acme, "current_cash", { notes: "From Mercury" });
+    let row = (await getReadiness(acme)).items.find((i) => i.itemKey === "current_cash")!;
+    expect(row.quality).toBe("validated"); // notes alone don't invalidate
+    await updateDataItem(founder, acme, "current_cash", { coverageEnd: "2026-10" });
+    row = (await getReadiness(acme)).items.find((i) => i.itemKey === "current_cash")!;
+    expect(row.quality).toBe("unverified");
+    expect(row.followUp).toBe("Confirm with Sep bank statement");
+  });
+
+  it("keeps each company's records separate", async () => {
+    await updateDataItem(founder, acme, "monthly_revenue", { status: "available", sourceSystem: "Xero" });
+    const g = await getReadiness(globex);
+    expect(g.items.find((i) => i.itemKey === "monthly_revenue")).toMatchObject({ status: "not_reviewed", sourceSystem: null });
+    expect(g.items.every((i) => i.companyId === globex.id)).toBe(true);
+    // Updating Globex (even by a key Acme also has) leaves Acme alone.
+    await updateDataItem(otherFounder, globex, "monthly_revenue", { status: "missing" });
+    expect((await getReadiness(acme)).items.find((i) => i.itemKey === "monthly_revenue")!.status).toBe("available");
+  });
+});
+
+describe("uploads", () => {
+  const CSV = "text/csv";
+  const customers = "Customer,Industry,Employees,Start date\nNorthwind,Logistics,420,2024-11-01\nInitech,Fintech,85,2026-02-15\n";
+
+  it("links an upload to its items and marks them available but unverified", async () => {
+    const pathname = put(acme, "customers.csv", CSV, customers);
+    const { duplicate } = await registerDocument(founder, acme, { pathname, filename: "customers.csv", docType: "customer_list", category: "customers", itemKeys: ["customer_list", "industry"], contentHash: hash("a") });
+    expect(duplicate).toBe(false);
+    const r = await getReadiness(acme);
+    expect(r.files).toHaveLength(1);
+    expect(r.files[0]).toMatchObject({ status: "uploaded", category: "customers", itemKeys: ["customer_list", "industry"] });
+    for (const key of ["customer_list", "industry"]) {
+      expect(r.items.find((i) => i.itemKey === key)).toMatchObject({ status: "available", collectionMethod: "file_upload", quality: "unverified" });
+    }
+  });
+
+  it("ignores item links from another category", async () => {
+    const pathname = put(acme, "c.csv", CSV, customers);
+    const { doc } = await registerDocument(founder, acme, { pathname, filename: "c.csv", docType: "customer_list", category: "customers", itemKeys: ["industry", "monthly_revenue"] });
+    expect(doc.dataItemKeys).toEqual(["industry"]);
+  });
+
+  it("re-uploading the same file reuses the record instead of duplicating it", async () => {
+    const first = put(acme, "customers.csv", CSV, customers);
+    await registerDocument(founder, acme, { pathname: first, filename: "customers.csv", docType: "customer_list", category: "customers", itemKeys: ["customer_list"], contentHash: hash("b") });
+    const second = put(acme, "customers-copy.csv", CSV, customers);
+    const again = await registerDocument(founder, acme, { pathname: second, filename: "customers-copy.csv", docType: "customer_list", category: "customers", itemKeys: ["company_size"], contentHash: hash("b") });
+    expect(again.duplicate).toBe(true);
+    expect(h.del).toHaveBeenCalledWith(`https://blob.test/${second}`);
+    const files = (await getReadiness(acme)).files;
+    expect(files).toHaveLength(1);
+    expect(files[0]!.itemKeys.sort()).toEqual(["company_size", "customer_list"]);
+    // The same content for another company is a separate record.
+    const g = put(globex, "customers.csv", CSV, customers);
+    expect((await registerDocument(otherFounder, globex, { pathname: g, filename: "customers.csv", docType: "customer_list", category: "customers", contentHash: hash("b") })).duplicate).toBe(false);
+  });
+
+  it("refuses files outside the company's folder", async () => {
+    const pathname = put(globex, "theirs.csv", CSV, customers);
+    await expect(registerDocument(founder, acme, { pathname, filename: "theirs.csv", docType: "customer_list", category: "customers" })).rejects.toThrow(/belong/);
+  });
+
+  it("profiles a CSV, proposes extracted values and flags missing columns", async () => {
+    h.extract.mockResolvedValue({ points: [{ metric: "arr", value: 4_200_000, period: "Sep 2026", page: null, raw_text: "Total ARR 4.2M", confidence: "high", inferred: false }], tokensIn: 10, tokensOut: 5, model: "test" });
+    const pathname = put(acme, "customers.csv", CSV, customers);
+    const { doc } = await registerDocument(founder, acme, { pathname, filename: "customers.csv", docType: "customer_list", category: "customers", itemKeys: ["revenue_by_customer"] });
+    await processDocument(doc.id);
+    const r = await getReadiness(acme);
+    expect(r.files[0]).toMatchObject({ status: "done", columns: ["Customer", "Industry", "Employees", "Start date"], dateRange: { start: "2024-11-01", end: "2026-02-15" }, dataPointsFound: 1 });
+    // A revenue-by-customer file with no revenue column is flagged, not assumed.
+    expect(r.missingFields.revenue_by_customer?.length).toBeGreaterThan(0);
+    const points = await db().select().from(schema.dataPoints).where(eq(schema.dataPoints.documentId, doc.id));
+    expect(points).toHaveLength(1);
+    expect(points[0]!.status).toBe("proposed"); // never accepted automatically
+  });
+
+  it("stores Word files without claiming to analyse them", async () => {
+    const pathname = put(acme, "notes.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "PK…");
+    const { doc } = await registerDocument(founder, acme, { pathname, filename: "notes.docx", docType: "other", category: "customers", itemKeys: ["use_case"] });
+    await processDocument(doc.id);
+    const f = (await getReadiness(acme)).files[0]!;
+    expect(f.status).toBe("stored");
+    expect(h.extract).not.toHaveBeenCalled();
+    expect(f.dataPointsFound).toBe(0);
+  });
+
+  it("records a failure with its reason", async () => {
+    const { ExtractionError } = await import("@/lib/ai/extract");
+    h.extract.mockRejectedValue(new ExtractionError("The analysis returned invalid data twice."));
+    const pathname = put(acme, "pipeline.csv", CSV, "Opportunity,Amount\nA,100\n");
+    const { doc } = await registerDocument(founder, acme, { pathname, filename: "pipeline.csv", docType: "other", category: "customers" });
+    await processDocument(doc.id);
+    expect((await getReadiness(acme)).files[0]).toMatchObject({ status: "failed", error: "The analysis returned invalid data twice." });
+  });
+});
+
+describe("readiness dashboard with realistic data", () => {
+  /** A Series A company that has its finance and CRM in order but little product or churn data. */
+  async function seedAcme() {
+    const avail = (key: string, extra: Parameters<typeof updateDataItem>[3] = {}) => updateDataItem(founder, acme, key, { status: "available", ...extra });
+    const year = { coverageStart: "2025-10", coverageEnd: "2026-09" };
+    await avail("monthly_revenue", { sourceSystem: "QuickBooks", ...year });
+    await avail("monthly_expenses", { sourceSystem: "QuickBooks", ...year });
+    await avail("monthly_burn", year);
+    await avail("current_cash", { sourceSystem: "Mercury", coverageStart: "2026-09", coverageEnd: "2026-09" });
+    await avail("customer_list", { sourceSystem: "HubSpot" });
+    await avail("revenue_by_customer", { sourceSystem: "Stripe", ...year });
+    await updateDataItem(founder, acme, "industry", { status: "partial", limitations: "Industry only tagged for ~60% of accounts" });
+    await avail("start_term");
+    await avail("opportunities", { sourceSystem: "HubSpot", ...year });
+    await avail("opp_value_dates", year);
+    await avail("win_loss", { quality: "estimated" });
+    await avail("marketing_spend", { coverageStart: "2025-01", coverageEnd: "2025-06" }); // stale
+    await updateDataItem(founder, acme, "churned_revenue", { status: "missing", notes: "We don't track churn by dollar yet" });
+    await updateDataItem(founder, acme, "ai_costs", { status: "not_applicable" });
+  }
+
+  it("separates completeness, quality and what can be calculated", async () => {
+    await seedAcme();
+    const { assessment: a } = await getReadiness(acme, new Date("2026-10-23T00:00:00Z"));
+
+    expect(a.collection.requiredPercent).toBeGreaterThan(0);
+    expect(a.collection.requiredPercent).toBeLessThan(100);
+    expect(a.quality.validated).toBe(0); // founder marking ≠ validation
+    expect(a.quality.estimated).toBe(1);
+    const issue = (key: string) => a.quality.issues.filter((i) => i.key === key).map((i) => i.kind);
+    expect(issue("marketing_spend")).toEqual(expect.arrayContaining(["outdated", "short_history"]));
+    expect(issue("industry")).toContain("limitations");
+
+    const metric = (key: string) => a.analytical.find((m) => m.key === key)!;
+    expect(metric("revenue_growth").state).toBe("ready");
+    expect(metric("net_revenue_retention")).toMatchObject({ state: "blocked", blockedBy: ["churned_revenue"] });
+    expect(metric("blended_cac").state).toBe("limited");
+    expect(a.gaps.missing).toContain("churned_revenue");
+    expect(a.nextRequest).not.toBeNull();
+    expect(a.readyForBenchmark).toBe(false);
+    expect(a.benchmarkBlockers.join(" ")).toMatch(/retention/i);
+  });
+
+  it("only hands off to the benchmark once critical inputs are supplied", async () => {
+    await seedAcme();
+    expect((await markReadyForBenchmark(acme)).ok).toBe(false);
+    // Founder reviews every remaining required item.
+    for (const key of ALL_ITEM_KEYS.filter((k) => getItem(k)!.required)) {
+      const row = (await getReadiness(acme)).items.find((i) => i.itemKey === key)!;
+      if (row.status === "not_reviewed" || row.status === "missing") await updateDataItem(founder, acme, key, { status: "partial" });
+    }
+    const [company] = await db().update(schema.companies).set({ phase: "upload" }).where(eq(schema.companies.id, acme.id)).returning();
+    expect(await markReadyForBenchmark(company!)).toEqual({ ok: true });
+    const [after] = await db().select().from(schema.companies).where(eq(schema.companies.id, acme.id));
+    expect(after!.phase).toBe("benchmark");
+    // Globex was untouched.
+    const [g] = await db().select().from(schema.companies).where(eq(schema.companies.id, globex.id));
+    expect(g!.phase).toBe("intake");
+  });
+});

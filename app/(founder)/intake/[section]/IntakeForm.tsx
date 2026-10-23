@@ -173,11 +173,11 @@ export function IntakeForm({
                 Save for later
               </Link>
               <Link
-                href={next ? `/intake/${next.id}` : "/upload"}
+                href={next ? `/intake/${next.id}` : "/readiness"}
                 className="px-4 py-2 rounded-lg text-sm font-medium transition-all hover:opacity-90"
                 style={{ background: "var(--green)", color: "#fff" }}
               >
-                {next ? "Continue →" : "Upload Documents →"}
+                {next ? "Continue →" : "Data Readiness →"}
               </Link>
             </div>
           </div>

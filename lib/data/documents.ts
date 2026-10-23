@@ -1,14 +1,17 @@
 import "server-only";
-import { get, head } from "@vercel/blob";
+import { del, get, head } from "@vercel/blob";
 import ExcelJS from "exceljs";
 import { and, desc, eq, inArray, isNull, ne, or } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import type { Company, User } from "@/lib/db/schema";
+import type { Company, FileProfile, User } from "@/lib/db/schema";
 import { track } from "@/lib/events";
 import { formatMetric, METRICS, type MetricKey } from "@/lib/metrics";
 import { ACCEPTED_TYPES, DOC_TYPES, findConflicts, MAX_UPLOAD_BYTES } from "@/lib/documents";
 import { AI_MODEL } from "@/lib/ai/config";
 import { extractMetrics, ExtractionError, type ExtractionInput } from "@/lib/ai/extract";
+import { parseCsv, profileSheets } from "@/lib/file-profile";
+import { getItem, type CategoryId } from "@/lib/readiness";
+import { markItemsSupplied } from "./readiness";
 
 type DocType = (typeof schema.docType.enumValues)[number];
 
@@ -18,30 +21,94 @@ export const companyBlobPrefix = (companyId: string) => `companies/${companyId}/
 // PDFs go to the model as base64, which must fit in one request.
 const MAX_PDF_BYTES = 20 * 1024 * 1024;
 
-export type RegisterInput = { pathname: string; docType: DocType; filename: string };
+export type RegisterInput = {
+  pathname: string;
+  docType: DocType;
+  filename: string;
+  /** Data Readiness category and the requirement items this file supports. */
+  category?: CategoryId;
+  itemKeys?: string[];
+  /** SHA-256 of the file computed in the browser; used to reuse an existing record for the same file. */
+  contentHash?: string;
+};
 
-/** Records an upload the founder finished, after checking the blob is theirs. */
-export async function registerDocument(user: User, company: Company, input: RegisterInput) {
+/** Document type implied by a readiness category (used when uploading from the readiness checklist). */
+export const DOC_TYPE_FOR_CATEGORY: Record<CategoryId, DocType> = {
+  financial: "financial_model",
+  customers: "customer_list",
+  pipeline: "other",
+  marketing: "gtm_plan",
+  product: "other",
+  team: "hiring_plan",
+};
+
+/**
+ * Records an upload the founder finished, after checking the blob is theirs.
+ * The same file uploaded again (same content hash) reuses the existing
+ * record: the new blob is deleted and any new item links are added.
+ */
+export async function registerDocument(
+  user: User,
+  company: Company,
+  input: RegisterInput,
+): Promise<{ doc: typeof schema.documents.$inferSelect; duplicate: boolean }> {
   if (!input.pathname.startsWith(companyBlobPrefix(company.id))) throw new Error("That file doesn't belong to your company.");
   const blob = await head(input.pathname);
   if (blob.size > MAX_UPLOAD_BYTES) throw new Error("File is too large.");
   if (!ACCEPTED_TYPES[blob.contentType]) throw new Error("That file type isn't supported.");
 
-  const [doc] = await db
-    .insert(schema.documents)
-    .values({
-      companyId: company.id,
-      docType: input.docType,
-      blobUrl: blob.url,
-      filename: input.filename.slice(0, 255),
-      mime: blob.contentType,
-      size: blob.size,
-      status: "uploaded",
-      uploadedBy: user.id,
-    })
+  const itemKeys = [...new Set(input.itemKeys ?? [])].filter((k) => getItem(k)?.category === input.category);
+  const hash = input.contentHash && /^[a-f0-9]{64}$/.test(input.contentHash) ? input.contentHash : null;
+
+  const findExisting = async () =>
+    hash
+      ? (
+          await db
+            .select()
+            .from(schema.documents)
+            .where(and(eq(schema.documents.companyId, company.id), eq(schema.documents.contentHash, hash)))
+            .limit(1)
+        )[0]
+      : undefined;
+
+  let duplicate = await findExisting();
+  if (!duplicate) {
+    const [inserted] = await db
+      .insert(schema.documents)
+      .values({
+        companyId: company.id,
+        docType: input.docType,
+        blobUrl: blob.url,
+        filename: input.filename.slice(0, 255),
+        mime: blob.contentType,
+        size: blob.size,
+        status: "uploaded",
+        uploadedBy: user.id,
+        dataCategory: input.category ?? null,
+        dataItemKeys: itemKeys,
+        contentHash: hash,
+      })
+      .onConflictDoNothing()
+      .returning();
+    if (inserted) {
+      await markItemsSupplied(user, company, itemKeys);
+      await track("document_uploaded", { userId: user.id, companyId: company.id, props: { docType: input.docType, mime: blob.contentType, category: input.category } });
+      return { doc: inserted, duplicate: false };
+    }
+    duplicate = await findExisting(); // lost a race with an identical upload
+    if (!duplicate) throw new Error("Upload failed. Try again.");
+  }
+
+  // Same file again: keep the original record, drop the new copy, add any new links.
+  if (duplicate.blobUrl !== blob.url) await del(blob.url).catch(() => undefined);
+  const mergedKeys = [...new Set([...duplicate.dataItemKeys, ...itemKeys])];
+  const [updated] = await db
+    .update(schema.documents)
+    .set({ dataItemKeys: mergedKeys, dataCategory: duplicate.dataCategory ?? input.category ?? null })
+    .where(eq(schema.documents.id, duplicate.id))
     .returning();
-  await track("document_uploaded", { userId: user.id, companyId: company.id, props: { docType: input.docType, mime: blob.contentType } });
-  return doc!;
+  await markItemsSupplied(user, company, itemKeys);
+  return { doc: updated ?? duplicate, duplicate: true };
 }
 
 async function readBlob(url: string): Promise<Buffer> {
@@ -50,35 +117,52 @@ async function readBlob(url: string): Promise<Buffer> {
   return Buffer.from(await new Response(result.stream).arrayBuffer());
 }
 
-/** One CSV block per worksheet, using each cell's displayed text. */
-async function spreadsheetToCsv(bytes: Buffer): Promise<string> {
+/** Each worksheet's rows, using each cell's displayed text. */
+async function spreadsheetRows(bytes: Buffer): Promise<{ name: string; rows: string[][] }[]> {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(bytes as unknown as ArrayBuffer);
-  const quote = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
-  const sheets: string[] = [];
+  const sheets: { name: string; rows: string[][] }[] = [];
   workbook.eachSheet((sheet) => {
-    const lines: string[] = [];
+    const rows: string[][] = [];
     sheet.eachRow({ includeEmpty: false }, (row) => {
       const cells: string[] = [];
-      for (let c = 1; c <= row.cellCount; c++) cells.push(quote(row.getCell(c).text ?? ""));
-      lines.push(cells.join(","));
+      for (let c = 1; c <= row.cellCount; c++) cells.push(row.getCell(c).text ?? "");
+      rows.push(cells);
     });
-    if (lines.length) sheets.push(`# Sheet: ${sheet.name}\n${lines.join("\n")}`);
+    sheets.push({ name: sheet.name, rows });
   });
-  return sheets.join("\n\n");
+  return sheets;
 }
 
-async function buildInput(doc: typeof schema.documents.$inferSelect): Promise<ExtractionInput> {
+const toCsv = (sheets: { name: string; rows: string[][] }[]) => {
+  const quote = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
+  return sheets
+    .filter((s) => s.rows.length)
+    .map((s) => `# Sheet: ${s.name}\n${s.rows.map((r) => r.map(quote).join(",")).join("\n")}`)
+    .join("\n\n");
+};
+
+/** Extraction input plus, for tabular files, the sheets used to profile columns and dates. */
+async function buildInput(
+  doc: typeof schema.documents.$inferSelect,
+): Promise<{ input: ExtractionInput; sheets: { name: string; rows: string[][] }[] | null }> {
   const docLabel = DOC_TYPES.find((d) => d.id === doc.docType)?.label ?? "Document";
   const kind = ACCEPTED_TYPES[doc.mime];
   const bytes = await readBlob(doc.blobUrl);
   if (kind === "pdf") {
     if (bytes.length > MAX_PDF_BYTES) throw new ExtractionError("PDFs can be up to 20 MB. Split or compress the file.");
-    return { kind: "pdf", base64: bytes.toString("base64"), filename: doc.filename, docLabel };
+    return { input: { kind: "pdf", base64: bytes.toString("base64"), filename: doc.filename, docLabel }, sheets: null };
   }
-  const text = kind === "xlsx" ? await spreadsheetToCsv(bytes) : bytes.toString("utf8");
+  if (kind === "xlsx") {
+    const sheets = await spreadsheetRows(bytes);
+    const text = toCsv(sheets);
+    if (!text.trim()) throw new ExtractionError("The spreadsheet has no readable content.");
+    return { input: { kind: "text", text, filename: doc.filename, docLabel }, sheets };
+  }
+  const text = bytes.toString("utf8");
   if (!text.trim()) throw new ExtractionError("The file has no readable content.");
-  return { kind: "text", text, filename: doc.filename, docLabel };
+  const sheets = doc.mime === "text/csv" ? [{ name: doc.filename, rows: parseCsv(text) }] : null;
+  return { input: { kind: "text", text, filename: doc.filename, docLabel }, sheets };
 }
 
 /**
@@ -91,6 +175,12 @@ export async function processDocument(documentId: string): Promise<void> {
   const [doc] = await db.select().from(schema.documents).where(eq(schema.documents.id, documentId)).limit(1);
   if (!doc) return;
 
+  // Formats we don't read automatically are kept and attached, but never reported as analysed.
+  if (ACCEPTED_TYPES[doc.mime] === "stored") {
+    await db.update(schema.documents).set({ status: "stored", error: null }).where(eq(schema.documents.id, doc.id));
+    return;
+  }
+
   await db.update(schema.documents).set({ status: "analyzing", error: null }).where(eq(schema.documents.id, doc.id));
   const [run] = await db
     .insert(schema.agentRuns)
@@ -99,7 +189,10 @@ export async function processDocument(documentId: string): Promise<void> {
   const started = Date.now();
 
   try {
-    const result = await extractMetrics(await buildInput(doc));
+    const { input, sheets } = await buildInput(doc);
+    // Column and date-range profile is computed in code, before (and independent of) the model.
+    if (sheets) await db.update(schema.documents).set({ profile: profileSheets(sheets) }).where(eq(schema.documents.id, doc.id));
+    const result = await extractMetrics(input);
 
     // Replace anything a previous run of this document proposed.
     await db.delete(schema.dataPoints).where(and(eq(schema.dataPoints.documentId, doc.id), eq(schema.dataPoints.status, "proposed")));
@@ -197,8 +290,13 @@ export type DocumentView = {
   id: string;
   docType: DocType;
   filename: string;
-  status: "uploaded" | "analyzing" | "done" | "failed";
+  status: "uploaded" | "analyzing" | "done" | "failed" | "stored";
   error: string | null;
+  mime: string;
+  size: number;
+  category: CategoryId | null;
+  itemKeys: string[];
+  profile: FileProfile | null;
   dataPointsFound: number;
   assumptionsFlagged: number;
   createdAt: string;
@@ -233,6 +331,11 @@ export async function listDocuments(company: Company): Promise<DocumentView[]> {
     filename: d.filename,
     status: d.status,
     error: d.error,
+    mime: d.mime,
+    size: d.size,
+    category: d.dataCategory,
+    itemKeys: d.dataItemKeys,
+    profile: d.profile,
     dataPointsFound: d.dataPointsFound,
     assumptionsFlagged: d.assumptionsFlagged,
     createdAt: d.createdAt.toISOString(),

@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  date,
   index,
   integer,
   jsonb,
@@ -55,7 +56,12 @@ export const docType = pgEnum("doc_type", [
   "hiring_plan",
   "other",
 ]);
-export const docStatus = pgEnum("doc_status", ["uploaded", "analyzing", "done", "failed"]);
+// "stored": kept and attached to the company, but in a format we don't analyse automatically (e.g. DOCX)
+export const docStatus = pgEnum("doc_status", ["uploaded", "analyzing", "done", "failed", "stored"]);
+export const dataCategory = pgEnum("data_category", ["financial", "customers", "pipeline", "marketing", "product", "team"]);
+export const dataItemStatus = pgEnum("data_item_status", ["not_reviewed", "available", "partial", "missing", "not_applicable"]);
+export const collectionMethod = pgEnum("collection_method", ["file_upload", "manual_entry", "integration"]);
+export const dataQuality = pgEnum("data_quality", ["unverified", "validated", "estimated"]);
 export const confidence = pgEnum("confidence", ["high", "medium", "low"]);
 export const dataPointStatus = pgEnum("data_point_status", ["proposed", "accepted", "rejected"]);
 export const registerType = pgEnum("register_type", ["missing", "question", "conflict", "assumption", "follow_up"]);
@@ -187,9 +193,74 @@ export const documents = pgTable(
     uploadedBy: uuid("uploaded_by").references(() => users.id, { onDelete: "set null" }),
     dataPointsFound: integer("data_points_found").notNull().default(0),
     assumptionsFlagged: integer("assumptions_flagged").notNull().default(0),
+    // Data Readiness: which category / requirement items this file supports
+    dataCategory: dataCategory("data_category"),
+    dataItemKeys: text("data_item_keys").array().notNull().default(sql`'{}'::text[]`),
+    // SHA-256 of the file, so re-uploading the same file reuses the existing record
+    contentHash: text("content_hash"),
+    // Spreadsheet/CSV shape (sheets, columns, rows, date range) computed on processing
+    profile: jsonb("profile").$type<FileProfile>(),
     ...timestamps,
   },
-  (t) => [index("documents_company_idx").on(t.companyId)],
+  (t) => [
+    index("documents_company_idx").on(t.companyId),
+    uniqueIndex("documents_company_hash_idx").on(t.companyId, t.contentHash),
+  ],
+);
+
+export type FileProfile = {
+  sheets: { name: string; rows: number; columns: string[] }[];
+  dateRange: { start: string; end: string } | null;
+};
+
+/**
+ * Growth Data Readiness: one row per company per requirement in lib/readiness.ts.
+ * Founder-reported availability and metadata; "available" never implies validated.
+ */
+export const dataItems = pgTable(
+  "data_items",
+  {
+    id: id(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    category: dataCategory("category").notNull(),
+    itemKey: text("item_key").notNull(),
+    status: dataItemStatus("status").notNull().default("not_reviewed"),
+    collectionMethod: collectionMethod("collection_method"),
+    sourceSystem: text("source_system"),
+    integrationRef: text("integration_ref"),
+    coverageStart: date("coverage_start", { mode: "string" }),
+    coverageEnd: date("coverage_end", { mode: "string" }),
+    quality: dataQuality("quality").notNull().default("unverified"),
+    limitations: text("limitations"),
+    notes: text("notes"),
+    // Request from the advisor (or system) asking for more on this item
+    followUp: text("follow_up"),
+    lastReviewedAt: timestamp("last_reviewed_at", { withTimezone: true }),
+    reviewedBy: uuid("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("data_items_company_item_idx").on(t.companyId, t.itemKey)],
+);
+
+/** Saved data-gap summaries (rule-based facts plus an optional AI-written summary of them). */
+export const readinessAssessments = pgTable(
+  "readiness_assessments",
+  {
+    id: id(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    facts: jsonb("facts").notNull(),
+    summary: jsonb("summary"),
+    model: text("model"),
+    tokensIn: integer("tokens_in"),
+    tokensOut: integer("tokens_out"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [index("readiness_assessments_company_idx").on(t.companyId, t.createdAt)],
 );
 
 export const dataPoints = pgTable(
