@@ -4,6 +4,10 @@ import { HandoffCard } from "@/components/readiness/HandoffCard";
 import { InboxDropzone } from "@/components/readiness/InboxDropzone";
 import { SortReview } from "@/components/readiness/SortReview";
 import { listDocuments } from "@/lib/data/documents";
+import { latestPreliminary } from "@/lib/data/preliminary";
+import { PreliminaryTrigger } from "@/components/deliverables/PreliminaryTrigger";
+import { BuildingRefresh } from "@/components/deliverables/BuildingRefresh";
+import { isStalled } from "@/lib/data/deliverables";
 import { ReadinessTabs } from "@/components/readiness/ReadinessTabs";
 import { SummaryCard } from "@/components/readiness/SummaryCard";
 import { gapSummarySchema } from "@/lib/ai/readiness-summary";
@@ -53,7 +57,9 @@ export default async function ReadinessPage() {
   }
   const { company, readiness, missingByCategory, blobPrefix } = data;
   const a = readiness.assessment;
-  const [last, documents] = await Promise.all([latestAssessment(company), listDocuments(company)]);
+  const [last, documents, prelim] = await Promise.all([latestAssessment(company), listDocuments(company), latestPreliminary(company.id)]);
+  const filesWorking = documents.some((d) => d.status === "uploaded" || d.status === "analyzing" || (d.inbox && (d.sortStatus === "sorting" || d.sortStatus === null)));
+  const prelimState = !prelim ? null : prelim.status === "drafting" || prelim.status === "qa" ? (isStalled(prelim) ? null : "building") : prelim.codeChecksPassed && (prelim.status === "in_review" || prelim.status === "approved") ? "ready" : null;
   const inbox = documents.filter((d) => d.inbox || d.suggestions.some((x) => x.status === "suggested"));
   const parsedSummary = last?.summary ? gapSummarySchema.safeParse(last.summary) : null;
   const lastChange = Math.max(0, ...readiness.items.map((i) => i.updatedAt.getTime()), ...readiness.files.map((f) => Date.parse(f.createdAt)));
@@ -74,6 +80,21 @@ export default async function ReadinessPage() {
       />
       <ReadinessTabs missingByCategory={missingByCategory} />
 
+      <PreliminaryTrigger filesWorking={filesWorking} />
+      <BuildingRefresh active={prelimState === "building"} />
+      {prelimState && (
+        <Link
+          href="/benchmark"
+          className="flex items-center gap-3 rounded-xl border p-4 mb-6"
+          style={{ background: "var(--card)", borderColor: "var(--green)" }}
+        >
+          <span className="text-xl" aria-hidden>📊</span>
+          <span className="flex-1 text-sm" style={{ color: "var(--foreground)" }}>
+            {prelimState === "building" ? "Building your preliminary benchmark from what you've shared…" : "Your preliminary benchmark is ready. See how you compare and what's still needed."}
+          </span>
+          <span className="text-sm font-semibold" style={{ color: "var(--green)" }}>{prelimState === "building" ? "Track progress →" : "View benchmark →"}</span>
+        </Link>
+      )}
       <InboxDropzone blobPrefix={blobPrefix} />
       <SortReview docs={inbox} />
 

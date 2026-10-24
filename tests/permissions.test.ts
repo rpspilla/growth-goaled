@@ -68,7 +68,8 @@ describe("route handlers", () => {
   it("check the caller (except the auth API itself)", () => {
     const routes = appFiles.filter((f) => f.endsWith("route.ts") && !f.includes(`${path.sep}api${path.sep}auth${path.sep}`));
     expect(routes.length).toBeGreaterThan(0);
-    for (const r of routes) expect(read(r), rel(r)).toMatch(/requireRole\(|getCurrentUser\(/);
+    // The Stripe webhook has no user; it verifies Stripe's signature instead.
+    for (const r of routes) expect(read(r), rel(r)).toMatch(/requireRole\(|getCurrentUser\(|webhooks\.constructEvent\(/);
   });
 });
 

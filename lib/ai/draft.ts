@@ -14,6 +14,8 @@ export type DraftInput = {
     label: string;
     lower_is_better: boolean;
     company_value: string;
+    /** false when the figure was read from the founder's file and they haven't confirmed it yet */
+    company_value_confirmed: boolean;
     cohort_median: string | null;
     cohort_top_quartile: string;
     status_vs_top_quartile: "ahead" | "behind";
@@ -21,7 +23,7 @@ export type DraftInput = {
     benchmark_row_id: string;
     benchmark_source: string | null;
   }[];
-  other_company_data: { metric: string; label: string; value: string; data_point_id: string }[];
+  other_company_data: { metric: string; label: string; value: string; confirmed: boolean; data_point_id: string }[];
   open_questions: { type: string; title: string }[];
   advisor_feedback: string | null;
 };
@@ -50,6 +52,7 @@ Rules:
 - headline: one sentence on the company's position. insight: the single most important diagnosis (headline + 2–4 sentence body).
 - strengths and watch_areas: 2–4 each, short and specific. priority: the one thing to focus on first, grounded in the comparison.
 - If important inputs are missing or open questions could change the conclusion, list them in missing_inputs instead of guessing. Don't present a conclusion more confidently than the data allows.
+- Figures with company_value_confirmed (or confirmed) false were read from the founder's files and not yet confirmed by them; don't build a strong conclusion on them alone, and mention confirming them in missing_inputs when they matter.
 - If advisor_feedback is present, address it.
 - Write plainly for a founder. No hype.`;
 

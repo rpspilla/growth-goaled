@@ -17,6 +17,8 @@ export type BenchmarkRowView = {
   topQuartile: string;
   status: BenchmarkStatus;
   claimKey: string;
+  /** Read from the founder's file and not yet confirmed by them (preliminary reports only). */
+  unconfirmed: boolean;
 };
 
 export type BenchmarkView = {
@@ -126,6 +128,7 @@ export async function benchmarkViewFor(deliverable: typeof schema.deliverables.$
       topQuartile: formatMetric(row.metric, bm.p75),
       status: statusVsTopQuartile(row.metric, dp.value, bm.p75),
       claimKey: row.claimKey,
+      unconfirmed: dp.status !== "accepted",
     });
     const subject = RADAR_LABEL[row.metric];
     if (subject && bm.median != null) {

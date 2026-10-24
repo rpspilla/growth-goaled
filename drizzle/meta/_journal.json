@@ -64,6 +64,13 @@
       "when": 1792783861110,
       "tag": "0008_source_url",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792803495079,
+      "tag": "0009_instant_benchmark",
+      "breakpoints": true
     }
   ]
 }

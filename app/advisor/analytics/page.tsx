@@ -6,6 +6,7 @@ import { apiKeyProblem } from "@/lib/ai/config";
 import { testAiConnection } from "./actions";
 
 const EVENTS = [
+  "benchmark_unlocked",
   "intake_section_completed",
   "document_uploaded",
   "extraction_completed",
@@ -40,6 +41,8 @@ export default async function AnalyticsPage() {
           { label: "Anthropic API key", problem: apiKeyProblem(process.env.ANTHROPIC_API_KEY) },
           { label: "File storage (Vercel Blob)", problem: process.env.BLOB_READ_WRITE_TOKEN ? null : "BLOB_READ_WRITE_TOKEN isn't set." },
           { label: "Email (Resend)", problem: process.env.RESEND_API_KEY ? null : "RESEND_API_KEY isn't set; invite emails won't send." },
+          { label: "Payments (Stripe)", problem: process.env.STRIPE_SECRET_KEY ? null : "STRIPE_SECRET_KEY isn't set; founders can't unlock the preliminary Benchmark." },
+          { label: "Stripe webhook", problem: process.env.STRIPE_WEBHOOK_SECRET ? null : "STRIPE_WEBHOOK_SECRET isn't set; payments unlock only when the founder returns from checkout." },
         ].map((c) => (
           <div key={c.label} className="text-sm flex gap-2">
             <span style={{ color: c.problem ? "var(--red)" : "var(--green)" }}>{c.problem ? "✕" : "✓"}</span>

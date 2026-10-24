@@ -116,6 +116,7 @@ export function BenchmarkView({
                 <div className="text-sm font-medium" style={{ color: "var(--foreground)" }}>{row.label}</div>
                 <div>
                   <div className="font-mono font-semibold text-sm" style={{ color: "var(--foreground)" }}>{row.value}</div>
+                  {row.unconfirmed && <div className="text-xs mt-0.5" style={{ color: "var(--amber)" }}>From your file · not confirmed</div>}
                   {row.median && (
                     <div className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>Median: {row.median}</div>
                   )}

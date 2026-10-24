@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { and, desc, eq, inArray, isNotNull, max } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, max, or } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { Company, QaResults, User } from "@/lib/db/schema";
 import { AI_MODEL, aiProblemForStaff, isAiConfigError } from "@/lib/ai/config";
@@ -53,12 +53,24 @@ export type BenchmarkInputs = {
 
 export class PipelineError extends Error {}
 
-export async function assembleBenchmarkInputs(company: Company, advisorFeedback: string | null = null): Promise<BenchmarkInputs> {
+/**
+ * @param includeProposed preliminary reports also use figures read from the
+ * founder's files that they haven't confirmed yet (accepted figures win).
+ */
+export async function assembleBenchmarkInputs(company: Company, advisorFeedback: string | null = null, { includeProposed = false } = {}): Promise<BenchmarkInputs> {
   const points = await db
     .select()
     .from(schema.dataPoints)
-    .where(and(eq(schema.dataPoints.companyId, company.id), eq(schema.dataPoints.status, "accepted")))
+    .where(
+      and(
+        eq(schema.dataPoints.companyId, company.id),
+        includeProposed
+          ? or(eq(schema.dataPoints.status, "accepted"), and(eq(schema.dataPoints.status, "proposed"), isNotNull(schema.dataPoints.documentId)))
+          : eq(schema.dataPoints.status, "accepted"),
+      ),
+    )
     .orderBy(desc(schema.dataPoints.updatedAt));
+  points.sort((a, b) => Number(b.status === "accepted") - Number(a.status === "accepted"));
   const latest = new Map<MetricKey, (typeof points)[number]>();
   for (const p of points) if (isMetricKey(p.metric) && !latest.has(p.metric)) latest.set(p.metric, p);
   if (!latest.size) throw new PipelineError("The company has no accepted figures to benchmark yet.");
@@ -119,6 +131,7 @@ export async function assembleBenchmarkInputs(company: Company, advisorFeedback:
       label: METRICS[r.metric].label,
       lower_is_better: METRICS[r.metric].lowerIsBetter,
       company_value: fmt(r.metric, r.company),
+      company_value_confirmed: latest.get(r.metric)!.status === "accepted",
       cohort_median: r.median !== null ? fmt(r.metric, r.median) : null,
       cohort_top_quartile: fmt(r.metric, r.topQuartile),
       status_vs_top_quartile: statusVsTopQuartile(r.metric, r.company, r.topQuartile),
@@ -126,7 +139,7 @@ export async function assembleBenchmarkInputs(company: Company, advisorFeedback:
       benchmark_row_id: r.benchmarkMetricId,
       benchmark_source: r.sourceName,
     })),
-    other_company_data: other.map(([m, p]) => ({ metric: m, label: METRICS[m].label, value: fmt(m, p.value), data_point_id: p.id })),
+    other_company_data: other.map(([m, p]) => ({ metric: m, label: METRICS[m].label, value: fmt(m, p.value), confirmed: p.status === "accepted", data_point_id: p.id })),
     open_questions: openQuestions,
     advisor_feedback: advisorFeedback,
   };
@@ -245,17 +258,27 @@ export async function activeBenchmark(companyId: string): Promise<Deliverable | 
   return rows.find((d) => !isStalled(d)) ?? null;
 }
 
-/** Creates a new draft version; returns null when one is already in progress. Stalled runs are marked failed. */
-export async function createBenchmarkVersion(company: Company): Promise<Deliverable | null> {
+/**
+ * Creates a new draft version; returns null when one is already in progress.
+ * Stalled runs are marked failed. A new preliminary version replaces an older
+ * preliminary one the advisor hasn't approved yet, but never an advisor-driven
+ * version or one still being drafted.
+ */
+export async function createBenchmarkVersion(company: Company, { preliminary = false } = {}): Promise<Deliverable | null> {
   const rows = await db
     .select()
     .from(schema.deliverables)
     .where(and(eq(schema.deliverables.companyId, company.id), eq(schema.deliverables.type, "benchmark"), inArray(schema.deliverables.status, ACTIVE)));
   for (const d of rows) if (isStalled(d)) await db.update(schema.deliverables).set({ status: "failed" }).where(eq(schema.deliverables.id, d.id));
-  if (rows.some((d) => !isStalled(d))) return null;
+  const live = rows.filter((d) => !isStalled(d));
+  if (preliminary) {
+    if (live.some((d) => !d.preliminary || d.status !== "in_review")) return null;
+  } else if (live.some((d) => !d.preliminary)) return null;
+  // Advisor-driven versions take over from any preliminary one; a newer preliminary replaces an unreviewed one.
+  for (const d of live) await db.update(schema.deliverables).set({ status: "changes_requested" }).where(eq(schema.deliverables.id, d.id));
   const [created] = await db
     .insert(schema.deliverables)
-    .values({ companyId: company.id, type: "benchmark", version: await nextVersion(company.id), status: "drafting" })
+    .values({ companyId: company.id, type: "benchmark", version: await nextVersion(company.id), status: "drafting", preliminary })
     .onConflictDoNothing()
     .returning();
   return created ?? null;
@@ -275,7 +298,10 @@ async function failRun(runId: string, deliverableId: string, err: unknown, start
     .update(schema.agentRuns)
     .set({ status: "failed", error: known ? (err as Error).message : isAiConfigError(err) ? aiProblemForStaff(err) : "Unexpected error. Try again.", durationMs: Date.now() - started })
     .where(eq(schema.agentRuns.id, runId));
-  await db.update(schema.deliverables).set({ status: "failed" }).where(eq(schema.deliverables.id, deliverableId));
+  await db
+    .update(schema.deliverables)
+    .set({ status: "failed" })
+    .where(and(eq(schema.deliverables.id, deliverableId), inArray(schema.deliverables.status, ["drafting", "qa"])));
 }
 
 /** Draft → code checks + QA → in_review. Runs after the response; every step is logged in agent_runs. */
@@ -290,7 +316,7 @@ export async function runBenchmarkPipeline(deliverableId: string, advisorFeedbac
   let inputs: BenchmarkInputs;
   let draft: DraftOutput;
   try {
-    inputs = await assembleBenchmarkInputs(company, advisorFeedback);
+    inputs = await assembleBenchmarkInputs(company, advisorFeedback, { includeProposed: d.preliminary });
     const inputHash = createHash("sha256").update(JSON.stringify(inputs.input)).digest("hex");
     const result = await (deps.draft ?? draftBenchmark)(inputs.input);
     draft = result.output;
@@ -300,7 +326,10 @@ export async function runBenchmarkPipeline(deliverableId: string, advisorFeedbac
       .update(schema.agentRuns)
       .set({ status: "succeeded", model: result.model, inputHash, output: { input: inputs.input, draft }, tokensIn: result.tokensIn, tokensOut: result.tokensOut, durationMs: Date.now() - started })
       .where(eq(schema.agentRuns.id, draftRun));
-    await db.update(schema.deliverables).set({ status: "qa", content, headline: draft.headline, createdByRun: draftRun }).where(eq(schema.deliverables.id, deliverableId));
+    await db
+      .update(schema.deliverables)
+      .set({ status: "qa", content, headline: draft.headline, createdByRun: draftRun })
+      .where(and(eq(schema.deliverables.id, deliverableId), eq(schema.deliverables.status, "drafting")));
   } catch (err) {
     return failRun(draftRun, deliverableId, err, started);
   }
@@ -330,7 +359,11 @@ async function runQa(
       .where(eq(schema.agentRuns.id, qaRun));
     const [d] = await db.select({ version: schema.deliverables.version }).from(schema.deliverables).where(eq(schema.deliverables.id, deliverableId));
     await db.insert(schema.reviews).values({ deliverableId, version: d!.version, qaResults });
-    await db.update(schema.deliverables).set({ status: "in_review" }).where(eq(schema.deliverables.id, deliverableId));
+    const codeChecksPassed = !code.untracedNumbers.length && !code.unsourcedClaims.length && !code.unknownSources.length;
+    await db
+      .update(schema.deliverables)
+      .set({ status: "in_review", codeChecksPassed })
+      .where(and(eq(schema.deliverables.id, deliverableId), eq(schema.deliverables.status, "qa")));
   } catch (err) {
     return failRun(qaRun, deliverableId, err, started);
   }
@@ -520,6 +553,7 @@ export type QueueItem = {
   version: number;
   status: Status | "stalled";
   updatedAt: string;
+  preliminary: boolean;
 };
 
 /** Benchmark versions for the given companies, newest first (callers pass managed companies only). */
@@ -538,6 +572,7 @@ export async function listQueue(companyIds: string[]): Promise<QueueItem[]> {
     version: d.version,
     status: isStalled(d) ? "stalled" : d.status,
     updatedAt: d.updatedAt.toISOString(),
+    preliminary: d.preliminary,
   }));
 }
 

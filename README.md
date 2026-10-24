@@ -112,6 +112,16 @@ Every resolution records who closed it, how and when, and emits `register_item_r
 
 Founders see progress on `/processing` (status only, never draft content) and the latest *published* version on `/benchmark`. Runs that haven't finished in 10 minutes show as stalled and can be restarted. Events: `review_decision`, `deliverable_published`, `deliverable_viewed`, `source_trail_opened`.
 
+### Instant preliminary Benchmark and $1 unlock
+
+Decided by the owner (Oct 2026), adjusting two HANDOFF rules: a founder can see a **preliminary** Benchmark before advisor review, and Phase 1 includes a small payment.
+
+- **When**: once a founder's uploads have finished reading and sorting, the Data Readiness page asks the server to build one (`startPreliminaryIfDue` in `lib/data/preliminary.ts`): only after at least one upload, only when figures changed since the last one, and automatically at most every 5 minutes ("Build it again" on `/benchmark` isn't limited).
+- **What**: the same pipeline as the advisor Benchmark (`deliverables.preliminary = true`), but it may also use figures read from the founder's files that they haven't confirmed yet (confirmed figures win). Those rows show "From your file · not confirmed". The report is only shown when the code checks passed (`deliverables.code_checks_passed`). An advisor-driven version always takes over from a preliminary one, and a superseded run can't come back to life.
+- **Before paying**: the cohort, which metrics were compared (names only, no figures) and **"To complete your fully calculated report"**: ordered steps computed in code (`lib/completion.ts`): cohort metrics we don't have a figure for (linked to the right Company Profile section), unconfirmed file figures, conflicts, blocked benchmark-critical metrics and remaining checklist items.
+- **Unlock**: `/benchmark` → "Unlock my benchmark · $1" creates a Stripe Checkout (`lib/data/payments.ts`) for the company. The company is unlocked (`companies.benchmark_unlocked_at`) when Stripe's signed webhook (`/api/stripe/webhook`, `checkout.session.completed`) arrives, or when the founder returns from Checkout and we confirm the session with Stripe. Only sessions this app created for that company count; it's idempotent. Price: `BENCHMARK_PRICE_CENTS` (default 100).
+- **Advisors** see preliminary versions labelled in the Review Queue and on the review page (with whether the founder can see it). Publishing a reviewed version replaces the preliminary one for the founder; advisor-published reports don't need the unlock.
+
 ### Advisor portfolio and company view
 
 `/advisor/portfolio` shows counts (active, requiring attention, awaiting founder input, in advisor review, complete) and a table of the advisor's companies (admins: all) built from accepted data, open registers, readiness and the latest Benchmark version (`lib/data/portfolio.ts`). A company needs attention when a Benchmark is waiting for review or publishing, a run failed, data conflicts are open, or its health is "at risk".

@@ -19,7 +19,10 @@ function Row({ item }: { item: QueueItem }) {
     <Link href={`/advisor/review/${item.id}`} className="flex items-center gap-4 px-5 py-4 border-b hover:opacity-80" style={{ borderColor: "var(--border)" }}>
       <div className="flex-1 min-w-0">
         <div className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>{item.companyName}</div>
-        <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>Benchmark · v{item.version} · updated {when(item.updatedAt)}</div>
+        <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+          Benchmark · v{item.version}
+          {item.preliminary && <span style={{ color: "var(--amber)" }}> · preliminary</span>} · updated {when(item.updatedAt)}
+        </div>
       </div>
       <span className="text-xs font-semibold" style={{ color: s.color }}>{s.label}</span>
     </Link>

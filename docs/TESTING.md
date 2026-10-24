@@ -48,6 +48,17 @@ Use two browsers (or a private window): one signed in as **admin** (ryan@growthg
 - [ ] A file over 25 MB is refused with a clear message
 - [ ] **Remove** a wrong file (from the sort review, the Files tab, and an item's file list): inline confirm, file disappears, values read from it disappear, items only that file supported go back to Not reviewed, items you'd added details to stay as they were
 
+## Instant preliminary Benchmark + $1 unlock
+- [ ] Stripe set up (see the setup steps in the chat / README): `STRIPE_SECRET_KEY` (test key on staging) and `STRIPE_WEBHOOK_SECRET` in Vercel Preview, redeployed; admin System checks show both ✓
+- [ ] An approved cohort matches the test company (Benchmarks page)
+- [ ] Upload a file → once it's read and sorted, Data Readiness shows "Building your preliminary benchmark…" then "ready"
+- [ ] `/benchmark` before paying: cohort and compared metric names only (no figures), the 🔒 list, and "To complete your fully calculated report" steps that make sense and link to the right places
+- [ ] "Unlock my benchmark · $1" → Stripe test checkout (card 4242 4242 4242 4242, any future date/CVC) → back on `/benchmark` with "Payment received" and the full preliminary report with the Preliminary banner; unconfirmed figures marked
+- [ ] Cancel at checkout → "Payment cancelled", still locked
+- [ ] Stripe dashboard → webhook endpoint shows a 200 for `checkout.session.completed`
+- [ ] Advisor: Review Queue shows the version as "preliminary"; review page says the founder can see it; publishing a reviewed version replaces it for the founder
+- [ ] Accept a figure or upload more → "Build it again" produces an updated preliminary report
+
 ## Questions and registers (M6)
 - [ ] Upload a file whose figure differs >10% from the profile (e.g. different sales cycle) → a conflict appears on `/questions`
 - [ ] Resolve the conflict by choosing a value → dashboard shows the chosen value

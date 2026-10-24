@@ -120,7 +120,7 @@ test("founder to published benchmark", async ({ browser }) => {
 
   // Nothing is visible to the founder before publishing.
   await founder.page.goto("/benchmark");
-  await expect(founder.page.getByText("Your benchmark is being prepared")).toBeVisible();
+  await expect(founder.page.getByText("Your advisor is preparing your full, reviewed benchmark")).toBeVisible();
 
   // --- Advisor: claim, review, approve, publish ---
   await admin.page.goto("/advisor/unassigned");

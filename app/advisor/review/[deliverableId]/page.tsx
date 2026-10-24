@@ -12,6 +12,7 @@ import { getManagedCompany } from "@/lib/data/companies";
 import { deliverableReviews, deliverableRuns, getDeliverable, isStalled, listQueue } from "@/lib/data/deliverables";
 import { benchmarkContentSchema } from "@/lib/deliverables/benchmark";
 import { approve, generateBenchmark, publish, saveEdits, sendBack } from "../actions";
+import { founderCanSeePreliminary } from "@/lib/data/preliminary";
 
 export const maxDuration = 300;
 
@@ -52,6 +53,20 @@ export default async function ReviewPage({ params }: { params: Promise<{ deliver
     <div className="p-8 max-w-7xl">
       <Link href="/advisor/review" className="text-xs" style={{ color: "var(--muted-foreground)" }}>← Review Queue</Link>
       <PageHeader title={`${company.name} — Benchmark`} subtitle={<>Version {d.version} · <span style={{ color: s.color, fontWeight: 600 }}>{s.label}</span></>} />
+
+      {d.preliminary && (
+        <div className="rounded-xl border p-4 mb-6 text-sm" style={{ ...card, borderColor: "var(--amber)", color: "var(--foreground)" }}>
+          <span className="font-semibold">Preliminary report</span>, built automatically after the founder&apos;s uploads.{" "}
+          {founderCanSeePreliminary(d)
+            ? company.benchmarkUnlockedAt
+              ? "The founder has paid and can see this version now, labelled as not yet advisor-reviewed."
+              : "The founder can see it after paying to unlock, labelled as not yet advisor-reviewed."
+            : d.codeChecksPassed === false
+              ? "It failed the code checks, so the founder can't see it."
+              : "The founder can't see it in this state."}{" "}
+          Publishing an approved version replaces it for the founder.
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-6 mb-8">
         <div className="lg:col-span-2 rounded-xl border p-6 space-y-5" style={card}>

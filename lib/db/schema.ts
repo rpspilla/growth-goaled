@@ -133,6 +133,8 @@ export const companies = pgTable(
     health: companyHealth("health"),
     // Null → company sits in the unassigned queue
     advisorId: uuid("advisor_id").references(() => users.id, { onDelete: "set null" }),
+    // When the founder paid to see the preliminary Benchmark
+    benchmarkUnlockedAt: timestamp("benchmark_unlocked_at", { withTimezone: true }),
     // Internal advisor note on the company (never shown to founders)
     advisorSummary: text("advisor_summary"),
     advisorSummaryAt: timestamp("advisor_summary_at", { withTimezone: true }),
@@ -460,6 +462,10 @@ export const deliverables = pgTable(
     content: jsonb("content"),
     headline: text("headline"),
     createdByRun: uuid("created_by_run"),
+    // Built automatically after uploads; founders can see it (once paid) before advisor review
+    preliminary: boolean("preliminary").notNull().default(false),
+    // Set after QA: true when the code checks (figures traced, claims sourced) all passed
+    codeChecksPassed: boolean("code_checks_passed"),
     ...timestamps,
   },
   (t) => [
@@ -543,6 +549,31 @@ export const reviews = pgTable(
     ...timestamps,
   },
   (t) => [index("reviews_deliverable_idx").on(t.deliverableId)],
+);
+
+// ---------------------------------------------------------------------------
+// Payments
+// ---------------------------------------------------------------------------
+
+export const paymentStatus = pgEnum("payment_status", ["pending", "paid", "expired"]);
+
+export const payments = pgTable(
+  "payments",
+  {
+    id: id(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    purpose: text("purpose").notNull(),
+    stripeSessionId: text("stripe_session_id").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    currency: text("currency").notNull(),
+    status: paymentStatus("status").notNull().default("pending"),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("payments_session_idx").on(t.stripeSessionId), index("payments_company_idx").on(t.companyId)],
 );
 
 // ---------------------------------------------------------------------------
