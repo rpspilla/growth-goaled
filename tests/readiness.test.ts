@@ -160,3 +160,34 @@ describe("file profiling", () => {
     expect(missingFieldsFor("monthly_revenue", ["Month", "Headcount"])).toEqual(["revenue"]);
   });
 });
+
+describe("messy spreadsheet layouts", () => {
+  it("skips title and note rows above the table", async () => {
+    const { headerRowIndex } = await import("@/lib/file-profile");
+    const rows = [["Harborview Compliance — Company Overview"], ["Prepared Oct 2026", ""], ["Metric", "Value", "Notes"], ["ARR", "$5,000,000", ""]];
+    expect(headerRowIndex(rows)).toBe(2);
+    expect(headerRowIndex([["Month", "Revenue"], ["2026-01", "100"]])).toBe(0);
+    expect(headerRowIndex([["Only one column"], ["x"]])).toBe(0);
+  });
+
+  it("captures row labels and treats month headers as dates (wide P&L)", () => {
+    const profile = profileSheets([
+      {
+        name: "P&L",
+        rows: [
+          ["Acme P&L FY2026"],
+          ["Line item", "Jan 2026", "Feb 2026", "Mar 2026"],
+          ["Revenue", "100", "110", "120"],
+          ["COGS", "20", "21", "22"],
+          ["Gross margin %", "80%", "81%", "82%"],
+        ],
+      },
+    ]);
+    const sheet = profile.sheets[0]!;
+    expect(sheet.columns).toEqual(["Line item", "Jan 2026", "Feb 2026", "Mar 2026"]);
+    expect(sheet.rows).toBe(3);
+    expect(sheet.labels).toEqual(["Revenue", "COGS", "Gross margin %"]);
+    expect(profile.dateRange).toEqual({ start: "2026-01-01", end: "2026-03-01" });
+    expect(missingFieldsFor("monthly_revenue", [...sheet.columns, ...sheet.labels!])).toEqual([]);
+  });
+});

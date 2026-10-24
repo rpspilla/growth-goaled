@@ -15,12 +15,12 @@ export function suggestFromColumns(profile: FileProfile | null): SortSuggestion[
   for (const sheet of profile.sheets) {
     for (const item of CATEGORIES.flatMap((c) => c.items)) {
       if (!item.fields || item.fields.length < 2) continue;
-      if (missingFieldsFor(item.key, sheet.columns).length === 0) {
+      if (missingFieldsFor(item.key, [...sheet.columns, ...(sheet.labels ?? [])]).length === 0) {
         out.push({
           itemKey: item.key,
           sheet: profile.sheets.length > 1 ? sheet.name : null,
           confidence: "medium",
-          reason: `Has the columns this needs (${item.fields.map((f) => f.label).join(", ")})`,
+          reason: `Has the fields this needs (${item.fields.map((f) => f.label).join(", ")})`,
           source: "columns",
           status: "suggested",
         });

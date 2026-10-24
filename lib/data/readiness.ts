@@ -131,6 +131,8 @@ export type ReadinessFile = {
   category: (typeof schema.dataCategory.enumValues)[number] | null;
   createdAt: string;
   columns: string[];
+  /** Row labels down the first column (used for matching, not shown as columns). */
+  labels: string[];
   dateRange: { start: string; end: string } | null;
   dataPointsFound: number;
 };
@@ -171,6 +173,7 @@ export async function getReadiness(company: Company, now = new Date()): Promise<
     category: d.dataCategory,
     createdAt: d.createdAt.toISOString(),
     columns: [...new Set(d.profile?.sheets.flatMap((s) => s.columns) ?? [])],
+    labels: [...new Set(d.profile?.sheets.flatMap((s) => s.labels ?? []) ?? [])],
     dateRange: d.profile?.dateRange ?? null,
     dataPointsFound: d.dataPointsFound,
   }));
@@ -180,7 +183,7 @@ export async function getReadiness(company: Company, now = new Date()): Promise<
     .filter((i) => ALL_ITEM_KEYS.includes(i.itemKey))
     .map((i) => {
       const linked = files.filter((f) => f.itemKeys.includes(i.itemKey));
-      const columns = linked.flatMap((f) => f.columns);
+      const columns = linked.flatMap((f) => [...f.columns, ...f.labels]);
       const missing = columns.length ? missingFieldsFor(i.itemKey, columns) : [];
       if (missing.length) missingFields[i.itemKey] = missing;
       return {

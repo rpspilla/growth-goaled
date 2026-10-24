@@ -233,7 +233,8 @@ export type SortSuggestion = {
 };
 
 export type FileProfile = {
-  sheets: { name: string; rows: number; columns: string[] }[];
+  /** labels: text down the first column (row headers), when present */
+  sheets: { name: string; rows: number; columns: string[]; labels?: string[] }[];
   dateRange: { start: string; end: string } | null;
 };
 

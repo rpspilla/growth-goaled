@@ -1,4 +1,5 @@
 import { ANALYTIC_METRICS, CATEGORIES, getItem, type CategoryId, type ItemQuality, type ItemStatus } from "@/lib/readiness";
+import { parseDateCell } from "@/lib/file-profile";
 
 /**
  * Rule-based data gap assessment. It only reads recorded statuses, file
@@ -239,5 +240,7 @@ export function missingFieldsFor(itemKey: string, columns: string[]): string[] {
   const fields = getItem(itemKey)?.fields;
   if (!fields || columns.length === 0) return [];
   const headers = columns.map(norm);
+  // Months laid out across the top ("Jan 2026", "2026-02") stand in for a month/date column.
+  if (columns.some((c) => parseDateCell(c))) headers.push("month date period");
   return fields.filter((f) => !f.match.some((m) => headers.some((h) => h.includes(norm(m))))).map((f) => f.label);
 }

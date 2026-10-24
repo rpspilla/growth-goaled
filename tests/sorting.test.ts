@@ -46,8 +46,8 @@ describe("classifier input", () => {
     const rows = Array.from({ length: 500 }, (_, r) => Array.from({ length: 60 }, (_, c) => `r${r}c${c}`));
     const preview = sheetPreview([{ name: "Everything", rows }]);
     expect(preview).toContain('Sheet "Everything" (500 rows)');
-    expect(preview).toContain("r7c29");
-    expect(preview).not.toContain("r8c0");
+    expect(preview).toContain("r14c29");
+    expect(preview).not.toContain("r15c0");
     expect(preview).not.toContain("c30");
   });
 });

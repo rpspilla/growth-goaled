@@ -49,7 +49,7 @@ export function sheetPreview(sheets: { name: string; rows: string[][] }[]): stri
   return sheets
     .slice(0, 25)
     .map((s) => {
-      const rows = s.rows.filter((r) => r.some((c) => c.trim())).slice(0, 8);
+      const rows = s.rows.filter((r) => r.some((c) => c.trim())).slice(0, 15);
       const body = rows.map((r) => r.slice(0, 30).map((c) => c.replace(/\s+/g, " ").slice(0, 40)).join(" | ")).join("\n");
       return `### Sheet "${s.name}" (${s.rows.length} rows)\n${body}`;
     })
