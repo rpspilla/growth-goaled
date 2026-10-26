@@ -1,6 +1,6 @@
 # Growth Goaled — Product Spec
 
-Status: v2 — Use Case Library (Oct 26, 2026). Supersedes the Benchmark-led v1 (Oct 22). Source: Figma Make file "Growth-Goaled-Product-Video" plus owner decisions below.
+Status: v2.1 — Use Case Library with five-step flow (Oct 26, 2026). Supersedes the Benchmark-led v1 (Oct 22). Source: Figma Make file "Growth-Goaled-Product-Video" plus owner decisions below.
 
 ## 1. What it is
 
@@ -11,7 +11,7 @@ Promise: **Know where you stand. Know what to fix. Know what comes next.**
 ### Why a use case library (decision, Oct 26)
 v1 led with a Benchmark against peer cohorts. With a young database the cohorts are thin, so the headline product was weakest exactly when we need it to be strongest. v2 leads with **use cases**: each one answers one founder decision and is useful on day one from the company's own data. Peer and published reference data still appears *inside* each use case as a reference line where it exists, and gets richer as more companies join (the compounding-intelligence story survives — it just isn't load-bearing at launch).
 
-Core flow: **Pick the decision → share the data it needs → Growth Intelligence Analysis → advisor review → action plan**
+Core flow: **Pick a use case → connect the relevant data → receive an advisor-approved baseline and plan → track progress**
 
 ## 2. Users
 
@@ -38,27 +38,32 @@ Each use case is one founder question with: a trigger (when founders come to it)
 
 Not in v1 (candidates for later): channel/budget allocation (folds into #1 as a recommendation for now), pricing & packaging, adding a product-led motion.
 
-## 4. Founder experience
+## 4. Founder experience — five steps
 
-1. **Welcome** — start, or explore the sample company (Acme AI, read-only).
-2. **Company profile** — light intake (name, stage, ARR band, model) so we can recommend use cases.
-3. **"What are you trying to decide?"** — the library: six cards, each showing how ready the founder's data is for it. Recommendation: seed / <$3M ARR → #2 and #1; otherwise → #1.
-4. **Use case page** — checklist of only the data this use case needs (reusing Data Readiness upload/sorting), then build. A preliminary analysis is available right after uploads (paid unlock, see §8); the advisor-approved version replaces it.
-5. **Questions / Registers** — conflicts, assumptions and gaps found while reading their data.
-6. **Deliverables** — every analysis, with status and history.
-7. **Source Trail** (side panel, everywhere) — sources behind each claim, confidence, method.
+Sign-up and sign-in are unchanged. The founder sidebar has exactly five steps:
+
+1. **Overview** — a simple visual of how the product works: pick a use case → connect the relevant data → receive an advisor-approved baseline and plan → track your progress. Shows where the founder is and their next action.
+2. **Use Case Library** — browse the six use cases; choosing one opens a short objective form (what you're trying to achieve, the metric and target, by when, why now, what you've tried, constraints, plus 2–4 questions specific to the use case). Submitting goes to Stripe Checkout; payment activates the use case and unlocks steps 3–5. Browsing and the form are free.
+3. **Data** — the data this use case needs, prioritised: what's required to establish the baseline first, then what sharpens it, then optional extras, each with why it matters for this objective. Upload anything, paste Google links, answer conflicts and questions found in the data. A meter shows when there's enough to build the baseline.
+4. **Baseline** — the company's starting point against its objective: where each key metric stands, the gap to target, the main constraint, and the plan (actions and the KPIs to track). Advisor-approved; source trail on every claim; version history.
+5. **Progress & Tracking** — ongoing monitoring: each KPI from baseline to latest to target with on-track / at-risk / off-track status, plan actions and their status, monthly check-ins with advisor notes, and re-baselining when things change.
+
+A company can activate several use cases; a switcher picks which one steps 3–5 show. Company profile moves to the profile menu. The sample company (Acme AI) demonstrates the full flow on "Where is our growth leaking?".
 
 ## 5. Advisor experience
 
-Portfolio, Unassigned, Company view (now shows which use cases each company has started and their status), Review Queue (per use case), **Reference data** (the former Benchmarks library: cohorts, published bars, advisory CSV import, public research — feeds use cases as reference lines), Score Rubrics (now per use case, including Series A and Series B readiness rubrics), Registers, Analytics, Users, Settings.
+Opening a company shows the **same five steps** the founder sees, with advisor actions on each: review the objective and activate without payment for pilots (Library), validate data and request follow-ups (Data), review the draft against QA results and approve / request changes / send back (Baseline), add notes to check-ins and adjust the plan (Progress & Tracking).
+
+Advisor top level: Portfolio (each company's use case, step, KPI status, last check-in), Unassigned, Review Queue, **Reference data** (the former Benchmarks library: cohorts, published bars tagged by stage, advisory CSV import, public research — feeds use cases as reference lines), Score Rubrics (per use case), Analytics, Users, Settings.
 
 ## 6. Data the app keeps
 
 Unchanged from v1 except:
 - **use cases** are defined in code (a registry), not the database.
-- **company_use_cases** — company, use case, status (not_started | collecting | building | in_review | published), started_at, started_by.
+- **company_use_cases** — company, use case, status (objective → active → baseline in review → tracking → closed), objective answers, activation (paid or advisor, with who and when).
+- **kpi_targets**, **plan_actions**, **check_ins** — the baseline's KPIs and targets, the plan's actions and their status, and monthly check-ins (founder and advisor notes).
 - **deliverables** — gain a `use_case` key; one deliverable per use case per version. Legacy `benchmark` deliverables stay readable as history.
-- **payments** — unlock is per company per use case.
+- **payments** — one payment activates one use case for one company.
 - **benchmark_* tables** — kept, presented as "Reference data". A use case can run with zero matching reference rows.
 - **score_rubrics** — gain a `use_case` key so an advisor can keep a rubric per use case (e.g. Series A readiness bars).
 - **metrics dictionary** — extended with the figures the use cases compute (gross margin, new/expansion/churned ARR, pipeline coverage, quota attainment, ramp, founder-closed share, top-customer concentration, runway).
@@ -69,7 +74,8 @@ Unchanged from v1 except:
 - **Figures in code:** each use case computes its numbers in code from accepted data points. The model never calculates.
 - **Draft Agent:** one shared agent with a per-use-case brief; returns the use case's structured JSON with every claim linked to sources.
 - **QA Agent:** independent call; five checks — data consistency, method (reference data / rubric used correctly), source trail, recommendation logic, missing inputs. Plus code checks: every number traces to an input; every claim has a source.
-- **Advisor gate:** nothing reaches a founder unapproved, except a clearly labelled preliminary version the founder has unlocked.
+- **Advisor gate:** nothing reaches a founder unapproved, except a clearly labelled preliminary baseline for a use case they've activated.
+- **Tracking:** KPI status is computed in code against a straight-line path from baseline to the founder's target.
 - **No reference data? Still useful.** Where no approved reference row exists, the analysis uses the company's own trend and the advisor's rubric, and says plainly that no peer reference is available yet.
 - **Language:** "Growth Intelligence Analysis", never "AI generated this".
 - **Privacy:** company data is never shown to other customers; only aggregates feed reference data.
@@ -80,12 +86,13 @@ Near-term goal: validate value and willingness to pay, and convert pilots to pai
 
 | Stage | Metric |
 |---|---|
-| Activation | % of signups who start a use case; % who reach "data ready" for it |
-| Time to value | Hours from signup to first preliminary analysis; to first approved analysis |
+| Activation | % of signups who complete an objective form; % who pay to activate; % who reach "data ready" |
+| Time to value | Hours from activation to preliminary baseline; to approved baseline |
+| Engagement | Monthly check-in rate; % of plan actions completed; % of KPIs on track |
 | Trust | % of source-trail panels opened; % of register items resolved by founder |
 | Expansion | Use cases per company; % who start a second use case (especially #1 → its recommended next) |
 | Advisor leverage | Review turnaround; % approved without changes |
-| Revenue | Preliminary unlocks per use case; pilot → paid conversion; companies per advisor |
+| Revenue | Activations per use case; pilot → paid conversion; companies per advisor |
 
 ## 9. Design system (from Figma)
 
@@ -100,7 +107,7 @@ Unchanged: Next.js on Vercel, Neon Postgres + Drizzle, Neon Auth, Vercel Blob, C
 ## 11. Phasing
 
 - **Phase 1 (done, Oct 22–24):** foundation, auth/roles, signup/invites, intake, Data Readiness + extraction, registers, reference-data library, Benchmark end to end, portfolio, analytics, preliminary $1 unlock.
-- **Phase 1.5 — Use Case Library (next):** see HANDOFF.md §13. Framework + library, then use cases in order: Where is growth leaking? → Series A / Series B readiness → Hire or fix → Who are we winning with → Founder-led handoff.
+- **Phase 1.5 — Use Case Library (next):** see HANDOFF.md §13 (rev. 2). U1 shell, Overview, Library + Stripe gate → U2 Data → U3 Baseline (Growth Leak end to end) → U4 Progress & Tracking → U5 Series A / B readiness → U6 Hire or fix, Who are we winning with → U7 Founder-led handoff.
 - **Phase 2:** reminders, Google Drive import, score shown on dashboard, use cases 7+.
 - **Phase 3:** methodology / data-quality screens, compounding-intelligence page, billing beyond unlocks.
 
@@ -111,6 +118,7 @@ Unchanged: Next.js on Vercel, Neon Postgres + Drizzle, Neon Auth, Vercel Blob, C
 3. **Signup:** founders self-sign-up (unassigned queue) and advisors can invite founders. *(Oct 22)*
 4. **Google Drive:** Phase 2. *(Oct 22)*
 5. **Domains:** www.growthgoaled.com (marketing, untouched), app.growthgoaled.com (prod), dev.growthgoaled.com (staging). *(Oct 22)*
-6. **Preliminary unlock:** founders can unlock a preliminary analysis for $1 via Stripe before advisor review. *(Oct 24, set during build)*
+6. **Preliminary unlock:** founders could unlock a preliminary Benchmark for $1 via Stripe. *(Oct 24, set during build — superseded by #9)*
 7. **Product leads with a Use Case Library, not Benchmark.** Benchmark becomes reference data used inside use cases. *(Oct 26)*
 8. **Series A readiness added** as a use case. This widens the target market down to late-seed companies (~$1–3M ARR) raising their A. *(Oct 26)*
+9. **Five-step flow:** Overview → Use Case Library (objective form, Stripe-gated per use case) → Data (prioritised for the use case) → Baseline → Progress & Tracking. Advisor view mirrors it per company. Sign-in unchanged. $1 stays as a test price until real pricing is set. *(Oct 26)*

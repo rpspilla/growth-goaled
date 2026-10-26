@@ -2,7 +2,7 @@
 
 > **For Claude Code.** This file is the single source of truth for building Growth Goaled. Read all of it before writing code. Build Phase 1 milestone by milestone; stop at the end of each milestone, summarise what was built, and wait for the owner to confirm before starting the next. When this file and the prototype disagree, this file wins. When something is ambiguous, ask instead of guessing.
 >
-> **Status (Oct 26, 2026): Phase 1 is complete. Next is Phase 1.5 — the Use Case Library in §13, which overrides earlier sections where they conflict. Start at U1.**
+> **Status (Oct 26, 2026): Phase 1 is complete. Next is Phase 1.5 — the Use Case Library in §13 (rev. 2: five-step flow), which overrides earlier sections where they conflict. Start at U1.**
 
 ---
 
@@ -220,75 +220,126 @@ Derived: activation (intake ≥80% + ≥1 doc), hours from signup to first publi
 
 ---
 
-## 13. Phase 1.5 — Use Case Library (added Oct 26, 2026)
+## 13. Phase 1.5 — Use Case Library (rev. 2, Oct 26, 2026)
 
-> **This section overrides §1, §6, §8 and §9 wherever they conflict.** Phase 1 (M1–M10, plus Data Readiness and the $1 preliminary unlock) is done. Build this next, milestone by milestone (U1–U6), stopping after each for owner review on dev.growthgoaled.com — same working agreement as §12. Product reasoning is in `docs/spec.md` (v2).
+> **This section overrides §1, §6, §8 and §9 wherever they conflict.** Phase 1 (M1–M10, plus Data Readiness and the $1 preliminary unlock) is done. Build this next, milestone by milestone (U1–U7), stopping after each for owner review on dev.growthgoaled.com — same working agreement as §12. Product reasoning is in `docs/spec.md` (v2). Rev. 2 replaces the earlier rev. 1 of this section (owner's five-step flow).
 
 ### 13.1 Why
-Benchmark against peer cohorts is weak while the database is young. The product now leads with a **library of use cases**: each answers one founder decision from the company's own data. Benchmark data is kept and renamed **Reference data**; it appears inside use cases as a reference line where approved rows exist. Every use case must still produce a useful, honest answer with **zero** matching reference rows (fall back to the company's own trend and the advisor's rubric, and say plainly that no peer reference is available yet).
+Benchmark against peer cohorts is weak while the database is young. The product now leads with a **library of use cases**: each answers one founder objective from the company's own data, and then tracks progress toward it. Benchmark data is kept and renamed **Reference data**; it appears inside a use case as a comparison line where approved rows exist. Every use case must still produce a useful, honest answer with **zero** matching reference rows (fall back to the company's own trend and the advisor's rubric, and say plainly that no peer reference is available yet).
 
-### 13.2 The six use cases
+### 13.2 The founder flow — five steps
+
+Sign-up and sign-in (magic link, invites, unassigned queue) are **unchanged**.
+
+The founder sidebar shows exactly five steps, in this order. Steps 3–5 are scoped to the **active use case** (see 13.5).
+
+| # | Sidebar label | Route | Purpose |
+|---|---|---|---|
+| 1 | **Overview** | `/overview` (the post-sign-in landing; `/dashboard` redirects here) | A simple visual of how Growth Goaled works: **Pick a use case → Connect the relevant data → Receive an advisor-approved baseline and plan → Track your progress.** Four connected steps, one line each, with the founder's current position highlighted and one primary button for their next action. No metrics tables. |
+| 2 | **Use Case Library** | `/library`, `/library/[useCase]` | Browse the six use cases (cards: the founder's question, when it's useful, what you get). Choosing one opens the **objective form** (13.4) to capture the nuance of what they're trying to achieve. Submitting the form leads to **Stripe Checkout** for that use case (13.6). Payment activates the use case and unlocks steps 3–5 for it. |
+| 3 | **Data** | `/data` | The data needed for the active use case, **prioritised**: first the items required to establish the baseline, then items that sharpen it, then optional extras — each with why it matters for *this* objective. Reuses Data Readiness (drop zone, Google links, sorting, checklist, statuses) scoped to the use case's items. Open conflicts and questions from extraction appear here under "Needs your answer" (the old Questions page folds in). A "Baseline readiness" meter shows when enough is in to build. |
+| 4 | **Baseline** | `/baseline` | The company's starting point against its objective: where each key metric stands today, the gap to the founder's target, the main constraint, and the **plan** (actions + KPIs to track). Built by the Draft Agent → QA Agent → advisor review pipeline; founders see only the advisor-approved version. Source Trail on every claim. Version history (the old Deliverables page folds in). |
+| 5 | **Progress & Tracking** | `/progress` | Ongoing monitoring toward the objective: each tracked KPI from baseline → latest → target with an on-track / at-risk / off-track status; the plan's actions with owner, due date and status; monthly check-ins (founder update + advisor note); a re-baseline option when the objective or data changes materially. |
+
+Locked steps (before a use case is activated, or before a baseline is approved) are visible but greyed, with one line saying what unlocks them.
+
+Company profile moves to the profile menu (top right) and is pre-filled from sign-up and the objective form; its remaining fields are optional. Remove Benchmark, Baseline (old), ICP, Channel Strategy, Hiring Plan, Questions, Deliverables and Company Profile from the founder sidebar. Redirect old routes: `/dashboard` → `/overview`; `/readiness`, `/upload`, `/questions` → `/data`; `/benchmark`, `/icp`, `/channels`, `/hiring`, `/deliverables` → `/baseline` (or `/library` if no active use case); `/intake/*` → profile.
+
+### 13.3 The six use cases
 
 Ids are stable keys used in code, URLs, DB rows and events.
 
-| id | Founder's question | Data items needed (keys in `lib/readiness.ts`; **bold** = required to build) | Figures computed in code | Reference data used if available | Output (content JSON) |
+| id | Founder's question | Data items (keys in `lib/readiness.ts`; **bold** = required for baseline) | Figures computed in code | Reference data if available | Baseline content |
 |---|---|---|---|---|---|
-| `growth_leak` | Where is our growth leaking? | **monthly_revenue**, **revenue_by_customer**, **churned_revenue**, renewals_expansions, grr_nrr, opportunities, stage_conversion, win_loss, leads_by_source | ARR, ARR growth, new / expansion / churned ARR (ARR bridge), NRR, GRR, win rate, stage conversions, sales cycle | Approved rows for the same metrics; advisor rubric for `growth_leak` | `bridge` (periods × new/expansion/churn), `funnel`, `constraint` (pipeline \| conversion \| retention \| expansion, with evidence), `findings[]`, `next_use_case` (one of the other ids + why), `missing_inputs[]` |
-| `series_a_ready` | Are we ready to raise a Series A? | **monthly_revenue**, **monthly_burn**, **cash_balances**, **customer_list**, **revenue_by_customer**, gross_margin, runway, grr_nrr, churn, active_usage, opportunities, win_loss | ARR, MoM and YoY growth, recurring share of revenue, gross margin, burn multiple, runway months, NRR/GRR, top-customer concentration (top 1 / top 10 share), customer count | Approved Series A bars (stage = Seed→A) from Reference data, each cited; advisor rubric for `series_a_ready` | `areas[]` (growth, retention, revenue quality, efficiency, GTM repeatability, runway & timing — each `ready \| close \| not_yet` with evidence), `investor_questions[]`, `plan_90_day[]`, `timing` (recommended raise window vs runway), `missing_inputs[]` |
-| `series_b_ready` | Are we ready to raise a Series B? | **monthly_revenue**, **monthly_burn**, **cash_balances**, **grr_nrr**, gross_margin, runway, marketing_spend, cpl_cac, roster, sales_capacity, forecast_vs_actual | ARR, YoY growth, NRR, GRR, gross margin, burn multiple, CAC payback, magic number, AE productivity, forecast accuracy, runway months | Approved Series B bars (stage = A→B), cited; advisor rubric for `series_b_ready` | Same shape as `series_a_ready` (areas: growth, net retention, efficiency, GTM repeatability, team & forecastability, runway & timing) |
-| `hire_or_fix` | Should we hire more salespeople, or fix what we have first? | **roster**, **sales_capacity**, **opportunities**, **win_loss**, targets, opp_value_dates, sales_cycle, compensation, hiring_dates_comp, open_roles | AE productivity, quota attainment, ramp months, pipeline coverage, win rate, sales cycle, AE / SDR counts, CAC payback | Approved rows for those metrics; advisor rubric for `hire_or_fix` | `verdict` (hire_now \| fix_first \| hire_after_fixes), `diagnosis[]`, `hires[]` (role, why, quarter), `fixes[]`, `timeline`, `missing_inputs[]` |
-| `winning_icp` | Who are we actually winning with? | **customer_list**, **revenue_by_customer**, **industry**, **company_size**, contract_metrics, use_case, start_term, status_renewal, win_loss, opp_value_dates | Per segment: customers, win rate, ACV, sales cycle, GRR/NRR, expansion; fit score from the rubric | Advisor rubric for `winning_icp` (fit weights) | `segments[]` (metrics + fit score), `primary_icp` (definition), `recommendation`, `deprioritise[]`, `missing_inputs[]` |
-| `founder_handoff` | Is our sales repeatable without the founder? | **opportunities** (must include deal owner), **win_loss**, **founder_dependencies**, stage_history, sales_activity, roster, org_chart, deal_terms | Founder-sourced and founder-closed share of deals and ARR, win rate and cycle by owner (founder vs reps), stage conversion by owner | Advisor rubric for `founder_handoff` | `readiness` (score + label), `gaps[]` (process not written down, founder-only stages, etc.), `first_hire` (first AE \| sales leader + timing), `plan[]`, `missing_inputs[]` |
+| `growth_leak` | Where is our growth leaking? | **monthly_revenue**, **revenue_by_customer**, **churned_revenue**, renewals_expansions, grr_nrr, opportunities, stage_conversion, win_loss, leads_by_source | ARR, ARR growth, new / expansion / churned ARR (ARR bridge), NRR, GRR, win rate, stage conversions, sales cycle | Approved rows for those metrics; advisor rubric for `growth_leak` | ARR bridge, funnel, main constraint (pipeline \| conversion \| retention \| expansion) with evidence, findings, plan, suggested next use case |
+| `series_a_ready` | Are we ready to raise a Series A? | **monthly_revenue**, **monthly_burn**, **cash_balances**, **customer_list**, **revenue_by_customer**, gross_margin, runway, grr_nrr, churn, active_usage, opportunities, win_loss | ARR, MoM and YoY growth, recurring share, gross margin, burn multiple, runway months, NRR/GRR, top-customer concentration (top 1 / top 10), customer count | Approved Series A bars (stage-tagged, cited); advisor rubric for `series_a_ready` | Readiness by area (growth, retention, revenue quality, efficiency, GTM repeatability, runway & timing: ready \| close \| not yet), investor questions, plan to close gaps, raise timing vs runway |
+| `series_b_ready` | Are we ready to raise a Series B? | **monthly_revenue**, **monthly_burn**, **cash_balances**, **grr_nrr**, gross_margin, runway, marketing_spend, cpl_cac, roster, sales_capacity, forecast_vs_actual | ARR, YoY growth, NRR, GRR, gross margin, burn multiple, CAC payback, magic number, AE productivity, forecast accuracy, runway months | Approved Series B bars (stage-tagged, cited); advisor rubric for `series_b_ready` | Same shape as Series A (areas: growth, net retention, efficiency, GTM repeatability, team & forecastability, runway & timing) |
+| `hire_or_fix` | Should we hire more salespeople, or fix what we have first? | **roster**, **sales_capacity**, **opportunities**, **win_loss**, targets, opp_value_dates, sales_cycle, compensation, hiring_dates_comp, open_roles | AE productivity, quota attainment, ramp months, pipeline coverage, win rate, sales cycle, AE / SDR counts, CAC payback | Approved rows for those metrics; advisor rubric for `hire_or_fix` | Verdict (hire now \| fix first \| hire after fixes), diagnosis, hires (role, why, quarter), fixes, plan |
+| `winning_icp` | Who are we actually winning with? | **customer_list**, **revenue_by_customer**, **industry**, **company_size**, contract_metrics, use_case, start_term, status_renewal, win_loss, opp_value_dates | Per segment: customers, win rate, ACV, sales cycle, GRR/NRR, expansion; fit score from rubric | Advisor rubric for `winning_icp` (fit weights) | Segments with metrics and fit, primary ICP definition, what to deprioritise, plan |
+| `founder_handoff` | Is our sales repeatable without the founder? | **opportunities** (must include deal owner), **win_loss**, **founder_dependencies**, stage_history, sales_activity, roster, org_chart, deal_terms | Founder-sourced and founder-closed share of deals and ARR, win rate and cycle by owner (founder vs reps), stage conversion by owner | Advisor rubric for `founder_handoff` | Handoff readiness score + label, gaps (undocumented process, founder-only stages…), first hire (first AE \| sales leader + timing), plan |
 
-**Library order and recommendation:** show all six cards. Recommend `series_a_ready` + `growth_leak` when stage is pre-Series A or ARR band is `lt_1m`/`1m_3m`; otherwise recommend `growth_leak`. A founder may start several.
+Every baseline also contains, in a shared shape: `objective` (restated from the form), `kpis[]` (metric, baseline value + data point id, target value + date — target from the founder's form, adjusted only with an advisor note), `plan[]` (action, owner, due, linked KPI), `missing_inputs[]`.
 
-**Fundraise bars (#2/#3):** never hard-code thresholds. They come from approved Reference data rows tagged with the target stage, plus the advisor's rubric. Extend `research.ts` so the advisor can run "Research published Series A / Series B bars", producing **proposed** cited rows to approve — same rules as §8.5.
+**Library recommendation:** pre-Series A or ARR band `lt_1m`/`1m_3m` → recommend `series_a_ready` and `growth_leak`; otherwise `growth_leak`. Show all six.
 
-### 13.3 Architecture
+**Fundraise bars:** never hard-coded. They come from approved Reference data rows tagged with the target stage, plus the advisor's rubric. Extend `research.ts` so the advisor can run "Research published Series A / Series B bars", producing **proposed** cited rows to approve — same rules as §8.5.
 
-- **Registry:** `lib/use-cases/` with one module per use case exporting a definition: `id`, `title` (founder question), `shortTitle`, `trigger`, `requiredItems` / `helpfulItems` (readiness keys), `computeFigures(company) → { figures, sourceIds }` (pure code, unit-tested), optional `referenceMetrics`, `contentSchema` (Zod), `draftBrief` (use-case-specific part of the Draft prompt), `qaBrief`, and the founder page component. Add the new metrics to `lib/metrics.ts`.
-- **Readiness per use case:** compute from `data_items` status against `requiredItems` (code, no AI). A use case can build when every required item is `available` or `partial`; show what's missing using each item's existing `followUp` text.
-- **Database (one migration):**
-  - `use_case` text column on `deliverables` (nullable for legacy rows; existing `benchmark` rows stay readable as history). New deliverables set `type` to a new enum value `use_case`, or drop the enum dependency — your call, keep it simple.
-  - `company_use_cases` (company_id, use_case, status: `not_started|collecting|building|in_review|published`, started_by, started_at; unique company+use_case).
-  - `use_case` column on `payments` and on `score_rubrics`.
-  - Replace `companies.benchmark_unlocked_at` with per-use-case unlock state (on `company_use_cases`, e.g. `unlocked_at`). Migrate existing values to `growth_leak`.
-  - `companies.phase`: reduce to a coarse lifecycle (onboarding → active → complete) or derive it; the per-step phases no longer drive the sidebar. Review `lib/phases.ts`.
-- **Pipeline:** generalise `lib/ai/draft.ts` and `lib/ai/qa.ts` into one Draft Agent and one QA Agent that take a use case definition (shared rules + `draftBrief`/`qaBrief`). Rename the QA check `benchmark_methodology` → `method` ("reference data and rubric used correctly"). Generalise `lib/deliverables/checks.ts` `allowedNumbers` to accept the use case's computed figures (plus gaps vs reference rows). Preliminary versions, supersession, throttling and code-check gating keep working as today, per use case.
-- **Stripe:** `$1` unlock becomes per company **per use case**. Checkout success/cancel URLs point at the use case page. Event `use_case_unlocked` with `use_case` prop (keep `benchmark_unlocked` history).
-- **Analytics events (add):** `use_case_viewed`, `use_case_started`, `use_case_data_ready`, `use_case_built` (preliminary / approved), `use_case_unlocked`, `next_use_case_clicked`. All carry `use_case`.
+### 13.4 Objective form (step 2)
 
-### 13.4 Routes and navigation
+Short, one screen, saved on blur, editable later (edits after baseline flag "objective changed" to the advisor). Shared questions for every use case:
+- What are you trying to achieve? (free text, required)
+- How will you know you've succeeded? Pick the main metric (from the use case's figures) and your target value (required)
+- By when? (date, required)
+- Why now? (free text)
+- What have you already tried? (free text)
+- Constraints we should know about (budget, hiring freeze, board expectations…) (free text)
 
-Founder:
-- `/decisions` — "What are you trying to decide?" library (six cards: question, trigger line, data-ready %, status, recommended badge).
-- `/decisions/[useCase]` — data checklist for this use case (reuse Data Readiness components scoped to its items) → build → preliminary (locked/unlocked) → published analysis with Source Trail.
-- Sidebar: Overview · Company Profile · **Decisions** (expands to the use cases the company has started) · Data Readiness · Questions · Deliverables. Remove Benchmark, Baseline, ICP, Channel Strategy, Hiring Plan from the founder sidebar. Redirect `/benchmark`, `/baseline`, `/icp`, `/channels`, `/hiring` to the matching use case (`/benchmark` and `/baseline` → `growth_leak`, `/icp` → `winning_icp`, `/hiring` → `hire_or_fix`, `/channels` → `growth_leak`).
-- Dashboard: replace benchmark-centric cards with "Your decisions" (status per started use case) and the recommended next use case.
+Plus 2–4 use-case-specific questions defined in the registry, e.g. `series_a_ready`: target raise amount, target close date, investor conversations so far; `hire_or_fix`: hiring budget, roles you're considering; `winning_icp`: segments you believe are best; `founder_handoff`: share of deals you're personally in, when you want to step back; `growth_leak`: where you think the leak is; `series_b_ready`: as Series A.
 
-Advisor:
-- Rename **Benchmarks** → **Reference data** (same pages; add a stage tag for fundraise bars).
-- Score Rubrics: pick the use case a rubric belongs to; seed a default rubric per use case (marked as editable defaults, no invented thresholds — leave threshold bands empty for the advisor to fill, except where an approved reference row can prefill them).
-- Company view and Review Queue: show use case name and status; filter by use case.
+Answers are stored per company use case and passed to the Draft Agent as context. Founder-entered targets are allowed numbers for the code checks; they are labelled "your target" in the UI, never presented as analysis.
 
-Sample (`/sample`): rebuild around Acme AI's **Where is our growth leaking?** analysis (its prototype story — "a sales efficiency problem, not a pipeline problem" — is exactly a `growth_leak` result), with `hire_or_fix` as the recommended next use case.
+### 13.5 Multiple use cases
+A company may activate several (each paid separately). A **use case switcher** at the top of the sidebar selects the active one; steps 3–5 follow it. Data items shared between use cases are uploaded once.
 
-### 13.5 Milestones
+### 13.6 Stripe gate
+- Browsing the library and filling in the objective form are free (we capture intent even if they don't pay).
+- Checkout is per company **per use case**; success returns to `/data` with that use case active; cancel returns to the form with answers kept.
+- Payment activates the use case. The separate "unlock the preliminary Benchmark" payment is retired: once a use case is paid, its preliminary baseline (clearly labelled, shown only when code checks pass) is visible without a further payment, and the advisor-approved version replaces it.
+- Price: keep the existing **$1** as a test price behind one config constant; the owner sets real pricing later.
+- Advisors and admins can activate a use case for a company without payment (pilots), recorded with who and why.
+- Reuse the existing webhook / return-verification / idempotency code; add `use_case` to `payments`. Event `use_case_activated` (keep `benchmark_unlocked` history).
 
-**U1 · Framework + library.** Registry with all six definitions (titles, triggers, required items; compute/draft can be stubs), `/decisions` library, `/decisions/[useCase]` data checklist with readiness %, `company_use_cases` + migration, new sidebar, redirects, dashboard "Your decisions".
-*Done when:* a founder sees six cards with correct readiness %, can start one, sees only that use case's data checklist, and old routes redirect.
+### 13.7 Advisor view mirrors the founder flow
+- Opening a company (`/advisor/companies/[id]`) shows the **same five steps** for that company — reuse the founder sidebar with a `basePath` of `/advisor/companies/[id]` (as `/sample` already does) — plus advisor actions on each step:
+  - Overview: company summary, active use cases and which step each is on.
+  - Use Case Library: the founder's objective answers; activate without payment; flag "objective changed".
+  - Data: everything the founder sees plus validate items, request follow-ups, resolve conflicts.
+  - Baseline: draft + QA results side by side, approve / request changes / send back (the existing review flow), edit targets with a note.
+  - Progress & Tracking: add advisor notes to check-ins, adjust plan actions, mark re-baseline.
+- Advisor top-level sidebar: Portfolio (adds columns: use case, step, KPI status on/at-risk/off-track, last check-in), Unassigned, Review Queue (filter by use case), Reference data (renamed from Benchmarks; adds stage tags), Score Rubrics (per use case), Analytics, Users, Settings. Registers fold into each company's Data step.
 
-**U2 · Pipeline generalised + `growth_leak` end to end.** Shared Draft/QA agents, code checks on computed figures, per-use-case preliminary + $1 unlock, review queue per use case, Source Trail, founder page for `growth_leak`, `/sample` rebuilt.
-*Done when:* upload → preliminary (unlock) → advisor approves → founder sees the published Growth Leak analysis, and it works with zero reference rows.
+### 13.8 Progress & Tracking — rules
+- KPIs come from the approved baseline. "Latest" is the newest accepted data point for that metric (new uploads in Data refresh it automatically) or a value the founder enters in a check-in (stored as a manual data point, unverified until the advisor validates).
+- Status is computed in code: compare latest against a straight-line path from baseline (value, date) to target (value, date); on track ≥ path, at risk within 10% of the remaining gap behind, off track beyond that. Respect lower-is-better metrics.
+- Monthly check-in: founder updates KPI values and action statuses and writes a short note; advisor adds a note. Reminder emails are Phase 2; for now show "check-in due" in the app.
+- Re-baseline creates a new baseline version through the same review pipeline; history keeps every version and its KPIs.
 
-**U3 · Fundraise readiness (`series_a_ready`, `series_b_ready`).** Shared engine, stage-tagged reference rows, "Research published bars" advisor tool, per-stage rubrics, founder page (areas, investor questions, 90-day plan, timing).
-*Done when:* a seed test company gets a Series A readiness analysis with every bar cited or explicitly marked "advisor rubric".
+### 13.9 Architecture and data
+- **Registry:** `lib/use-cases/` — one module per use case: `id`, `title`, `shortTitle`, `whenUseful`, `youGet`, `objectiveQuestions` (extra form fields, Zod), `requiredItems` / `helpfulItems` / `optionalItems` (readiness keys, in priority order), `computeFigures(company) → { figures, sourceIds }` (pure code, unit-tested), `trackableMetrics`, optional `referenceMetrics`, `contentSchema` (Zod, extends the shared baseline shape), `draftBrief`, `qaBrief`, and the baseline page component. Add new metrics to `lib/metrics.ts` (gross margin, new/expansion/churned ARR, pipeline coverage, quota attainment, ramp months, founder-closed share, top-customer concentration, runway months, MoM growth).
+- **Database (migrations):**
+  - `company_use_cases` — company_id, use_case, status (`objective` → `active` → `baseline_in_review` → `tracking` → `closed`), objective (jsonb), objective_updated_at, activated_at, activated_by, activation (`paid` | `advisor`) + note; unique (company_id, use_case).
+  - `deliverables` — add `company_use_case_id`; new deliverables are baselines for a use case. Legacy `benchmark` rows remain readable in history.
+  - `kpi_targets` — company_use_case_id, deliverable_id (baseline version), metric, baseline_value, baseline_data_point_id, baseline_date, target_value, target_date, lower_is_better, target_note.
+  - `plan_actions` — company_use_case_id, deliverable_id, title, detail, owner (`founder` | `advisor` | name), due_date, kpi_metric (nullable), status (`not_started` | `in_progress` | `done` | `blocked`), updated_by.
+  - `check_ins` — company_use_case_id, period (month), founder_note, advisor_note, submitted_by, submitted_at.
+  - `payments` — add `use_case`; replace `companies.benchmark_unlocked_at` with activation on `company_use_cases` (migrate existing unlocks to `growth_leak`).
+  - `score_rubrics` — add `use_case`.
+  - `companies.phase` — no longer drives navigation; derive step state from `company_use_cases`. Review `lib/phases.ts`.
+- **Pipeline:** generalise `lib/ai/draft.ts` / `lib/ai/qa.ts` into one Draft Agent and one QA Agent that take a use case definition and the objective. Rename QA check `benchmark_methodology` → `method` ("reference data, rubric and targets used correctly"). Generalise `lib/deliverables/checks.ts` `allowedNumbers` to the use case's computed figures, reference rows and the founder's targets. Preliminary versions, supersession, throttling and code-check gating keep working, per use case.
+- **Analytics events (add):** `library_viewed`, `use_case_viewed`, `objective_saved`, `checkout_started`, `use_case_activated`, `baseline_data_ready`, `baseline_built` (preliminary | approved), `check_in_submitted`, `kpi_status_changed`. All carry `use_case`.
 
-**U4 · `hire_or_fix`.**  **U5 · `winning_icp`.**  **U6 · `founder_handoff`** (add "deal owner" as an expected column for `opportunities` in `lib/readiness.ts`).
-*Each done when:* end to end as in U2, with unit tests for `computeFigures` and an e2e path.
+### 13.10 Milestones
 
-After U6: update `docs/TESTING.md`, README and the permission/e2e suites; retire dead Benchmark-only code paths (keep Reference data).
+**U1 · New shell, Overview and Library.** Five-step founder sidebar with locked states and use case switcher; Overview visual; Library cards; objective form (shared + per-use-case questions, autosave); per-use-case Stripe gate and advisor activation; `company_use_cases`; redirects; advisor company view mirrored with the same five steps (content can be placeholders for 3–5).
+*Done when:* a new founder signs up, lands on Overview, picks a use case, fills the objective, pays $1 (Stripe test mode on dev), and lands on Data with that use case active; the advisor sees the same steps for that company.
 
-### 13.6 Owner decisions still open (ask before building the affected part)
-- Unlock price and scope: $1 per use case (default) vs one unlock for all use cases.
-- Whether advisors can hide a use case per company (default: no).
+**U2 · Data prioritised per use case.** Data step scoped to the active use case (required → sharpening → optional, with why-it-matters per objective), drop zone and Google links reused, "Needs your answer" (conflicts/questions), Baseline readiness meter; advisor validation/follow-ups in the mirrored view.
+*Done when:* Data shows only what the active use case needs, in priority order, and the meter reaches "ready" when required items are in.
+
+**U3 · Baseline pipeline + `growth_leak` end to end.** Shared Draft/QA agents with objective context, code checks (figures + targets), KPIs and plan in the baseline, preliminary + advisor review, Source Trail, version history; rebuild `/sample` around Acme AI's Growth Leak baseline (its prototype story — "a sales efficiency problem, not a pipeline problem" — is a `growth_leak` result), suggesting `hire_or_fix` next.
+*Done when:* upload → preliminary baseline → advisor approves → founder sees the approved baseline with KPIs and plan; works with zero reference rows.
+
+**U4 · Progress & Tracking.** KPI cards (baseline → latest → target, status), plan actions, monthly check-ins, re-baseline; advisor notes; portfolio columns for step and KPI status.
+*Done when:* a new upload or check-in value moves a KPI's status, and the advisor sees it in Portfolio and the company's Progress step.
+
+**U5 · Fundraise readiness (`series_a_ready`, `series_b_ready`).** Shared engine, stage-tagged reference rows, "Research published bars" tool, per-stage rubrics, baseline page, tracked readiness areas in Progress.
+*Done when:* a seed test company gets a Series A readiness baseline with every bar cited or marked "advisor rubric", and tracks it.
+
+**U6 · `hire_or_fix` and `winning_icp`.**  **U7 · `founder_handoff`** (add "deal owner" as an expected column for `opportunities` in `lib/readiness.ts`).
+*Each done when:* end to end as in U3–U4, with unit tests for `computeFigures` and an e2e path.
+
+After U7: update `docs/TESTING.md`, README, permission and e2e suites; retire Benchmark-only code paths (keep Reference data).
+
+### 13.11 Owner decisions still open (ask before building the affected part)
+- Real pricing per use case (the $1 stays as a test price until then).
+- Whether advisors can hide a use case for a company (default: no).
