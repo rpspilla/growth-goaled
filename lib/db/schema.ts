@@ -584,7 +584,7 @@ export const companyUseCases = pgTable(
   (t) => [uniqueIndex("company_use_cases_company_use_case_idx").on(t.companyId, t.useCase)],
 );
 
-export const paymentStatus = pgEnum("payment_status", ["pending", "paid", "expired"]);
+export const paymentStatus = pgEnum("payment_status", ["pending", "paid", "expired", "failed"]);
 
 export const payments = pgTable(
   "payments",
@@ -598,6 +598,8 @@ export const payments = pgTable(
     // Use case the payment activates (null for the retired benchmark unlock)
     useCase: text("use_case"),
     stripeSessionId: text("stripe_session_id").notNull(),
+    // Hosted Checkout link, reused while the session is open so repeat clicks don't create a second charge
+    checkoutUrl: text("checkout_url"),
     amountCents: integer("amount_cents").notNull(),
     currency: text("currency").notNull(),
     status: paymentStatus("status").notNull().default("pending"),
@@ -605,6 +607,25 @@ export const payments = pgTable(
     ...timestamps,
   },
   (t) => [uniqueIndex("payments_session_idx").on(t.stripeSessionId), index("payments_company_idx").on(t.companyId)],
+);
+
+export const advisoryRequestStatus = pgEnum("advisory_request_status", ["new", "contacted", "closed"]);
+
+/** Optional advisory sessions a founder asked about (when no booking link is configured, or alongside one). */
+export const advisoryRequests = pgTable(
+  "advisory_requests",
+  {
+    id: id(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    useCase: text("use_case"),
+    message: text("message"),
+    status: advisoryRequestStatus("status").notNull().default("new"),
+    ...timestamps,
+  },
+  (t) => [index("advisory_requests_company_idx").on(t.companyId)],
 );
 
 // ---------------------------------------------------------------------------

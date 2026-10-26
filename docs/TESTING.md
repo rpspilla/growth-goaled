@@ -24,11 +24,11 @@ Use two browsers (or a private window): one signed in as **admin** (ryan@growthg
 
 ## Data step (simplified per use case)
 - [ ] `/data` title is "Data for <use case>"; no mention of benchmark; tabs are only What we need / Files / Needs your answer
-- [ ] Items are only the active use case's, in three groups: **Needed for your baseline**, **Sharpens it**, **Optional extras**; each card has a "Why it matters" line for this objective
+- [ ] Items are only the active use case's, in three groups: **Needed for the assessment**, **Sharpens it**, **Optional extras**; each card has a "Why it matters" line for this objective
 - [ ] Switch use case in the sidebar → the list and reasons change (shared items keep their status and files)
 - [ ] Status buttons save (Available / Partially / Missing / N/A); "Details" opens source system, coverage, quality, limitations, notes
-- [ ] **Baseline readiness** meter: "N of M required items in", turns green with "Ready" when all required items are in
-- [ ] Growth Leak: "Build my baseline" is disabled until ready, then goes to Baseline with "Your advisor is preparing…"; other use cases say the advisor will build it
+- [ ] **Ready for analysis** meter: "N of M required items in", turns green with "Ready" when all required items are in
+- [ ] Growth Leak: "Analyze my data" is disabled until ready, then goes to Results; other use cases say an analyst will prepare the results
 - [ ] Upload a **CSV** and an **XLSX**: status goes reading → read, columns / rows / date range shown, missing-column warning when a needed column is absent
 - [ ] Upload a **PDF**: extracted values appear as proposed; accept / reject works
 - [ ] Old category links (`/data/financial` etc.) land on `/data`
@@ -47,29 +47,30 @@ Use two browsers (or a private window): one signed in as **admin** (ryan@growthg
 - [ ] A file over 25 MB is refused with a clear message
 - [ ] **Remove** a wrong file (from the sort review, the Files tab, and an item's file list): inline confirm, file disappears, values read from it disappear, items only that file supported go back to Not reviewed, items you'd added details to stay as they were
 
-## U1 · Five steps, Overview, Use Case Library, per-use-case payment
-- [ ] Stripe set up: `STRIPE_SECRET_KEY` (test key on staging) and `STRIPE_WEBHOOK_SECRET` in Vercel Preview, redeployed; webhook endpoint `https://dev.growthgoaled.com/api/stripe/webhook` for `checkout.session.completed`
-- [ ] New founder: sign up → `/welcome` → lands on **Overview** (four connected steps, "You are here" on *Pick a use case*, one green button)
-- [ ] Sidebar shows exactly five steps; **Data**, **Baseline** and **Progress & Tracking** are greyed with a lock and one line saying what unlocks them
-- [ ] **Library**: six cards (question, when it's useful, what you get); *Recommended* on Series A Readiness + Growth Leak for a Seed / <$3M company, Growth Leak only for a later one
-- [ ] Open a card → objective form + "What you get" + "Data we'll ask for" (required items in bold)
-- [ ] Answers save on blur ("Your answers are saved…"), survive a reload, and show again after leaving and coming back; the target value has the *your target* label; bad number/date shows an error
-- [ ] "Continue to payment · $1" stays disabled until the four required answers are in
-- [ ] Pay with Stripe test card 4242 4242 4242 4242 → back on **Data** titled "Data for <use case>"; Data and Baseline unlocked in the sidebar
-- [ ] Cancel at checkout → back on the form with "Payment cancelled" and answers kept
-- [ ] Stripe dashboard → webhook shows a 200 for `checkout.session.completed`
-- [ ] Overview now shows "Connect your data" and the use case with "Your target: …"
-- [ ] Activate a second use case (pay again, or as admin) → a **switcher** appears at the top of the sidebar; switching changes the Data title and list
-- [ ] Old links redirect: `/dashboard` → Overview, `/readiness` → Data, `/questions` → Data › Needs your answer, `/intake/company` → Profile, `/benchmark` → Baseline (or Library with no active use case)
-- [ ] **Company profile** link at top right opens the old profile sections
-- [ ] With Growth Leak active, **Baseline** shows the preliminary / published benchmark as before (no separate $1 unlock any more); for other use cases a short "we'll build it once the data is in" note
-- [ ] Admin: open the company from Portfolio → the founder's five steps in a second column; Overview lists use cases with their step and the founder's target
-- [ ] Admin: **Use Case Library** step shows the founder's objective answers; "Activate without payment" needs a note and records who and why
-- [ ] Admin: **Data** step has the item review, open questions and files; **Baseline** has the benchmark position and Generate / review link; **Progress** is a placeholder
-- [ ] Your existing company (Harborview Compliance): if it paid the old $1 benchmark unlock, Growth Leak is already active
-- [ ] Analytics (admin): `library_viewed`, `use_case_viewed`, `objective_saved`, `checkout_started`, `use_case_activated` appear
+## Self-service pricing and customer journey
+- [ ] Stripe on staging: test keys in Vercel Preview; webhook `https://dev.growthgoaled.com/api/stripe/webhook` sends `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `checkout.session.expired`
+- [ ] New founder lands on **Overview**: "Pick a question, get a free Snapshot" highlighted; Data and Results greyed with "Unlocks when you buy an assessment"
+- [ ] **Library**: six cards with the question, the problem, "For: …", key outputs and "Explore assessment"; Growth Leak shows "Free Snapshot · Assessment $499", the other five "Assessment coming soon"
+- [ ] Open a card: who it's for, what you'll receive, **$499** price box, how it works, data we may ask for. No payment prompt anywhere on this page
+- [ ] Questionnaire: only the challenge, stage and sales model are required; profile questions you've already answered are listed ("From your company profile…") instead of asked; answers save on blur and survive a reload
+- [ ] "See my free Snapshot": **Hypotheses** banner, "Is this the right assessment?" (try Series A readiness while at Series A → suggests Series B), signals each with "Based on: your answer…", and the data it would take to confirm. Stripe dashboard shows no charge so far
+- [ ] "Get the full assessment · $499" → Stripe test checkout (4242 4242 4242 4242) → lands on **Data** for that assessment
+- [ ] Cancel at checkout → back on the Snapshot with "Payment cancelled. Nothing was charged"; Data still locked
+- [ ] Declined card (4000 0000 0000 0002) → Stripe shows the error; nothing unlocks
+- [ ] Click the buy button twice quickly, or come back and click again within a day → the same Stripe checkout opens (one pending payment in Stripe, not two)
+- [ ] After paying, the Snapshot page shows "You have this assessment · continue" instead of a buy button
+- [ ] Data: "Analyze my data" once the three required items are in → Results ("Analyzing your data…", then preliminary results)
+- [ ] **Results**: eight numbered sections (summary, findings, evidence, diagnosis, decision, actions, confidence, next steps); every finding has "Evidence →" opening the Source Trail; Preliminary label until reviewed; peer columns only when approved reference data exists
+- [ ] One advisory card at the end ("From $750", "Explore advisory support"); results stay fully visible whether or not you use it
+- [ ] Advisory page: request a session → "We'll email you…"; a second request the same week says you've already asked; admin sees it on the company's Overview
+- [ ] With `ADVISORY_BOOKING_URL` set in Vercel, the advisory page shows "Choose a time" and opens that page
+- [ ] **Your assessments** (top right): one row per question with purchase status, status, started/completed dates and a link (Open for bought ones, Snapshot otherwise)
+- [ ] Admin: company → Library step → "Grant without payment" (with a note) gives the founder that assessment; history shows "Granted by your advisor"
+- [ ] Change `ASSESSMENT_PRICE_CENTS` in Vercel (e.g. 59900) and redeploy: cards, price box, buy button and the Stripe checkout all show the new price
+- [ ] Phone width: the menu button opens the steps; library, Snapshot and Results are readable without sideways scrolling (tables scroll inside their card)
+- [ ] Analytics (admin): `library_viewed`, `use_case_viewed`, `objective_saved`, `snapshot_viewed`, `checkout_started`, `use_case_activated`, `advisory_requested`
 
-## Instant preliminary Benchmark (now inside Growth Leak's Baseline)
+## Preliminary results (Growth Leak)
 - [ ] An approved cohort matches the test company (Benchmarks page)
 - [ ] With Growth Leak active, upload a file → once it's read and sorted, Data shows "Building your preliminary benchmark…" then "ready"
 - [ ] Baseline shows the full preliminary report with the Preliminary banner; unconfirmed figures marked; "To complete your fully calculated report" steps link to the right places

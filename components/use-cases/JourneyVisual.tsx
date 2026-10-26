@@ -1,10 +1,10 @@
 import Link from "next/link";
 
 const STAGES = [
-  { title: "Pick a use case", line: "Choose the question you most need answered and tell us what you're aiming for." },
-  { title: "Connect the relevant data", line: "Share the files that use case needs. Upload whatever you have; we'll sort it." },
-  { title: "Receive your baseline and plan", line: "An advisor-approved view of where you stand today, the gap to your target and what to do." },
-  { title: "Track your progress", line: "Follow your KPIs and plan month by month, with your advisor alongside." },
+  { title: "Pick a question, get a free Snapshot", line: "Choose the decision you're facing, answer a few questions and see early hypotheses. Free." },
+  { title: "Buy the assessment and share data", line: "One-time payment per question. Upload whatever you have; we'll sort it." },
+  { title: "Receive your results", line: "Findings, evidence, recommendations and an action plan, with confidence and gaps stated plainly." },
+  { title: "Act on it", line: "Work through the plan yourself, or book an optional advisory session to pressure-test it." },
 ] as const;
 
 /** Overview: how Growth Goaled works, with the company's current position highlighted. */

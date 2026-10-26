@@ -28,12 +28,12 @@ export default async function CompanyLibraryPage({ params }: { params: Promise<{
               <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>{def.question}</span>
               {recommended.includes(def.id) && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "var(--green-muted)", color: "var(--green)" }}>Recommended</span>}
               <span className="ml-auto text-xs font-medium" style={{ color: row?.activatedAt ? "var(--green)" : "var(--muted-foreground)" }}>
-                {row?.activatedAt ? "Active" : row ? "Objective started" : "Not started"}
+                {row?.activatedAt ? "Purchased" : row ? "Snapshot only" : "Not started"}
               </span>
             </div>
             {row?.activatedAt && (
               <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-                {row.activation === "advisor" ? `Activated without payment by ${activators.get(row.activatedBy ?? "") ?? "an advisor"}` : "Paid"} on{" "}
+                {row.activation === "advisor" ? `Granted without payment by ${activators.get(row.activatedBy ?? "") ?? "an advisor"}` : "Paid"} on{" "}
                 {row.activatedAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                 {row.activationNote && ` · ${row.activationNote}`}
               </p>
@@ -48,7 +48,7 @@ export default async function CompanyLibraryPage({ params }: { params: Promise<{
                 ))}
               </dl>
             ) : (
-              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>No objective answers yet.</p>
+              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>No questionnaire answers yet.</p>
             )}
             {!row?.activatedAt && <ActivateForm companyId={company.id} useCase={def.id} activate={activateForCompany} />}
           </section>

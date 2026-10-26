@@ -67,9 +67,25 @@ test("old founder routes redirect into the five steps", async ({ browser }) => {
     await page.goto(from);
     await expect(page, from).toHaveURL(to);
   }
-  // Data is locked until a use case is active.
+  // Data is locked until an assessment is bought.
   await page.goto("/data");
-  await expect(page.getByText("This step unlocks when you activate a use case.")).toBeVisible();
+  await expect(page.getByText(/This step unlocks when you buy an assessment\./)).toBeVisible();
+  await ctx.close();
+});
+
+test("paid steps need a payment Stripe confirmed, never a URL or the browser", async ({ browser }) => {
+  const { ctx, page } = await as(browser, "access-founder@e2e.test");
+  // A made-up success return doesn't unlock anything.
+  await page.goto("/api/checkout/return?use_case=growth_leak&session_id=cs_forged");
+  await expect(page).toHaveURL(/\/library\/growth_leak\/snapshot\?checkout=pending|\/library\/growth_leak$/);
+  await page.goto("/data");
+  await expect(page.getByText(/This step unlocks when you buy an assessment\./)).toBeVisible();
+  // Results and "open assessment" links for something not bought go back to the library / history.
+  await page.goto("/baseline");
+  await expect(page).toHaveURL(/\/library$/);
+  await page.goto("/assessments/open?use_case=growth_leak");
+  await expect(page).toHaveURL(/\/assessments$/);
+  await expect(page.getByText("No assessments yet.")).toBeVisible();
   await ctx.close();
 });
 

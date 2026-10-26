@@ -282,6 +282,9 @@ Answers are stored per company use case and passed to the Draft Agent as context
 A company may activate several (each paid separately). A **use case switcher** at the top of the sidebar selects the active one; steps 3–5 follow it. Data items shared between use cases are uploaded once.
 
 ### 13.6 Stripe gate
+
+> **Superseded (owner decision, Oct 26, 2026):** selecting a use case is now free, with a free questionnaire and Growth Snapshot; payment is a $499 Single Assessment per use case, plus an optional advisory session (from $750) and a reserved $299/month subscription. Prices are configurable. See README › "Pricing and the founder journey". The rest of this subsection is kept for history.
+
 - Browsing the library and filling in the objective form are free (we capture intent even if they don't pay).
 - Checkout is per company **per use case**; success returns to `/data` with that use case active; cancel returns to the form with answers kept.
 - Payment activates the use case. The separate "unlock the preliminary Benchmark" payment is retired: once a use case is paid, its preliminary baseline (clearly labelled, shown only when code checks pass) is visible without a further payment, and the advisor-approved version replaces it.

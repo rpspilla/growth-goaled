@@ -3,12 +3,13 @@ import type { ReactNode } from "react";
 import { isStaging } from "@/lib/env";
 import { signOut } from "./actions";
 import { initials } from "./initials";
+import { MobileNav } from "./MobileNav";
 
 /** Two-column app frame from the prototype: navy sidebar + top bar + scrolling content. */
 export function Shell({ sidebar, topbar, children }: { sidebar: ReactNode; topbar: ReactNode; children: ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden">
-      <aside className="flex flex-col w-56 shrink-0 h-full" style={{ background: "var(--navy)", color: "#C8D3E0" }}>
+      <aside className="hidden md:flex flex-col w-56 shrink-0 h-full" style={{ background: "var(--navy)", color: "#C8D3E0" }}>
         <div className="px-5 pt-6 pb-5 border-b" style={{ borderColor: "#1E3347" }}>
           <div className="flex items-center gap-2.5">
             <div
@@ -25,10 +26,11 @@ export function Shell({ sidebar, topbar, children }: { sidebar: ReactNode; topba
 
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <header
-          className="flex items-center h-14 px-6 border-b shrink-0"
+          className="flex items-center h-14 px-4 md:px-6 border-b shrink-0 min-w-0"
           style={{ background: "var(--card)", borderColor: "var(--border)" }}
         >
-          {topbar}
+          <MobileNav>{sidebar}</MobileNav>
+          <div className="flex items-center flex-1 min-w-0 gap-2">{topbar}</div>
         </header>
         <main className="flex-1 overflow-y-auto">
           <div className="page-enter">{children}</div>
@@ -54,8 +56,8 @@ export function UserMenu({ name, email, color, profileHref }: { name: string | n
   return (
     <div className="flex items-center gap-3">
       {profileHref && (
-        <Link href={profileHref} className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-          Company profile
+        <Link href={profileHref} className="text-xs whitespace-nowrap" style={{ color: "var(--muted-foreground)" }}>
+          <span className="hidden sm:inline">Company </span>profile
         </Link>
       )}
       <div
@@ -66,7 +68,7 @@ export function UserMenu({ name, email, color, profileHref }: { name: string | n
         {initials(name, email)}
       </div>
       <form action={signOut}>
-        <button type="submit" className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+        <button type="submit" className="text-xs whitespace-nowrap" style={{ color: "var(--muted-foreground)" }}>
           Sign out
         </button>
       </form>

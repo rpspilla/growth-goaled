@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { recordPaidSession } from "@/lib/data/payments";
+import { markSession, recordPaidSession } from "@/lib/data/payments";
 import { stripe } from "@/lib/stripe";
 
 /**
- * Stripe webhook: unlocks the Benchmark when a Checkout completes. The
- * signature is verified with STRIPE_WEBHOOK_SECRET; nothing is trusted otherwise.
+ * Stripe webhook: grants a purchased assessment when its Checkout is paid, and records
+ * expired or failed sessions. The signature is verified with STRIPE_WEBHOOK_SECRET;
+ * nothing is trusted otherwise. Handlers are idempotent (Stripe may retry).
  */
 export async function POST(request: Request) {
   const secret = process.env.STRIPE_WEBHOOK_SECRET?.trim();
@@ -18,6 +19,10 @@ export async function POST(request: Request) {
   }
   if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
     await recordPaidSession(event.data.object);
+  } else if (event.type === "checkout.session.expired") {
+    await markSession(event.data.object.id, "expired");
+  } else if (event.type === "checkout.session.async_payment_failed") {
+    await markSession(event.data.object.id, "failed");
   }
   return NextResponse.json({ received: true });
 }

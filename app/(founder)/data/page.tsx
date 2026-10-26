@@ -43,7 +43,7 @@ export default async function DataPage() {
   const inbox = documents.filter((d) => d.inbox || d.suggestions.some((x) => x.status === "suggested"));
 
   const groups = [
-    { title: "Needed for your baseline", caption: "We can't build your baseline without these.", keys: useCase.requiredItems, required: true },
+    { title: "Needed for the assessment", caption: "We can't complete the assessment without these.", keys: useCase.requiredItems, required: true },
     { title: "Sharpens it", caption: "Not required, but each one makes the answer more precise.", keys: useCase.helpfulItems, required: false },
     { title: "Optional extras", caption: "Useful if you have them to hand.", keys: useCase.optionalItems, required: false },
   ].filter((g) => g.keys.length);

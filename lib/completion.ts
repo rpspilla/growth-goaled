@@ -35,7 +35,7 @@ export function completionSteps(input: CompletionInput): CompletionStep[] {
     const section = intakeSectionFor(m);
     steps.push({
       title: `Add your ${label(m)}`,
-      detail: `Your peer cohort has a benchmark for ${label(m)}, but we don't have your figure yet, so it isn't compared.`,
+      detail: `Peer reference data exists for ${label(m)}, but we don't have your figure yet, so it isn't compared.`,
       href: section ? `/profile/${section}` : "/data",
       label: section ? "Add it in Company Profile" : "Upload a file with it",
     });
@@ -82,8 +82,8 @@ export function completionSteps(input: CompletionInput): CompletionStep[] {
 
   if (input.noCohort) {
     steps.unshift({
-      title: "Waiting on a matching peer cohort",
-      detail: "We don't have approved benchmarks for companies like yours yet. Your advisor is adding them; nothing for you to do here.",
+      title: "No matching peer reference data yet",
+      detail: "We don't have approved peer reference data for companies like yours yet. This version of the assessment needs it, so an analyst will prepare your results instead; nothing for you to do here.",
       href: "/baseline",
       label: "Check back soon",
     });

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { HealthPicker, SummaryEditor } from "@/components/advisor/CompanyControls";
+import { listAdvisoryRequests } from "@/lib/data/advisory";
 import { latestMetrics, portfolioRows, userName } from "@/lib/data/portfolio";
 import { formatMetric, type MetricKey } from "@/lib/metrics";
 import { getUseCase, targetSummary } from "@/lib/use-cases";
@@ -13,10 +14,11 @@ const card = { background: "var(--card)", borderColor: "var(--border)" };
 /** Step 1 mirrored: company summary, its use cases and which step each is on. */
 export default async function CompanyOverviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { company, useCases } = await companyContext((await params).id);
-  const [metrics, [row], summaryBy] = await Promise.all([
+  const [metrics, [row], summaryBy, advisory] = await Promise.all([
     latestMetrics([company.id]).then((m) => m.get(company.id) ?? new Map()),
     portfolioRows([company]),
     userName(company.advisorSummaryBy),
+    listAdvisoryRequests([company.id]),
   ]);
   const base = `/advisor/companies/${company.id}`;
 
@@ -64,7 +66,7 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
         <div className="rounded-xl border divide-y" style={card}>
           {useCases.length === 0 && (
             <div className="p-4 text-sm" style={{ color: "var(--muted-foreground)" }}>
-              The founder hasn&apos;t picked a use case yet. <Link href={`${base}/library`} style={{ color: "var(--green)" }}>Open the library</Link> to activate one for a pilot.
+              The founder hasn&apos;t picked a use case yet. <Link href={`${base}/library`} style={{ color: "var(--green)" }}>Open the library</Link> to grant one for a pilot.
             </div>
           )}
           {useCases.flatMap((u) => {
@@ -78,7 +80,7 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
                 <div className="flex-1">
                   <div className="font-medium" style={{ color: "var(--foreground)" }}>{def.shortTitle}</div>
                   <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-                    {u.activatedAt ? `Active since ${u.activatedAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} · ${u.activation === "advisor" ? "activated by advisor" : "paid"}` : "Objective started, not activated"}
+                    {u.activatedAt ? `Purchased ${u.activatedAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} · ${u.activation === "advisor" ? "granted by advisor" : "paid"}` : "Free Snapshot only"}
                     {target && ` · founder's target: ${target}`}
                   </div>
                 </div>
@@ -88,6 +90,24 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
           })}
         </div>
       </section>
+
+      {advisory.length > 0 && (
+        <section>
+          <h2 className="text-sm font-semibold mb-2" style={{ color: "var(--foreground)" }}>Advisory requests</h2>
+          <div className="rounded-xl border divide-y" style={card}>
+            {advisory.map((a) => (
+              <div key={a.id} className="px-4 py-3 text-sm" style={{ borderColor: "var(--border)" }}>
+                <div className="flex gap-2 flex-wrap text-xs" style={{ color: "var(--muted-foreground)" }}>
+                  <span className="font-semibold" style={{ color: a.status === "new" ? "var(--amber)" : "var(--muted-foreground)" }}>{a.status === "new" ? "New" : a.status}</span>
+                  <span>{a.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                  {a.useCase && getUseCase(a.useCase) && <span>· {getUseCase(a.useCase)!.shortTitle}</span>}
+                </div>
+                <div style={{ color: "var(--foreground)" }}>{a.message ?? "No message."}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="grid md:grid-cols-3 gap-6">
         <div className="rounded-xl border p-5" style={card}>

@@ -5,7 +5,7 @@ import type { CompletionStep } from "@/lib/completion";
 export function CompletionList({ steps }: { steps: CompletionStep[] }) {
   return (
     <div className="rounded-xl border p-6" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
-      <div className="text-sm font-semibold mb-1" style={{ color: "var(--foreground)" }}>To complete your fully calculated report</div>
+      <div className="text-sm font-semibold mb-1" style={{ color: "var(--foreground)" }}>What would make your results more complete</div>
       {steps.length === 0 ? (
         <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
           You&apos;ve provided everything the full report needs. Your advisor will review it and publish the final version.

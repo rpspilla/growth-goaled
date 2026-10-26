@@ -6,10 +6,10 @@ import { getUseCase, targetSummary } from "@/lib/use-cases";
 import { journeyStage, nextAction } from "@/lib/use-cases/steps";
 
 const STATUS_LINE: Record<string, string> = {
-  objective: "Objective saved · not active yet",
-  active: "Active · connecting data",
-  baseline_in_review: "Baseline being prepared",
-  tracking: "Tracking progress",
+  objective: "Free Snapshot · not purchased",
+  active: "Purchased · sharing data",
+  baseline_in_review: "Purchased · being analyzed",
+  tracking: "Complete",
   closed: "Closed",
 };
 
@@ -24,19 +24,22 @@ export default async function OverviewPage() {
     <div className="p-8 max-w-6xl space-y-8">
       <PageHeader
         title={company ? `Welcome to Growth Goaled, ${company.name}` : "Welcome to Growth Goaled"}
-        subtitle="Pick the question that matters most right now. We answer it from your own data, then help you track progress toward your goal."
+        subtitle="Pick the decision you're facing. Get a free Snapshot from a few questions, then a full assessment from your own data when you're ready."
       />
       <JourneyVisual stage={journeyStage(state)} action={{ label: action.label, href: action.path }} />
 
       {listed.length > 0 && (
         <section>
-          <h2 className="text-sm font-semibold mb-2" style={{ color: "var(--foreground)" }}>Your use cases</h2>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>Your assessments</h2>
+            <Link href="/assessments" className="text-xs" style={{ color: "var(--green)" }}>All assessments →</Link>
+          </div>
           <div className="rounded-xl border divide-y" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
             {listed.map((u) => {
               const def = getUseCase(u.useCase)!;
               const target = targetSummary(u.objective);
               return (
-                <Link key={u.id} href={`/library/${def.id}`} className="flex items-center gap-4 px-4 py-3 hover:opacity-80" style={{ borderColor: "var(--border)" }}>
+                <Link key={u.id} href={u.activatedAt ? `/assessments/open?use_case=${def.id}` : `/library/${def.id}/snapshot`} className="flex items-center gap-4 px-4 py-3 hover:opacity-80" style={{ borderColor: "var(--border)" }}>
                   <div className="flex-1">
                     <div className="text-sm font-medium" style={{ color: "var(--foreground)" }}>{def.question}</div>
                     {target && <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>Your target: {target}</div>}

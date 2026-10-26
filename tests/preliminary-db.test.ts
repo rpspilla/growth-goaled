@@ -14,7 +14,8 @@ import type { Company, User } from "@/lib/db/schema";
 import type { DraftInput } from "@/lib/ai/draft";
 import { approveDeliverable, createBenchmarkVersion, publishDeliverable, runBenchmarkPipeline, sendBackDeliverable } from "@/lib/data/deliverables";
 import { founderBenchmark, startPreliminaryIfDue } from "@/lib/data/preliminary";
-import { confirmCheckout, createUseCaseCheckout, recordPaidSession } from "@/lib/data/payments";
+import { CheckoutError, confirmCheckout, createAssessmentCheckout, markSession, recordPaidSession } from "@/lib/data/payments";
+import { createAdvisoryRequest } from "@/lib/data/advisory";
 import { activateUseCase, activateWithoutPayment, getCompanyUseCase, pickActiveUseCase, listCompanyUseCases, saveObjectiveAnswer } from "@/lib/data/use-cases";
 import { completionSteps } from "@/lib/completion";
 import { assessReadiness } from "@/lib/readiness-assessment";
@@ -38,7 +39,7 @@ beforeAll(async () => {
 const refresh = async () => (await db().select().from(schema.companies).where(eq(schema.companies.id, acme.id)))[0]!;
 
 beforeEach(async () => {
-  for (const t of [schema.events, schema.companyUseCases, schema.payments, schema.agentRuns, schema.reviews, schema.deliverables, schema.benchmarkMetrics, schema.benchmarkSources, schema.benchmarkCohorts, schema.companies, schema.users]) await db().delete(t);
+  for (const t of [schema.events, schema.advisoryRequests, schema.companyUseCases, schema.payments, schema.agentRuns, schema.reviews, schema.deliverables, schema.benchmarkMetrics, schema.benchmarkSources, schema.benchmarkCohorts, schema.companies, schema.users]) await db().delete(t);
   [founder, advisor] = (await db()
     .insert(schema.users)
     .values([
@@ -159,7 +160,7 @@ describe("preliminary benchmark", () => {
   });
 });
 
-describe("use case activation", () => {
+describe("assessment purchase", () => {
   const fakeStripe = (session: Record<string, unknown>) => ({
     checkout: {
       sessions: {
@@ -169,57 +170,122 @@ describe("use case activation", () => {
     },
   });
   const activeRows = async () => (await db().select().from(schema.companyUseCases)).filter((r) => r.activatedAt);
+  const paid = { id: "cs_test_1", client_reference_id: "", metadata: {}, amount_total: 49_900, payment_status: "paid" as "paid" | "unpaid" };
 
-  it("creates a $1 checkout per use case and activates only that use case on a matching paid session", async () => {
+  it("selecting a use case and answering questions is free: no payment, no entitlement", async () => {
+    await saveObjectiveAnswer(acme, "growth_leak", "goal", "Find the leak");
+    expect(await db().select().from(schema.payments)).toHaveLength(0);
+    expect(await activeRows()).toHaveLength(0);
+    expect(await getCompanyUseCase(acme.id, "growth_leak")).toMatchObject({ status: "objective", activatedAt: null });
+  });
+
+  it("creates a $499 checkout for the company and use case, and grants it only on a matching paid session", async () => {
     const stripe = fakeStripe({});
-    const url = await createUseCaseCheckout(founder, acme, "series_a_ready", "https://dev.test", stripe as never);
+    const url = await createAssessmentCheckout(founder, acme, "growth_leak", "https://dev.test", stripe as never);
     expect(url).toBe("https://checkout.stripe.com/c/pay/cs_test_1");
-    const args = (stripe.checkout.sessions.create.mock.calls[0] as unknown[])[0] as {
-      line_items: { price_data: { unit_amount: number } }[];
-      client_reference_id: string;
-      success_url: string;
-      cancel_url: string;
-      metadata: Record<string, string>;
-    };
-    expect(args.line_items[0]!.price_data.unit_amount).toBe(100);
+    const [args, opts] = stripe.checkout.sessions.create.mock.calls[0] as unknown as [
+      { line_items: { price_data: { unit_amount: number } }[]; client_reference_id: string; success_url: string; cancel_url: string; metadata: Record<string, string> },
+      { idempotencyKey: string },
+    ];
+    expect(args.line_items[0]!.price_data.unit_amount).toBe(49_900);
     expect(args.client_reference_id).toBe(acme.id);
-    expect(args.metadata.useCase).toBe("series_a_ready");
-    expect(args.success_url).toContain("use_case=series_a_ready");
-    expect(args.success_url).toContain("session_id={CHECKOUT_SESSION_ID}");
-    expect(args.cancel_url).toBe("https://dev.test/library/series_a_ready?checkout=cancelled");
+    expect(args.metadata).toMatchObject({ useCase: "growth_leak", purpose: "assessment", userId: founder.id });
+    expect(args.success_url).toBe("https://dev.test/api/checkout/return?use_case=growth_leak&session_id={CHECKOUT_SESSION_ID}");
+    expect(args.cancel_url).toBe("https://dev.test/library/growth_leak/snapshot?checkout=cancelled");
+    expect(opts.idempotencyKey).toMatch(new RegExp(`^assessment:${acme.id}:growth_leak:`));
+    expect((await db().select().from(schema.payments))[0]).toMatchObject({ status: "pending", amountCents: 49_900, useCase: "growth_leak", purpose: "assessment", checkoutUrl: url });
 
-    const base = { id: "cs_test_1", client_reference_id: acme.id, metadata: { companyId: acme.id }, amount_total: 100 };
+    const base = { ...paid, client_reference_id: acme.id, metadata: { companyId: acme.id } };
     expect(await recordPaidSession({ ...base, payment_status: "unpaid" })).toBe(false);
-    expect(await recordPaidSession({ ...base, payment_status: "paid", client_reference_id: "someone-else" })).toBe(false);
-    expect(await recordPaidSession({ ...base, id: "cs_unknown", payment_status: "paid" })).toBe(false);
-    expect(await recordPaidSession({ ...base, payment_status: "paid", amount_total: 50 })).toBe(false);
+    expect(await recordPaidSession({ ...base, client_reference_id: "someone-else" })).toBe(false);
+    expect(await recordPaidSession({ ...base, metadata: { companyId: "someone-else" } })).toBe(false);
+    expect(await recordPaidSession({ ...base, id: "cs_unknown" })).toBe(false);
+    expect(await recordPaidSession({ ...base, amount_total: 100 })).toBe(false); // underpaid
     expect(await activeRows()).toHaveLength(0);
 
-    expect(await recordPaidSession({ ...base, payment_status: "paid" })).toBe(true);
-    expect(await recordPaidSession({ ...base, payment_status: "paid" })).toBe(true); // idempotent (webhook + return)
+    expect(await recordPaidSession(base)).toBe(true);
+    expect(await recordPaidSession(base)).toBe(true); // idempotent (webhook + return)
     const rows = await activeRows();
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ useCase: "series_a_ready", status: "active", activation: "paid", activatedBy: founder.id });
-    const [p] = await db().select().from(schema.payments);
-    expect(p).toMatchObject({ status: "paid", amountCents: 100, useCase: "series_a_ready" });
+    expect(rows[0]).toMatchObject({ useCase: "growth_leak", status: "active", activation: "paid", activatedBy: founder.id });
+    expect((await db().select().from(schema.payments))[0]).toMatchObject({ status: "paid" });
     const events = await db().select().from(schema.events).where(eq(schema.events.name, "use_case_activated"));
     expect(events).toHaveLength(1);
-    expect(events[0]!.props).toMatchObject({ use_case: "series_a_ready" });
   });
 
-  it("still honours a paid legacy benchmark unlock as Growth Leak", async () => {
-    await db().insert(schema.payments).values({ companyId: acme.id, userId: founder.id, purpose: "benchmark_unlock", stripeSessionId: "cs_old", amountCents: 100, currency: "usd" });
-    expect(await recordPaidSession({ id: "cs_old", payment_status: "paid", client_reference_id: acme.id, metadata: { companyId: acme.id }, amount_total: 100 })).toBe(true);
-    expect((await getCompanyUseCase(acme.id, "growth_leak"))?.activatedAt).toBeTruthy();
+  it("prevents duplicate charges: reuses an open checkout, refuses one already bought", async () => {
+    const open = fakeStripe({ id: "cs_test_1", status: "open", payment_status: "unpaid" });
+    const first = await createAssessmentCheckout(founder, acme, "growth_leak", "https://dev.test", open as never);
+    const second = await createAssessmentCheckout(founder, acme, "growth_leak", "https://dev.test", open as never);
+    expect(second).toBe(first);
+    expect(open.checkout.sessions.create).toHaveBeenCalledTimes(1);
+    expect(await db().select().from(schema.payments)).toHaveLength(1);
+
+    // Paid in the meantime (webhook not yet arrived): the retry grants it and refuses a new charge.
+    const nowPaid = fakeStripe({ ...paid, status: "complete", client_reference_id: acme.id, metadata: { companyId: acme.id } });
+    await expect(createAssessmentCheckout(founder, acme, "growth_leak", "https://dev.test", nowPaid as never)).rejects.toThrow(CheckoutError);
+    expect(nowPaid.checkout.sessions.create).not.toHaveBeenCalled();
+    expect(await activeRows()).toHaveLength(1);
+    await expect(createAssessmentCheckout(founder, acme, "growth_leak", "https://dev.test", nowPaid as never)).rejects.toThrow("You already have this assessment.");
   });
 
-  it("confirms on return from checkout only for the company's own session", async () => {
-    await createUseCaseCheckout(founder, acme, "growth_leak", "https://dev.test", fakeStripe({}) as never);
+  it("starts a fresh checkout once the old one expired, and records failed and expired sessions without granting", async () => {
+    await createAssessmentCheckout(founder, acme, "growth_leak", "https://dev.test", fakeStripe({}) as never);
+    const expired = fakeStripe({ id: "cs_test_1", status: "expired", payment_status: "unpaid" });
+    expired.checkout.sessions.create.mockResolvedValueOnce({ id: "cs_test_2", url: "https://checkout.stripe.com/c/pay/cs_test_2" });
+    expect(await createAssessmentCheckout(founder, acme, "growth_leak", "https://dev.test", expired as never)).toBe("https://checkout.stripe.com/c/pay/cs_test_2");
+    const statuses = Object.fromEntries((await db().select().from(schema.payments)).map((p) => [p.stripeSessionId, p.status]));
+    expect(statuses).toEqual({ cs_test_1: "expired", cs_test_2: "pending" });
+
+    await markSession("cs_test_2", "failed");
+    expect((await db().select().from(schema.payments).where(eq(schema.payments.stripeSessionId, "cs_test_2")))[0]!.status).toBe("failed");
+    expect(await activeRows()).toHaveLength(0);
+    // A paid payment is never downgraded by a late "expired" event.
+    await db().update(schema.payments).set({ status: "paid" }).where(eq(schema.payments.stripeSessionId, "cs_test_1"));
+    await markSession("cs_test_1", "expired");
+    expect((await db().select().from(schema.payments).where(eq(schema.payments.stripeSessionId, "cs_test_1")))[0]!.status).toBe("paid");
+  });
+
+  it("only sells assessments that are available", async () => {
+    await expect(createAssessmentCheckout(founder, acme, "series_a_ready", "https://dev.test", fakeStripe({}) as never)).rejects.toThrow("isn't available to buy yet");
+    process.env.SELLABLE_USE_CASES = "growth_leak,series_a_ready";
+    try {
+      expect(await createAssessmentCheckout(founder, acme, "series_a_ready", "https://dev.test", fakeStripe({}) as never)).toContain("checkout.stripe.com");
+    } finally {
+      delete process.env.SELLABLE_USE_CASES;
+    }
+  });
+
+  it("confirms on return from checkout with Stripe, only for the company's own session", async () => {
+    await createAssessmentCheckout(founder, acme, "growth_leak", "https://dev.test", fakeStripe({}) as never);
     const [other] = (await db().insert(schema.companies).values({ name: "Other" }).returning()) as [Company];
-    const paid = fakeStripe({ id: "cs_test_1", payment_status: "paid", client_reference_id: acme.id, metadata: { companyId: acme.id }, amount_total: 100 });
-    expect(await confirmCheckout(other, "cs_test_1", paid as never)).toBe(false);
+    const ok = fakeStripe({ ...paid, client_reference_id: acme.id, metadata: { companyId: acme.id } });
+    expect(await confirmCheckout(other, "cs_test_1", ok as never)).toBe("unknown");
     expect(await getCompanyUseCase(other.id, "growth_leak")).toBeNull();
-    expect(await confirmCheckout(acme, "cs_test_1", paid as never)).toBe(true);
+    expect(await confirmCheckout(acme, "cs_test_1", fakeStripe({ id: "cs_test_1", status: "open", payment_status: "unpaid" }) as never)).toBe("pending");
+    expect(await activeRows()).toHaveLength(0);
+    expect(await confirmCheckout(acme, "cs_test_1", ok as never)).toBe("paid");
+    expect(await activeRows()).toHaveLength(1);
+  });
+
+  it("still honours paid sessions from the retired $1 purchases", async () => {
+    await db().insert(schema.payments).values([
+      { companyId: acme.id, userId: founder.id, purpose: "benchmark_unlock", stripeSessionId: "cs_old", amountCents: 100, currency: "usd" },
+      { companyId: acme.id, userId: founder.id, purpose: "use_case", useCase: "winning_icp", stripeSessionId: "cs_uc", amountCents: 100, currency: "usd" },
+    ]);
+    const s = { payment_status: "paid" as const, client_reference_id: acme.id, metadata: { companyId: acme.id }, amount_total: 100 };
+    expect(await recordPaidSession({ ...s, id: "cs_old" })).toBe(true);
+    expect(await recordPaidSession({ ...s, id: "cs_uc" })).toBe(true);
+    expect((await activeRows()).map((r) => r.useCase).sort()).toEqual(["growth_leak", "winning_icp"]);
+  });
+
+  it("records advisory requests once a week per use case, and never touches the assessment", async () => {
+    await activateUseCase(acme.id, "growth_leak", { activation: "paid", by: founder.id });
+    expect(await createAdvisoryRequest(founder, acme, "growth_leak", "Help prioritize")).toEqual({ created: true });
+    expect(await createAdvisoryRequest(founder, acme, "growth_leak", "Again")).toEqual({ created: false });
+    expect(await createAdvisoryRequest(founder, acme, "hire_or_fix", "")).toEqual({ created: true });
+    expect(await db().select().from(schema.advisoryRequests)).toHaveLength(2);
+    expect((await getCompanyUseCase(acme.id, "growth_leak"))!.activatedAt).toBeTruthy();
   });
 
   it("saves objective answers one at a time, keeps them through activation, and validates them", async () => {

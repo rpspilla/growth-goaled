@@ -5,7 +5,7 @@ export const STEPS = [
   { key: "overview", label: "Overview", path: "/overview" },
   { key: "library", label: "Use Case Library", path: "/library" },
   { key: "data", label: "Data", path: "/data" },
-  { key: "baseline", label: "Baseline", path: "/baseline" },
+  { key: "baseline", label: "Results", path: "/baseline" },
   { key: "progress", label: "Progress & Tracking", path: "/progress" },
 ] as const;
 
@@ -35,8 +35,8 @@ export function stepStates(active: ActiveUseCase): StepState[] {
   const currentKey: StepKey = ["library", "data", "baseline", "progress"][stage] as StepKey;
   return STEPS.map((s, i) => {
     let lockedReason: string | null = null;
-    if ((s.key === "data" || s.key === "baseline") && !active) lockedReason = "Unlocks when you activate a use case";
-    if (s.key === "progress" && stage < 3) lockedReason = active ? "Unlocks when your baseline is approved" : "Unlocks after your baseline is approved";
+    if ((s.key === "data" || s.key === "baseline") && !active) lockedReason = "Unlocks when you buy an assessment";
+    if (s.key === "progress" && stage < 3) lockedReason = active ? "Unlocks when your results are approved" : "Unlocks after your results are approved";
     const doneAt: Partial<Record<StepKey, number>> = { library: 1, data: 2, baseline: 3 };
     return {
       key: s.key,
@@ -53,12 +53,12 @@ export function stepStates(active: ActiveUseCase): StepState[] {
 
 /** The founder's next action, for the Overview's primary button. */
 export function nextAction(active: ActiveUseCase, startedUseCase: UseCaseId | null): { label: string; path: string } {
-  if (!active) return startedUseCase ? { label: "Finish your objective", path: `/library/${startedUseCase}` } : { label: "Pick a use case", path: "/library" };
+  if (!active) return startedUseCase ? { label: "See your free Snapshot", path: `/library/${startedUseCase}/snapshot` } : { label: "Pick a question to answer", path: "/library" };
   switch (journeyStage(active)) {
     case 1:
       return { label: "Connect your data", path: "/data" };
     case 2:
-      return { label: "See your baseline", path: "/baseline" };
+      return { label: "See your results", path: "/baseline" };
     default:
       return { label: "Track your progress", path: "/progress" };
   }

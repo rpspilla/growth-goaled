@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 
-/** Advisor/admin: activate a use case without payment, with a note saying why. */
+/** Advisor/admin: grant an assessment without payment (pilots), with a note saying why. */
 export function ActivateForm({
   companyId,
   useCase,
@@ -28,7 +28,7 @@ export function ActivateForm({
       }}
     >
       <input
-        aria-label="Why activate without payment"
+        aria-label="Why grant without payment"
         value={note}
         onChange={(e) => setNote(e.target.value)}
         placeholder="Why (e.g. pilot customer)"
@@ -36,7 +36,7 @@ export function ActivateForm({
         style={{ background: "var(--background)", borderColor: "var(--border)", color: "var(--foreground)" }}
       />
       <button type="submit" disabled={pending} className="px-3 py-1.5 rounded-md text-sm font-semibold disabled:opacity-50" style={{ background: "var(--green)", color: "#fff" }}>
-        {pending ? "Activating…" : "Activate without payment"}
+        {pending ? "Granting…" : "Grant without payment"}
       </button>
       {error && <p className="w-full text-xs" role="alert" style={{ color: "var(--red)" }}>{error}</p>}
     </form>

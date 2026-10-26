@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { founderContext } from "@/lib/data/founder-context";
 import { Shell, StagingBadge, UserMenu } from "@/components/shell/Shell";
@@ -27,17 +28,17 @@ export default async function FounderLayout({ children }: { children: ReactNode 
       }
       topbar={
         <>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <div
               className="w-6 h-6 rounded text-xs font-bold flex items-center justify-center"
               style={{ background: "var(--green-muted)", color: "var(--green)" }}
             >
               {companyName[0]?.toUpperCase()}
             </div>
-            <span className="font-semibold text-sm" style={{ color: "var(--foreground)" }}>{companyName}</span>
+            <span className="font-semibold text-sm truncate" style={{ color: "var(--foreground)" }}>{companyName}</span>
             {company?.stage && (
               <span
-                className="text-xs px-2 py-0.5 rounded-full font-medium"
+                className="hidden sm:inline text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap"
                 style={{ background: "var(--blue-muted)", color: "var(--blue)" }}
               >
                 {company.stage}
@@ -45,7 +46,10 @@ export default async function FounderLayout({ children }: { children: ReactNode 
             )}
             <StagingBadge />
           </div>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-3">
+            <Link href="/assessments" className="text-xs whitespace-nowrap" style={{ color: "var(--muted-foreground)" }}>
+              <span className="hidden sm:inline">Your </span>assessments
+            </Link>
             <UserMenu name={user.name} email={user.email} color="navy" profileHref="/profile" />
           </div>
         </>

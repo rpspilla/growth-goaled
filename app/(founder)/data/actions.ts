@@ -147,13 +147,13 @@ export async function reviewPoint(dataPointId: string, decision: "accepted" | "r
 export async function requestBaseline(): Promise<{ ok: true } | { ok: false; error: string }> {
   const { company } = await founderCompany();
   const { active } = await founderContext();
-  if (!active) return { ok: false, error: "Activate a use case first." };
+  if (!active) return { ok: false, error: "Buy an assessment first." };
   const { items } = await getReadiness(company);
   const meter = baselineReadiness(active.def, Object.fromEntries(items.map((i) => [i.itemKey, i.status])));
   if (!meter.ready) return { ok: false, error: "Add the required items first." };
-  if (active.def.id !== "growth_leak") return { ok: false, error: "Your advisor will build this baseline from your data." };
+  if (active.def.id !== "growth_leak") return { ok: false, error: "An analyst will prepare these results from your data." };
   const version = await createBenchmarkVersion(company);
-  if (!version) return { ok: false, error: "Your baseline is already being prepared." };
+  if (!version) return { ok: false, error: "Your data is already being analyzed." };
   if (company.phase === "intake" || company.phase === "upload") await db.update(schema.companies).set({ phase: "benchmark" }).where(eq(schema.companies.id, company.id));
   await setUseCaseStatus(company.id, active.def.id, "baseline_in_review");
   after(() => runBenchmarkPipeline(version.id));
