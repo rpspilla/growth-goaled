@@ -2,16 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CATEGORIES } from "@/lib/readiness";
 
-/** Overview, one tab per category (A–F) and the file list. */
-export function ReadinessTabs({ missingByCategory }: { missingByCategory: Record<string, number> }) {
+/** The Data step's tabs: what the use case needs, uploaded files, and open questions. */
+export function ReadinessTabs({ questions = 0 }: { questions?: number }) {
   const path = usePathname();
   const tabs = [
-    { href: "/data", label: "Overview", badge: 0 },
-    ...CATEGORIES.map((c) => ({ href: `/data/${c.id}`, label: `${c.letter}. ${c.name}`, badge: missingByCategory[c.id] ?? 0 })),
+    { href: "/data", label: "What we need", badge: 0 },
     { href: "/data/files", label: "Files", badge: 0 },
-    { href: "/data/questions", label: "Needs your answer", badge: 0 },
+    { href: "/data/questions", label: "Needs your answer", badge: questions },
   ];
   return (
     <nav className="flex gap-1 overflow-x-auto border-b mb-8" style={{ borderColor: "var(--border)" }}>

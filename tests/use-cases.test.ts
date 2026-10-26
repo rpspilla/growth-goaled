@@ -5,6 +5,7 @@ import { ALL_ITEM_KEYS } from "@/lib/readiness";
 import { isMetricKey } from "@/lib/metrics";
 import { getUseCase, missingRequired, objectiveFields, parseAnswer, recommendedUseCases, targetSummary, USE_CASE_IDS, USE_CASES } from "@/lib/use-cases";
 import { journeyStage, nextAction, stepStates } from "@/lib/use-cases/steps";
+import { baselineReadiness } from "@/lib/use-cases/readiness";
 
 describe("use case registry", () => {
   it("has the six use cases from HANDOFF §13.3, in order, with stable ids", () => {
@@ -121,4 +122,22 @@ describe("migration 0010", () => {
     const pay = await pg.query<{ use_case: string }>("SELECT use_case FROM payments");
     expect(pay.rows[0]!.use_case).toBe("growth_leak");
   }, 60_000);
+});
+
+describe("Data step", () => {
+  it.each(USE_CASES.map((u) => [u.id, u] as const))("%s explains why each required and helpful item matters", (_id, u) => {
+    for (const k of [...u.requiredItems, ...u.helpfulItems]) expect(u.itemWhy[k], k).toBeTruthy();
+    for (const k of Object.keys(u.itemWhy)) expect([...u.requiredItems, ...u.helpfulItems, ...u.optionalItems], k).toContain(k);
+    expect(Object.values(u.itemWhy).join(" ")).not.toMatch(/benchmark/i);
+  });
+
+  it("baseline readiness counts required items in and is ready only when all are", () => {
+    const leak = getUseCase("growth_leak")!;
+    expect(baselineReadiness(leak, {})).toMatchObject({ done: 0, total: 3, percent: 0, ready: false, outstanding: ["monthly_revenue", "revenue_by_customer", "churned_revenue"] });
+    const some = baselineReadiness(leak, { monthly_revenue: "available", revenue_by_customer: "missing", grr_nrr: "available" });
+    expect(some).toMatchObject({ done: 1, percent: 33, ready: false, outstanding: ["revenue_by_customer", "churned_revenue"] });
+    expect(baselineReadiness(leak, { monthly_revenue: "available", revenue_by_customer: "partial", churned_revenue: "not_applicable" })).toMatchObject({ done: 3, ready: true });
+    // Everything "not applicable" isn't something we can build from.
+    expect(baselineReadiness(leak, { monthly_revenue: "not_applicable", revenue_by_customer: "not_applicable", churned_revenue: "not_applicable" }).ready).toBe(false);
+  });
 });

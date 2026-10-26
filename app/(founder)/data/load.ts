@@ -11,8 +11,7 @@ export async function loadReadiness() {
   const company = await getFounderCompany(user);
   if (!company) return null;
   const readiness = await getReadiness(company);
-  const missingByCategory = Object.fromEntries(readiness.assessment.collection.byCategory.map((c) => [c.id, c.missingRequired]));
-  return { user, company, readiness, blobPrefix: companyBlobPrefix(company.id), missingByCategory };
+  return { user, company, readiness, blobPrefix: companyBlobPrefix(company.id) };
 }
 
 export function toRecord(row: DataItemRow | undefined): ItemRecord {

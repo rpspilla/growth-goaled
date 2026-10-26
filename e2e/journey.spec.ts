@@ -121,7 +121,7 @@ test("founder to published benchmark", async ({ browser }) => {
   await expect(founder.page.getByText("your target", { exact: true })).toBeVisible();
   await pay.click();
   await expect(founder.page).toHaveURL(/\/data\?checkout=success/);
-  await expect(founder.page.getByText("Use case:")).toContainText("Growth Leak");
+  await expect(founder.page.getByRole("heading", { name: "Data for Growth Leak" })).toBeVisible();
   await expect(steps.getByRole("link", { name: /Data/ })).toBeVisible();
   await founder.page.goto("/overview");
   await expect(founder.page.getByText("Active · connecting data")).toBeVisible();
@@ -133,22 +133,25 @@ test("founder to published benchmark", async ({ browser }) => {
   }
   await expect(founder.page.getByRole("link", { name: "Go to Data →" })).toBeVisible();
 
-  // --- Founder: data readiness ---
-  for (const category of ["financial", "customers", "pipeline", "marketing", "product", "team"]) {
-    await founder.page.goto(`/data/${category}`);
-    const groups = founder.page.getByRole("group", { name: /^Status of / });
-    const n = await groups.count();
-    for (let i = 0; i < n; i++) {
-      const button = groups.nth(i).getByRole("button", { name: "Available", exact: true });
-      await button.click();
-      await expect(button).toHaveAttribute("aria-pressed", "true");
-    }
-  }
+  // --- Founder: Data shows only Growth Leak's items, in priority order ---
   await founder.page.goto("/data");
-  await expect(founder.page.getByText("100%").first()).toBeVisible();
-  await founder.page.getByRole("button", { name: "Send to my advisor for the benchmark" }).click();
-  await expect(founder.page).toHaveURL(/\/processing/);
-  await expect(founder.page.getByText("Your advisor is reviewing your benchmark")).toBeVisible({ timeout: 90_000 });
+  await expect(founder.page.getByRole("heading", { name: "Data for Growth Leak" })).toBeVisible();
+  await expect(founder.page.getByText(/benchmark/i)).toHaveCount(0);
+  await expect(founder.page.getByRole("heading", { name: "Needed for your baseline (3)" })).toBeVisible();
+  await expect(founder.page.getByText("Why it matters:").first()).toBeVisible();
+  await expect(founder.page.getByText("0 of 3 required items in")).toBeVisible();
+  const build = founder.page.getByRole("button", { name: "Build my baseline" });
+  await expect(build).toBeDisabled();
+  const groups = founder.page.getByRole("group", { name: /^Status of / });
+  await expect(groups).toHaveCount(9); // 3 required + 5 helpful + 1 optional
+  for (let i = 0; i < 3; i++) {
+    const button = groups.nth(i).getByRole("button", { name: "Available", exact: true });
+    await button.click();
+    await expect(button).toHaveAttribute("aria-pressed", "true");
+  }
+  await expect(founder.page.getByText("Ready: everything your baseline needs is in.")).toBeVisible();
+  await build.click();
+  await expect(founder.page).toHaveURL(/\/baseline/);
 
   // Nothing is visible to the founder before publishing.
   await founder.page.goto("/baseline");
@@ -186,9 +189,9 @@ test("founder to published benchmark", async ({ browser }) => {
   await founder.page.goto("/data");
   const switcher = founder.page.getByRole("combobox", { name: "Active use case" });
   await switcher.selectOption("winning_icp");
-  await expect(founder.page.getByText("Use case:")).toContainText("Winning ICP");
+  await expect(founder.page.getByRole("heading", { name: "Data for Winning ICP" })).toBeVisible();
   await switcher.selectOption("growth_leak");
-  await expect(founder.page.getByText("Use case:")).toContainText("Growth Leak");
+  await expect(founder.page.getByRole("heading", { name: "Data for Growth Leak" })).toBeVisible();
   await founder.page.goto("/baseline");
   await expect(founder.page.getByText("is the main gap to the top quartile.")).toBeVisible();
   await expect(founder.page.getByRole("heading", { name: "How do you compare?" })).toBeVisible();

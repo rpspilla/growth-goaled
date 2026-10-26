@@ -16,7 +16,7 @@ export default async function QuestionsPage() {
   return (
     <div className="p-8 max-w-6xl">
       {header}
-      <ReadinessTabs missingByCategory={{}} />
+      <ReadinessTabs questions={items.length} />
       <QuestionsView items={items} files={files} resolve={resolveQuestion} />
     </div>
   );

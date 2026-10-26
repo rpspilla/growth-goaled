@@ -2,6 +2,7 @@
 
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth/session";
@@ -20,10 +21,11 @@ import {
   reviewDataPoint,
   sortDocument,
 } from "@/lib/data/documents";
-import { getReadiness, latestAssessment, markReadyForBenchmark, updateDataItem, type ItemPatch, type UpdateResult } from "@/lib/data/readiness";
-import { summarizeGaps } from "@/lib/ai/readiness-summary";
-import { readinessFacts } from "@/lib/readiness-facts";
+import { getReadiness, updateDataItem, type ItemPatch, type UpdateResult } from "@/lib/data/readiness";
 import { createBenchmarkVersion, runBenchmarkPipeline } from "@/lib/data/deliverables";
+import { founderContext } from "@/lib/data/founder-context";
+import { setUseCaseStatus } from "@/lib/data/use-cases";
+import { baselineReadiness } from "@/lib/use-cases/readiness";
 
 /** Every action works on the signed-in founder's own company; the client never supplies a company id. */
 async function founderCompany() {
@@ -138,37 +140,24 @@ export async function reviewPoint(dataPointId: string, decision: "accepted" | "r
   refresh();
 }
 
-/** Hands the data to the advisor and starts drafting the Benchmark (nothing reaches the founder until it's published). */
-export async function sendForBenchmark(): Promise<{ ok: true } | { ok: false; error: string }> {
+/**
+ * "Build my baseline": once the active use case's required items are in, starts the
+ * draft → QA → advisor review pipeline. Growth Leak uses the benchmark pipeline until U3.
+ */
+export async function requestBaseline(): Promise<{ ok: true } | { ok: false; error: string }> {
   const { company } = await founderCompany();
-  const result = await markReadyForBenchmark(company);
-  if (result.ok) {
-    const version = await createBenchmarkVersion(company);
-    if (version) after(() => runBenchmarkPipeline(version.id));
-  }
+  const { active } = await founderContext();
+  if (!active) return { ok: false, error: "Activate a use case first." };
+  const { items } = await getReadiness(company);
+  const meter = baselineReadiness(active.def, Object.fromEntries(items.map((i) => [i.itemKey, i.status])));
+  if (!meter.ready) return { ok: false, error: "Add the required items first." };
+  if (active.def.id !== "growth_leak") return { ok: false, error: "Your advisor will build this baseline from your data." };
+  const version = await createBenchmarkVersion(company);
+  if (!version) return { ok: false, error: "Your baseline is already being prepared." };
+  if (company.phase === "intake" || company.phase === "upload") await db.update(schema.companies).set({ phase: "benchmark" }).where(eq(schema.companies.id, company.id));
+  await setUseCaseStatus(company.id, active.def.id, "baseline_in_review");
+  after(() => runBenchmarkPipeline(version.id));
   revalidatePath("/", "layout");
-  return result;
-}
-
-export type SummaryResult = { ok: true } | { ok: false; error: string };
-
-/** Saves the rule-based facts and an AI-written summary of them. At most one every two minutes. */
-export async function generateGapSummary(): Promise<SummaryResult> {
-  const { user, company } = await founderCompany();
-  const last = await latestAssessment(company);
-  if (last && Date.now() - last.createdAt.getTime() < 2 * 60_000) return { ok: false, error: "A summary was just generated. Try again in a couple of minutes." };
-
-  const { assessment, items } = await getReadiness(company);
-  const facts = readinessFacts(assessment, Object.fromEntries(items.map((i) => [i.itemKey, i.status])));
-  try {
-    const { summary, model, tokensIn, tokensOut } = await summarizeGaps(facts);
-    await db.insert(schema.readinessAssessments).values({ companyId: company.id, facts, summary, model, tokensIn, tokensOut, createdBy: user.id });
-  } catch (err) {
-    console.error("[readiness] Gap summary failed", err);
-    // Keep the facts even when the summary fails, so the record is auditable.
-    await db.insert(schema.readinessAssessments).values({ companyId: company.id, facts, summary: null, createdBy: user.id });
-    return { ok: false, error: "The summary couldn't be generated right now. The checks below are still up to date." };
-  }
-  refresh();
   return { ok: true };
 }
+

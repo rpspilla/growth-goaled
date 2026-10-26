@@ -13,6 +13,17 @@ export const growthLeak: UseCaseDef = {
   requiredItems: ["monthly_revenue", "revenue_by_customer", "churned_revenue"],
   helpfulItems: ["renewals_expansions", "grr_nrr", "opportunities", "stage_conversion", "win_loss"],
   optionalItems: ["leads_by_source"],
+  itemWhy: {
+    monthly_revenue: "Builds your ARR and growth trend, the line we're explaining.",
+    revenue_by_customer: "Splits growth into new, expansion and churned revenue (the ARR bridge).",
+    churned_revenue: "Shows how much growth leaks out through lost and shrinking customers.",
+    renewals_expansions: "Shows whether existing customers grow, the other side of the bridge.",
+    grr_nrr: "Gives retention directly if you already track it.",
+    opportunities: "Tests whether the leak is in pipeline volume.",
+    stage_conversion: "Shows which funnel stage deals stall in.",
+    win_loss: "Shows whether you're losing deals you should win, and why.",
+    leads_by_source: "Shows which channels feed the pipeline.",
+  },
   figures: ["arr", "arr_growth", "new_arr", "expansion_arr", "churned_arr", "nrr", "grr", "win_rate", "sales_cycle_days"],
   trackableMetrics: ["arr", "arr_growth", "nrr", "grr", "win_rate", "sales_cycle_days"],
 };

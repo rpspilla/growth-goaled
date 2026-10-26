@@ -63,6 +63,7 @@ export function ItemCard({
   files,
   missingFields,
   blobPrefix,
+  why,
 }: {
   def: DataItemDef;
   category: CategoryId;
@@ -71,6 +72,8 @@ export function ItemCard({
   files: ReadinessFile[];
   missingFields: string[];
   blobPrefix: string;
+  /** Why the item matters for the active use case, shown on the card. */
+  why?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -130,6 +133,7 @@ export function ItemCard({
               )}
             </div>
             <p className="text-sm mt-1" style={{ color: "var(--muted-foreground)" }}>{def.description}</p>
+            {why && <p className="text-xs mt-1" style={{ color: "var(--foreground)" }}><span className="font-semibold">Why it matters:</span> {why}</p>}
           </div>
           <button
             type="button"

@@ -31,6 +31,8 @@ export type UseCaseDef = {
   requiredItems: readonly string[];
   helpfulItems: readonly string[];
   optionalItems: readonly string[];
+  /** Why each item matters for this objective (shown on the Data step). */
+  itemWhy: Readonly<Record<string, string>>;
   figures: readonly MetricKey[];
   trackableMetrics: readonly MetricKey[];
 };

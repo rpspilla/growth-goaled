@@ -6,16 +6,7 @@ import { founderContext } from "@/lib/data/founder-context";
 /** Data is scoped to the active use case, so it stays locked until one is activated (HANDOFF §13.2). */
 export default async function DataLayout({ children }: { children: ReactNode }) {
   const { active } = await founderContext();
-  if (active) {
-    return (
-      <>
-        <div className="px-8 pt-6 -mb-4 text-xs" style={{ color: "var(--muted-foreground)" }}>
-          Use case: <span className="font-semibold" style={{ color: "var(--foreground)" }}>{active.def.shortTitle}</span> · {active.def.question}
-        </div>
-        {children}
-      </>
-    );
-  }
+  if (active) return children;
   return (
     <div className="p-8 max-w-3xl">
       <PageHeader eyebrow="Step 3 · Data" title="Data" subtitle="Connect the data your use case needs." />

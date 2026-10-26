@@ -22,17 +22,16 @@ Use two browsers (or a private window): one signed in as **admin** (ryan@growthg
 - [ ] % complete updates; at 100% the "Go to Data →" button appears and the phase moves on
 - [ ] Numeric answers (ARR, growth, NRR, sales cycle…) show on the dashboard
 
-## Data Readiness (readiness rework)
-- [ ] Six categories A–F, each item's status buttons save (Available / Partially / Missing / N/A)
-- [ ] Item details save: source system, method, coverage months, quality (founder can't pick Validated), limitations, notes
-- [ ] Upload a **CSV** and an **XLSX** into an item: status goes reading → read, columns / rows / date range shown, missing-column warning when a needed column is absent
-- [ ] Upload a **PDF** (board deck or financial model): extracted values appear as proposed; accept / reject works
-- [ ] Upload a **DOCX**: shows "stored, not analysed automatically"
-- [ ] Upload the **same file twice**: second time says it linked the existing copy; only one file listed
-- [ ] Rejected formats (.pptx, .xls) show the export-as message
-- [ ] Overview: three separate panels (collection / quality / analytical), next-step card, metrics list, quality concerns
-- [ ] "Summarise gaps" produces an AI summary grounded in the checks (no figures); "data changed" note after edits
-- [ ] "Send to my advisor for the benchmark" stays disabled until blockers are cleared, then goes to `/processing`
+## Data step (simplified per use case)
+- [ ] `/data` title is "Data for <use case>"; no mention of benchmark; tabs are only What we need / Files / Needs your answer
+- [ ] Items are only the active use case's, in three groups: **Needed for your baseline**, **Sharpens it**, **Optional extras**; each card has a "Why it matters" line for this objective
+- [ ] Switch use case in the sidebar → the list and reasons change (shared items keep their status and files)
+- [ ] Status buttons save (Available / Partially / Missing / N/A); "Details" opens source system, coverage, quality, limitations, notes
+- [ ] **Baseline readiness** meter: "N of M required items in", turns green with "Ready" when all required items are in
+- [ ] Growth Leak: "Build my baseline" is disabled until ready, then goes to Baseline with "Your advisor is preparing…"; other use cases say the advisor will build it
+- [ ] Upload a **CSV** and an **XLSX**: status goes reading → read, columns / rows / date range shown, missing-column warning when a needed column is absent
+- [ ] Upload a **PDF**: extracted values appear as proposed; accept / reject works
+- [ ] Old category links (`/data/financial` etc.) land on `/data`
 
 ## Upload whatever you have (inbox)
 - [ ] Drag several files onto the drop zone at the top of `/data` (and also try click-to-choose); each shows uploading → "reading and sorting"
@@ -56,11 +55,11 @@ Use two browsers (or a private window): one signed in as **admin** (ryan@growthg
 - [ ] Open a card → objective form + "What you get" + "Data we'll ask for" (required items in bold)
 - [ ] Answers save on blur ("Your answers are saved…"), survive a reload, and show again after leaving and coming back; the target value has the *your target* label; bad number/date shows an error
 - [ ] "Continue to payment · $1" stays disabled until the four required answers are in
-- [ ] Pay with Stripe test card 4242 4242 4242 4242 → back on **Data** with "Use case: …" at the top; Data and Baseline unlocked in the sidebar
+- [ ] Pay with Stripe test card 4242 4242 4242 4242 → back on **Data** titled "Data for <use case>"; Data and Baseline unlocked in the sidebar
 - [ ] Cancel at checkout → back on the form with "Payment cancelled" and answers kept
 - [ ] Stripe dashboard → webhook shows a 200 for `checkout.session.completed`
 - [ ] Overview now shows "Connect your data" and the use case with "Your target: …"
-- [ ] Activate a second use case (pay again, or as admin) → a **switcher** appears at the top of the sidebar; switching changes "Use case:" on Data
+- [ ] Activate a second use case (pay again, or as admin) → a **switcher** appears at the top of the sidebar; switching changes the Data title and list
 - [ ] Old links redirect: `/dashboard` → Overview, `/readiness` → Data, `/questions` → Data › Needs your answer, `/intake/company` → Profile, `/benchmark` → Baseline (or Library with no active use case)
 - [ ] **Company profile** link at top right opens the old profile sections
 - [ ] With Growth Leak active, **Baseline** shows the preliminary / published benchmark as before (no separate $1 unlock any more); for other use cases a short "we'll build it once the data is in" note

@@ -14,6 +14,16 @@ export const founderHandoff: UseCaseDef = {
   requiredItems: ["opportunities", "win_loss", "founder_dependencies"],
   helpfulItems: ["stage_history", "sales_activity", "roster"],
   optionalItems: ["org_chart", "deal_terms"],
+  itemWhy: {
+    opportunities: "Deals with their owner, so we can compare your deals with your reps'.",
+    win_loss: "Win rate for your deals vs. the team's.",
+    founder_dependencies: "Which stages and relationships still rely on you.",
+    stage_history: "Where deals stall when you're not in them.",
+    sales_activity: "How much selling the team does without you.",
+    roster: "Who could take over, and what's missing.",
+    org_chart: "Reporting lines for a first sales leader.",
+    deal_terms: "Whether reps discount more than you do.",
+  },
   figures: ["founder_closed_share", "win_rate", "sales_cycle_days"],
   trackableMetrics: ["founder_closed_share", "win_rate", "sales_cycle_days"],
 };

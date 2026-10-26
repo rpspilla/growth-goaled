@@ -111,3 +111,11 @@ export async function activationsFor(companyIds: readonly string[]) {
     .where(and(inArray(schema.companyUseCases.companyId, [...companyIds]), isNotNull(schema.companyUseCases.activatedAt)))
     .orderBy(desc(schema.companyUseCases.activatedAt));
 }
+
+/** Moves an activated use case along (objective → active → baseline_in_review → tracking → closed). */
+export async function setUseCaseStatus(companyId: string, useCaseId: UseCaseId, status: CompanyUseCase["status"]) {
+  await db
+    .update(schema.companyUseCases)
+    .set({ status, updatedAt: new Date() })
+    .where(and(eq(schema.companyUseCases.companyId, companyId), eq(schema.companyUseCases.useCase, useCaseId), isNotNull(schema.companyUseCases.activatedAt)));
+}
