@@ -179,8 +179,9 @@ test("founder: free snapshot, $499 assessment, results, optional advisory", asyn
   await expect(founder.page.getByRole("heading", { name: "Needed for the assessment (3)" })).toBeVisible();
   await expect(founder.page.getByText("Why it matters:").first()).toBeVisible();
   await expect(founder.page.getByText("0 of 3 required items in")).toBeVisible();
+  // Analysis is never blocked: with data missing it runs on what's shared and lists the gaps.
+  await expect(founder.page.getByRole("button", { name: "Analyze what I've shared" })).toBeEnabled();
   const build = founder.page.getByRole("button", { name: "Analyze my data" });
-  await expect(build).toBeDisabled();
   const groups = founder.page.getByRole("group", { name: /^Status of / });
   await expect(groups).toHaveCount(9); // 3 required + 5 helpful + 1 optional
   for (let i = 0; i < 3; i++) {
@@ -241,11 +242,13 @@ test("founder: free snapshot, $499 assessment, results, optional advisory", asyn
   await expect(founder.page.getByText(/Reviewed by E2E Admin/)).toBeVisible();
   await expect(founder.page.getByText(/Checked against your profile\./)).toBeVisible();
 
-  // --- Optional advisory: shown once, never gating the results ---
-  await expect(founder.page.getByRole("link", { name: "Explore advisory support →" })).toHaveCount(1);
-  await expect(founder.page.getByLabel("Optional advisory support")).toContainText("From $750");
-  await founder.page.getByRole("link", { name: "Explore advisory support →" }).click();
-  await expect(founder.page).toHaveURL(/\/advisory\?use_case=growth_leak/);
+  // --- Complete data: a clear plan and a monthly executive advisor call, shown once ---
+  await expect(founder.page.getByRole("link", { name: "Book your monthly call →" })).toHaveCount(1);
+  await expect(founder.page.getByLabel("Executive advisor")).toContainText("from $750");
+  await expect(founder.page.getByLabel("Executive advisor")).toContainText("monthly call with an executive-level advisor");
+  await founder.page.getByRole("link", { name: "Book your monthly call →" }).click();
+  await expect(founder.page).toHaveURL(/\/advisory\?use_case=growth_leak&kind=monthly/);
+  await expect(founder.page.getByRole("heading", { name: "Monthly executive advisor call" })).toBeVisible();
   await founder.page.getByLabel(/What would you like to work through/).fill("Which fix to start with.");
   await founder.page.getByRole("button", { name: "Request a session" }).click();
   await expect(founder.page.getByText(/We'll email you/)).toBeVisible();

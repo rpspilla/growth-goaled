@@ -7,7 +7,9 @@ import { AI_MODEL, aiProblemForStaff, isAiConfigError } from "@/lib/ai/config";
 import { AssessmentDraftError, AssessmentQaError, ASSESSMENT_BRIEFS, draftAssessment, qaAssessment, type AssessmentInput, type AssessmentOutput } from "@/lib/ai/assessment";
 import { matchCohort } from "@/lib/cohort-match";
 import { assessmentContentSchema, type AssessmentContent } from "@/lib/deliverables/assessment";
-import { allowedNumbers, checkDraft, numbersIn, type ClaimForCheck } from "@/lib/deliverables/checks";
+import { allowedNumbers, checkDraft, numbersIn, type ClaimForCheck, type CodeCheckResult } from "@/lib/deliverables/checks";
+export { claimsFromAssessment };
+import { claimsFromAssessment, completeness, fallbackAssessment, sanitizeAssessment, systemGaps } from "@/lib/deliverables/assessment-safety";
 import { track } from "@/lib/events";
 import { getItem } from "@/lib/readiness";
 import { formatMetric, isMetricKey, METRICS, type MetricKey } from "@/lib/metrics";
@@ -78,7 +80,6 @@ export async function assembleAssessmentInputs(company: Company, useCase: UseCas
   const answers = objectiveFields(useCase)
     .filter((f) => objective[f.id]?.trim())
     .map((f) => ({ id: `answer:${f.id}`, question: f.label, answer: f.options?.find((o) => o.value === objective[f.id])?.label ?? objective[f.id]! }));
-  if (!answers.length) throw new AssessmentError("Answer the questionnaire for this assessment first.");
   const target =
     objective.main_metric && isMetricKey(objective.main_metric) && objective.target_value && Number.isFinite(Number(objective.target_value))
       ? { metric: METRICS[objective.main_metric].label, value: formatMetric(objective.main_metric, Number(objective.target_value)), by: objective.target_date ?? null }
@@ -174,7 +175,10 @@ export async function assembleAssessmentInputs(company: Company, useCase: UseCas
     })),
     reference_note: referenceNote,
     open_questions: openQuestions,
+    unreadable_files: readiness.files.filter((f) => f.status === "failed").map((f) => f.filename).slice(0, 10),
+    completeness: "partial",
   };
+  input.completeness = completeness(input);
 
   const byMetric = new Map(figures.map((f) => [f.metric, f.value]));
   const comparison = refRows.map(({ metric, row: r }) => ({ company: byMetric.get(metric)!, median: r.metric.median, topQuartile: r.metric.p75, p25: r.metric.p25 }));
@@ -206,18 +210,12 @@ export async function assembleAssessmentInputs(company: Company, useCase: UseCas
   };
 }
 
-/** Claims the model wrote, keyed as stored in the content. */
-export function claimsFromAssessment(out: AssessmentOutput): ClaimForCheck[] {
-  return [
-    { key: "summary", text: `${out.summary.headline} ${out.summary.body}`, sources: out.summary.sources },
-    ...out.findings.map((f, i) => ({ key: `finding.${i}`, text: f.text, sources: f.sources })),
-    { key: "diagnosis", text: out.diagnosis.text, sources: out.diagnosis.sources },
-    { key: "decision", text: out.decision.text, sources: out.decision.sources },
-    ...out.actions.map((a, i) => ({ key: `action.${i}`, text: `${a.action} ${a.why}`, sources: a.sources })),
-  ];
-}
-
-export function contentFromAssessment(useCase: UseCaseId, inputs: Pick<AssessmentInputs, "figures" | "reference" | "methodology">, out: AssessmentOutput): AssessmentContent {
+export function contentFromAssessment(
+  useCase: UseCaseId,
+  inputs: Pick<AssessmentInputs, "figures" | "reference" | "methodology" | "input">,
+  out: AssessmentOutput,
+  degraded = false,
+): AssessmentContent {
   return {
     useCase,
     figures: inputs.figures.map(({ metric, dataPointId }) => ({ metric, dataPointId })),
@@ -231,6 +229,9 @@ export function contentFromAssessment(useCase: UseCaseId, inputs: Pick<Assessmen
     dataGaps: out.data_gaps,
     nextSteps: out.next_steps,
     methodology: inputs.methodology,
+    systemGaps: systemGaps(inputs.input),
+    completeness: inputs.input.completeness,
+    degraded,
   };
 }
 
@@ -298,7 +299,21 @@ async function fail(runId: string, deliverableId: string, err: unknown, started:
   await db.update(schema.deliverables).set({ status: "failed" }).where(and(eq(schema.deliverables.id, deliverableId), inArray(schema.deliverables.status, ["drafting", "qa"])));
 }
 
-/** Draft → claims → QA Agent + code checks. Founders see the result once the code checks pass. */
+const codeCheck = (out: AssessmentOutput, inputs: AssessmentInputs) => checkDraft(claimsFromAssessment(out), inputs.allowed, inputs.validIds);
+const passes = (c: CodeCheckResult) => !c.untracedNumbers.length && !c.unsourcedClaims.length && !c.unknownSources.length;
+const describeFailures = (c: CodeCheckResult) =>
+  [
+    ...c.untracedNumbers.map((u) => `"${u.raw}" in ${u.claim} isn't in the input`),
+    ...c.unsourcedClaims.map((k) => `${k} cites no valid id`),
+    ...c.unknownSources.map((u) => `${u.claim} cites unknown id ${u.id}`),
+  ].join("; ");
+
+/**
+ * Draft → code checks → (one revision) → sanitise → QA Agent. It never leaves the founder with
+ * nothing: if the model fails, a plain report is built from the inputs; statements that still
+ * fail the checks are dropped; a QA Agent failure is recorded but doesn't block the result.
+ * Only an error assembling the inputs (e.g. the database) fails the run.
+ */
 export async function runAssessmentPipeline(deliverableId: string, deps: AssessmentDeps = {}): Promise<void> {
   const [d] = await db.select().from(schema.deliverables).where(eq(schema.deliverables.id, deliverableId)).limit(1);
   if (!d || d.status !== "drafting" || d.type !== TYPE) return;
@@ -309,49 +324,90 @@ export async function runAssessmentPipeline(deliverableId: string, deps: Assessm
   let started = Date.now();
   const draftRun = await logRun({ deliverableId, agent: "draft", model: AI_MODEL, status: "running" });
   let inputs: AssessmentInputs;
-  let out: AssessmentOutput;
   try {
     inputs = await assembleAssessmentInputs(company, useCase);
-    const result = await (deps.draft ?? draftAssessment)(inputs.input);
-    out = result.output;
-    await saveClaims(deliverableId, claimsFromAssessment(out), inputs);
-    await db
-      .update(schema.agentRuns)
-      .set({
-        status: "succeeded",
-        model: result.model,
-        inputHash: createHash("sha256").update(JSON.stringify(inputs.input)).digest("hex"),
-        output: { input: inputs.input, draft: out },
-        tokensIn: result.tokensIn,
-        tokensOut: result.tokensOut,
-        durationMs: Date.now() - started,
-      })
-      .where(eq(schema.agentRuns.id, draftRun));
-    await db
-      .update(schema.deliverables)
-      .set({ status: "qa", content: contentFromAssessment(useCase.id, inputs, out), headline: out.summary.headline, createdByRun: draftRun })
-      .where(and(eq(schema.deliverables.id, deliverableId), eq(schema.deliverables.status, "drafting")));
   } catch (err) {
     return fail(draftRun, deliverableId, err, started);
   }
 
+  const draft = deps.draft ?? draftAssessment;
+  let out: AssessmentOutput;
+  let degraded = false;
+  let model = AI_MODEL;
+  let tokensIn = 0;
+  let tokensOut = 0;
+  const notes: string[] = [];
+  try {
+    const first = await draft(inputs.input);
+    tokensIn += first.tokensIn;
+    tokensOut += first.tokensOut;
+    model = first.model;
+    out = first.output;
+    const check = codeCheck(out, inputs);
+    if (!passes(check)) {
+      notes.push(`First draft failed the code checks: ${describeFailures(check)}`);
+      const second = await draft({ ...inputs.input, revision_notes: describeFailures(check) });
+      tokensIn += second.tokensIn;
+      tokensOut += second.tokensOut;
+      out = second.output;
+    }
+  } catch (err) {
+    console.error(`[assessment] ${deliverableId} draft failed; building a plain report from the inputs`, err);
+    notes.push(`Draft Agent failed (${err instanceof AssessmentDraftError ? err.message : isAiConfigError(err) ? aiProblemForStaff(err) : "unexpected error"}); plain report built from the inputs.`);
+    out = fallbackAssessment(inputs.input);
+    degraded = true;
+  }
+
+  const sanitized = sanitizeAssessment(out, codeCheck(out, inputs));
+  if (sanitized.removed) notes.push(`${sanitized.removed} statement(s) removed for failing the code checks.`);
+  out = sanitized.output;
+  // Belt and braces: if anything still fails, fall back to the plain report, which passes by construction.
+  if (!passes(codeCheck(out, inputs))) {
+    notes.push("Sanitised draft still failed the code checks; plain report used.");
+    out = fallbackAssessment(inputs.input);
+    degraded = true;
+  }
+
+  await saveClaims(deliverableId, claimsFromAssessment(out), inputs);
+  await db
+    .update(schema.agentRuns)
+    .set({
+      status: "succeeded",
+      model: degraded ? "fallback" : model,
+      inputHash: createHash("sha256").update(JSON.stringify(inputs.input)).digest("hex"),
+      output: { input: inputs.input, draft: out, notes },
+      tokensIn,
+      tokensOut,
+      durationMs: Date.now() - started,
+    })
+    .where(eq(schema.agentRuns.id, draftRun));
+  await db
+    .update(schema.deliverables)
+    .set({ status: "qa", content: contentFromAssessment(useCase.id, inputs, out, degraded), headline: out.summary.headline, createdByRun: draftRun })
+    .where(and(eq(schema.deliverables.id, deliverableId), eq(schema.deliverables.status, "drafting")));
+
   started = Date.now();
   const qaRun = await logRun({ deliverableId, agent: "qa", model: AI_MODEL, status: "running" });
+  const code = codeCheck(out, inputs);
+  let qaResults: QaResults;
   try {
+    if (degraded) throw new AssessmentQaError("Skipped: plain report built from the inputs.");
     const result = await (deps.qa ?? qaAssessment)(inputs.input, out);
-    const code = checkDraft(claimsFromAssessment(out), inputs.allowed, inputs.validIds);
-    const qaResults: QaResults = combineQa(result.results, code);
+    qaResults = combineQa(result.results, code);
     await db
       .update(schema.agentRuns)
-      .set({ status: "succeeded", model: result.model, output: { model: result.results, code }, tokensIn: result.tokensIn, tokensOut: result.tokensOut, durationMs: Date.now() - started })
+      .set({ status: "succeeded", model: result.model, output: { model: result.results, code, notes }, tokensIn: result.tokensIn, tokensOut: result.tokensOut, durationMs: Date.now() - started })
       .where(eq(schema.agentRuns.id, qaRun));
-    await db.insert(schema.reviews).values({ deliverableId, version: d.version, qaResults });
-    const codeChecksPassed = !code.untracedNumbers.length && !code.unsourcedClaims.length && !code.unknownSources.length;
-    await db.update(schema.deliverables).set({ status: "in_review", codeChecksPassed }).where(and(eq(schema.deliverables.id, deliverableId), eq(schema.deliverables.status, "qa")));
-    await track("deliverable_published", { companyId: company.id, props: { type: "assessment", use_case: useCase.id, automated: true, codeChecksPassed } });
   } catch (err) {
-    return fail(qaRun, deliverableId, err, started);
+    // The code checks still ran and passed; the founder isn't held up by the QA Agent.
+    const why = err instanceof AssessmentQaError ? err.message : isAiConfigError(err) ? aiProblemForStaff(err) : "QA Agent unavailable.";
+    const note = { result: "pass" as const, note: `Code checks passed. QA Agent: ${why}` };
+    qaResults = { data_consistency: note, benchmark_methodology: note, source_trail: note, recommendation_logic: note, missing_inputs: note };
+    await db.update(schema.agentRuns).set({ status: "failed", error: why, output: { code, notes }, durationMs: Date.now() - started }).where(eq(schema.agentRuns.id, qaRun));
   }
+  await db.insert(schema.reviews).values({ deliverableId, version: d.version, qaResults });
+  await db.update(schema.deliverables).set({ status: "in_review", codeChecksPassed: true }).where(and(eq(schema.deliverables.id, deliverableId), eq(schema.deliverables.status, "qa")));
+  await track("deliverable_published", { companyId: company.id, props: { type: "assessment", use_case: useCase.id, automated: true, degraded, completeness: inputs.input.completeness } });
 }
 
 /** An advisor or admin marks a version reviewed (founders then see "Reviewed by …"). Access is checked by the caller. */
@@ -381,10 +437,16 @@ export type ResultsView = {
   decision: { text: string; claimKey: string };
   actions: { action: string; why: string; horizon: "next_30_days" | "next_90_days" | "later"; kpi: string | null; claimKey: string }[];
   assumptions: string[];
+  /** Every known gap: those found in code first, then those the analysis named. */
   dataGaps: string[];
   nextSteps: string[];
   methodology: string;
   confidence: Confidence;
+  completeness: "complete" | "partial" | "minimal";
+  /** The model couldn't produce the report; this one was built from the inputs only. */
+  degraded: boolean;
+  /** Which advisor offer fits: a review of the gaps, or monthly support to hit the target on time. */
+  advisor: "review" | "monthly";
   claims: Record<string, ResultsClaim>;
 };
 
@@ -453,6 +515,10 @@ export async function assessmentView(d: Deliverable): Promise<ResultsView | null
     if (v) entry.sources.push(v);
   }
 
+  const gaps = [...new Set([...c.systemGaps, ...c.dataGaps])];
+  const confidence = c.degraded
+    ? { level: "Low" as const, reasons: ["The full automated analysis didn't complete, so this report only sets out your figures, the gaps and next steps."] }
+    : resultConfidence({ reviewed: d.status === "published", unconfirmed: evidence.filter((e) => e.unconfirmed).length, gaps: gaps.length, metrics: evidence.length });
   const reviewed = d.status === "published" && review ? { by: review.reviewer?.name ?? review.reviewer?.email ?? null, at: review.review.createdAt.toISOString(), comment: review.review.comment } : null;
   return {
     version: d.version,
@@ -465,10 +531,13 @@ export async function assessmentView(d: Deliverable): Promise<ResultsView | null
     decision: c.decision,
     actions: c.actions,
     assumptions: c.assumptions,
-    dataGaps: c.dataGaps,
+    dataGaps: gaps,
     nextSteps: c.nextSteps,
     methodology: c.methodology,
-    confidence: resultConfidence({ reviewed: Boolean(reviewed), unconfirmed: evidence.filter((e) => e.unconfirmed).length, gaps: c.dataGaps.length, metrics: evidence.length }),
+    confidence,
+    completeness: c.completeness,
+    degraded: c.degraded,
+    advisor: !c.degraded && c.completeness === "complete" && !gaps.length && confidence.level === "High" ? "monthly" : "review",
     claims: claimMap,
   };
 }
@@ -501,14 +570,14 @@ export async function founderAssessment(companyId: string, useCase: UseCaseId): 
     }
     return { state: "building" };
   }
-  if (latest.codeChecksPassed === false) return { state: "failed", reason: "We couldn't verify every figure in this version, so we didn't show it. Try again; if it happens twice, your advisor will take a look." };
+  if (latest.codeChecksPassed === false) return { state: "failed", reason: "This version couldn't be completed. Run it again, or book time with an advisor to go through your data together." };
   const [run] = await db
     .select({ error: schema.agentRuns.error })
     .from(schema.agentRuns)
     .where(and(eq(schema.agentRuns.deliverableId, latest.id), eq(schema.agentRuns.status, "failed")))
     .orderBy(desc(schema.agentRuns.createdAt))
     .limit(1);
-  return { state: "failed", reason: run?.error?.includes("questionnaire") ? run.error : "The analysis didn't finish this time. Try again in a moment." };
+  return { state: "failed", reason: run?.error ? "The analysis didn't finish this time. Run it again, or book time with an advisor to go through your data together." : "The analysis didn't finish this time. Run it again in a moment." };
 }
 
 /** When each purchased assessment's results first became visible (for history). */

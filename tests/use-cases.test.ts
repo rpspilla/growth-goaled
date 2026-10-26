@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { ALL_ITEM_KEYS } from "@/lib/readiness";
 import { isMetricKey } from "@/lib/metrics";
 import { getUseCase, isUseCaseId, missingRequired, objectiveFields, parseAnswer, parseProfileFieldId, recommendedUseCases, targetSummary, USE_CASE_IDS, USE_CASES } from "@/lib/use-cases";
-import { advisoryBookingUrl, formatPrice, pricing, sellableUseCases } from "@/lib/pricing";
+import { advisoryBookingUrl, advisoryHref, formatPrice, pricing, sellableUseCases } from "@/lib/pricing";
 import { assessmentHistory } from "@/lib/use-cases/history";
 import { questionnaire } from "@/lib/use-cases/questionnaire";
 import { resultConfidence } from "@/lib/use-cases/results";
@@ -169,6 +169,13 @@ describe("pricing", () => {
       expect(sellableUseCases()).toEqual(["growth_leak", "winning_icp"]);
       process.env.ADVISORY_BOOKING_URL = "https://calendly.com/growthgoaled/session";
       expect(advisoryBookingUrl()).toBe("https://calendly.com/growthgoaled/session");
+      expect(advisoryBookingUrl("monthly")).toBe("https://calendly.com/growthgoaled/session");
+      process.env.ADVISORY_MONTHLY_BOOKING_URL = "https://calendly.com/growthgoaled/monthly";
+      expect(advisoryBookingUrl("monthly")).toBe("https://calendly.com/growthgoaled/monthly");
+      expect(advisoryHref("growth_leak", "review")).toBe("/advisory/book?use_case=growth_leak&kind=review");
+      delete process.env.ADVISORY_BOOKING_URL;
+      delete process.env.ADVISORY_MONTHLY_BOOKING_URL;
+      expect(advisoryHref("growth_leak", "monthly")).toBe("/advisory?use_case=growth_leak&kind=monthly");
       delete process.env.SELLABLE_USE_CASES;
       expect(sellableUseCases()).toEqual([...USE_CASE_IDS]);
     } finally {

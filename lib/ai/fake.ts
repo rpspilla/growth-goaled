@@ -38,21 +38,21 @@ export const fakeQa = () => ({
 export function fakeAssessment(input: AssessmentInput): AssessmentOutput {
   const fig = input.figures[0];
   const ref = fig ? input.reference.find((r) => r.metric === fig.metric) : undefined;
-  const answer = input.founder_answers[0]!;
+  const answer = input.founder_answers[0];
   const item = input.data_supplied[0];
-  const cite = [fig?.id, ref?.id, answer.id, item?.id].filter((x): x is string => Boolean(x));
+  const cite = [fig?.id, ref?.id, answer?.id, item?.id].filter((x): x is string => Boolean(x));
   const figText = fig ? `${fig.label} is ${fig.value}${ref ? ` against a peer top quartile of ${ref.top_quartile}` : ""}.` : "We worked from your answers and the data you shared.";
   return {
     summary: { headline: `Test mode assessment: ${input.use_case.question}`, body: `${figText} ${input.reference_note}`, sources: cite },
     findings: [
       { kind: "concern", text: fig ? `${fig.label}: ${fig.value}.` : "Few figures were available.", sources: cite },
-      { kind: "strength", text: `You told us: ${answer.answer.slice(0, 120)}`, sources: [answer.id] },
+      ...(answer ? [{ kind: "strength" as const, text: `You told us: ${answer.answer.slice(0, 120)}`, sources: [answer.id] }] : []),
     ],
     diagnosis: { text: figText, sources: cite },
     decision: { text: "Fix the main constraint before adding spend.", sources: cite },
     actions: [
       { action: "Address the main constraint first.", why: "It explains most of the gap.", horizon: "next_30_days", kpi: fig?.label ?? null, sources: cite },
-      { action: "Review progress against your target.", why: "Keeps the plan honest.", horizon: "next_90_days", kpi: null, sources: [answer.id] },
+      { action: "Review progress against your target.", why: "Keeps the plan honest.", horizon: "next_90_days", kpi: null, sources: cite },
     ],
     assumptions: ["Test mode."],
     data_gaps: [],

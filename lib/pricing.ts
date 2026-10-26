@@ -25,11 +25,20 @@ export const pricing = () => ({
   subscriptionAvailable: false as const,
 });
 
-/** Booking link for advisory sessions (e.g. a Calendly page); null → founders send a request instead. */
-export function advisoryBookingUrl(): string | null {
-  const url = process.env.ADVISORY_BOOKING_URL?.trim();
-  return url && /^https:\/\//.test(url) ? url : null;
+export type AdvisoryKind = "review" | "monthly";
+
+/**
+ * Booking link for an executive advisor (e.g. a Calendly page); null → founders send a request instead.
+ * A monthly call can use its own event (ADVISORY_MONTHLY_BOOKING_URL), else the same link.
+ */
+export function advisoryBookingUrl(kind: AdvisoryKind = "review"): string | null {
+  const pick = (v: string | undefined) => (v?.trim() && /^https:\/\//.test(v.trim()) ? v.trim() : null);
+  return (kind === "monthly" ? pick(process.env.ADVISORY_MONTHLY_BOOKING_URL) : null) ?? pick(process.env.ADVISORY_BOOKING_URL);
 }
+
+/** Where an advisor call-to-action goes: the booking page (via a tracked redirect) or the request form. */
+export const advisoryHref = (useCase: string, kind: AdvisoryKind) =>
+  advisoryBookingUrl(kind) ? `/advisory/book?use_case=${useCase}&kind=${kind}` : `/advisory?use_case=${useCase}&kind=${kind}`;
 
 /**
  * Use cases whose full assessment can be bought (all six by default). SELLABLE_USE_CASES,

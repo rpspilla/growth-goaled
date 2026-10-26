@@ -9,7 +9,7 @@ import { AssessmentResults } from "@/components/views/AssessmentResults";
 import { founderAssessment } from "@/lib/data/assessments";
 import { founderContext } from "@/lib/data/founder-context";
 import { track } from "@/lib/events";
-import { formatPrice, pricing } from "@/lib/pricing";
+import { advisoryHref, formatPrice, pricing } from "@/lib/pricing";
 import { getUseCase, targetSummary } from "@/lib/use-cases";
 import { sourceTrailOpened } from "./actions";
 
@@ -33,7 +33,8 @@ export default async function ResultsPage() {
         title={def.question}
         data={state.view}
         nextUseCase={next ? { href: `/library/${next.id}`, question: next.question } : null}
-        advisory={<AdvisoryOffer price={formatPrice(pricing().advisoryFromCents)} useCase={def.id} />}
+        advisory={<AdvisoryOffer kind={state.view.advisor} price={formatPrice(pricing().advisoryFromCents)} href={advisoryHref(def.id, state.view.advisor)} target={targetSummary(active.objective)} />}
+        reviewHref={advisoryHref(def.id, "review")}
         actions={
           <div className="mt-3">
             <RunAssessmentButton label="Re-run with my latest data" />
@@ -59,7 +60,10 @@ export default async function ResultsPage() {
       {state.state === "failed" && (
         <div className="rounded-xl border p-6 text-sm space-y-3" style={{ ...card, borderColor: "var(--amber)" }}>
           <p style={{ color: "var(--foreground)" }}>{state.reason}</p>
-          <RunAssessmentButton label="Try again" primary />
+          <div className="flex items-center gap-4 flex-wrap">
+            <RunAssessmentButton label="Run it again" primary />
+            <a href={advisoryHref(def.id, "review")} className="text-sm font-semibold" style={{ color: "var(--green)" }}>Book time with an executive advisor →</a>
+          </div>
         </div>
       )}
       {state.state === "not_started" && (

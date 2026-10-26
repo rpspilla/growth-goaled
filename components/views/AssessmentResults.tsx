@@ -31,6 +31,7 @@ export function AssessmentResults({
   nextUseCase,
   advisory,
   actions,
+  reviewHref,
   onSourceTrail,
 }: {
   title: string;
@@ -40,6 +41,8 @@ export function AssessmentResults({
   advisory: ReactNode;
   /** Extra controls under the header (e.g. re-run with new data). */
   actions?: ReactNode;
+  /** Booking link for an advisor review, shown with the gaps when there are any. */
+  reviewHref?: string;
   onSourceTrail?: (claimKey: string) => void;
 }) {
   const [openClaim, setOpenClaimState] = useState<string | null>(null);
@@ -79,6 +82,23 @@ export function AssessmentResults({
         )}
         {actions}
       </header>
+
+      {(data.degraded || data.dataGaps.length > 0) && (
+        <div className="rounded-xl border p-4 text-sm" role="note" style={{ background: "var(--card)", borderColor: "var(--amber)", color: "var(--foreground)" }}>
+          <div className="font-semibold mb-1">
+            {data.degraded ? "A partial report: the full analysis couldn't be completed this time" : `Built as far as your data allows · ${data.dataGaps.length} ${data.dataGaps.length === 1 ? "gap" : "gaps"}`}
+          </div>
+          <ul className="space-y-0.5 mb-2" style={{ color: "var(--muted-foreground)" }}>
+            {data.dataGaps.slice(0, 4).map((g) => <li key={g}>• {g}</li>)}
+            {data.dataGaps.length > 4 && <li>• and {data.dataGaps.length - 4} more under Confidence below</li>}
+          </ul>
+          {reviewHref && (
+            <a href={reviewHref} className="text-sm font-semibold" style={{ color: "var(--green)" }}>
+              Book time with an executive advisor to review it →
+            </a>
+          )}
+        </div>
+      )}
 
       <Section n={1} title="Executive summary">
         <div className="flex gap-3 items-start">

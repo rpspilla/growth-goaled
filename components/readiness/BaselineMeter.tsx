@@ -16,7 +16,7 @@ export function BaselineMeter({ done, total, ready, assessment }: { done: number
   const run = (label: string, primary: boolean) => (
     <button
       type="button"
-      disabled={!ready || pending}
+      disabled={pending}
       onClick={() =>
         start(async () => {
           setError(null);
@@ -52,9 +52,14 @@ export function BaselineMeter({ done, total, ready, assessment }: { done: number
             {run("Re-run with my latest data", false)}
           </div>
         ) : (
-          run(assessment === "failed" ? "Try the analysis again" : "Analyze my data", true)
+          run(assessment === "failed" ? "Run the analysis again" : ready ? "Analyze my data" : "Analyze what I've shared", true)
         )}
       </div>
+      {!ready && assessment !== "building" && (
+        <p className="text-xs mt-2" style={{ color: "var(--muted-foreground)" }}>
+          You can analyze now: the report is built as far as your data allows and lists what&apos;s missing. Adding the required items makes it sharper.
+        </p>
+      )}
       {error && <p className="text-xs mt-2" role="alert" style={{ color: "var(--red)" }}>{error}</p>}
     </div>
   );

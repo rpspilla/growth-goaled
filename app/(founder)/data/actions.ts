@@ -20,11 +20,10 @@ import {
   reviewDataPoint,
   sortDocument,
 } from "@/lib/data/documents";
-import { getReadiness, updateDataItem, type ItemPatch, type UpdateResult } from "@/lib/data/readiness";
+import { updateDataItem, type ItemPatch, type UpdateResult } from "@/lib/data/readiness";
 import { createAssessmentVersion, runAssessmentPipeline } from "@/lib/data/assessments";
 import { founderContext } from "@/lib/data/founder-context";
 import { track } from "@/lib/events";
-import { baselineReadiness } from "@/lib/use-cases/readiness";
 
 /** Every action works on the signed-in founder's own company; the client never supplies a company id. */
 async function founderCompany() {
@@ -140,16 +139,14 @@ export async function reviewPoint(dataPointId: string, decision: "accepted" | "r
 }
 
 /**
- * "Analyze my data": once the active assessment's required items are in, runs the assessment
- * engine (draft → QA → code checks) in the background. Also used to re-run with new data.
+ * "Analyze my data": runs the assessment engine in the background for the active assessment,
+ * with whatever has been shared so far (missing data is reported as gaps, never a blocker).
+ * Also used to re-run with new data.
  */
 export async function requestAssessment(): Promise<{ ok: true } | { ok: false; error: string }> {
   const { user, company } = await founderCompany();
   const { active } = await founderContext();
   if (!active) return { ok: false, error: "Buy an assessment first." };
-  const { items } = await getReadiness(company);
-  const meter = baselineReadiness(active.def, Object.fromEntries(items.map((i) => [i.itemKey, i.status])));
-  if (!meter.ready) return { ok: false, error: "Add the required items first." };
   const version = await createAssessmentVersion(company, active.def.id);
   if (!version) return { ok: false, error: "Your data is already being analyzed." };
   await track("analysis_requested", { userId: user.id, companyId: company.id, props: { use_case: active.def.id, version: version.version } });

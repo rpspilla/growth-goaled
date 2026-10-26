@@ -27,6 +27,12 @@ export type AssessmentInput = {
   reference: { id: string; metric: string; label: string; median: string | null; top_quartile: string; source: string | null }[];
   reference_note: string;
   open_questions: { type: string; title: string }[];
+  /** Files the founder shared that couldn't be read. */
+  unreadable_files: string[];
+  /** "complete" when all required data is in and confirmed; changes what the plan should look like. */
+  completeness: "complete" | "partial" | "minimal";
+  /** Present on a second attempt: what the code checks rejected last time. */
+  revision_notes?: string;
 };
 
 const sources = z.array(z.string());
@@ -80,6 +86,10 @@ Rules:
 - If reference is empty, judge against the company's own figures, trend and the founder's target, and say plainly that no peer reference is available yet. Don't imply peer comparisons.
 - Address the brief as far as the data allows. Where it doesn't, say what's missing in data_gaps and keep the conclusion proportionate; don't pad.
 - summary: a one-sentence headline answering the question, then 2–4 sentences. findings: 3–6, concerns first. diagnosis: what's going on and why it matters, 2–4 sentences. decision: the recommended course of action in one or two sentences. actions: 3–6 concrete, prioritized actions with why, a horizon and the KPI to watch (a metric label from the input, or null). assumptions: what you had to assume. next_steps: 1–3 short items (data to add, what to re-check, which assessment to run next).
+- Never refuse or stop because data is missing or unclear. Produce the best report the inputs allow, be explicit about what you could not determine, and list every gap in data_gaps.
+- When completeness is "complete", the actions must be a clear, sequenced action plan that addresses the underlying constraint you diagnosed (for example retention, if that is what the data shows): concrete steps, each with a horizon and the KPI that will show progress toward the founder's target and date.
+- When completeness is "partial" or "minimal", keep conclusions proportionate, make the first actions about closing the most important gaps, and still give the best guidance the data supports.
+- If revision_notes is present, fix exactly what it lists: remove or correct those figures and use only valid ids.
 - Write plainly for a founder. No hype, no consulting jargon.`;
 
 export class AssessmentDraftError extends Error {}

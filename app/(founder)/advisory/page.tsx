@@ -9,16 +9,22 @@ import { requestAdvisory } from "./actions";
 const card = { background: "var(--card)", borderColor: "var(--border)" };
 
 /** Optional advisory support: book directly (when a booking link is configured) or ask us to arrange a session. */
-export default async function AdvisoryPage({ searchParams }: { searchParams: Promise<{ use_case?: string }> }) {
+export default async function AdvisoryPage({ searchParams }: { searchParams: Promise<{ use_case?: string; kind?: string }> }) {
   await founderContext();
-  const useCase = getUseCase((await searchParams).use_case ?? "");
-  const booking = advisoryBookingUrl();
+  const params = await searchParams;
+  const useCase = getUseCase(params.use_case ?? "");
+  const kind = params.kind === "monthly" ? "monthly" : "review";
+  const booking = advisoryBookingUrl(kind);
   const price = formatPrice(pricing().advisoryFromCents);
 
   return (
     <div className="p-4 sm:p-8 max-w-3xl">
       {useCase && <Link href="/baseline" className="text-xs" style={{ color: "var(--muted-foreground)" }}>← Back to your results</Link>}
-      <PageHeader eyebrow="Optional" title="Advisory session" subtitle={`A working session with a Growth Goaled advisor${useCase ? ` on your ${useCase.shortTitle} results` : ""}. From ${price}.`} />
+      <PageHeader
+        eyebrow="Optional"
+        title={kind === "monthly" ? "Monthly executive advisor call" : "Review with an executive advisor"}
+        subtitle={`${kind === "monthly" ? "A monthly working call with an executive-level Growth Goaled advisor to keep your plan on schedule" : "A working session with an executive-level Growth Goaled advisor"}${useCase ? ` on your ${useCase.shortTitle} results` : ""}. From ${price}.`}
+      />
       <div className="rounded-xl border p-5 sm:p-6 mb-6" style={card}>
         <div className="text-sm font-semibold mb-2" style={{ color: "var(--foreground)" }}>In the session we&apos;ll</div>
         <ul className="text-sm space-y-1 mb-4" style={{ color: "var(--muted-foreground)" }}>
@@ -35,7 +41,7 @@ export default async function AdvisoryPage({ searchParams }: { searchParams: Pro
         {booking ? (
           <>
             <a
-              href={`/advisory/book${useCase ? `?use_case=${useCase.id}` : ""}`}
+              href={`/advisory/book?kind=${kind}${useCase ? `&use_case=${useCase.id}` : ""}`}
               className="inline-block px-4 py-2 rounded-lg text-sm font-semibold mb-4"
               style={{ background: "var(--green)", color: "#fff" }}
             >

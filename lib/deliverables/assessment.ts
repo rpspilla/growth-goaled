@@ -26,6 +26,11 @@ export const assessmentContentSchema = z.object({
   dataGaps: z.array(z.string()),
   nextSteps: z.array(z.string()),
   methodology: z.string(),
+  /** Gaps found in code (missing required data, unreadable files, unconfirmed figures); always shown. */
+  systemGaps: z.array(z.string()).default([]),
+  completeness: z.enum(["complete", "partial", "minimal"]).default("partial"),
+  /** True when the model couldn't produce a report and a plain one was built from the inputs. */
+  degraded: z.boolean().default(false),
 });
 
 export type AssessmentContent = z.infer<typeof assessmentContentSchema>;

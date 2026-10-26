@@ -32,7 +32,7 @@ beforeAll(async () => {
 }, 60_000);
 
 beforeEach(async () => {
-  for (const t of [schema.claimSources, schema.claims, schema.reviews, schema.agentRuns, schema.deliverables, schema.companyUseCases, schema.dataPoints, schema.benchmarkMetrics, schema.benchmarkSources, schema.benchmarkCohorts, schema.events, schema.companies, schema.users]) await db().delete(t);
+  for (const t of [schema.dataItems, schema.claimSources, schema.claims, schema.reviews, schema.agentRuns, schema.deliverables, schema.companyUseCases, schema.dataPoints, schema.benchmarkMetrics, schema.benchmarkSources, schema.benchmarkCohorts, schema.events, schema.companies, schema.users]) await db().delete(t);
   [founder, advisor] = (await db()
     .insert(schema.users)
     .values([
@@ -115,22 +115,89 @@ describe("assessment engine", () => {
     expect(reviewed.state === "ready" && reviewed.view.reviewed).toMatchObject({ by: "Ana", comment: "Looks right." });
   });
 
-  it("hides a version with invented numbers or unknown sources, and says to try again", async () => {
+  it("never hides the report: a draft with invented figures is revised, and anything still failing is dropped", async () => {
     await activateUseCase(co.id, "hire_or_fix", { activation: "paid", by: founder.id });
+    const bad = async (i: AssessmentInput) => {
+      const d = await goodDraft(i);
+      d.output.findings.push({ kind: "concern", text: "Peers win 32% of deals.", sources: ["made-up-id"] });
+      return d;
+    };
+    // Revised on the second attempt: the notes say exactly what failed.
+    let calls = 0;
+    const revised = async (i: AssessmentInput) => {
+      calls++;
+      if (calls === 1) return bad(i);
+      expect(i.revision_notes).toMatch(/"32%" in finding.2 isn't in the input/);
+      return goodDraft(i);
+    };
+    let v = (await createAssessmentVersion(co, "hire_or_fix"))!;
+    await runAssessmentPipeline(v.id, { draft: revised, qa });
+    let state = await founderAssessment(co.id, "hire_or_fix");
+    if (state.state !== "ready") throw new Error("expected ready");
+    expect(state.view.findings.map((f) => f.text)).not.toContain("Peers win 32% of deals.");
+    expect(state.view.degraded).toBe(false);
+
+    // Still bad after revision: the failing statement is removed and the gap is stated.
+    v = (await createAssessmentVersion(co, "hire_or_fix"))!;
+    await runAssessmentPipeline(v.id, { draft: bad, qa });
+    state = await founderAssessment(co.id, "hire_or_fix");
+    if (state.state !== "ready") throw new Error("expected ready");
+    expect(state.view.version).toBe(v.version);
+    expect(state.view.findings.map((f) => f.text)).not.toContain("Peers win 32% of deals.");
+    expect(state.view.dataGaps).toContain("Some statements couldn't be verified against your data and were left out.");
+    expect(state.view.advisor).toBe("review");
+  });
+
+  it("builds a plain report from the inputs when the model fails, and when the QA Agent fails still shows the result", async () => {
+    await activateUseCase(co.id, "hire_or_fix", { activation: "paid", by: founder.id });
+    let v = (await createAssessmentVersion(co, "hire_or_fix"))!;
+    await runAssessmentPipeline(v.id, { draft: async () => { throw new Error("model down"); }, qa });
+    let state = await founderAssessment(co.id, "hire_or_fix");
+    if (state.state !== "ready") throw new Error("expected ready");
+    expect(state.view.degraded).toBe(true);
+    expect(state.view.confidence.level).toBe("Low");
+    expect(state.view.findings.map((f) => f.text)).toContain("Win Rate is 18%.");
+    expect(state.view.advisor).toBe("review");
+    expect(state.view.dataGaps.some((g) => /hasn't been shared yet/.test(g))).toBe(true);
+
+    v = (await createAssessmentVersion(co, "hire_or_fix"))!;
+    await runAssessmentPipeline(v.id, { draft: goodDraft, qa: async () => { throw new Error("qa down"); } });
+    state = await founderAssessment(co.id, "hire_or_fix");
+    expect(state.state === "ready" && state.view.version).toBe(v.version);
+  });
+
+  it("works with no answers and no data at all", async () => {
+    const [empty] = (await db().insert(schema.companies).values({ name: "Empty Co" }).returning()) as [Company];
+    await activateUseCase(empty.id, "winning_icp", { activation: "advisor", by: advisor.id, note: "test" });
+    const v = (await createAssessmentVersion(empty, "winning_icp"))!;
+    await runAssessmentPipeline(v.id, { draft: async () => { throw new Error("nothing to go on"); }, qa });
+    const state = await founderAssessment(empty.id, "winning_icp");
+    if (state.state !== "ready") throw new Error(`expected ready, got ${state.state}`);
+    expect(state.view.completeness).toBe("minimal");
+    expect(state.view.dataGaps).toEqual(expect.arrayContaining(["The questionnaire wasn't answered, so the report can't reflect your goal or context."]));
+  });
+
+  it("recommends a monthly executive call when the data is complete", async () => {
+    await activateUseCase(co.id, "hire_or_fix", { activation: "paid", by: founder.id });
+    for (const k of hire.requiredItems) {
+      await db().insert(schema.dataItems).values({ companyId: co.id, category: "team", itemKey: k, status: "available" }).onConflictDoNothing();
+    }
+    await db().update(schema.dataPoints).set({ status: "accepted" }).where(eq(schema.dataPoints.companyId, co.id));
+    await db().insert(schema.dataPoints).values({ companyId: co.id, metric: "quota_attainment", value: 71, unit: "percent", confidence: "high", status: "accepted" });
+    const inputs = await assembleAssessmentInputs(co, hire);
+    expect(inputs.input.completeness).toBe("complete");
     const v = (await createAssessmentVersion(co, "hire_or_fix"))!;
-    await runAssessmentPipeline(v.id, {
-      draft: async (i) => {
-        const d = await goodDraft(i);
-        d.output.findings.push({ kind: "concern", text: "Peers win 32% of deals.", sources: ["made-up-id"] });
-        return d;
-      },
-      qa,
-    });
-    const [d] = await db().select().from(schema.deliverables).where(eq(schema.deliverables.id, v.id));
-    expect(d!.codeChecksPassed).toBe(false);
+    const complete = async (i: AssessmentInput) => {
+      const d = await goodDraft(i);
+      d.output.data_gaps = [];
+      return d;
+    };
+    await runAssessmentPipeline(v.id, { draft: complete, qa });
     const state = await founderAssessment(co.id, "hire_or_fix");
-    expect(state).toMatchObject({ state: "failed" });
-    expect(await approveAssessment(advisor, v.id, null)).toBe(false);
+    if (state.state !== "ready") throw new Error("expected ready");
+    expect(state.view.dataGaps).toEqual([]);
+    expect(state.view.confidence.level).toBe("High");
+    expect(state.view.advisor).toBe("monthly");
   });
 
   it("uses approved reference rows when a cohort matches", async () => {
