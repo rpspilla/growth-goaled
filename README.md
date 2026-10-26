@@ -112,15 +112,23 @@ Every resolution records who closed it, how and when, and emits `register_item_r
 
 Founders see progress on `/processing` (status only, never draft content) and the latest *published* version on `/benchmark`. Runs that haven't finished in 10 minutes show as stalled and can be restarted. Events: `review_decision`, `deliverable_published`, `deliverable_viewed`, `source_trail_opened`.
 
-### Instant preliminary Benchmark and $1 unlock
+### Use case library and the five founder steps (HANDOFF §13, U1)
 
-Decided by the owner (Oct 2026), adjusting two HANDOFF rules: a founder can see a **preliminary** Benchmark before advisor review, and Phase 1 includes a small payment.
+- **Steps**: the founder sidebar (`components/shell/UseCaseSidebar.tsx`, state from `lib/use-cases/steps.ts`) shows Overview `/overview`, Use Case Library `/library`, Data `/data`, Baseline `/baseline`, Progress & Tracking `/progress`. Data and Baseline unlock when a use case is activated; Progress when its baseline is approved. `companies.phase` no longer drives navigation. Old routes redirect in `next.config.ts`; the company profile lives at `/profile` (top-right link).
+- **Registry**: `lib/use-cases/` has one module per use case (`growth_leak`, `series_a_ready`, `series_b_ready`, `hire_or_fix`, `winning_icp`, `founder_handoff`) with its question, card copy, objective questions, readiness items in priority order (required / helpful / optional), figures and trackable metrics. `objectiveFields()` adds the shared questions; answers are validated per field and saved on blur.
+- **Data**: `company_use_cases` (one row per company and use case: status, objective jsonb, activation `paid` | `advisor` with who and a note). The active use case for steps 3–5 is the one picked in the sidebar switcher (cookie `gg_use_case`, a preference only) if it's activated, else the latest activation.
+- **Payment**: browsing and the objective are free. "Continue to payment" creates a Stripe Checkout for that company and use case (`createUseCaseCheckout` in `lib/data/payments.ts`; `payments.use_case`). The use case activates when the signed webhook (`/api/stripe/webhook`) arrives or when the founder returns via `/api/checkout/return`, which confirms the session with Stripe, selects the use case and opens Data. Cancel returns to the form with answers kept. Only sessions this app created for that company count; it's idempotent. Price: `USE_CASE_PRICE_CENTS` in `lib/stripe.ts` ($1 test price, `BENCHMARK_PRICE_CENTS` overrides) until real pricing is set. Advisors and admins can "Activate without payment" from the company's Library step.
+- **Retired**: the separate $1 benchmark unlock. Migration 0010 turned existing unlocks into an active Growth Leak; old unlock sessions still activate Growth Leak. `companies.benchmark_unlocked_at` is no longer read.
+- **Advisor mirror**: `/advisor/companies/[id]` shows the same five steps (`layout.tsx`): Overview (summary, use cases and their step), Library (objective answers, activate), Data (item review, questions, files), Baseline (benchmark position, review), Progress (placeholder until U4).
 
-- **When**: once a founder's uploads have finished reading and sorting, the Data Readiness page asks the server to build one (`startPreliminaryIfDue` in `lib/data/preliminary.ts`): only after at least one upload, only when figures changed since the last one, and automatically at most every 5 minutes ("Build it again" on `/benchmark` isn't limited).
-- **What**: the same pipeline as the advisor Benchmark (`deliverables.preliminary = true`), but it may also use figures read from the founder's files that they haven't confirmed yet (confirmed figures win). Those rows show "From your file · not confirmed". The report is only shown when the code checks passed (`deliverables.code_checks_passed`). An advisor-driven version always takes over from a preliminary one, and a superseded run can't come back to life.
-- **Before paying**: the cohort, which metrics were compared (names only, no figures) and **"To complete your fully calculated report"**: ordered steps computed in code (`lib/completion.ts`): cohort metrics we don't have a figure for (linked to the right Company Profile section), unconfirmed file figures, conflicts, blocked benchmark-critical metrics and remaining checklist items.
-- **Unlock**: `/benchmark` → "Unlock my benchmark · $1" creates a Stripe Checkout (`lib/data/payments.ts`) for the company. The company is unlocked (`companies.benchmark_unlocked_at`) when Stripe's signed webhook (`/api/stripe/webhook`, `checkout.session.completed`) arrives, or when the founder returns from Checkout and we confirm the session with Stripe. Only sessions this app created for that company count; it's idempotent. Price: `BENCHMARK_PRICE_CENTS` (default 100).
-- **Advisors** see preliminary versions labelled in the Review Queue and on the review page (with whether the founder can see it). Publishing a reviewed version replaces the preliminary one for the founder; advisor-published reports don't need the unlock.
+### Instant preliminary Benchmark (Growth Leak's interim baseline)
+
+Decided by the owner (Oct 2026): a founder can see a **preliminary** Benchmark before advisor review. Until U3 replaces it with the use case baseline, it's shown on `/baseline` when Growth Leak is active.
+
+- **When**: once a founder's uploads have finished reading and sorting, the Data page asks the server to build one (`startPreliminaryIfDue` in `lib/data/preliminary.ts`): only after at least one upload, only when figures changed since the last one, and automatically at most every 5 minutes ("Build it again" isn't limited).
+- **What**: the same pipeline as the advisor Benchmark (`deliverables.preliminary = true`), but it may also use figures read from the founder's files that they haven't confirmed yet (confirmed figures win). Those rows show "From your file · not confirmed". The report is only shown when the code checks passed (`deliverables.code_checks_passed`) and Growth Leak is active. An advisor-driven version always takes over from a preliminary one, and a superseded run can't come back to life.
+- **"To complete your fully calculated report"**: ordered steps computed in code (`lib/completion.ts`): cohort metrics we don't have a figure for (linked to the right profile section), unconfirmed file figures, conflicts, blocked benchmark-critical metrics and remaining checklist items.
+- **Advisors** see preliminary versions labelled in the Review Queue and on the review page (with whether the founder can see it).
 
 ### Advisor portfolio and company view
 
@@ -141,11 +149,11 @@ Events are recorded with `track()` (`lib/events.ts`): `intake_section_completed`
 - **Source trails opened**: share of companies that viewed a Benchmark and opened a source trail.
 - **Review turnaround**: median hours from QA complete to the advisor's decision.
 - **Approved without changes**: published Benchmarks with no edit or send-back since the previous publish.
-- Pilot → paid isn't tracked (no payments in Phase 1).
+- Use case funnel: `library_viewed`, `use_case_viewed`, `objective_saved`, `checkout_started`, `use_case_activated` (all carry `use_case`).
 
 ### End-to-end tests
 
-`npm run test:e2e` starts a throwaway local Postgres (`e2e/db.sh`, needs Postgres 16 binaries; set `PG_BIN` if they live elsewhere), applies the migrations and runs `next dev` in **test mode** (`E2E_AUTH=1`, `lib/e2e.ts`). Test mode signs users in from a `gg_e2e_user` cookie instead of Neon Auth and replaces model calls with deterministic stubs (`lib/ai/fake.ts`). It only switches on under `next dev`, outside Vercel, with the variable set explicitly, so it can't be active on a deployment (covered by `tests/permissions.test.ts`).
+`npm run test:e2e` starts a throwaway local Postgres (`e2e/db.sh`, needs Postgres 16 binaries; set `PG_BIN` if they live elsewhere), applies the migrations and runs `next dev` in **test mode** (`E2E_AUTH=1`, `lib/e2e.ts`). Test mode signs users in from a `gg_e2e_user` cookie instead of Neon Auth and replaces model calls with deterministic stubs (`lib/ai/fake.ts`) and Stripe with a fake whose Checkout returns straight to the success URL as paid. It only switches on under `next dev`, outside Vercel, with the variable set explicitly, so it can't be active on a deployment (covered by `tests/permissions.test.ts`).
 
 - `e2e/journey.spec.ts`: advisor sets up a cohort (CSV import, approve rows); founder signs up, completes the company profile and Data Readiness, and hands off; the pipeline drafts and QAs; advisor claims, approves and publishes; founder sees the Benchmark with the approval note; portfolio and analytics reflect it.
 - `e2e/access.spec.ts`: signed-out, founder and advisor access across areas, and advisors can't open companies that aren't theirs.

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
 import { contentTypeFor, INBOX_FOLDER, MAX_UPLOAD_BYTES } from "@/lib/documents";
-import { importFromLink, registerInboxUpload } from "@/app/(founder)/readiness/actions";
+import { importFromLink, registerInboxUpload } from "@/app/(founder)/data/actions";
 import { sha256 } from "./hash";
 
 type Row = { key: string; name: string; state: "waiting" | "uploading" | "done" | "duplicate" | "error"; percent: number; error?: string };

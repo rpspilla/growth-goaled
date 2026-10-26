@@ -12,14 +12,14 @@ Use two browsers (or a private window): one signed in as **admin** (ryan@growthg
 
 ## Sign-in and onboarding (M1, M3)
 - [ ] Founder sign-up with magic link lands on `/welcome`, not a loop
-- [ ] `/welcome`: name, title, company, website, **Annual Revenue** buckets (<$1M … $20M–$50M); then lands on the dashboard
+- [ ] `/welcome`: name, title, company, website, **Annual Revenue** buckets (<$1M … $20M–$50M); then lands on Overview
 - [ ] New company appears in admin's `/advisor/unassigned`; claim it (admin can assign to another advisor)
 - [ ] Advisor invite: invite an email to a company, the email arrives (Resend), the link signs them in to that company
 - [ ] Signed-out visits to founder or advisor pages go to sign-in
 
 ## Company profile / intake (M4)
 - [ ] Answers autosave on blur and survive a reload
-- [ ] % complete updates; at 100% the "Data Readiness →" button appears and the phase moves on
+- [ ] % complete updates; at 100% the "Go to Data →" button appears and the phase moves on
 - [ ] Numeric answers (ARR, growth, NRR, sales cycle…) show on the dashboard
 
 ## Data Readiness (readiness rework)
@@ -35,7 +35,7 @@ Use two browsers (or a private window): one signed in as **admin** (ryan@growthg
 - [ ] "Send to my advisor for the benchmark" stays disabled until blockers are cleared, then goes to `/processing`
 
 ## Upload whatever you have (inbox)
-- [ ] Drag several files onto the drop zone at the top of `/readiness` (and also try click-to-choose); each shows uploading → "reading and sorting"
+- [ ] Drag several files onto the drop zone at the top of `/data` (and also try click-to-choose); each shows uploading → "reading and sorting"
 - [ ] A **messy single spreadsheet** with several tabs (P&L, customers, pipeline…): suggestions name the right items and sheets; confirm some, untick others → only confirmed items become Available (unverified) and the file shows "Supports: …"
 - [ ] "It also covers…" adds an item by hand; "Doesn't cover any" clears the file from the review list
 - [ ] A **PDF** board deck and a **screenshot** (PNG/JPG): suggestions appear and extracted values show on the Files tab
@@ -48,15 +48,33 @@ Use two browsers (or a private window): one signed in as **admin** (ryan@growthg
 - [ ] A file over 25 MB is refused with a clear message
 - [ ] **Remove** a wrong file (from the sort review, the Files tab, and an item's file list): inline confirm, file disappears, values read from it disappear, items only that file supported go back to Not reviewed, items you'd added details to stay as they were
 
-## Instant preliminary Benchmark + $1 unlock
-- [ ] Stripe set up (see the setup steps in the chat / README): `STRIPE_SECRET_KEY` (test key on staging) and `STRIPE_WEBHOOK_SECRET` in Vercel Preview, redeployed; admin System checks show both ✓
+## U1 · Five steps, Overview, Use Case Library, per-use-case payment
+- [ ] Stripe set up: `STRIPE_SECRET_KEY` (test key on staging) and `STRIPE_WEBHOOK_SECRET` in Vercel Preview, redeployed; webhook endpoint `https://dev.growthgoaled.com/api/stripe/webhook` for `checkout.session.completed`
+- [ ] New founder: sign up → `/welcome` → lands on **Overview** (four connected steps, "You are here" on *Pick a use case*, one green button)
+- [ ] Sidebar shows exactly five steps; **Data**, **Baseline** and **Progress & Tracking** are greyed with a lock and one line saying what unlocks them
+- [ ] **Library**: six cards (question, when it's useful, what you get); *Recommended* on Series A Readiness + Growth Leak for a Seed / <$3M company, Growth Leak only for a later one
+- [ ] Open a card → objective form + "What you get" + "Data we'll ask for" (required items in bold)
+- [ ] Answers save on blur ("Your answers are saved…"), survive a reload, and show again after leaving and coming back; the target value has the *your target* label; bad number/date shows an error
+- [ ] "Continue to payment · $1" stays disabled until the four required answers are in
+- [ ] Pay with Stripe test card 4242 4242 4242 4242 → back on **Data** with "Use case: …" at the top; Data and Baseline unlocked in the sidebar
+- [ ] Cancel at checkout → back on the form with "Payment cancelled" and answers kept
+- [ ] Stripe dashboard → webhook shows a 200 for `checkout.session.completed`
+- [ ] Overview now shows "Connect your data" and the use case with "Your target: …"
+- [ ] Activate a second use case (pay again, or as admin) → a **switcher** appears at the top of the sidebar; switching changes "Use case:" on Data
+- [ ] Old links redirect: `/dashboard` → Overview, `/readiness` → Data, `/questions` → Data › Needs your answer, `/intake/company` → Profile, `/benchmark` → Baseline (or Library with no active use case)
+- [ ] **Company profile** link at top right opens the old profile sections
+- [ ] With Growth Leak active, **Baseline** shows the preliminary / published benchmark as before (no separate $1 unlock any more); for other use cases a short "we'll build it once the data is in" note
+- [ ] Admin: open the company from Portfolio → the founder's five steps in a second column; Overview lists use cases with their step and the founder's target
+- [ ] Admin: **Use Case Library** step shows the founder's objective answers; "Activate without payment" needs a note and records who and why
+- [ ] Admin: **Data** step has the item review, open questions and files; **Baseline** has the benchmark position and Generate / review link; **Progress** is a placeholder
+- [ ] Your existing company (Harborview Compliance): if it paid the old $1 benchmark unlock, Growth Leak is already active
+- [ ] Analytics (admin): `library_viewed`, `use_case_viewed`, `objective_saved`, `checkout_started`, `use_case_activated` appear
+
+## Instant preliminary Benchmark (now inside Growth Leak's Baseline)
 - [ ] An approved cohort matches the test company (Benchmarks page)
-- [ ] Upload a file → once it's read and sorted, Data Readiness shows "Building your preliminary benchmark…" then "ready"
-- [ ] `/benchmark` before paying: cohort and compared metric names only (no figures), the 🔒 list, and "To complete your fully calculated report" steps that make sense and link to the right places
-- [ ] "Unlock my benchmark · $1" → Stripe test checkout (card 4242 4242 4242 4242, any future date/CVC) → back on `/benchmark` with "Payment received" and the full preliminary report with the Preliminary banner; unconfirmed figures marked
-- [ ] Cancel at checkout → "Payment cancelled", still locked
-- [ ] Stripe dashboard → webhook endpoint shows a 200 for `checkout.session.completed`
-- [ ] Advisor: Review Queue shows the version as "preliminary"; review page says the founder can see it; publishing a reviewed version replaces it for the founder
+- [ ] With Growth Leak active, upload a file → once it's read and sorted, Data shows "Building your preliminary benchmark…" then "ready"
+- [ ] Baseline shows the full preliminary report with the Preliminary banner; unconfirmed figures marked; "To complete your fully calculated report" steps link to the right places
+- [ ] Advisor: Review Queue shows the version as "preliminary"; review page says whether the founder can see it; publishing a reviewed version replaces it for the founder
 - [ ] Accept a figure or upload more → "Build it again" produces an updated preliminary report
 
 ## Questions and registers (M6)

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { removeFile } from "@/app/(founder)/readiness/actions";
+import { removeFile } from "@/app/(founder)/data/actions";
 
 /** "Remove" with an inline confirm, for files uploaded by mistake. */
 export function RemoveFileButton({ documentId, filename, compact = false }: { documentId: string; filename: string; compact?: boolean }) {

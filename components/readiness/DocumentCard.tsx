@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import type { DocumentView } from "@/lib/data/documents";
 import { DOC_TYPES } from "@/lib/documents";
 import { getCategory, getItem } from "@/lib/readiness";
-import { retryDocument, reviewPoint } from "@/app/(founder)/readiness/actions";
+import { retryDocument, reviewPoint } from "@/app/(founder)/data/actions";
 import { RemoveFileButton } from "./RemoveFileButton";
 
 export function AnalyzingDots({ label = "Analyzing document..." }: { label?: string }) {

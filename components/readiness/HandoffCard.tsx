@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { sendForBenchmark } from "@/app/(founder)/readiness/actions";
+import { sendForBenchmark } from "@/app/(founder)/data/actions";
 
 /** The path from data collection to the Benchmark and Baseline. */
 export function HandoffCard({ ready, blockers, alreadyMoved }: { ready: boolean; blockers: string[]; alreadyMoved: boolean }) {
@@ -51,7 +51,7 @@ export function HandoffCard({ ready, blockers, alreadyMoved }: { ready: boolean;
             {pending ? "Sending..." : "Send to my advisor for the benchmark"}
           </button>
         )}
-        <Link href="/benchmark" className="text-xs px-3 py-1.5 rounded-md font-medium" style={{ background: "var(--muted)", color: "var(--foreground)" }}>
+        <Link href="/baseline" className="text-xs px-3 py-1.5 rounded-md font-medium" style={{ background: "var(--muted)", color: "var(--foreground)" }}>
           Benchmark →
         </Link>
         <Link href="/baseline" className="text-xs px-3 py-1.5 rounded-md font-medium" style={{ background: "var(--muted)", color: "var(--foreground)" }}>

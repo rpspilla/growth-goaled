@@ -24,6 +24,20 @@ export const METRICS = {
   sdrs: { label: "SDRs / BDRs", unit: "count", format: "integer", lowerIsBetter: false },
   magic_number: { label: "Magic Number", unit: "ratio", format: "multiple", lowerIsBetter: false },
   burn_multiple: { label: "Burn Multiple", unit: "ratio", format: "multiple", lowerIsBetter: true },
+  // Added for the use case library (HANDOFF §13)
+  mom_growth: { label: "MoM Growth", unit: "percent", format: "percent", lowerIsBetter: false },
+  gross_margin: { label: "Gross Margin", unit: "percent", format: "percent", lowerIsBetter: false },
+  recurring_share: { label: "Recurring Revenue Share", unit: "percent", format: "percent", lowerIsBetter: false },
+  new_arr: { label: "New ARR", unit: "usd", format: "currency", lowerIsBetter: false },
+  expansion_arr: { label: "Expansion ARR", unit: "usd", format: "currency", lowerIsBetter: false },
+  churned_arr: { label: "Churned ARR", unit: "usd", format: "currency", lowerIsBetter: true },
+  runway_months: { label: "Runway", unit: "months", format: "months", lowerIsBetter: false },
+  top_customer_concentration: { label: "Top-Customer Concentration", unit: "percent", format: "percent", lowerIsBetter: true },
+  pipeline_coverage: { label: "Pipeline Coverage", unit: "ratio", format: "multiple", lowerIsBetter: false },
+  quota_attainment: { label: "Quota Attainment", unit: "percent", format: "percent", lowerIsBetter: false },
+  ramp_months: { label: "AE Ramp Time", unit: "months", format: "months", lowerIsBetter: true },
+  forecast_accuracy: { label: "Forecast Accuracy", unit: "percent", format: "percent", lowerIsBetter: false },
+  founder_closed_share: { label: "Founder-Closed Share", unit: "percent", format: "percent", lowerIsBetter: true },
 } as const satisfies Record<string, MetricDefinition>;
 
 export type MetricKey = keyof typeof METRICS;

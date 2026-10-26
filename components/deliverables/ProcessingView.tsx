@@ -82,11 +82,11 @@ export function ProcessingView({ status, hasPublished }: { status: FounderStatus
         </div>
         <div className="mt-8 flex justify-center gap-3">
           {(status === "published" || hasPublished) && (
-            <Link href="/benchmark" className="px-4 py-2 rounded-lg text-sm font-semibold" style={{ background: "var(--green)", color: "#fff" }}>
+            <Link href="/baseline" className="px-4 py-2 rounded-lg text-sm font-semibold" style={{ background: "var(--green)", color: "#fff" }}>
               {status === "published" ? "View your benchmark →" : "View your current benchmark →"}
             </Link>
           )}
-          <Link href="/dashboard" className="px-4 py-2 rounded-lg text-sm" style={{ color: "#7A98B4" }}>Back to overview</Link>
+          <Link href="/overview" className="px-4 py-2 rounded-lg text-sm" style={{ color: "#7A98B4" }}>Back to overview</Link>
         </div>
       </div>
     </div>

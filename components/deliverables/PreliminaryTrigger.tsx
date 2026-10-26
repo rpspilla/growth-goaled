@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
-import { ensurePreliminary } from "@/app/(founder)/benchmark/actions";
+import { ensurePreliminary } from "@/app/(founder)/baseline/actions";
 
 /** Once uploads have settled, asks the server to build the preliminary Benchmark (it decides whether one is due). */
 export function PreliminaryTrigger({ filesWorking }: { filesWorking: boolean }) {

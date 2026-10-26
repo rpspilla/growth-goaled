@@ -6,6 +6,11 @@ import { apiKeyProblem } from "@/lib/ai/config";
 import { testAiConnection } from "./actions";
 
 const EVENTS = [
+  "library_viewed",
+  "use_case_viewed",
+  "objective_saved",
+  "checkout_started",
+  "use_case_activated",
   "benchmark_unlocked",
   "intake_section_completed",
   "document_uploaded",

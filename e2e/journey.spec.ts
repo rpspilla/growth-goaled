@@ -3,9 +3,11 @@ import { Client } from "pg";
 import { E2E_DATABASE_URL } from "../playwright.config";
 
 /**
- * Phase 1 journey: founder signs up → company profile → data readiness →
- * hand-off; advisor sets up an approved cohort, claims the company, approves
- * and publishes the Benchmark; founder sees it. Model calls are stubbed.
+ * Founder signs up → lands on Overview → picks Growth Leak in the library →
+ * fills the objective → pays (fake Stripe in test mode) → lands on Data with
+ * the use case active → company profile and data → hand-off; the advisor sees
+ * the same five steps, sets up an approved cohort, claims the company,
+ * approves and publishes; the founder sees it on Baseline. Models are stubbed.
  */
 
 const FOUNDER = "founder@e2e.test";
@@ -85,7 +87,7 @@ test("founder to published benchmark", async ({ browser }) => {
 
   // --- Founder: sign up and company profile ---
   const founder = await as(browser, FOUNDER);
-  await founder.page.goto("/dashboard");
+  await founder.page.goto("/overview");
   await expect(founder.page).toHaveURL(/\/welcome/);
   await founder.page.locator("#name").fill("Maya Founder");
   await founder.page.locator("#title").fill("CEO");
@@ -93,17 +95,47 @@ test("founder to published benchmark", async ({ browser }) => {
   await founder.page.locator("#website").fill("e2e-analytics.test");
   await founder.page.locator("#revenueBand").selectOption("3m_10m");
   await founder.page.getByRole("button", { name: "Start Your Growth Profile" }).click();
-  await expect(founder.page).toHaveURL(/\/dashboard/);
+  await expect(founder.page).toHaveURL(/\/overview/);
+
+  // --- Founder: Overview → Library → objective → pay → Data ---
+  const steps = founder.page.getByRole("navigation", { name: "Steps" });
+  await expect(steps.getByText("Unlocks when you activate a use case").first()).toBeVisible();
+  await expect(steps.getByRole("link", { name: /Data/ })).toHaveCount(0);
+  await founder.page.getByRole("link", { name: "Pick a use case →" }).click();
+  await expect(founder.page).toHaveURL(/\/library$/);
+  await expect(founder.page.getByRole("link", { name: /Where is our growth leaking\?/ })).toContainText("Recommended");
+  await founder.page.getByRole("link", { name: /Where is our growth leaking\?/ }).click();
+  await expect(founder.page).toHaveURL(/\/library\/growth_leak/);
+  const pay = founder.page.getByRole("button", { name: /Continue to payment · \$1/ });
+  await expect(pay).toBeDisabled();
+  await founder.page.getByLabel("What are you trying to achieve?").fill("Find out why growth slowed after Q2.");
+  await founder.page.getByLabel(/Pick the main metric/).selectOption("arr");
+  await founder.page.getByLabel(/Your target value/).fill("6,000,000");
+  await founder.page.getByLabel("By when?").fill("2027-06-30");
+  await founder.page.getByLabel("Where do you think the leak is?").fill("Deals stall after the demo.");
+  await founder.page.getByLabel("Where do you think the leak is?").blur();
+  await expect(founder.page.getByText("Your answers are saved.")).toBeVisible();
+  // Answers survive a reload (autosave), and the target is labelled as the founder's.
+  await founder.page.reload();
+  await expect(founder.page.getByLabel(/Your target value/)).toHaveValue("6000000");
+  await expect(founder.page.getByText("your target", { exact: true })).toBeVisible();
+  await pay.click();
+  await expect(founder.page).toHaveURL(/\/data\?checkout=success/);
+  await expect(founder.page.getByText("Use case:")).toContainText("Growth Leak");
+  await expect(steps.getByRole("link", { name: /Data/ })).toBeVisible();
+  await founder.page.goto("/overview");
+  await expect(founder.page.getByText("Active · connecting data")).toBeVisible();
+  await expect(founder.page.getByText("Your target: ARR $6M by 2027-06-30")).toBeVisible();
 
   for (const section of ["company", "customers", "gtm", "icp", "hiring"]) {
-    await founder.page.goto(`/intake/${section}`);
+    await founder.page.goto(`/profile/${section}`);
     await fillSection(founder.page);
   }
-  await expect(founder.page.getByRole("link", { name: "Data Readiness →" })).toBeVisible();
+  await expect(founder.page.getByRole("link", { name: "Go to Data →" })).toBeVisible();
 
   // --- Founder: data readiness ---
   for (const category of ["financial", "customers", "pipeline", "marketing", "product", "team"]) {
-    await founder.page.goto(`/readiness/${category}`);
+    await founder.page.goto(`/data/${category}`);
     const groups = founder.page.getByRole("group", { name: /^Status of / });
     const n = await groups.count();
     for (let i = 0; i < n; i++) {
@@ -112,19 +144,33 @@ test("founder to published benchmark", async ({ browser }) => {
       await expect(button).toHaveAttribute("aria-pressed", "true");
     }
   }
-  await founder.page.goto("/readiness");
+  await founder.page.goto("/data");
   await expect(founder.page.getByText("100%").first()).toBeVisible();
   await founder.page.getByRole("button", { name: "Send to my advisor for the benchmark" }).click();
   await expect(founder.page).toHaveURL(/\/processing/);
   await expect(founder.page.getByText("Your advisor is reviewing your benchmark")).toBeVisible({ timeout: 90_000 });
 
   // Nothing is visible to the founder before publishing.
-  await founder.page.goto("/benchmark");
+  await founder.page.goto("/baseline");
   await expect(founder.page.getByText("Your advisor is preparing your full, reviewed benchmark")).toBeVisible();
 
-  // --- Advisor: claim, review, approve, publish ---
+  // --- Advisor: claim; the company shows the founder's five steps ---
   await admin.page.goto("/advisor/unassigned");
   await admin.page.getByRole("button", { name: /Assign|Claim/ }).first().click();
+  await admin.page.goto("/advisor/portfolio");
+  await admin.page.getByRole("link", { name: /E2E Analytics/ }).first().click();
+  const mirrored = admin.page.getByRole("navigation", { name: "Steps" });
+  for (const label of ["Overview", "Use Case Library", "Data", "Baseline", "Progress & Tracking"]) await expect(mirrored.getByRole("link", { name: label })).toBeVisible();
+  await expect(admin.page.getByText("Active since")).toBeVisible();
+  await mirrored.getByRole("link", { name: "Use Case Library" }).click();
+  await expect(admin.page.getByText("Find out why growth slowed after Q2.")).toBeVisible();
+  await expect(admin.page.getByText("Deals stall after the demo.")).toBeVisible();
+  // Pilot activation without payment, recorded with a note.
+  await admin.page.locator("section", { hasText: "Winning ICP" }).getByPlaceholder("Why (e.g. pilot customer)").fill("E2E pilot");
+  await admin.page.locator("section", { hasText: "Winning ICP" }).getByRole("button", { name: "Activate without payment" }).click();
+  await expect(admin.page.getByText(/Activated without payment by E2E Admin .* · E2E pilot/)).toBeVisible();
+
+  // --- Advisor: review, approve, publish ---
   await admin.page.goto("/advisor/review");
   await admin.page.getByRole("link", { name: /E2E Analytics/ }).first().click();
   await expect(admin.page.getByText("Review now")).toBeVisible();
@@ -135,8 +181,15 @@ test("founder to published benchmark", async ({ browser }) => {
   await admin.page.getByRole("button", { name: "Publish to founder" }).click();
   await expect(admin.page.getByText("Published. The founder can see this version.")).toBeVisible();
 
-  // --- Founder: sees the published benchmark ---
-  await founder.page.goto("/benchmark");
+  // --- Founder: sees the published benchmark (Growth Leak's baseline for now) ---
+  // The use case switcher follows the advisor's pilot activation; steps 3–5 follow it.
+  await founder.page.goto("/data");
+  const switcher = founder.page.getByRole("combobox", { name: "Active use case" });
+  await switcher.selectOption("winning_icp");
+  await expect(founder.page.getByText("Use case:")).toContainText("Winning ICP");
+  await switcher.selectOption("growth_leak");
+  await expect(founder.page.getByText("Use case:")).toContainText("Growth Leak");
+  await founder.page.goto("/baseline");
   await expect(founder.page.getByText("is the main gap to the top quartile.")).toBeVisible();
   await expect(founder.page.getByRole("heading", { name: "How do you compare?" })).toBeVisible();
   await expect(founder.page.getByText("Checked against your profile.")).toBeVisible();

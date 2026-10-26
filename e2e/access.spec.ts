@@ -35,7 +35,7 @@ const as = async (browser: import("@playwright/test").Browser, email: string) =>
 };
 
 test("signed-out visitors go to sign-in", async ({ page }) => {
-  for (const path of ["/dashboard", "/readiness", "/advisor/portfolio", "/advisor/review"]) {
+  for (const path of ["/overview", "/data", "/advisor/portfolio", "/advisor/review"]) {
     await page.goto(path);
     await expect(page, path).toHaveURL(/\/sign-in/);
   }
@@ -45,18 +45,43 @@ test("founders can't open advisor pages", async ({ browser }) => {
   const { ctx, page } = await as(browser, "access-founder@e2e.test");
   for (const path of ["/advisor/portfolio", "/advisor/benchmarks", "/advisor/analytics", `/advisor/companies/${companyId}`]) {
     await page.goto(path);
-    await expect(page, path).toHaveURL(/\/dashboard$/);
+    await expect(page, path).toHaveURL(/\/overview$/);
   }
+  await ctx.close();
+});
+
+test("old founder routes redirect into the five steps", async ({ browser }) => {
+  const { ctx, page } = await as(browser, "access-founder@e2e.test");
+  const cases: [string, RegExp][] = [
+    ["/dashboard", /\/overview$/],
+    ["/readiness", /\/data$/],
+    ["/readiness/files", /\/data\/files$/],
+    ["/questions", /\/data\/questions$/],
+    ["/upload", /\/data$/],
+    ["/intake/company", /\/profile\/company$/],
+    // No active use case yet, so Baseline sends them to the library.
+    ["/benchmark", /\/library$/],
+    ["/hiring", /\/library$/],
+  ];
+  for (const [from, to] of cases) {
+    await page.goto(from);
+    await expect(page, from).toHaveURL(to);
+  }
+  // Data is locked until a use case is active.
+  await page.goto("/data");
+  await expect(page.getByText("This step unlocks when you activate a use case.")).toBeVisible();
   await ctx.close();
 });
 
 test("advisors can't open founder or admin pages, or companies not assigned to them", async ({ browser }) => {
   const { ctx, page } = await as(browser, "access-advisor@e2e.test");
-  for (const path of ["/readiness", "/questions", "/benchmark", "/advisor/analytics", "/advisor/users"]) {
+  for (const path of ["/data", "/data/questions", "/baseline", "/advisor/analytics", "/advisor/users"]) {
     await page.goto(path);
     await expect(page, path).toHaveURL(/\/advisor\/portfolio$/);
   }
-  const res = await page.goto(`/advisor/companies/${companyId}`);
-  expect(res?.status()).toBe(404);
+  for (const step of ["", "/library", "/data", "/baseline", "/progress"]) {
+    const res = await page.goto(`/advisor/companies/${companyId}${step}`);
+    expect(res?.status(), step).toBe(404);
+  }
   await ctx.close();
 });

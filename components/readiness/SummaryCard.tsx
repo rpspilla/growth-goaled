@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import type { GapSummary } from "@/lib/ai/readiness-summary";
-import { generateGapSummary } from "@/app/(founder)/readiness/actions";
+import { generateGapSummary } from "@/app/(founder)/data/actions";
 
 /** AI rewording of the rule-based checks. Clearly labelled; never the source of truth. */
 export function SummaryCard({ summary, createdAt, stale }: { summary: GapSummary | null; createdAt: string | null; stale: boolean }) {

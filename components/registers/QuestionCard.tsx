@@ -165,14 +165,14 @@ export function QuestionCard({
                     {files.map((f) => <option key={f.id} value={f.id}>{f.filename}</option>)}
                   </select>
                   <button disabled={pending} className="text-xs px-3 py-1.5 rounded-md font-semibold" style={{ background: "var(--green)", color: "#fff" }}>Use this file</button>
-                  {!companyName && <Link href="/readiness/files" className="text-xs" style={{ color: "var(--green)" }}>Upload another →</Link>}
+                  {!companyName && <Link href="/data/files" className="text-xs" style={{ color: "var(--green)" }}>Upload another →</Link>}
                 </form>
               ) : (
                 <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
                   No files yet.{" "}
                   {!companyName && (
                     <>
-                      <Link href="/readiness/files" style={{ color: "var(--green)" }}>Upload one</Link>, then come back to link it.
+                      <Link href="/data/files" style={{ color: "var(--green)" }}>Upload one</Link>, then come back to link it.
                     </>
                   )}
                 </p>

@@ -36,7 +36,7 @@ export function completionSteps(input: CompletionInput): CompletionStep[] {
     steps.push({
       title: `Add your ${label(m)}`,
       detail: `Your peer cohort has a benchmark for ${label(m)}, but we don't have your figure yet, so it isn't compared.`,
-      href: section ? `/intake/${section}` : "/readiness",
+      href: section ? `/profile/${section}` : "/data",
       label: section ? "Add it in Company Profile" : "Upload a file with it",
     });
   }
@@ -45,7 +45,7 @@ export function completionSteps(input: CompletionInput): CompletionStep[] {
     steps.push({
       title: `Confirm ${input.unconfirmedMetrics.length} ${input.unconfirmedMetrics.length === 1 ? "figure" : "figures"} read from your files`,
       detail: `${input.unconfirmedMetrics.map(label).join(", ")} ${input.unconfirmedMetrics.length === 1 ? "was" : "were"} read automatically. Accept or correct ${input.unconfirmedMetrics.length === 1 ? "it" : "them"} so the report uses confirmed numbers.`,
-      href: "/readiness/files",
+      href: "/data/files",
       label: "Review figures",
     });
   }
@@ -54,7 +54,7 @@ export function completionSteps(input: CompletionInput): CompletionStep[] {
     steps.push({
       title: `Resolve ${input.openConflicts} conflicting ${input.openConflicts === 1 ? "value" : "values"}`,
       detail: "Two of your sources disagree on a figure. Pick the right one so the comparison is accurate.",
-      href: "/questions",
+      href: "/data/questions",
       label: "Answer questions",
     });
   }
@@ -65,7 +65,7 @@ export function completionSteps(input: CompletionInput): CompletionStep[] {
     steps.push({
       title: `Unlock ${metric.label.toLowerCase()}`,
       detail: `${metric.message ?? ""} Needed: ${metric.blockedBy.map((k) => getItem(k)?.name ?? k).join(", ")}.`.trim(),
-      href: item ? `/readiness/${item.category}` : "/readiness",
+      href: item ? `/data/${item.category}` : "/data",
       label: "Add this data",
     });
   }
@@ -75,7 +75,7 @@ export function completionSteps(input: CompletionInput): CompletionStep[] {
     steps.push({
       title: `Go through ${notReviewed} remaining checklist ${notReviewed === 1 ? "item" : "items"}`,
       detail: "Mark each required item as available, partial, missing or not applicable so we know what the full report can rely on.",
-      href: "/readiness",
+      href: "/data",
       label: "Open Data Readiness",
     });
   }
@@ -84,7 +84,7 @@ export function completionSteps(input: CompletionInput): CompletionStep[] {
     steps.unshift({
       title: "Waiting on a matching peer cohort",
       detail: "We don't have approved benchmarks for companies like yours yet. Your advisor is adding them; nothing for you to do here.",
-      href: "/benchmark",
+      href: "/baseline",
       label: "Check back soon",
     });
   }

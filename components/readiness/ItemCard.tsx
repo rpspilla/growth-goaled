@@ -12,7 +12,7 @@ import {
   type ItemQuality,
   type ItemStatus,
 } from "@/lib/readiness";
-import { updateItem } from "@/app/(founder)/readiness/actions";
+import { updateItem } from "@/app/(founder)/data/actions";
 import { UploadButton } from "./UploadButton";
 import { RemoveFileButton } from "./RemoveFileButton";
 

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import type { DocumentView } from "@/lib/data/documents";
 import { CATEGORIES, getCategory, getItem } from "@/lib/readiness";
-import { confirmFileItems, resortFile, retryDocument } from "@/app/(founder)/readiness/actions";
+import { confirmFileItems, resortFile, retryDocument } from "@/app/(founder)/data/actions";
 import { AnalyzingDots } from "./DocumentCard";
 import { RemoveFileButton } from "./RemoveFileButton";
 import { useProcessingRefresh } from "./useProcessingRefresh";

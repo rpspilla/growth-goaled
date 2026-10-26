@@ -555,6 +555,35 @@ export const reviews = pgTable(
 // Payments
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Use case library (HANDOFF §13)
+// ---------------------------------------------------------------------------
+
+export const companyUseCaseStatus = pgEnum("use_case_status", ["objective", "active", "baseline_in_review", "tracking", "closed"]);
+export const companyUseCaseActivation = pgEnum("use_case_activation", ["paid", "advisor"]);
+
+/** A use case a company has started: the objective form, then activation (paid or by an advisor). */
+export const companyUseCases = pgTable(
+  "company_use_cases",
+  {
+    id: id(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    // Id from lib/use-cases
+    useCase: text("use_case").notNull(),
+    status: companyUseCaseStatus("status").notNull().default("objective"),
+    objective: jsonb("objective").$type<Record<string, string>>().notNull().default({}),
+    objectiveUpdatedAt: timestamp("objective_updated_at", { withTimezone: true }),
+    activatedAt: timestamp("activated_at", { withTimezone: true }),
+    activatedBy: uuid("activated_by").references(() => users.id, { onDelete: "set null" }),
+    activation: companyUseCaseActivation("activation"),
+    activationNote: text("activation_note"),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("company_use_cases_company_use_case_idx").on(t.companyId, t.useCase)],
+);
+
 export const paymentStatus = pgEnum("payment_status", ["pending", "paid", "expired"]);
 
 export const payments = pgTable(
@@ -566,6 +595,8 @@ export const payments = pgTable(
       .references(() => companies.id, { onDelete: "cascade" }),
     userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
     purpose: text("purpose").notNull(),
+    // Use case the payment activates (null for the retired benchmark unlock)
+    useCase: text("use_case"),
     stripeSessionId: text("stripe_session_id").notNull(),
     amountCents: integer("amount_cents").notNull(),
     currency: text("currency").notNull(),
@@ -596,3 +627,4 @@ export const events = pgTable(
 export type User = typeof users.$inferSelect;
 export type Role = (typeof userRole.enumValues)[number];
 export type Company = typeof companies.$inferSelect;
+export type CompanyUseCase = typeof companyUseCases.$inferSelect;

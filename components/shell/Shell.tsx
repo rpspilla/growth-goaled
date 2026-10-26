@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { isStaging } from "@/lib/env";
 import { signOut } from "./actions";
@@ -49,9 +50,14 @@ export function StagingBadge() {
   );
 }
 
-export function UserMenu({ name, email, color }: { name: string | null; email: string; color: "navy" | "green" }) {
+export function UserMenu({ name, email, color, profileHref }: { name: string | null; email: string; color: "navy" | "green"; profileHref?: string }) {
   return (
     <div className="flex items-center gap-3">
+      {profileHref && (
+        <Link href={profileHref} className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+          Company profile
+        </Link>
+      )}
       <div
         title={email}
         className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"

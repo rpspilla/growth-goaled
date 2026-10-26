@@ -57,7 +57,7 @@ describe("canViewDeliverable", () => {
 
 describe("homePathFor", () => {
   it("routes founders and staff to different apps", () => {
-    expect(homePathFor("founder")).toBe("/dashboard");
+    expect(homePathFor("founder")).toBe("/overview");
     expect(homePathFor("advisor")).toBe("/advisor/portfolio");
     expect(homePathFor("admin")).toBe("/advisor/portfolio");
   });

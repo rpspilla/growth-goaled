@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { rebuildPreliminary } from "@/app/(founder)/benchmark/actions";
+import { rebuildPreliminary } from "@/app/(founder)/baseline/actions";
 
 export function RebuildButton({ label = "Build it again with my latest data" }: { label?: string }) {
   const [pending, startTransition] = useTransition();

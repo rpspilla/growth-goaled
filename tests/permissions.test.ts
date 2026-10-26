@@ -19,6 +19,9 @@ const read = (p: string) => readFileSync(p, "utf8");
 const rel = (p: string) => path.relative(root, p);
 
 const GUARDS = /requireRole\(|requireUser\(|founderCompany\(\)|managed\(|managedItemCompany\(|staff\(\)/;
+// Shared loaders that call requireRole themselves (asserted below).
+const FOUNDER_CONTEXT = path.join(root, "lib/data/founder-context.ts");
+const COMPANY_CONTEXT = path.join(root, "app/advisor/companies/[id]/context.ts");
 
 describe("server actions", () => {
   const files = appFiles.filter((f) => f.endsWith(".ts") && read(f).trimStart().startsWith('"use server"'));
@@ -39,7 +42,7 @@ describe("server actions", () => {
       const src = read(file);
       for (const helper of ["founderCompany", "managed", "managedItemCompany", "staff"]) {
         const def = src.match(new RegExp(`(?:async function ${helper}\\(|const ${helper} = \\(\\) =>)[\\s\\S]{0,200}`));
-        if (def) expect(def[0], `${rel(file)} ${helper}`).toMatch(/requireRole\(/);
+        if (def) expect(def[0], `${rel(file)} ${helper}`).toMatch(/requireRole\(|founderContext\(\)/);
       }
     }
   });
@@ -51,16 +54,26 @@ describe("pages", () => {
     expect(pages.length).toBeGreaterThan(10);
     for (const p of pages) {
       const src = read(p);
-      // Readiness pages use loadReadiness(), which calls requireRole(["founder"]); /upload only redirects.
-      expect(src, rel(p)).toMatch(/requireRole\(\["founder"\]\)|loadReadiness\(\)|^[\s\S]*redirect\("\/readiness"\)/);
+      // Data pages use loadReadiness(), the rest founderContext(); both call requireRole(["founder"]).
+      expect(src, rel(p)).toMatch(/requireRole\(\["founder"\]\)|loadReadiness\(\)|founderContext\(\)/);
     }
-    expect(read(path.join(root, "app/(founder)/readiness/load.ts"))).toMatch(/requireRole\(\["founder"\]\)/);
-    expect(read(path.join(root, "app/(founder)/layout.tsx"))).toMatch(/requireRole\(\["founder"\]\)|requireUser\(/);
+    expect(read(path.join(root, "app/(founder)/data/load.ts"))).toMatch(/requireRole\(\["founder"\]\)/);
+    expect(read(FOUNDER_CONTEXT)).toMatch(/const founderContext = cache\(async \(\) => \{\n\s+const user = await requireRole\(\["founder"\]\);/);
+    expect(read(path.join(root, "app/(founder)/layout.tsx"))).toMatch(/requireRole\(\["founder"\]\)|requireUser\(|founderContext\(\)/);
   });
 
   it("the advisor area requires advisor or admin, and admin pages require admin", () => {
     expect(read(path.join(root, "app/advisor/layout.tsx"))).toMatch(/requireRole\(\["advisor", "admin"\]\)/);
     for (const p of ["app/advisor/users/page.tsx", "app/advisor/analytics/page.tsx"]) expect(read(path.join(root, p)), p).toMatch(/requireRole\(\["admin"\]\)/);
+  });
+
+  it("a company's mirrored steps load it only through getManagedCompany", () => {
+    const ctx = read(COMPANY_CONTEXT);
+    expect(ctx).toMatch(/requireRole\(\["advisor", "admin"\]\)/);
+    expect(ctx).toMatch(/getManagedCompany\(user, id\)[\s\S]*notFound\(\)/);
+    const pages = appFiles.filter((f) => f.includes(`${path.sep}companies${path.sep}[id]${path.sep}`) && /(page|layout)\.tsx$/.test(f));
+    expect(pages.length).toBeGreaterThanOrEqual(6);
+    for (const p of pages) expect(read(p), rel(p)).toMatch(/companyContext\(/);
   });
 });
 

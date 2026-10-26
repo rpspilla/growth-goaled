@@ -9,6 +9,7 @@ import { isMetricKey, METRICS } from "@/lib/metrics";
 import { benchmarkViewFor, getPublishedBenchmark, type BenchmarkView } from "./benchmark";
 import { createBenchmarkVersion, isStalled } from "./deliverables";
 import { getReadiness } from "./readiness";
+import { isUseCaseActive } from "./use-cases";
 
 type Deliverable = typeof schema.deliverables.$inferSelect;
 
@@ -97,7 +98,7 @@ export async function founderBenchmark(company: Company): Promise<FounderBenchma
       )
       .limit(1),
   ]);
-  const unlocked = company.benchmarkUnlockedAt !== null;
+  const unlocked = await isUseCaseActive(company.id, "growth_leak");
   const content = d ? benchmarkContentSchema.safeParse(d.content) : null;
   const cohortId = content?.success ? content.data.cohortId : null;
   const [cohort, cohortRows, points] = await Promise.all([

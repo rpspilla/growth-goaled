@@ -1,17 +1,30 @@
 import type { ReactNode } from "react";
-import { requireRole } from "@/lib/auth/session";
-import { getFounderCompany } from "@/lib/data/companies";
+import { founderContext } from "@/lib/data/founder-context";
 import { Shell, StagingBadge, UserMenu } from "@/components/shell/Shell";
-import { FounderSidebar } from "@/components/shell/FounderSidebar";
+import { UseCaseSidebar } from "@/components/shell/UseCaseSidebar";
+import { selectUseCase } from "@/components/shell/actions";
+import { getUseCase } from "@/lib/use-cases";
+import { stepStates } from "@/lib/use-cases/steps";
 
 export default async function FounderLayout({ children }: { children: ReactNode }) {
-  const user = await requireRole(["founder"]);
-  const company = await getFounderCompany(user);
+  const { user, company, useCases, active } = await founderContext();
   const companyName = company?.name ?? "Your company";
+  const options = useCases.filter((u) => u.activatedAt).flatMap((u) => {
+    const def = getUseCase(u.useCase);
+    return def ? [{ id: def.id, label: def.shortTitle }] : [];
+  });
 
   return (
     <Shell
-      sidebar={<FounderSidebar phase={company?.phase ?? "intake"} />}
+      sidebar={
+        <UseCaseSidebar
+          steps={stepStates(active && { useCase: active.def.id, status: active.status })}
+          options={options}
+          activeUseCase={active?.useCase ?? null}
+          select={selectUseCase}
+          libraryHint="Pick one in the library"
+        />
+      }
       topbar={
         <>
           <div className="flex items-center gap-2">
@@ -33,7 +46,7 @@ export default async function FounderLayout({ children }: { children: ReactNode 
             <StagingBadge />
           </div>
           <div className="ml-auto">
-            <UserMenu name={user.name} email={user.email} color="navy" />
+            <UserMenu name={user.name} email={user.email} color="navy" profileHref="/profile" />
           </div>
         </>
       }

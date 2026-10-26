@@ -12,7 +12,12 @@ export type EventName =
   | "review_decision"
   | "invite_sent"
   | "invite_accepted"
-  | "benchmark_unlocked";
+  | "benchmark_unlocked"
+  | "library_viewed"
+  | "use_case_viewed"
+  | "objective_saved"
+  | "checkout_started"
+  | "use_case_activated";
 
 /** Records a product analytics event. Never throws: analytics must not break the action it measures. */
 export async function track(name: EventName, p: { userId?: string; companyId?: string; props?: Record<string, unknown> } = {}) {

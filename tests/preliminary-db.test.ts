@@ -1,4 +1,4 @@
-/** Instant preliminary Benchmark + $1 unlock, against Postgres (PGlite). Models and Stripe are stubbed. */
+/** Instant preliminary Benchmark + per-use-case $1 activation, against Postgres (PGlite). Models and Stripe are stubbed. */
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 
@@ -14,7 +14,8 @@ import type { Company, User } from "@/lib/db/schema";
 import type { DraftInput } from "@/lib/ai/draft";
 import { approveDeliverable, createBenchmarkVersion, publishDeliverable, runBenchmarkPipeline, sendBackDeliverable } from "@/lib/data/deliverables";
 import { founderBenchmark, startPreliminaryIfDue } from "@/lib/data/preliminary";
-import { confirmCheckout, createBenchmarkCheckout, recordPaidSession } from "@/lib/data/payments";
+import { confirmCheckout, createUseCaseCheckout, recordPaidSession } from "@/lib/data/payments";
+import { activateUseCase, activateWithoutPayment, getCompanyUseCase, pickActiveUseCase, listCompanyUseCases, saveObjectiveAnswer } from "@/lib/data/use-cases";
 import { completionSteps } from "@/lib/completion";
 import { assessReadiness } from "@/lib/readiness-assessment";
 
@@ -37,7 +38,7 @@ beforeAll(async () => {
 const refresh = async () => (await db().select().from(schema.companies).where(eq(schema.companies.id, acme.id)))[0]!;
 
 beforeEach(async () => {
-  for (const t of [schema.payments, schema.agentRuns, schema.reviews, schema.deliverables, schema.benchmarkMetrics, schema.benchmarkSources, schema.benchmarkCohorts, schema.companies, schema.users]) await db().delete(t);
+  for (const t of [schema.events, schema.companyUseCases, schema.payments, schema.agentRuns, schema.reviews, schema.deliverables, schema.benchmarkMetrics, schema.benchmarkSources, schema.benchmarkCohorts, schema.companies, schema.users]) await db().delete(t);
   [founder, advisor] = (await db()
     .insert(schema.users)
     .values([
@@ -100,7 +101,7 @@ describe("preliminary benchmark", () => {
     expect(titles).toContain("Add your Win Rate");
     expect(titles).toContain("Confirm 1 figure read from your files");
 
-    await db().update(schema.companies).set({ benchmarkUnlockedAt: new Date() }).where(eq(schema.companies.id, acme.id));
+    await activateUseCase(acme.id, "growth_leak", { activation: "paid", by: founder.id });
     const open = await founderBenchmark(await refresh());
     if (open.kind !== "preliminary" || !open.view) throw new Error("expected view");
     expect(open.view.rows.find((r) => r.metric === "nrr")).toMatchObject({ value: "108%", unconfirmed: true });
@@ -108,7 +109,7 @@ describe("preliminary benchmark", () => {
   });
 
   it("isn't shown when the code checks fail, or after the advisor sends it back", async () => {
-    await db().update(schema.companies).set({ benchmarkUnlockedAt: new Date() }).where(eq(schema.companies.id, acme.id));
+    await activateUseCase(acme.id, "growth_leak", { activation: "paid", by: founder.id });
     const id = (await startPreliminaryIfDue(acme))!;
     await runBenchmarkPipeline(id, null, {
       draft: async (i) => {
@@ -158,7 +159,7 @@ describe("preliminary benchmark", () => {
   });
 });
 
-describe("$1 unlock", () => {
+describe("use case activation", () => {
   const fakeStripe = (session: Record<string, unknown>) => ({
     checkout: {
       sessions: {
@@ -167,36 +168,93 @@ describe("$1 unlock", () => {
       },
     },
   });
+  const activeRows = async () => (await db().select().from(schema.companyUseCases)).filter((r) => r.activatedAt);
 
-  it("creates a $1 checkout for the company and unlocks only on a matching paid session", async () => {
+  it("creates a $1 checkout per use case and activates only that use case on a matching paid session", async () => {
     const stripe = fakeStripe({});
-    const url = await createBenchmarkCheckout(founder, acme, "https://dev.test", stripe as never);
+    const url = await createUseCaseCheckout(founder, acme, "series_a_ready", "https://dev.test", stripe as never);
     expect(url).toBe("https://checkout.stripe.com/c/pay/cs_test_1");
-    const args = (stripe.checkout.sessions.create.mock.calls[0] as unknown[])[0] as { line_items: { price_data: { unit_amount: number } }[]; client_reference_id: string; success_url: string };
+    const args = (stripe.checkout.sessions.create.mock.calls[0] as unknown[])[0] as {
+      line_items: { price_data: { unit_amount: number } }[];
+      client_reference_id: string;
+      success_url: string;
+      cancel_url: string;
+      metadata: Record<string, string>;
+    };
     expect(args.line_items[0]!.price_data.unit_amount).toBe(100);
     expect(args.client_reference_id).toBe(acme.id);
+    expect(args.metadata.useCase).toBe("series_a_ready");
+    expect(args.success_url).toContain("use_case=series_a_ready");
     expect(args.success_url).toContain("session_id={CHECKOUT_SESSION_ID}");
+    expect(args.cancel_url).toBe("https://dev.test/library/series_a_ready?checkout=cancelled");
 
     const base = { id: "cs_test_1", client_reference_id: acme.id, metadata: { companyId: acme.id }, amount_total: 100 };
     expect(await recordPaidSession({ ...base, payment_status: "unpaid" })).toBe(false);
     expect(await recordPaidSession({ ...base, payment_status: "paid", client_reference_id: "someone-else" })).toBe(false);
     expect(await recordPaidSession({ ...base, id: "cs_unknown", payment_status: "paid" })).toBe(false);
-    expect((await refresh()).benchmarkUnlockedAt).toBeNull();
+    expect(await recordPaidSession({ ...base, payment_status: "paid", amount_total: 50 })).toBe(false);
+    expect(await activeRows()).toHaveLength(0);
 
     expect(await recordPaidSession({ ...base, payment_status: "paid" })).toBe(true);
     expect(await recordPaidSession({ ...base, payment_status: "paid" })).toBe(true); // idempotent (webhook + return)
-    expect((await refresh()).benchmarkUnlockedAt).not.toBeNull();
+    const rows = await activeRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ useCase: "series_a_ready", status: "active", activation: "paid", activatedBy: founder.id });
     const [p] = await db().select().from(schema.payments);
-    expect(p).toMatchObject({ status: "paid", amountCents: 100 });
-    expect((await db().select().from(schema.events).where(eq(schema.events.name, "benchmark_unlocked"))).length).toBe(1);
+    expect(p).toMatchObject({ status: "paid", amountCents: 100, useCase: "series_a_ready" });
+    const events = await db().select().from(schema.events).where(eq(schema.events.name, "use_case_activated"));
+    expect(events).toHaveLength(1);
+    expect(events[0]!.props).toMatchObject({ use_case: "series_a_ready" });
+  });
+
+  it("still honours a paid legacy benchmark unlock as Growth Leak", async () => {
+    await db().insert(schema.payments).values({ companyId: acme.id, userId: founder.id, purpose: "benchmark_unlock", stripeSessionId: "cs_old", amountCents: 100, currency: "usd" });
+    expect(await recordPaidSession({ id: "cs_old", payment_status: "paid", client_reference_id: acme.id, metadata: { companyId: acme.id }, amount_total: 100 })).toBe(true);
+    expect((await getCompanyUseCase(acme.id, "growth_leak"))?.activatedAt).toBeTruthy();
   });
 
   it("confirms on return from checkout only for the company's own session", async () => {
-    await createBenchmarkCheckout(founder, acme, "https://dev.test", fakeStripe({}) as never);
+    await createUseCaseCheckout(founder, acme, "growth_leak", "https://dev.test", fakeStripe({}) as never);
     const [other] = (await db().insert(schema.companies).values({ name: "Other" }).returning()) as [Company];
     const paid = fakeStripe({ id: "cs_test_1", payment_status: "paid", client_reference_id: acme.id, metadata: { companyId: acme.id }, amount_total: 100 });
     expect(await confirmCheckout(other, "cs_test_1", paid as never)).toBe(false);
+    expect(await getCompanyUseCase(other.id, "growth_leak")).toBeNull();
     expect(await confirmCheckout(acme, "cs_test_1", paid as never)).toBe(true);
+  });
+
+  it("saves objective answers one at a time, keeps them through activation, and validates them", async () => {
+    expect(await saveObjectiveAnswer(acme, "series_a_ready", "goal", "  Raise a $12M Series A  ")).toEqual({ ok: true, value: "Raise a $12M Series A" });
+    expect(await saveObjectiveAnswer(acme, "series_a_ready", "target_value", "$5,000,000")).toEqual({ ok: true, value: "5000000" });
+    expect(await saveObjectiveAnswer(acme, "series_a_ready", "target_value", "lots")).toMatchObject({ ok: false });
+    expect(await saveObjectiveAnswer(acme, "series_a_ready", "main_metric", "made_up")).toMatchObject({ ok: false });
+    expect(await saveObjectiveAnswer(acme, "series_a_ready", "target_date", "2027-13-45")).toMatchObject({ ok: false });
+    expect(await saveObjectiveAnswer(acme, "series_a_ready", "not_a_question", "x")).toMatchObject({ ok: false });
+    expect(await saveObjectiveAnswer(acme, "growth_leak", "raise_amount", "1")).toMatchObject({ ok: false }); // another use case's question
+    let row = await getCompanyUseCase(acme.id, "series_a_ready");
+    expect(row).toMatchObject({ status: "objective", activatedAt: null, objective: { goal: "Raise a $12M Series A", target_value: "5000000" } });
+    expect(await saveObjectiveAnswer(acme, "series_a_ready", "goal", "")).toMatchObject({ ok: true });
+    row = await getCompanyUseCase(acme.id, "series_a_ready");
+    expect(row!.objective).toEqual({ target_value: "5000000" });
+
+    await activateWithoutPayment(advisor, acme, "series_a_ready", "Pilot");
+    row = await getCompanyUseCase(acme.id, "series_a_ready");
+    expect(row).toMatchObject({ status: "active", activation: "advisor", activatedBy: advisor.id, activationNote: "Pilot", objective: { target_value: "5000000" } });
+    // A second activation (e.g. a late payment) keeps the original record.
+    expect(await activateUseCase(acme.id, "series_a_ready", { activation: "paid", by: founder.id })).toEqual({ activated: false });
+    expect((await getCompanyUseCase(acme.id, "series_a_ready"))!.activation).toBe("advisor");
+    await expect(activateWithoutPayment(founder, acme, "growth_leak", "me")).rejects.toThrow();
+  });
+
+  it("picks the preferred active use case, else the latest activation", async () => {
+    await activateUseCase(acme.id, "growth_leak", { activation: "paid", by: founder.id });
+    await new Promise((r) => setTimeout(r, 5));
+    await activateUseCase(acme.id, "hire_or_fix", { activation: "paid", by: founder.id });
+    await saveObjectiveAnswer(acme, "winning_icp", "goal", "Find our ICP");
+    const rows = await listCompanyUseCases(acme.id);
+    expect(pickActiveUseCase(rows, undefined)?.useCase).toBe("hire_or_fix");
+    expect(pickActiveUseCase(rows, "growth_leak")?.useCase).toBe("growth_leak");
+    expect(pickActiveUseCase(rows, "winning_icp")?.useCase).toBe("hire_or_fix"); // not activated
+    expect(pickActiveUseCase([], "growth_leak")).toBeNull();
   });
 });
 
@@ -210,9 +268,9 @@ describe("completion steps", () => {
       assessment: assessReadiness([], [], new Date("2026-10-24")),
       noCohort: false,
     });
-    expect(steps[0]).toMatchObject({ title: "Add your Sales Cycle", href: "/intake/customers" });
-    expect(steps.find((s) => s.title.startsWith("Confirm"))).toMatchObject({ href: "/readiness/files" });
-    expect(steps.find((s) => s.title.startsWith("Resolve 2"))).toMatchObject({ href: "/questions" });
+    expect(steps[0]).toMatchObject({ title: "Add your Sales Cycle", href: "/profile/customers" });
+    expect(steps.find((s) => s.title.startsWith("Confirm"))).toMatchObject({ href: "/data/files" });
+    expect(steps.find((s) => s.title.startsWith("Resolve 2"))).toMatchObject({ href: "/data/questions" });
     expect(steps.some((s) => s.title.startsWith("Unlock revenue growth"))).toBe(true);
   });
 });

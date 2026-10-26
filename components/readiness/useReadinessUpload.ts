@@ -5,7 +5,7 @@ import { useState } from "react";
 import { upload } from "@vercel/blob/client";
 import { ACCEPTED_TYPES, contentTypeFor, MAX_UPLOAD_BYTES, unsupportedReason } from "@/lib/documents";
 import type { CategoryId } from "@/lib/readiness";
-import { registerUpload } from "@/app/(founder)/readiness/actions";
+import { registerUpload } from "@/app/(founder)/data/actions";
 
 import { sha256 } from "./hash";
 
