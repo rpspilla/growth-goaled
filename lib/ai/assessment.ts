@@ -8,9 +8,11 @@ import { AI_MODEL, anthropic } from "./config";
 import { fakeAssessment, fakeQa } from "./fake";
 
 /**
- * The assessment engine's agents (HANDOFF §13.9): one Draft Agent and one QA Agent for every
- * use case, given the use case's brief, the founder's answers and their data. Every figure is
- * precomputed in code and carries an id the draft must cite.
+ * The Decision Brief agents (HANDOFF §13.9): one Draft Agent and one QA Agent for every use
+ * case. Everything factual is prepared in code first: figures (with origin, method and period),
+ * tables computed from the founder's files, and a rule-based diagnosis with ranked candidates
+ * and evidence. The model interprets and explains; it never calculates, and it cites the ids
+ * it was given.
  */
 
 export type AssessmentInput = {
@@ -19,13 +21,22 @@ export type AssessmentInput = {
   /** ids "answer:<field>" */
   founder_answers: { id: string; question: string; answer: string }[];
   founder_target: { metric: string; value: string; by: string | null } | null;
-  /** ids are data point ids */
-  figures: { id: string; metric: string; label: string; value: string; lower_is_better: boolean; confirmed: boolean; period: string | null }[];
+  /** ids are data point ids. origin: calculated (in code from their rows), manual (they entered it), extracted (read from a document). */
+  figures: { id: string; metric: string; label: string; value: string; lower_is_better: boolean; confirmed: boolean; period: string | null; origin?: string; method?: string | null; sample_size?: number | null }[];
   /** ids "item:<key>": what data the founder has supplied for this question */
   data_supplied: { id: string; item: string; priority: "required" | "helpful" | "optional"; status: string; coverage: string | null; files: number; columns: string[] }[];
   /** ids are approved reference rows; empty when no approved reference data matches */
   reference: { id: string; metric: string; label: string; median: string | null; top_quartile: string; source: string | null }[];
   reference_note: string;
+  /** Rule-based diagnosis from code. Candidate ids "candidate:<id>", evidence ids "ev:<n>". */
+  diagnosis?: {
+    certainty: "established" | "leading" | "unresolved";
+    candidates: { id: string; title: string; arr_at_stake: string | null; context: string[]; supporting: string[]; contradicting: string[]; test: string }[];
+    evidence: { id: string; text: string; kind: "calculated" | "reported" | "inference" }[];
+    unknowns: string[];
+  };
+  /** ids "analysis:<n>": tables computed in code (ARR bridge, segment breakdowns, pipeline). */
+  analyses?: { id: string; title: string; rows: string[] }[];
   open_questions: { type: string; title: string }[];
   /** Files the founder shared that couldn't be read. */
   unreadable_files: string[];
@@ -33,67 +44,86 @@ export type AssessmentInput = {
   conflicts: { metric: string; label: string; values: string }[];
   /** "complete" when all required data is in and confirmed; changes what the plan should look like. */
   completeness: "complete" | "partial" | "minimal";
+  /** Metric keys the plan can name as success metrics (tracked on Progress). */
+  trackable_metrics?: string[];
   /** Present on a second attempt: what the code checks rejected last time. */
   revision_notes?: string;
 };
 
 const sources = z.array(z.string());
-const claim = z.object({ text: z.string(), sources });
 
 export const assessmentOutputSchema = z.object({
-  summary: z.object({ headline: z.string(), body: z.string(), sources }),
-  findings: z.array(z.object({ kind: z.enum(["concern", "strength"]), text: z.string(), sources })),
-  diagnosis: claim,
-  decision: claim,
-  actions: z.array(
+  executive_decision: z.object({ decision: z.string(), conclusion: z.string(), sources }),
+  diagnosis: z.object({
+    primary: z.object({ candidate_id: z.string().nullable(), title: z.string(), explanation: z.string(), sources }),
+    alternatives: z.array(z.object({ candidate_id: z.string().nullable(), title: z.string(), assessment: z.string(), sources })),
+    how_to_distinguish: z.string().nullable(),
+  }),
+  evidence: z.array(z.object({ text: z.string(), status: z.enum(["verified", "calculated", "inference", "hypothesis"]), bearing: z.enum(["supports", "contradicts", "context"]), sources })),
+  alternatives: z.array(z.object({ option: z.string(), upside: z.string(), downside: z.string(), implications: z.string(), sources })),
+  recommendation: z.object({ option: z.string(), why: z.string(), sources }),
+  action_plan: z.array(
     z.object({
+      priority: z.number().int(),
       action: z.string(),
-      why: z.string(),
-      horizon: z.enum(["next_30_days", "next_90_days", "later"]),
-      kpi: z.string().nullable(),
+      rationale: z.string(),
+      timing: z.enum(["next_30_days", "days_31_60", "days_61_90"]),
+      role: z.string().nullable(),
+      success_metric: z.string(),
+      metric_key: z.string().nullable(),
+      expected_signal: z.string(),
+      dependencies_risks: z.string(),
       sources,
     }),
   ),
+  change_triggers: z.array(z.object({ if_this: z.string(), then_this: z.string() })),
+  follow_up: z.object({
+    metrics: z.array(z.object({ metric_key: z.string().nullable(), label: z.string(), why: z.string() })),
+    revisit_in_days: z.number().int(),
+    revisit_trigger: z.string(),
+  }),
   assumptions: z.array(z.string()),
   data_gaps: z.array(z.string()),
-  next_steps: z.array(z.string()),
 });
 
 export type AssessmentOutput = z.infer<typeof assessmentOutputSchema>;
 
-/** What each assessment must evaluate (HANDOFF §13.3 and the pricing brief). */
+/** The decision each framework must support (HANDOFF §13.3 and the pricing brief). */
 export const ASSESSMENT_BRIEFS: Record<UseCaseId, string> = {
   growth_leak:
-    "Find where growth is being lost: new business (pipeline volume, funnel conversion, sales cycle), retention (churn, contraction) or expansion. Where the figures allow, describe the ARR bridge (new, expansion, contraction, churn). Name the single most significant constraint with its evidence, recommend the next action, and say which other assessment to run next if appropriate.",
+    "Decide where growth is leaking and what to do first. Use the ARR bridge (new, expansion, contraction, churn), pipeline generation and conversion, sales-cycle changes, channels, segments and retention. Name the most consequential constraint with its evidence and competing explanations, the next investigation or intervention, and which assessment to run next if appropriate.",
   series_a_ready:
-    "Judge readiness for a Series A raise in roughly 6–12 months, dimension by dimension: growth, retention, revenue quality and concentration, efficiency (burn, gross margin), GTM repeatability, and runway and timing. Name the investor concerns and areas of scrutiny, the material gaps with evidence, a prioritized 90-day improvement plan, and fundraising preparation and timing relative to runway. Only compare with Series A bars that appear in the reference data; otherwise judge from the company's own figures and say no reference is available.",
+    "Decide whether to start a Series A process now, and what to fix first. Judge readiness area by area: revenue traction and growth consistency, retention and expansion, GTM repeatability, sales efficiency and customer concentration, team and operating discipline, runway and timing. Give likely investor questions, material evidence gaps and a 90-day preparation plan. Never present a universal threshold as a requirement; compare only with reference rows given, otherwise with the company's own trend.",
   series_b_ready:
-    "Judge readiness for a Series B raise in roughly 6–12 months using stage-appropriate criteria: growth consistency and predictability, retention and expansion, GTM repeatability, sales and capital efficiency, team and forecastability, runway and timing. Name likely investor concerns and a prioritized improvement plan. Only compare with Series B bars that appear in the reference data; otherwise judge from the company's own figures and say no reference is available.",
+    "Decide whether the business can support a Series B narrative now. Judge sustained growth and retention, repeatable acquisition and expansion, revenue quality and efficiency, sales and organisational scalability, forecasting reliability, capital needs and operating leverage. These are Series B questions: emphasise durability, efficiency and predictability over early traction. Give risks to the narrative, the evidence needed, and a preparation plan.",
   hire_or_fix:
-    "Decide whether to hire more salespeople or fix existing constraints first. Assess pipeline sufficiency, sales productivity and capacity, funnel conversion and sales cycle, rep ramp time, hiring economics, and process and management gaps. The decision must be one of: hire now, fix first, or run a targeted validation test, with the suggested role, timing and rationale where the evidence supports it.",
+    "Decide between hiring more salespeople now, fixing the process first, or gathering more evidence. Use pipeline volume and quality, conversion by stage and source, cycle and win/loss, team capacity and productivity, founder involvement, ramp time and hiring cost, runway. Name the likely bottleneck, the hiring sequence and role if hiring is right, and the conditions that would change the answer. A large pipeline or a recent raise is not by itself a reason to hire.",
   winning_icp:
-    "Identify who the company actually wins with. Rank customer segments by commercial attractiveness using win rate, ACV, sales cycle, retention, expansion and acquisition economics where measurable; say where samples are too small. Recommend the primary ICP and secondary segments, segments to deprioritize, positioning and qualification implications, and validation experiments.",
+    "Decide which customers to focus on. Rank segments using win rate, contract value, cycle, retention, expansion, channel and service cost where measurable, flagging sample-size limits. Recommend the primary ICP and segments to deprioritise, with implications for positioning, qualification and channels, and the data that would validate it.",
   founder_handoff:
-    "Assess whether sales is repeatable without the founder: founder dependence across the sales process, repeatability of qualification, messaging and closing, process documentation and consistency, and readiness to transfer selling. Recommend the next role (first AE or sales leader) and when, the gaps to close before or during the transition, and a prioritized transition plan.",
+    "Decide the next step toward sales that work without the founder: better documentation, a first account executive, a sales leader, or more validation. Use founder participation in deals, stages and qualification, documented process, sources of won deals, win/loss by owner, and capacity. Several founder-closed wins do not show repeatability. Give the process gaps, hiring sequence and readiness criteria, and metrics to watch after the transition.",
 };
 
-const SYSTEM = `You are Growth Goaled's Draft Agent. You write a founder's self-service assessment for one business question, from their own answers and data.
+const SYSTEM = `You are Growth Goaled's Draft Agent. You write a Decision Brief that helps a founder make one growth decision, from evidence prepared in code.
 
-You receive JSON with the use case (the question, what the founder was promised, and a brief of what to evaluate), the company profile, the founder's answers and target, computed figures, an inventory of the data they supplied, approved peer reference rows (possibly none) and open questions.
+The input has the company's figures (each with origin, method and period), tables computed from their files (analyses), approved peer reference rows (possibly none), the founder's answers and target, and a rule-based diagnosis: ranked candidate constraints with supporting, contradicting and context evidence, and a certainty set by rule.
 
 Rules:
-- Use only numbers that appear in the input, written as they appear there. You may state a simple difference between two input figures. Never invent, estimate or extrapolate figures, and never cite benchmarks or "typical" values that aren't in the reference list.
-- Every summary, finding, diagnosis, decision and action must cite its evidence in sources using only ids from the input: figure ids, reference ids, "answer:..." ids for the founder's own answers, and "item:..." ids for data they supplied.
+- Never calculate or estimate figures. Use only numbers in the input, written as they appear there. You may state a simple difference between two input figures. Never invent benchmarks, "typical" values, owners, deadlines or results.
+- Cite sources on every statement using only input ids: figure ids, reference ids, "answer:", "item:", "ev:", "candidate:" and "analysis:" ids.
 - Respect lower_is_better. Figures with confirmed false were read from files and not yet confirmed; don't rest a strong conclusion on them alone.
-- If reference is empty, judge against the company's own figures, trend and the founder's target, and say plainly that no peer reference is available yet. Don't imply peer comparisons.
-- Address the brief as far as the data allows. Where it doesn't, say what's missing in data_gaps and keep the conclusion proportionate; don't pad.
-- summary: a one-sentence headline answering the question, then 2–4 sentences. findings: 3–6, concerns first. diagnosis: what's going on and why it matters, 2–4 sentences. decision: the recommended course of action in one or two sentences. actions: 3–6 concrete, prioritized actions with why, a horizon and the KPI to watch (a metric label from the input, or null). assumptions: what you had to assume. next_steps: 1–3 short items (data to add, what to re-check, which assessment to run next).
-- Never refuse or stop because data is missing or unclear. Produce the best report the inputs allow, be explicit about what you could not determine, and list every gap in data_gaps.
-- When completeness is "complete", the actions must be a clear, sequenced action plan that addresses the underlying constraint you diagnosed (for example retention, if that is what the data shows): concrete steps, each with a horizon and the KPI that will show progress toward the founder's target and date.
-- When completeness is "partial" or "minimal", keep conclusions proportionate, make the first actions about closing the most important gaps, and still give the best guidance the data supports.
-- For metrics listed in conflicts, the founder hasn't confirmed which value is right: say so, don't build a conclusion on either value, and name the conflict in data_gaps.
-- If revision_notes is present, fix exactly what it lists: remove or correct those figures and use only valid ids.
-- Write plainly for a founder. No hype, no consulting jargon.`;
+- Respect diagnosis.certainty. "established": lead with that candidate. "leading": present it as the most likely explanation and say what would confirm it. "unresolved": do not pick a root cause; make primary the most plausible explanation, framed as not yet established, put the others in alternatives, and fill how_to_distinguish with the fastest way to tell them apart. If you rank candidates differently from the input, say why.
+- evidence: 3–8 key facts, each with a status (verified = a confirmed figure or the founder's answer; calculated = computed in code; inference = your reasoning from evidence; hypothesis = plausible but untested) and whether it supports or contradicts the primary explanation, or is context. Include contradicting evidence when it exists.
+- alternatives: 2–4 realistic options for the decision (including doing nothing or gathering more evidence when relevant), each with upside, downside and implications. Quantify only with input numbers.
+- recommendation: the option you recommend and why it beats the others.
+- action_plan: 3–6 actions over 30–90 days, priority 1 first. role only when the input makes it clear, else null. success_metric names what to measure; metric_key is one of trackable_metrics when it fits, else null. expected_signal says what progress would look like, framed as a recommendation, not a fact. Include dependencies and risks.
+- change_triggers: 2–4 pieces of new evidence or circumstances that would change the recommendation.
+- follow_up: the metrics to monitor, when to revisit (days), and what should trigger an earlier revisit.
+- If reference is empty, say plainly that no peer reference is available; don't imply peer comparisons.
+- Never refuse or stop because data is missing: be explicit about what you couldn't determine and list every gap in data_gaps. For metrics in conflicts, don't conclude on either value.
+- When completeness is "complete", the plan must be a clear, sequenced plan against the diagnosed constraint (for example retention, if that is what the evidence shows). When "partial" or "minimal", keep conclusions proportionate and make the first actions about closing the most important gaps.
+- If revision_notes is present, fix exactly what it lists.
+- Write plainly and concisely for a founder. Lead with the conclusion. No hype or consulting jargon.`;
 
 export class AssessmentDraftError extends Error {}
 
@@ -106,12 +136,12 @@ export async function draftAssessment(input: AssessmentInput): Promise<Assessmen
   for (let attempt = 1; attempt <= 2; attempt++) {
     const response = await anthropic().beta.messages.parse({
       model: AI_MODEL,
-      max_tokens: 16000,
+      max_tokens: 20000,
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
       system: SYSTEM,
       output_config: { effort: "high", format: betaZodOutputFormat(assessmentOutputSchema) },
-      messages: [{ role: "user", content: `Write the assessment from this input:\n\n${JSON.stringify(input, null, 2)}` }],
+      messages: [{ role: "user", content: `Write the Decision Brief from this input:\n\n${JSON.stringify(input, null, 2)}` }],
     });
     tokensIn += response.usage.input_tokens;
     tokensOut += response.usage.output_tokens;
@@ -132,13 +162,13 @@ const qaSchema = z.object({
   missing_inputs: check,
 });
 
-const QA_SYSTEM = `You are Growth Goaled's QA Agent. You independently check a founder's assessment before they see it. You see the exact input the Draft Agent was given and its output, nothing else.
+const QA_SYSTEM = `You are Growth Goaled's QA Agent. You independently check a founder's Decision Brief before they see it. You see the exact input the Draft Agent was given and its output, nothing else.
 
 Run five checks. Each is pass or fail with a short, specific note:
-- data_consistency: every figure appears in the input (or is a simple difference between two input figures) and is described correctly.
-- method: reference data is used only where given and correctly (lower-is-better respected), the founder's target is treated as their target, and no peer comparison is implied when there is no reference.
-- source_trail: each statement cites ids that actually support it.
-- recommendation_logic: the decision and actions follow from the evidence and answer the use case's question.
+- data_consistency: every figure appears in the input (or is a simple difference between two input figures) and is described correctly, with the right period.
+- method: the brief respects the rule-based certainty, uses reference data only where given and correctly (lower-is-better respected), treats the founder's target as theirs, and labels inferences and hypotheses as such.
+- source_trail: each statement cites ids that actually support it, and contradicting evidence isn't hidden.
+- recommendation_logic: the recommendation follows from the evidence, is compared fairly with the alternatives, and the plan addresses the diagnosed constraint.
 - missing_inputs: data gaps and open questions that could change the conclusion are acknowledged.
 
 Be strict. A plausible but unsupported statement is a fail.`;

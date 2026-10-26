@@ -13,6 +13,8 @@ import { founderContext } from "@/lib/data/founder-context";
 import { track } from "@/lib/events";
 import { advisoryHref, formatPrice, pricing } from "@/lib/pricing";
 import { assessmentMetrics, getUseCase, targetSummary } from "@/lib/use-cases";
+import { CommitPlanButton } from "@/components/progress/CommitPlanButton";
+import { commitPlanAction } from "../progress/actions";
 import { chooseFigureAction, enterFigureAction, sourceTrailOpened } from "./actions";
 
 // The assessment is drafted after the action responds (next/server after()), within this budget.
@@ -28,6 +30,7 @@ export default async function ResultsPage() {
   const [state, choices] = await Promise.all([founderAssessment(company.id, def.id), figureChoices(company, assessmentMetrics(def, active.objective))]);
   const figures = (
     <FigureChecker
+      key="figures"
       choices={choices}
       choose={chooseFigureAction}
       enter={enterFigureAction}
@@ -43,11 +46,12 @@ export default async function ResultsPage() {
         title={def.question}
         data={state.view}
         nextUseCase={next ? { href: `/library/${next.id}`, question: next.question } : null}
-        advisory={<AdvisoryOffer kind={state.view.advisor} price={formatPrice(pricing().advisoryFromCents)} href={advisoryHref(def.id, state.view.advisor)} target={targetSummary(active.objective)} />}
+        advisory={<AdvisoryOffer key="advisory" kind={state.view.advisor} price={formatPrice(pricing().advisoryFromCents)} href={advisoryHref(def.id, state.view.advisor)} target={targetSummary(active.objective)} />}
         reviewHref={advisoryHref(def.id, "review")}
         figures={figures}
+        commit={<CommitPlanButton key="commit" committedAt={state.view.committedAt} commit={commitPlanAction.bind(null, state.view.deliverableId)} />}
         actions={
-          <div className="mt-3">
+          <div key="actions" className="mt-3">
             <RunAssessmentButton label="Re-run with my latest data" />
           </div>
         }

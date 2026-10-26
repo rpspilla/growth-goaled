@@ -34,28 +34,41 @@ export const fakeQa = () => ({
   missing_inputs: pass("Test mode"),
 });
 
-/** Assessment stand-in: cites only input ids and restates input figures. */
+/** Decision Brief stand-in: follows the rule-based diagnosis, cites only input ids and restates input figures. */
 export function fakeAssessment(input: AssessmentInput): AssessmentOutput {
   const fig = input.figures[0];
   const ref = fig ? input.reference.find((r) => r.metric === fig.metric) : undefined;
   const answer = input.founder_answers[0];
   const item = input.data_supplied[0];
   const cite = [fig?.id, ref?.id, answer?.id, item?.id].filter((x): x is string => Boolean(x));
+  const top = input.diagnosis?.candidates[0];
   const figText = fig ? `${fig.label} is ${fig.value}${ref ? ` against a peer top quartile of ${ref.top_quartile}` : ""}.` : "We worked from your answers and the data you shared.";
+  const tracked = input.figures.find((f) => input.trackable_metrics?.includes(f.metric));
   return {
-    summary: { headline: `Test mode assessment: ${input.use_case.question}`, body: `${figText} ${input.reference_note}`, sources: cite },
-    findings: [
-      { kind: "concern", text: fig ? `${fig.label}: ${fig.value}.` : "Few figures were available.", sources: cite },
-      ...(answer ? [{ kind: "strength" as const, text: `You told us: ${answer.answer.slice(0, 120)}`, sources: [answer.id] }] : []),
+    executive_decision: { decision: `Test mode brief: ${input.use_case.question}`, conclusion: `${figText} ${input.reference_note}`, sources: cite },
+    diagnosis: {
+      primary: top
+        ? { candidate_id: top.id, title: top.title, explanation: input.diagnosis!.certainty === "unresolved" ? "Not yet established." : "The leading explanation from the rules.", sources: [`candidate:${top.id}`, ...top.supporting] }
+        : { candidate_id: null, title: "Not yet established", explanation: figText, sources: cite },
+      alternatives: (input.diagnosis?.candidates ?? []).slice(1, 3).map((c) => ({ candidate_id: c.id, title: c.title, assessment: "Less supported by the evidence.", sources: [`candidate:${c.id}`] })),
+      how_to_distinguish: top?.test ?? null,
+    },
+    evidence: [
+      { text: fig ? `${fig.label}: ${fig.value}.` : "Few figures were available.", status: fig?.origin === "calculated" ? "calculated" : "verified", bearing: "supports", sources: cite },
+      ...(answer ? [{ text: `You told us: ${answer.answer.slice(0, 120)}`, status: "verified" as const, bearing: "context" as const, sources: [answer.id] }] : []),
     ],
-    diagnosis: { text: figText, sources: cite },
-    decision: { text: "Fix the main constraint before adding spend.", sources: cite },
-    actions: [
-      { action: "Address the main constraint first.", why: "It explains most of the gap.", horizon: "next_30_days", kpi: fig?.label ?? null, sources: cite },
-      { action: "Review progress against your target.", why: "Keeps the plan honest.", horizon: "next_90_days", kpi: null, sources: cite },
+    alternatives: [
+      { option: "Fix the main constraint first", upside: "Addresses the cause.", downside: "Slower to add capacity.", implications: "Hold new spend until it moves.", sources: cite },
+      { option: "Gather more evidence", upside: "A firmer answer.", downside: "Delays action.", implications: "Share the missing data.", sources: cite },
     ],
+    recommendation: { option: "Fix the main constraint first", why: "The evidence points there.", sources: cite },
+    action_plan: [
+      { priority: 1, action: "Address the main constraint first.", rationale: "It explains most of the gap.", timing: "next_30_days", role: null, success_metric: fig?.label ?? "Main constraint", metric_key: tracked?.metric ?? null, expected_signal: "The figure moves in the right direction.", dependencies_risks: "Needs an owner.", sources: cite },
+      { priority: 2, action: "Review progress against your target.", rationale: "Keeps the plan honest.", timing: "days_61_90", role: null, success_metric: "Progress review held", metric_key: null, expected_signal: "A clear read on progress.", dependencies_risks: "None.", sources: cite },
+    ],
+    change_triggers: [{ if_this: "New data points to a different constraint", then_this: "Revisit the recommendation." }],
+    follow_up: { metrics: tracked ? [{ metric_key: tracked.metric, label: tracked.label, why: "The main figure for this decision." }] : [], revisit_in_days: 30, revisit_trigger: "A sharp move in a key figure." },
     assumptions: ["Test mode."],
     data_gaps: [],
-    next_steps: ["Add more history to sharpen the result."],
   };
 }

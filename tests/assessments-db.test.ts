@@ -57,17 +57,29 @@ const goodDraft = async (i: AssessmentInput) => {
   const win = i.figures.find((f) => f.metric === "win_rate")!;
   const goal = i.founder_answers.find((a) => a.id === "answer:goal")!;
   const output: AssessmentOutput = {
-    summary: { headline: "Fix conversion before hiring.", body: `Win rate is ${win.value} and you want to add reps.`, sources: [win.id, goal.id] },
-    findings: [
-      { kind: "strength", text: "You have a hiring budget ready.", sources: ["answer:hiring_budget"] },
-      { kind: "concern", text: `Win rate is ${win.value}.`, sources: [win.id] },
+    executive_decision: { decision: "Fix conversion before hiring.", conclusion: `Win rate is ${win.value} and you want to add reps.`, sources: [win.id, goal.id] },
+    diagnosis: {
+      primary: { candidate_id: "conversion", title: "Conversion", explanation: "New reps would split a pipeline that converts poorly.", sources: [win.id, "item:opportunities"] },
+      alternatives: [],
+      how_to_distinguish: null,
+    },
+    evidence: [
+      { text: "You have a hiring budget ready.", status: "verified", bearing: "context", sources: ["answer:hiring_budget"] },
+      { text: `Win rate is ${win.value}.`, status: "verified", bearing: "supports", sources: [win.id] },
     ],
-    diagnosis: { text: "New reps would split a pipeline that converts poorly.", sources: [win.id, "item:opportunities"] },
-    decision: { text: "Fix first, then hire.", sources: [win.id] },
-    actions: [{ action: "Tighten qualification.", why: "Raises win rate within 90 days.", horizon: "next_90_days", kpi: "Win Rate", sources: [win.id] }],
+    alternatives: [
+      { option: "Hire now", upside: "More capacity.", downside: "Splits a weak pipeline.", implications: "Higher burn.", sources: [win.id] },
+      { option: "Fix first", upside: "Better conversion.", downside: "Slower.", implications: "Hire later.", sources: [win.id] },
+    ],
+    recommendation: { option: "Fix first, then hire.", why: "Conversion is the constraint.", sources: [win.id] },
+    action_plan: [
+      { priority: 2, action: "Review lost deals.", rationale: "Find the pattern.", timing: "next_30_days", role: null, success_metric: "Loss reasons logged", metric_key: null, expected_signal: "A clear pattern.", dependencies_risks: "CRM hygiene.", sources: [win.id] },
+      { priority: 1, action: "Tighten qualification.", rationale: "Raises win rate within 90 days.", timing: "days_61_90", role: "Founder", success_metric: "Win rate", metric_key: "win_rate", expected_signal: "Win rate rising.", dependencies_risks: "None.", sources: [win.id] },
+    ],
+    change_triggers: [{ if_this: "Win rate rises", then_this: "Start hiring." }],
+    follow_up: { metrics: [{ metric_key: "win_rate", label: "Win rate", why: "The constraint." }], revisit_in_days: 45, revisit_trigger: "A big swing in win rate." },
     assumptions: ["Pipeline volume is stable."],
     data_gaps: ["No opportunity export yet."],
-    next_steps: ["Upload your opportunity export."],
   };
   return { output, model: "stub", tokensIn: 1, tokensOut: 1 };
 };
@@ -100,11 +112,13 @@ describe("assessment engine", () => {
     const state = await founderAssessment(co.id, "hire_or_fix");
     if (state.state !== "ready") throw new Error(`expected ready, got ${state.state}`);
     const view = state.view;
-    expect(view.summary.headline).toBe("Fix conversion before hiring.");
-    expect(view.findings[0]!.kind).toBe("concern"); // concerns first
-    expect(view.evidence.find((e) => e.label === "Win Rate")).toMatchObject({ value: "18%", unconfirmed: false, topQuartile: null });
+    expect(view.executiveDecision.decision).toBe("Fix conversion before hiring.");
+    expect(view.plan.map((a) => [a.priority, a.action])).toEqual([[1, "Tighten qualification."], [2, "Review lost deals."]]); // ordered by priority
+    expect(view.plan[0]).toMatchObject({ metricKey: "win_rate", metricLabel: "Win Rate", role: "Founder" });
+    expect(view.baseline.find((e) => e.label === "Win Rate")).toMatchObject({ value: "18%", confirmed: true, origin: "manual", topQuartile: null, previous: null, stale: false });
+    expect(view.certainty).not.toBeNull();
     expect(view.reference).toBeNull();
-    expect(view.claims["finding.0"]!.sources.map((s) => s.kind)).toEqual(expect.arrayContaining(["founder_answer", "methodology"]));
+    expect(view.claims["evidence.0"]!.sources.map((s) => s.kind)).toEqual(expect.arrayContaining(["founder_answer", "methodology"]));
     expect(view.claims.diagnosis!.sources.map((s) => s.kind)).toEqual(expect.arrayContaining(["data_point", "document"]));
     expect(view.confidence.level).toBe("Low"); // two figures and one data gap
     expect(view.reviewed).toBeNull();
@@ -119,7 +133,7 @@ describe("assessment engine", () => {
     await activateUseCase(co.id, "hire_or_fix", { activation: "paid", by: founder.id });
     const bad = async (i: AssessmentInput) => {
       const d = await goodDraft(i);
-      d.output.findings.push({ kind: "concern", text: "Peers win 32% of deals.", sources: ["made-up-id"] });
+      d.output.evidence.push({ text: "Peers win 32% of deals.", status: "inference", bearing: "supports", sources: ["made-up-id"] });
       return d;
     };
     // Revised on the second attempt: the notes say exactly what failed.
@@ -127,14 +141,14 @@ describe("assessment engine", () => {
     const revised = async (i: AssessmentInput) => {
       calls++;
       if (calls === 1) return bad(i);
-      expect(i.revision_notes).toMatch(/"32%" in finding.2 isn't in the input/);
+      expect(i.revision_notes).toMatch(/"32%" in evidence.2 isn't in the input/);
       return goodDraft(i);
     };
     let v = (await createAssessmentVersion(co, "hire_or_fix"))!;
     await runAssessmentPipeline(v.id, { draft: revised, qa });
     let state = await founderAssessment(co.id, "hire_or_fix");
     if (state.state !== "ready") throw new Error("expected ready");
-    expect(state.view.findings.map((f) => f.text)).not.toContain("Peers win 32% of deals.");
+    expect(state.view.evidence.map((f) => f.text)).not.toContain("Peers win 32% of deals.");
     expect(state.view.degraded).toBe(false);
 
     // Still bad after revision: the failing statement is removed and the gap is stated.
@@ -143,7 +157,7 @@ describe("assessment engine", () => {
     state = await founderAssessment(co.id, "hire_or_fix");
     if (state.state !== "ready") throw new Error("expected ready");
     expect(state.view.version).toBe(v.version);
-    expect(state.view.findings.map((f) => f.text)).not.toContain("Peers win 32% of deals.");
+    expect(state.view.evidence.map((f) => f.text)).not.toContain("Peers win 32% of deals.");
     expect(state.view.dataGaps).toContain("Some statements couldn't be verified against your data and were left out.");
     expect(state.view.advisor).toBe("review");
   });
@@ -156,7 +170,7 @@ describe("assessment engine", () => {
     if (state.state !== "ready") throw new Error("expected ready");
     expect(state.view.degraded).toBe(true);
     expect(state.view.confidence.level).toBe("Low");
-    expect(state.view.findings.map((f) => f.text)).toContain("Win Rate is 18%.");
+    expect(state.view.evidence.map((f) => f.text).join(" ")).toMatch(/Win Rate 18%/);
     expect(state.view.advisor).toBe("review");
     expect(state.view.dataGaps.some((g) => /hasn't been shared yet/.test(g))).toBe(true);
 
@@ -213,7 +227,8 @@ describe("assessment engine", () => {
     await runAssessmentPipeline(v.id, { draft: goodDraft, qa });
     const state = await founderAssessment(co.id, "hire_or_fix");
     if (state.state !== "ready") throw new Error("expected ready");
-    expect(state.view.reference).toEqual({ name: "Seed founder-led", companyCount: 30 });
-    expect(state.view.evidence.find((e) => e.label === "Win Rate")).toMatchObject({ median: "21%", topQuartile: "27%" });
+    expect(state.view.reference).toMatchObject({ name: "Seed founder-led", companyCount: 30 });
+    expect(state.view.baseline.find((e) => e.label === "Win Rate")).toMatchObject({ median: "21%", topQuartile: "27%" });
+    expect(state.view.reference).toMatchObject({ sources: ["Survey"] });
   });
 });

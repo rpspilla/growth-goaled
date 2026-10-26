@@ -6,6 +6,7 @@ const KIND_LABEL: Record<string, string> = {
   document: "Data you shared",
   founder_answer: "Your answer",
   methodology: "Methodology",
+  analysis: "Calculated from your data",
 };
 
 type TrailClaim = { text: string; confidence?: string | null; sources: { kind: string; title: string; detail: string | null }[] };

@@ -238,7 +238,7 @@ describe("five steps", () => {
 
     const active = stepStates({ useCase: "growth_leak", status: "active" });
     expect(active.filter((s) => s.locked).map((s) => s.key)).toEqual(["progress"]);
-    expect(active.find((s) => s.key === "progress")!.lockedReason).toBe("Unlocks when your results are approved");
+    expect(active.find((s) => s.key === "progress")!.lockedReason).toBe("Unlocks when you commit to your plan");
     expect(active.find((s) => s.current)!.key).toBe("data");
     expect(active.find((s) => s.key === "library")!.done).toBe(true);
 

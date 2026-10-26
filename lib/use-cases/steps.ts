@@ -36,7 +36,7 @@ export function stepStates(active: ActiveUseCase): StepState[] {
   return STEPS.map((s, i) => {
     let lockedReason: string | null = null;
     if ((s.key === "data" || s.key === "baseline") && !active) lockedReason = "Unlocks when you buy an assessment";
-    if (s.key === "progress" && stage < 3) lockedReason = active ? "Unlocks when your results are approved" : "Unlocks after your results are approved";
+    if (s.key === "progress" && stage < 3) lockedReason = active ? "Unlocks when you commit to your plan" : "Unlocks after you commit to a plan";
     const doneAt: Partial<Record<StepKey, number>> = { library: 1, data: 2, baseline: 3 };
     return {
       key: s.key,

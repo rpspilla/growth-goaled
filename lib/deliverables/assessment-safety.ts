@@ -2,23 +2,34 @@ import type { AssessmentInput, AssessmentOutput } from "@/lib/ai/assessment";
 import type { ClaimForCheck, CodeCheckResult } from "./checks";
 
 /**
- * Keeps an assessment from ever "breaking". Pure functions, so they're unit-tested:
+ * Keeps a Decision Brief from ever "breaking". Pure functions, so they're unit-tested:
  * - systemGaps: the gaps we can see in code (missing required data, unreadable files,
  *   unconfirmed figures), always shown, whatever the model wrote;
  * - sanitizeAssessment: drops statements that failed the code checks rather than hiding
- *   the whole report;
- * - fallbackAssessment: a plain, honest report built only from the inputs, used when the
- *   model couldn't produce one.
+ *   the whole brief;
+ * - fallbackAssessment: an honest brief built only from the inputs and the rule-based
+ *   diagnosis, used when the model couldn't produce one.
  */
 
-/** Claims the model wrote, keyed as stored in the content (summary, finding.N, diagnosis, decision, action.N). */
+/**
+ * Claims the model wrote, keyed as stored in the content: decision, diagnosis, diagnosis.alt.N,
+ * evidence.N, option.N, recommendation, action.N, trigger.N, follow.N.
+ */
 export function claimsFromAssessment(out: AssessmentOutput): ClaimForCheck[] {
+  const anchor = [...new Set([...out.recommendation.sources, ...out.executive_decision.sources])];
+  const d = out.diagnosis;
   return [
-    { key: "summary", text: `${out.summary.headline} ${out.summary.body}`, sources: out.summary.sources },
-    ...out.findings.map((f, i) => ({ key: `finding.${i}`, text: f.text, sources: f.sources })),
-    { key: "diagnosis", text: out.diagnosis.text, sources: out.diagnosis.sources },
-    { key: "decision", text: out.decision.text, sources: out.decision.sources },
-    ...out.actions.map((a, i) => ({ key: `action.${i}`, text: `${a.action} ${a.why}`, sources: a.sources })),
+    { key: "decision", text: `${out.executive_decision.decision} ${out.executive_decision.conclusion}`, sources: out.executive_decision.sources },
+    { key: "diagnosis", text: `${d.primary.title} ${d.primary.explanation} ${d.how_to_distinguish ?? ""}`, sources: d.primary.sources },
+    ...d.alternatives.map((a, i) => ({ key: `diagnosis.alt.${i}`, text: `${a.title} ${a.assessment}`, sources: a.sources })),
+    ...out.evidence.map((e, i) => ({ key: `evidence.${i}`, text: e.text, sources: e.sources })),
+    ...out.alternatives.map((a, i) => ({ key: `option.${i}`, text: `${a.option} ${a.upside} ${a.downside} ${a.implications}`, sources: a.sources })),
+    { key: "recommendation", text: `${out.recommendation.option} ${out.recommendation.why}`, sources: out.recommendation.sources },
+    ...out.action_plan.map((a, i) => ({ key: `action.${i}`, text: `${a.action} ${a.rationale} ${a.success_metric} ${a.expected_signal} ${a.dependencies_risks} ${a.role ?? ""}`, sources: a.sources })),
+    // Triggers and follow-up carry no citations of their own; they're checked for numbers against the brief's anchor.
+    ...out.change_triggers.map((t, i) => ({ key: `trigger.${i}`, text: `${t.if_this} ${t.then_this}`, sources: anchor })),
+    ...out.follow_up.metrics.map((m, i) => ({ key: `follow.${i}`, text: `${m.label} ${m.why}`, sources: anchor })),
+    { key: "follow", text: out.follow_up.revisit_trigger, sources: anchor },
   ];
 }
 
@@ -50,73 +61,118 @@ export function completeness(input: AssessmentInput): Completeness {
 }
 
 /**
- * Removes what failed the code checks. Findings and actions that fail are dropped; a failing
- * summary, diagnosis or decision is replaced by an honest sentence, so the report always renders.
+ * Removes what failed the code checks. Listed statements that fail are dropped; a failing
+ * decision, diagnosis or recommendation is replaced by an honest sentence, so the brief always renders.
  */
 export function sanitizeAssessment(out: AssessmentOutput, check: CodeCheckResult): { output: AssessmentOutput; removed: number } {
   const bad = new Set([...check.untracedNumbers.map((u) => u.claim), ...check.unsourcedClaims, ...check.unknownSources.map((u) => u.claim)]);
   if (!bad.size) return { output: out, removed: 0 };
-  const findings = out.findings.filter((_, i) => !bad.has(`finding.${i}`));
-  const actions = out.actions.filter((_, i) => !bad.has(`action.${i}`));
-  const anchor = [...new Set([...out.summary.sources, ...out.decision.sources, ...out.diagnosis.sources])].filter((id) => !check.unknownSources.some((u) => u.id === id));
-  const safe = (text: string) => ({ text, sources: anchor });
+  const unknown = new Set(check.unknownSources.map((u) => u.id));
+  const anchor = [...new Set([...out.executive_decision.sources, ...out.recommendation.sources, ...out.diagnosis.primary.sources])].filter((id) => !unknown.has(id));
+  const keep = <T,>(prefix: string, xs: T[]) => xs.filter((_, i) => !bad.has(`${prefix}.${i}`));
   return {
     output: {
       ...out,
-      summary: bad.has("summary")
-        ? { headline: "Here's what we can say from the data you shared.", body: "Part of the summary couldn't be verified against your data, so we've left it out. The findings and actions below were checked.", sources: anchor }
-        : out.summary,
-      diagnosis: bad.has("diagnosis") ? safe("We couldn't verify a full diagnosis against your data. An advisor review can close this gap.") : out.diagnosis,
-      decision: bad.has("decision") ? safe("Work through the checked actions below, and review the open gaps with an advisor before committing spend.") : out.decision,
-      findings,
-      actions,
+      executive_decision: bad.has("decision")
+        ? { decision: "Work through the checked plan below, and review the open gaps before committing spend.", conclusion: "Part of the summary couldn't be verified against your data, so we've left it out.", sources: anchor }
+        : out.executive_decision,
+      diagnosis: {
+        primary: bad.has("diagnosis")
+          ? { candidate_id: null, title: "Not yet established", explanation: "We couldn't verify a full diagnosis against your data. An advisor review can close this gap.", sources: anchor }
+          : out.diagnosis.primary,
+        alternatives: keep("diagnosis.alt", out.diagnosis.alternatives),
+        how_to_distinguish: bad.has("diagnosis") ? null : out.diagnosis.how_to_distinguish,
+      },
+      evidence: keep("evidence", out.evidence),
+      alternatives: keep("option", out.alternatives),
+      recommendation: bad.has("recommendation") ? { option: "Close the gaps, then decide", why: "The recommendation couldn't be verified against your data, so we've left it out.", sources: anchor } : out.recommendation,
+      action_plan: keep("action", out.action_plan),
+      change_triggers: keep("trigger", out.change_triggers),
+      follow_up: {
+        ...out.follow_up,
+        metrics: keep("follow", out.follow_up.metrics),
+        revisit_trigger: bad.has("follow") ? "Revisit sooner if a key figure moves sharply." : out.follow_up.revisit_trigger,
+      },
       data_gaps: [...out.data_gaps, "Some statements couldn't be verified against your data and were left out."],
     },
     removed: bad.size,
   };
 }
 
-/** A report built only from the inputs (no model): every figure quoted verbatim, every statement sourced. */
+const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+
+/**
+ * A brief built only from the inputs (no model): the rule-based diagnosis and its evidence,
+ * every figure quoted verbatim, every statement sourced.
+ */
 export function fallbackAssessment(input: AssessmentInput): AssessmentOutput {
   const answerIds = input.founder_answers.map((a) => a.id);
-  const goal = input.founder_answers.find((a) => a.id === "answer:goal");
   const figureIds = input.figures.map((f) => f.id);
   const items = input.data_supplied.filter((d) => d.status === "available" || d.status === "partial").map((d) => d.id);
   const all = [...figureIds, ...answerIds, ...items];
   // Something to cite is always available: the data items the use case asks for are inputs too.
   const anchor = all.length ? all.slice(0, 6) : input.data_supplied.slice(0, 3).map((d) => d.id);
-  const watch = input.figures.filter((f) => {
-    const r = input.reference.find((x) => x.metric === f.metric);
-    return Boolean(r);
-  });
+  const dx = input.diagnosis;
+  const top = dx?.candidates[0];
+  const settled = Boolean(top && dx && dx.certainty !== "unresolved");
+  const evText = new Map((dx?.evidence ?? []).map((e) => [e.id, e]));
+  const cite = (c: NonNullable<typeof top>) => [`candidate:${c.id}`, ...c.supporting, ...c.contradicting, ...c.context];
+  const explain = (c: NonNullable<typeof top>) =>
+    [...c.supporting, ...c.context].map((id) => evText.get(id)?.text).filter(Boolean).join(" ") || "The rules found no evidence for or against this yet.";
+
+  const evidence: AssessmentOutput["evidence"] = dx?.evidence.length
+    ? dx.evidence.slice(0, 8).map((e) => ({
+        text: e.text,
+        status: e.kind === "calculated" ? "calculated" : e.kind === "inference" ? "inference" : /not confirmed/.test(e.text) ? "hypothesis" : "verified",
+        bearing: top?.supporting.includes(e.id) ? "supports" : top?.contradicting.includes(e.id) ? "contradicts" : "context",
+        sources: [e.id],
+      }))
+    : input.figures.slice(0, 6).map((f) => ({
+        text: `${f.label} is ${f.value}${f.confirmed ? "" : " (read from your file, not yet confirmed)"}.`,
+        status: f.origin === "calculated" ? "calculated" : f.confirmed ? "verified" : "hypothesis",
+        bearing: "context",
+        sources: [f.id],
+      }));
+
+  const options = [
+    { option: top ? `Act on the leading explanation: ${lowerFirst(top.title)}` : "Act on the figures you have now", upside: "Starts fixing the likely constraint straight away.", downside: "If the explanation is wrong, effort goes to the wrong place.", implications: "Needs the checks in the plan to confirm it early.", sources: top ? cite(top) : anchor },
+    { option: "Close the main data gaps first, then decide", upside: "A firmer diagnosis before committing time or budget.", downside: "A few weeks' delay before acting.", implications: "Share the missing data and confirm the figures listed below.", sources: anchor },
+  ];
+
   return {
-    summary: {
-      headline: `A first view of ${input.use_case.question.replace(/\?$/, "").toLowerCase()}, from what you've shared.`,
-      body: `${goal ? `You told us: “${goal.answer.slice(0, 200)}”. ` : ""}We couldn't complete the full automated analysis this time, so this report sets out the figures and data we have, what's missing, and the next steps. ${input.reference_note}`,
-      sources: anchor,
+    executive_decision: {
+      decision: settled ? `Start with ${lowerFirst(top!.title)}.` : "Close the most important data gaps before committing to a course of action.",
+      conclusion: `We couldn't complete the full written analysis this time, so this brief sets out the rule-based diagnosis from your data, the gaps and the next steps. ${input.reference_note}`,
+      sources: top ? [...cite(top).slice(0, 4), ...anchor.slice(0, 2)] : anchor,
     },
-    findings: [
-      ...input.figures.slice(0, 5).map((f) => ({
-        kind: "concern" as const,
-        text: `${f.label} is ${f.value}${f.confirmed ? "" : " (read from your file, not yet confirmed)"}${input.reference.find((r) => r.metric === f.metric) ? `; peer top quartile ${input.reference.find((r) => r.metric === f.metric)!.top_quartile}` : ""}.`,
-        sources: [f.id, ...(input.reference.find((r) => r.metric === f.metric) ? [input.reference.find((r) => r.metric === f.metric)!.id] : [])],
-      })),
-      ...(input.figures.length ? [] : items.slice(0, 3).map((id) => ({ kind: "strength" as const, text: `You've shared ${input.data_supplied.find((d) => d.id === id)!.item.toLowerCase()}.`, sources: [id] }))),
+    diagnosis: top
+      ? {
+          primary: { candidate_id: top.id, title: settled ? top.title : `Not yet established. Most plausible: ${lowerFirst(top.title)}`, explanation: explain(top), sources: cite(top) },
+          alternatives: dx!.candidates.slice(1, 4).map((c) => ({ candidate_id: c.id, title: c.title, assessment: explain(c), sources: cite(c) })),
+          how_to_distinguish: top.test,
+        }
+      : {
+          primary: { candidate_id: null, title: "Not yet established", explanation: "There isn't enough verified data yet to identify the main constraint. The gaps below say what would make the difference.", sources: anchor },
+          alternatives: [],
+          how_to_distinguish: null,
+        },
+    evidence,
+    alternatives: options,
+    recommendation: settled
+      ? { option: options[0]!.option, why: "The calculated evidence points to it more than to the alternatives; the first action checks it quickly.", sources: options[0]!.sources }
+      : { option: options[1]!.option, why: "The data can't yet separate the possible explanations, so acting now risks fixing the wrong thing.", sources: anchor },
+    action_plan: [
+      ...(top ? [{ priority: 1, action: top.test, rationale: "Confirms or rules out the leading explanation quickly.", timing: "next_30_days" as const, role: null, success_metric: "A clear answer on whether this is the main constraint", metric_key: null, expected_signal: "The pattern either holds across accounts or it doesn't.", dependencies_risks: "Needs the underlying records to hand.", sources: cite(top) }] : []),
+      { priority: top ? 2 : 1, action: "Share the missing required data and confirm the figures read from your files.", rationale: "The full analysis depends on it.", timing: "next_30_days", role: null, success_metric: "All required data marked available", metric_key: null, expected_signal: "No open gaps under Data.", dependencies_risks: "Someone needs time to export the data.", sources: anchor },
+      { priority: top ? 3 : 2, action: "Re-run the assessment once the data is in.", rationale: "You'll get the full written brief and plan.", timing: "days_31_60", role: null, success_metric: "A complete brief", metric_key: null, expected_signal: "A firmer diagnosis.", dependencies_risks: "Depends on the step above.", sources: anchor },
     ],
-    diagnosis: {
-      text: watch.length
-        ? "The figures above are compared with approved peer reference data where it exists. A full diagnosis needs the gaps below closed."
-        : "There isn't enough verified data yet for a full diagnosis. The gaps below say what would make the difference.",
-      sources: anchor,
+    change_triggers: [{ if_this: "Confirmed figures or new data point to a different constraint", then_this: "The recommendation changes to address that constraint instead." }],
+    follow_up: {
+      metrics: input.figures.filter((f) => input.trackable_metrics?.includes(f.metric)).slice(0, 4).map((f) => ({ metric_key: f.metric, label: f.label, why: "A key figure for this decision." })),
+      revisit_in_days: 30,
+      revisit_trigger: "Revisit as soon as the missing data is in.",
     },
-    decision: { text: "Close the most important data gaps, then re-run the assessment; review the open questions with an advisor in the meantime.", sources: anchor },
-    actions: [
-      { action: "Share the missing required data listed below.", why: "It's what the full analysis depends on.", horizon: "next_30_days", kpi: null, sources: anchor },
-      { action: "Confirm the figures read from your files.", why: "Confirmed figures make the conclusions firmer.", horizon: "next_30_days", kpi: null, sources: anchor },
-      { action: "Re-run the assessment once the data is in.", why: "You'll get the full findings and action plan.", horizon: "next_30_days", kpi: null, sources: anchor },
-    ],
-    assumptions: ["This is a partial report: the automated analysis didn't complete, so no conclusions beyond the figures above are drawn."],
-    data_gaps: [],
-    next_steps: ["Add the missing data and re-run.", "Book a review with an advisor to go through the gaps."],
+    assumptions: ["This is a partial brief: the written analysis didn't complete, so it goes no further than the rule-based diagnosis and your figures."],
+    data_gaps: [...(dx?.unknowns ?? [])],
   };
 }

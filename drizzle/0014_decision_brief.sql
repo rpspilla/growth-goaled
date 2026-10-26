@@ -1,0 +1,1 @@
+ALTER TYPE "public"."claim_source_kind" ADD VALUE 'analysis';

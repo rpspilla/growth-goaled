@@ -1,15 +1,17 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { and, desc, eq, inArray, isNotNull, max, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, lt, max, ne, or } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { Company, QaResults, User } from "@/lib/db/schema";
 import { AI_MODEL, aiProblemForStaff, isAiConfigError } from "@/lib/ai/config";
 import { AssessmentDraftError, AssessmentQaError, ASSESSMENT_BRIEFS, draftAssessment, qaAssessment, type AssessmentInput, type AssessmentOutput } from "@/lib/ai/assessment";
 import { matchCohort } from "@/lib/cohort-match";
-import { assessmentContentSchema, type AssessmentContent } from "@/lib/deliverables/assessment";
+import { parseBrief, type BriefContent } from "@/lib/deliverables/assessment";
 import { allowedNumbers, checkDraft, numbersIn, type ClaimForCheck, type CodeCheckResult } from "@/lib/deliverables/checks";
 export { claimsFromAssessment };
 import { claimsFromAssessment, completeness, fallbackAssessment, sanitizeAssessment, systemGaps } from "@/lib/deliverables/assessment-safety";
+import { diagnose, KEY_METRICS, type Figure } from "@/lib/diagnostics";
+import { analysisTables, diagnosisInput } from "@/lib/diagnostics/evidence";
 import { track } from "@/lib/events";
 import { getItem } from "@/lib/readiness";
 import { formatMetric, isMetricKey, METRICS, type MetricKey } from "@/lib/metrics";
@@ -22,28 +24,35 @@ import { getReadiness } from "./readiness";
 import { getCompanyUseCase, setUseCaseStatus } from "./use-cases";
 
 /**
- * The assessment engine (HANDOFF §13.9): one pipeline for every use case. Inputs are
- * assembled in code from the founder's answers, figures, supplied data and any approved
- * reference rows; the Draft Agent writes the assessment, then the QA Agent and code checks
- * verify it. Founders see a version once its code checks pass; advisors can review it.
+ * The assessment engine (HANDOFF §13.9): one pipeline for every use case, producing a Decision
+ * Brief. Inputs are assembled in code: the founder's answers, figures (calculated, entered or
+ * extracted, each with its method and period), tables computed from their files, approved
+ * reference rows, and a rule-based diagnosis. The Draft Agent writes the brief; code checks
+ * and the QA Agent verify it. Founders see a version once its code checks pass.
  */
 
 type Deliverable = typeof schema.deliverables.$inferSelect;
 const TYPE = "baseline" as const;
-const HORIZON_DAYS = [30, 60, 90];
+const HORIZON_DAYS = [30, 31, 60, 61, 90];
 
 export class AssessmentError extends Error {}
 
 export type AssessmentInputs = {
   input: AssessmentInput;
   figures: { metric: MetricKey; dataPointId: string; value: number }[];
-  reference: AssessmentContent["reference"];
+  /** Snapshot of the figures the brief rests on, saved with it for later comparison. */
+  baseline: BriefContent["baseline"];
+  analyses: { title: string; rows: string[] }[];
+  unknowns: string[];
+  reference: BriefContent["reference"];
   methodology: string;
   validIds: Set<string>;
   dataPointIds: Set<string>;
   benchmarkIds: Set<string>;
   answerNotes: Map<string, string>;
   itemNotes: Map<string, string>;
+  /** Code-side evidence ids (ev:, candidate:, analysis:) and what each says, for the Source Trail. */
+  analysisNotes: Map<string, string>;
   allowed: number[];
 };
 
@@ -73,7 +82,7 @@ export async function assembleAssessmentInputs(company: Company, useCase: UseCas
   points.sort((a, b) => Number(b.status === "accepted") - Number(a.status === "accepted"));
   const latest = new Map<MetricKey, (typeof points)[number]>();
   for (const p of points) if (isMetricKey(p.metric) && !latest.has(p.metric)) latest.set(p.metric, p);
-  const wanted = new Set<MetricKey>([...useCase.figures, "arr", "arr_growth", "customers"]);
+  const wanted = new Set<MetricKey>([...useCase.figures, ...KEY_METRICS[useCase.id], "arr", "arr_growth", "customers"]);
   const figures = [...latest.entries()].filter(([m]) => wanted.has(m)).map(([metric, p]) => ({ metric, dataPointId: p.id, value: p.value, point: p }));
 
   // Founder answers: the questionnaire for this use case.
@@ -136,12 +145,37 @@ export async function assembleAssessmentInputs(company: Company, useCase: UseCas
         return r && r.metric.p75 != null ? [{ metric, row: r }] : [];
       })
     : [];
-  const reference: AssessmentContent["reference"] = chosen && refRows.length
-    ? { cohortId: chosen.cohort.id, name: chosen.cohort.name, companyCount: chosen.cohort.companyCount, rows: refRows.map((r) => ({ metric: r.metric, benchmarkMetricId: r.row.metric.id })) }
+  const reference: BriefContent["reference"] = chosen && refRows.length
+    ? {
+        cohortId: chosen.cohort.id,
+        name: chosen.cohort.name,
+        companyCount: chosen.cohort.companyCount,
+        rows: refRows.map((r) => ({ metric: r.metric, benchmarkMetricId: r.row.metric.id })),
+        matched: match!.matched,
+        unmatched: match!.unmatched,
+      }
     : null;
   const referenceNote = reference
-    ? `Peer reference: ${reference.name}${reference.companyCount ? ` (${reference.companyCount} companies)` : ""}, approved and cited.`
+    ? `Peer reference: ${reference.name}${reference.companyCount ? ` (${reference.companyCount} companies)` : ""}, approved and cited.${reference.unmatched.length ? ` An imperfect match: not matched on ${reference.unmatched.join("; ")}.` : ""}`
     : "No approved peer reference data matches this company yet, so this assessment uses the company's own figures, answers and target.";
+
+  // Tables computed from their files, newest first, and the rule-based diagnosis over them.
+  const files = await db
+    .select({ filename: schema.documents.filename, analysis: schema.documents.analysis })
+    .from(schema.documents)
+    .where(and(eq(schema.documents.companyId, company.id), isNotNull(schema.documents.analysis), ne(schema.documents.status, "failed")))
+    .orderBy(desc(schema.documents.updatedAt));
+  const fileAnalyses = files.flatMap((f) => (f.analysis ? [{ filename: f.filename, analysis: f.analysis }] : []));
+  const tables = analysisTables(fileAnalyses);
+  const dxFigures: Figure[] = figures.map((f) => ({
+    metric: f.metric,
+    value: f.value,
+    period: f.point.period,
+    origin: f.point.origin,
+    confirmed: f.point.status === "accepted",
+    ...(f.point.calc?.sampleSize !== undefined ? { sampleSize: f.point.calc.sampleSize } : {}),
+  }));
+  const dx = diagnosisInput(diagnose(useCase.id, dxFigures, fileAnalyses.map((f) => f.analysis)));
 
   const fmt = (m: MetricKey, v: number) => formatMetric(m, v);
   const input: AssessmentInput = {
@@ -164,6 +198,9 @@ export async function assembleAssessmentInputs(company: Company, useCase: UseCas
       lower_is_better: METRICS[f.metric].lowerIsBetter,
       confirmed: f.point.status === "accepted",
       period: f.point.period,
+      origin: f.point.origin,
+      method: f.point.method,
+      sample_size: f.point.calc?.sampleSize ?? null,
     })),
     data_supplied: supplied,
     reference: refRows.map(({ metric, row: r }) => ({
@@ -175,12 +212,15 @@ export async function assembleAssessmentInputs(company: Company, useCase: UseCas
       source: r.source ? [r.source.name, r.source.year].filter(Boolean).join(", ") : null,
     })),
     reference_note: referenceNote,
+    diagnosis: dx,
+    analyses: tables,
     open_questions: openQuestions,
     unreadable_files: readiness.files.filter((f) => f.status === "failed").map((f) => f.filename).slice(0, 10),
     conflicts: (await figureChoices(company, assessmentMetrics(useCase, objective)))
       .filter((c) => c.state === "conflict")
       .map((c) => ({ metric: c.metric, label: c.label, values: c.candidates.map((x) => `${x.formatted} in ${x.source === "Your company profile" ? "your company profile" : x.source}`).join(" vs ") })),
     completeness: "partial",
+    trackable_metrics: [...wanted],
   };
   input.completeness = completeness(input);
 
@@ -194,44 +234,97 @@ export async function assembleAssessmentInputs(company: Company, useCase: UseCas
     ...targetNumber,
     ...HORIZON_DAYS,
     ...(reference?.companyCount ? [reference.companyCount] : []),
+    // Numbers in code-side evidence and tables are inputs too (they were computed, not written by the model).
+    ...dx.evidence.flatMap((e) => numbersIn(e.text).map((n) => n.value)),
+    ...dx.candidates.flatMap((c) => (c.arr_at_stake ? numbersIn(c.arr_at_stake).map((n) => n.value) : [])),
+    ...tables.flatMap((t) => [t.title, ...t.rows]).flatMap((r) => numbersIn(r).map((n) => n.value)),
   ]);
 
   const dataPointIds = new Set(figures.map((f) => f.dataPointId));
   const benchmarkIds = new Set(refRows.map((r) => r.row.metric.id));
   const answerNotes = new Map(answers.map((a) => [a.id, `Your answer to “${a.question}”: ${a.answer}`]));
   const itemNotes = new Map(supplied.map((s) => [s.id, `${s.item}: ${s.status.replace("_", " ")}${s.files ? `, ${s.files} ${s.files === 1 ? "file" : "files"}` : ""}${s.coverage ? `, ${s.coverage}` : ""}`]));
+  const analysisNotes = new Map<string, string>([
+    ...dx.evidence.map((e) => [e.id, `${e.text} (${e.kind === "calculated" ? "calculated in code" : e.kind === "reported" ? "your figure" : "inference by rule"})`] as const),
+    ...dx.candidates.map((c) => [`candidate:${c.id}`, `Diagnostic rule: ${c.title}. Test: ${c.test}`] as const),
+    ...tables.map((t) => [t.id, `${t.title}: ${t.rows.join("; ")}`] as const),
+  ]);
   return {
     input,
     figures: figures.map(({ metric, dataPointId, value }) => ({ metric, dataPointId, value })),
+    baseline: figures.map(({ metric, point: p }) => ({
+      metric,
+      dataPointId: p.id,
+      value: p.value,
+      period: p.period,
+      origin: p.origin,
+      method: p.method,
+      confirmed: p.status === "accepted",
+      sampleSize: p.calc?.sampleSize ?? null,
+      recordedAt: p.updatedAt.toISOString(),
+    })),
+    analyses: tables.map(({ title, rows }) => ({ title, rows })),
+    unknowns: dx.unknowns,
     reference,
-    methodology: `${referenceNote} Figures come from your company profile and files (unconfirmed file figures are marked). Every statement was checked in code against these inputs.`,
-    validIds: new Set([...dataPointIds, ...benchmarkIds, ...answerNotes.keys(), ...itemNotes.keys()]),
+    methodology: `${referenceNote} Figures marked "calculated" were computed in code from your files; others come from your company profile or were read from your documents (unconfirmed ones are marked). The diagnosis is ranked by fixed rules over that evidence; the written brief was checked in code against every input.`,
+    validIds: new Set([...dataPointIds, ...benchmarkIds, ...answerNotes.keys(), ...itemNotes.keys(), ...analysisNotes.keys()]),
     dataPointIds,
     benchmarkIds,
     answerNotes,
     itemNotes,
+    analysisNotes,
     allowed,
   };
 }
 
 export function contentFromAssessment(
   useCase: UseCaseId,
-  inputs: Pick<AssessmentInputs, "figures" | "reference" | "methodology" | "input">,
+  inputs: Pick<AssessmentInputs, "figures" | "reference" | "methodology" | "input" | "baseline" | "analyses" | "unknowns">,
   out: AssessmentOutput,
   degraded = false,
-): AssessmentContent {
+): BriefContent {
+  const key = (k: string | null) => (k && isMetricKey(k) ? k : null);
   return {
+    format: "brief",
     useCase,
     figures: inputs.figures.map(({ metric, dataPointId }) => ({ metric, dataPointId })),
     reference: inputs.reference,
-    summary: { headline: out.summary.headline, body: out.summary.body, claimKey: "summary" },
-    findings: [...out.findings].sort((a, b) => Number(a.kind === "strength") - Number(b.kind === "strength")).map((f) => ({ kind: f.kind, text: f.text, claimKey: `finding.${out.findings.indexOf(f)}` })),
-    diagnosis: { text: out.diagnosis.text, claimKey: "diagnosis" },
-    decision: { text: out.decision.text, claimKey: "decision" },
-    actions: out.actions.map((a, i) => ({ action: a.action, why: a.why, horizon: a.horizon, kpi: a.kpi, claimKey: `action.${i}` })),
+    baseline: inputs.baseline,
+    certainty: inputs.input.diagnosis?.certainty ?? null,
+    executiveDecision: { decision: out.executive_decision.decision, conclusion: out.executive_decision.conclusion, claimKey: "decision" },
+    diagnosis: {
+      primary: { title: out.diagnosis.primary.title, explanation: out.diagnosis.primary.explanation, claimKey: "diagnosis" },
+      alternatives: out.diagnosis.alternatives.map((a, i) => ({ title: a.title, assessment: a.assessment, claimKey: `diagnosis.alt.${i}` })),
+      howToDistinguish: out.diagnosis.how_to_distinguish,
+      unknowns: inputs.unknowns,
+    },
+    evidence: out.evidence.map((e, i) => ({ text: e.text, status: e.status, bearing: e.bearing, claimKey: `evidence.${i}` })),
+    analyses: inputs.analyses,
+    alternatives: out.alternatives.map((a, i) => ({ option: a.option, upside: a.upside, downside: a.downside, implications: a.implications, claimKey: `option.${i}` })),
+    recommendation: { option: out.recommendation.option, why: out.recommendation.why, claimKey: "recommendation" },
+    plan: out.action_plan
+      .map((a, i) => ({
+        priority: a.priority,
+        action: a.action,
+        rationale: a.rationale,
+        timing: a.timing,
+        role: a.role,
+        successMetric: a.success_metric,
+        metricKey: key(a.metric_key),
+        expectedSignal: a.expected_signal,
+        dependenciesRisks: a.dependencies_risks,
+        claimKey: `action.${i}`,
+      }))
+      .sort((a, b) => a.priority - b.priority)
+      .map((a, i) => ({ ...a, priority: i + 1 })),
+    changeTriggers: out.change_triggers.map((t) => ({ ifThis: t.if_this, thenThis: t.then_this })),
+    followUp: {
+      metrics: out.follow_up.metrics.map((m) => ({ metricKey: key(m.metric_key), label: m.label, why: m.why })),
+      revisitInDays: Math.min(Math.max(out.follow_up.revisit_in_days, 7), 180),
+      revisitTrigger: out.follow_up.revisit_trigger,
+    },
     assumptions: out.assumptions,
     dataGaps: out.data_gaps,
-    nextSteps: out.next_steps,
     methodology: inputs.methodology,
     systemGaps: systemGaps(inputs.input),
     completeness: inputs.input.completeness,
@@ -248,6 +341,7 @@ async function saveClaims(deliverableId: string, claims: ClaimForCheck[], inputs
       else if (inputs.benchmarkIds.has(id)) sources.push({ claimId: row!.id, kind: "benchmark_metric", refId: id });
       else if (inputs.answerNotes.has(id)) sources.push({ claimId: row!.id, kind: "founder_answer", note: inputs.answerNotes.get(id)! });
       else if (inputs.itemNotes.has(id)) sources.push({ claimId: row!.id, kind: "document", note: inputs.itemNotes.get(id)! });
+      else if (inputs.analysisNotes.has(id)) sources.push({ claimId: row!.id, kind: "analysis", note: inputs.analysisNotes.get(id)! });
     }
     sources.push({ claimId: row!.id, kind: "methodology", note: inputs.methodology });
     await db.insert(schema.claimSources).values(sources);
@@ -282,7 +376,8 @@ export async function createAssessmentVersion(company: Company, useCase: UseCase
     .values({ companyId: company.id, type: TYPE, useCase, version: await nextVersion(company.id), status: "drafting" })
     .onConflictDoNothing()
     .returning();
-  if (created) await setUseCaseStatus(company.id, useCase, "baseline_in_review");
+  // A reassessment while tracking keeps Progress open.
+  if (created && owned.status !== "tracking") await setUseCaseStatus(company.id, useCase, "baseline_in_review");
   return created ?? null;
 }
 
@@ -387,7 +482,7 @@ export async function runAssessmentPipeline(deliverableId: string, deps: Assessm
     .where(eq(schema.agentRuns.id, draftRun));
   await db
     .update(schema.deliverables)
-    .set({ status: "qa", content: contentFromAssessment(useCase.id, inputs, out, degraded), headline: out.summary.headline, createdByRun: draftRun })
+    .set({ status: "qa", content: contentFromAssessment(useCase.id, inputs, out, degraded), headline: out.executive_decision.decision, createdByRun: draftRun })
     .where(and(eq(schema.deliverables.id, deliverableId), eq(schema.deliverables.status, "drafting")));
 
   started = Date.now();
@@ -430,40 +525,73 @@ export async function approveAssessment(actor: User, deliverableId: string, comm
 export type SourceView = { kind: string; title: string; detail: string | null };
 export type ResultsClaim = { text: string; sources: SourceView[] };
 
+export type BaselineRow = {
+  metric: MetricKey;
+  label: string;
+  value: string;
+  period: string | null;
+  origin: "manual" | "extracted" | "calculated";
+  method: string | null;
+  confirmed: boolean;
+  sampleSize: number | null;
+  /** Recorded more than 90 days before this brief was built. */
+  stale: boolean;
+  /** The same figure in the previous brief for this question, when it differs or matches. */
+  previous: { value: string; version: number; direction: "better" | "worse" | "same" } | null;
+  median: string | null;
+  topQuartile: string | null;
+};
+
 export type ResultsView = {
+  deliverableId: string;
   version: number;
+  builtAt: string;
   reviewed: { by: string | null; at: string; comment: string | null } | null;
-  summary: { headline: string; body: string; claimKey: string };
-  findings: { kind: "concern" | "strength"; text: string; claimKey: string }[];
-  evidence: { label: string; value: string; unconfirmed: boolean; median: string | null; topQuartile: string | null }[];
-  reference: { name: string; companyCount: number | null } | null;
-  diagnosis: { text: string; claimKey: string };
-  decision: { text: string; claimKey: string };
-  actions: { action: string; why: string; horizon: "next_30_days" | "next_90_days" | "later"; kpi: string | null; claimKey: string }[];
+  certainty: BriefContent["certainty"];
+  executiveDecision: BriefContent["executiveDecision"];
+  baseline: BaselineRow[];
+  reference: { name: string; companyCount: number | null; matched: string[]; unmatched: string[]; sources: string[] } | null;
+  diagnosis: BriefContent["diagnosis"];
+  evidence: BriefContent["evidence"];
+  analyses: BriefContent["analyses"];
+  alternatives: BriefContent["alternatives"];
+  recommendation: BriefContent["recommendation"];
+  plan: (BriefContent["plan"][number] & { metricLabel: string | null })[];
+  changeTriggers: BriefContent["changeTriggers"];
+  followUp: BriefContent["followUp"] & { revisitBy: string };
   assumptions: string[];
   /** Every known gap: those found in code first, then those the analysis named. */
   dataGaps: string[];
-  nextSteps: string[];
   methodology: string;
   confidence: Confidence;
   completeness: "complete" | "partial" | "minimal";
-  /** The model couldn't produce the report; this one was built from the inputs only. */
+  /** The model couldn't produce the brief; this one was built from the inputs and rules only. */
   degraded: boolean;
   /** Which advisor offer fits: a review of the gaps, or monthly support to hit the target on time. */
   advisor: "review" | "monthly";
+  /** When the founder committed to this plan (Progress tracks it from then). */
+  committedAt: string | null;
   claims: Record<string, ResultsClaim>;
 };
 
-/** Renders a version for display. Figures are read from their data points now, never copied. */
+const VISIBLE = ["in_review", "approved", "published"] as const;
+const STALE_MS = 90 * 86_400_000;
+
+/** Renders a version for display, with the previous version's figures for comparison. */
 export async function assessmentView(d: Deliverable): Promise<ResultsView | null> {
-  const parsed = assessmentContentSchema.safeParse(d.content);
-  if (!parsed.success) return null;
-  const c = parsed.data;
+  const c = parseBrief(d.content);
+  if (!c) return null;
   const dpIds = c.figures.map((f) => f.dataPointId);
   const bmIds = c.reference?.rows.map((r) => r.benchmarkMetricId) ?? [];
-  const [points, refs, claims, review] = await Promise.all([
+  const [points, refs, claims, review, previous, committed] = await Promise.all([
     dpIds.length ? db.select().from(schema.dataPoints).where(and(eq(schema.dataPoints.companyId, d.companyId), inArray(schema.dataPoints.id, dpIds))) : [],
-    bmIds.length ? db.select().from(schema.benchmarkMetrics).where(and(inArray(schema.benchmarkMetrics.id, bmIds), eq(schema.benchmarkMetrics.status, "approved"))) : [],
+    bmIds.length
+      ? db
+          .select({ metric: schema.benchmarkMetrics, source: schema.benchmarkSources })
+          .from(schema.benchmarkMetrics)
+          .leftJoin(schema.benchmarkSources, eq(schema.benchmarkSources.id, schema.benchmarkMetrics.sourceId))
+          .where(and(inArray(schema.benchmarkMetrics.id, bmIds), eq(schema.benchmarkMetrics.status, "approved")))
+      : [],
     db
       .select({ claim: schema.claims, source: schema.claimSources })
       .from(schema.claims)
@@ -477,39 +605,87 @@ export async function assessmentView(d: Deliverable): Promise<ResultsView | null
       .orderBy(desc(schema.reviews.createdAt))
       .limit(1)
       .then((r) => r[0]),
+    d.useCase
+      ? db
+          .select()
+          .from(schema.deliverables)
+          .where(
+            and(
+              eq(schema.deliverables.companyId, d.companyId),
+              eq(schema.deliverables.type, TYPE),
+              eq(schema.deliverables.useCase, d.useCase),
+              lt(schema.deliverables.version, d.version),
+              eq(schema.deliverables.codeChecksPassed, true),
+              inArray(schema.deliverables.status, [...VISIBLE]),
+            ),
+          )
+          .orderBy(desc(schema.deliverables.version))
+          .limit(1)
+          .then((r) => r[0])
+      : undefined,
+    db.select({ at: schema.planActions.createdAt }).from(schema.planActions).where(eq(schema.planActions.deliverableId, d.id)).limit(1).then((r) => r[0]),
   ]);
   const dp = new Map(points.map((p) => [p.id, p]));
-  const refByMetric = new Map((c.reference?.rows ?? []).map((r) => [r.metric, r.benchmarkMetricId]));
+  const refByMetric = new Map((c.reference?.rows ?? []).map((r) => [r.metric, refs.find((x) => x.metric.id === r.benchmarkMetricId)]));
+  const prev = previous ? parseBrief(previous.content) : null;
+  const prevByMetric = new Map((prev?.baseline ?? []).map((b) => [b.metric, b.value]));
+  const built = d.createdAt.getTime();
 
-  const evidence = c.figures.flatMap((f) => {
-    const p = dp.get(f.dataPointId);
-    if (!p) return [];
-    const r = refByMetric.has(f.metric) ? refs.find((x) => x.id === refByMetric.get(f.metric)) : undefined;
-    return [
-      {
-        label: METRICS[f.metric].label,
-        value: formatMetric(f.metric, p.value),
-        unconfirmed: p.status !== "accepted",
-        median: r?.median != null ? formatMetric(f.metric, r.median) : null,
-        topQuartile: r?.p75 != null ? formatMetric(f.metric, r.p75) : null,
-      },
-    ];
+  // The snapshot the brief was built on; briefs in the first format read their figures live.
+  const snapshot: BriefContent["baseline"] = c.baseline.length
+    ? c.baseline
+    : c.figures.flatMap((f) => {
+        const p = dp.get(f.dataPointId);
+        return p ? [{ metric: f.metric, dataPointId: p.id, value: p.value, period: p.period, origin: p.origin, method: p.method, confirmed: p.status === "accepted", sampleSize: p.calc?.sampleSize ?? null, recordedAt: p.updatedAt.toISOString() }] : [];
+      });
+  const baseline: BaselineRow[] = snapshot.map((b) => {
+    const r = refByMetric.get(b.metric)?.metric;
+    const before = prevByMetric.get(b.metric);
+    const lower = METRICS[b.metric].lowerIsBetter;
+    return {
+      metric: b.metric,
+      label: METRICS[b.metric].label,
+      value: formatMetric(b.metric, b.value),
+      period: b.period,
+      origin: b.origin,
+      method: b.method,
+      confirmed: b.confirmed,
+      sampleSize: b.sampleSize,
+      stale: built - Date.parse(b.recordedAt) > STALE_MS,
+      previous:
+        before === undefined || !previous
+          ? null
+          : { value: formatMetric(b.metric, before), version: previous.version, direction: before === b.value ? "same" : before < b.value !== lower ? "better" : "worse" },
+      median: r?.median != null ? formatMetric(b.metric, r.median) : null,
+      topQuartile: r?.p75 != null ? formatMetric(b.metric, r.p75) : null,
+    };
   });
 
   const describe = (s: typeof schema.claimSources.$inferSelect): SourceView | null => {
     if (s.kind === "data_point") {
       const p = s.refId ? dp.get(s.refId) : undefined;
       if (!p || !isMetricKey(p.metric)) return null;
-      return { kind: "data_point", title: `${METRICS[p.metric].label}: ${formatMetric(p.metric, p.value)}${p.period ? ` (${p.period})` : ""}`, detail: [p.rawText, p.status === "accepted" ? "confirmed" : "from your file, not yet confirmed"].filter(Boolean).join(" · ") };
+      const how = p.origin === "calculated" ? "calculated in code" : p.origin === "manual" ? "entered by you" : "read from your document";
+      return {
+        kind: "data_point",
+        title: `${METRICS[p.metric].label}: ${formatMetric(p.metric, p.value)}${p.period ? ` (${p.period})` : ""}`,
+        detail: [how, p.method, p.origin === "calculated" ? null : p.rawText, p.status === "accepted" ? "confirmed" : "not yet confirmed"].filter(Boolean).join(" · "),
+      };
     }
     if (s.kind === "benchmark_metric") {
-      const r = refs.find((x) => x.id === s.refId);
-      if (!r || !isMetricKey(r.metric)) return null;
-      const f = (n: number | null) => (n == null ? "—" : formatMetric(r.metric as MetricKey, n));
-      return { kind: "benchmark_metric", title: `Peer reference, ${METRICS[r.metric as MetricKey].label}: median ${f(r.median)}, top quartile ${f(r.p75)}`, detail: c.reference?.name ?? null };
+      const r = refs.find((x) => x.metric.id === s.refId);
+      if (!r || !isMetricKey(r.metric.metric)) return null;
+      const m = r.metric.metric as MetricKey;
+      const f = (n: number | null) => (n == null ? "—" : formatMetric(m, n));
+      return {
+        kind: "benchmark_metric",
+        title: `Peer reference, ${METRICS[m].label}: median ${f(r.metric.median)}, top quartile ${f(r.metric.p75)}`,
+        detail: [c.reference?.name, r.source ? [r.source.name, r.source.year].filter(Boolean).join(", ") : null].filter(Boolean).join(" · ") || null,
+      };
     }
     if (s.kind === "founder_answer") return { kind: "founder_answer", title: s.note ?? "Your answer", detail: null };
     if (s.kind === "document") return { kind: "document", title: s.note ?? "Data you shared", detail: null };
+    if (s.kind === "analysis") return { kind: "analysis", title: s.note ?? "Calculated from your data", detail: null };
     return { kind: "methodology", title: "How this was produced", detail: s.note };
   };
   const claimMap: Record<string, ResultsClaim> = {};
@@ -521,27 +697,44 @@ export async function assessmentView(d: Deliverable): Promise<ResultsView | null
 
   const gaps = [...new Set([...c.systemGaps, ...c.dataGaps])];
   const confidence = c.degraded
-    ? { level: "Low" as const, reasons: ["The full automated analysis didn't complete, so this report only sets out your figures, the gaps and next steps."] }
-    : resultConfidence({ reviewed: d.status === "published", unconfirmed: evidence.filter((e) => e.unconfirmed).length, gaps: gaps.length, metrics: evidence.length });
+    ? { level: "Low" as const, reasons: ["The written analysis didn't complete, so this brief goes no further than the rule-based diagnosis, your figures and the gaps."] }
+    : resultConfidence({ reviewed: d.status === "published", unconfirmed: baseline.filter((e) => !e.confirmed).length, gaps: gaps.length, metrics: baseline.length });
   const reviewed = d.status === "published" && review ? { by: review.reviewer?.name ?? review.reviewer?.email ?? null, at: review.review.createdAt.toISOString(), comment: review.review.comment } : null;
+  const usedRefs = refs.filter((r) => baseline.some((b) => b.metric === r.metric.metric));
   return {
+    deliverableId: d.id,
     version: d.version,
+    builtAt: d.createdAt.toISOString(),
     reviewed,
-    summary: c.summary,
-    findings: c.findings,
-    evidence,
-    reference: c.reference && evidence.some((e) => e.topQuartile) ? { name: c.reference.name, companyCount: c.reference.companyCount } : null,
+    certainty: c.certainty,
+    executiveDecision: c.executiveDecision,
+    baseline,
+    reference:
+      c.reference && baseline.some((e) => e.topQuartile)
+        ? {
+            name: c.reference.name,
+            companyCount: c.reference.companyCount,
+            matched: c.reference.matched,
+            unmatched: c.reference.unmatched,
+            sources: [...new Set(usedRefs.flatMap((r) => (r.source ? [[r.source.name, r.source.year].filter(Boolean).join(", ")] : [])))],
+          }
+        : null,
     diagnosis: c.diagnosis,
-    decision: c.decision,
-    actions: c.actions,
+    evidence: c.evidence,
+    analyses: c.analyses,
+    alternatives: c.alternatives,
+    recommendation: c.recommendation,
+    plan: c.plan.map((a) => ({ ...a, metricLabel: a.metricKey ? METRICS[a.metricKey].label : null })),
+    changeTriggers: c.changeTriggers,
+    followUp: { ...c.followUp, revisitBy: new Date(built + c.followUp.revisitInDays * 86_400_000).toISOString() },
     assumptions: c.assumptions,
     dataGaps: gaps,
-    nextSteps: c.nextSteps,
     methodology: c.methodology,
     confidence,
     completeness: c.completeness,
     degraded: c.degraded,
     advisor: !c.degraded && c.completeness === "complete" && !gaps.length && confidence.level === "High" ? "monthly" : "review",
+    committedAt: committed ? committed.at.toISOString() : null,
     claims: claimMap,
   };
 }

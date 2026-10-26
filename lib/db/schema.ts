@@ -84,7 +84,7 @@ export const deliverableStatus = pgEnum("deliverable_status", [
   "published",
   "failed",
 ]);
-export const claimSourceKind = pgEnum("claim_source_kind", ["data_point", "benchmark_metric", "document", "methodology", "founder_answer"]);
+export const claimSourceKind = pgEnum("claim_source_kind", ["data_point", "benchmark_metric", "document", "methodology", "founder_answer", "analysis"]);
 export const agentKind = pgEnum("agent_kind", ["draft", "qa", "extract", "research", "sort"]);
 export const agentRunStatus = pgEnum("agent_run_status", ["running", "succeeded", "failed"]);
 export const reviewDecision = pgEnum("review_decision", ["approve", "request_changes", "send_back"]);

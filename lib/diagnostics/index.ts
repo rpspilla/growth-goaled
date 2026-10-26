@@ -159,7 +159,7 @@ function hireOrFix(figures: Figure[], a: FileAnalysis[]): Candidate[] {
       id: "pipeline",
       title: "Not enough pipeline for more reps to work",
       impactArr: null,
-      context: [{ text: `${pipe.openCount} open deals worth ${usd(pipe.openAmount)} as of ${pipe.asOf}.`, kind: "calculated" }],
+      context: [{ text: `${pipe.openCount} open deals worth ${usd(pipe.openAmount)}${pipe.asOf !== "unknown" ? ` as of ${pipe.asOf}` : ""}.`, kind: "calculated" }],
       supporting: [],
       contradicting: [],
       test: "Divide open pipeline by each rep's quarterly quota to get coverage per rep.",
@@ -225,7 +225,8 @@ function fundraise(figures: Figure[]): Candidate[] {
   return out;
 }
 
-const KEY_METRICS: Record<UseCaseId, MetricKey[]> = {
+/** The figures each decision rests on most; missing ones become unknowns. */
+export const KEY_METRICS: Record<UseCaseId, MetricKey[]> = {
   growth_leak: ["nrr", "grr", "new_arr", "churned_arr", "win_rate"],
   series_a_ready: ["arr", "arr_growth", "nrr", "runway_months", "gross_margin", "top_customer_concentration"],
   series_b_ready: ["arr", "arr_growth", "nrr", "gross_margin", "burn_multiple", "runway_months"],
