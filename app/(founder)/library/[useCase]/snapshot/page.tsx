@@ -10,6 +10,7 @@ import { formatPrice, pricing, sellableUseCases } from "@/lib/pricing";
 import { getItem } from "@/lib/readiness";
 import { stripeConfigured } from "@/lib/stripe";
 import { getUseCase, missingRequired } from "@/lib/use-cases";
+import { howWeWork } from "@/lib/use-cases/how-we-work";
 import { growthSnapshot } from "@/lib/use-cases/snapshot";
 import { startAssessmentCheckout } from "../../actions";
 
@@ -43,6 +44,7 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
     profile: answers,
     dataStatus: Object.fromEntries(readiness.items.map((i) => [i.itemKey, i.status])),
   });
+  const approach = howWeWork({ useCase: def.id, profile: answers, revenueBand: company.revenueBand });
   const suggested = snapshot.fit.suggested ? getUseCase(snapshot.fit.suggested) : undefined;
   const price = formatPrice(pricing().assessmentCents);
   const sellable = sellableUseCases().includes(def.id) && stripeConfigured();
@@ -86,6 +88,26 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
                 </li>
               ))}
             </ul>
+          </section>
+
+          <section className="rounded-xl border p-5" style={card} aria-labelledby="how-we-work">
+            <h2 id="how-we-work" className="text-sm font-semibold mb-1" style={{ color: "var(--foreground)" }}>How we work with companies like yours</h2>
+            <p className="text-xs mb-3" style={{ color: "var(--muted-foreground)" }}>{approach.audience}</p>
+            <ul className="text-sm space-y-1.5 mb-5" style={{ color: "var(--foreground)" }}>
+              {approach.approach.map((a) => (
+                <li key={a} className="flex gap-2">
+                  <span aria-hidden style={{ color: "var(--green)" }}>•</span>
+                  <span>{a}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="rounded-lg p-4" style={{ background: "var(--muted)" }}>
+              <div className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--green)" }}>For example, after the assessment</div>
+              <p className="text-sm font-medium mb-2" style={{ color: "var(--foreground)" }}>{approach.example.trigger}</p>
+              <ol className="text-sm space-y-1.5 list-decimal pl-5" style={{ color: "var(--foreground)" }}>
+                {approach.example.steps.map((s) => <li key={s}>{s}</li>)}
+              </ol>
+            </div>
           </section>
 
           <section className="rounded-xl border p-5" style={card}>

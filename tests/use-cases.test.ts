@@ -9,6 +9,7 @@ import { assessmentHistory } from "@/lib/use-cases/history";
 import { questionnaire } from "@/lib/use-cases/questionnaire";
 import { resultConfidence } from "@/lib/use-cases/results";
 import { growthSnapshot } from "@/lib/use-cases/snapshot";
+import { howWeWork } from "@/lib/use-cases/how-we-work";
 import { journeyStage, nextAction, stepStates } from "@/lib/use-cases/steps";
 import { baselineReadiness } from "@/lib/use-cases/readiness";
 
@@ -285,5 +286,28 @@ describe("Data step", () => {
     expect(baselineReadiness(leak, { monthly_revenue: "available", revenue_by_customer: "partial", churned_revenue: "not_applicable" })).toMatchObject({ done: 3, ready: true });
     // Everything "not applicable" isn't something we can build from.
     expect(baselineReadiness(leak, { monthly_revenue: "not_applicable", revenue_by_customer: "not_applicable", churned_revenue: "not_applicable" }).ready).toBe(false);
+  });
+});
+
+describe("how we work with companies like yours", () => {
+  const profile = { "company.industry": "Fintech", "company.stage": "Seed", "customers.segment": "Mid-market", "gtm.model": "Founder-led" };
+  it("describes the founder's kind of company and what we'd do after the assessment, without claiming past results", () => {
+    for (const u of USE_CASES) {
+      const h = howWeWork({ useCase: u.id, profile, revenueBand: "1m_3m" });
+      expect(h.audience).toBe("Seed fintech companies selling to mid-market companies, with founder-led sales, at $1–3M ARR");
+      expect(h.approach.length).toBeGreaterThanOrEqual(3);
+      expect(h.example.trigger).toMatch(/^If the assessment/);
+      expect(h.example.steps.length).toBeGreaterThanOrEqual(3);
+      const text = [...h.approach, h.example.trigger, ...h.example.steps].join(" ");
+      expect(text, u.id).not.toMatch(/\d+\s?%|\$\d|customers like|helped|we've helped|case study/i);
+    }
+  });
+
+  it("tailors the example to the founder's answers", () => {
+    expect(howWeWork({ useCase: "growth_leak", profile: { "customers.nrr": 92 }, revenueBand: null }).example.trigger).toMatch(/existing customers/);
+    expect(howWeWork({ useCase: "growth_leak", profile: { "customers.nrr": 110 }, revenueBand: null }).example.trigger).toMatch(/new business/);
+    expect(howWeWork({ useCase: "series_a_ready", profile: { "gtm.model": "Founder-led" }, revenueBand: null }).example.trigger).toMatch(/founder-led sales/);
+    expect(howWeWork({ useCase: "hire_or_fix", profile: { "gtm.sales_reps": 0 }, revenueBand: null }).example.trigger).toMatch(/first sales hire/);
+    expect(howWeWork({ useCase: "growth_leak", profile: {}, revenueBand: null }).audience).toBe("Early-stage B2B software companies");
   });
 });

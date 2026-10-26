@@ -135,6 +135,10 @@ test("founder: free snapshot, $499 assessment, results, optional advisory", asyn
   await expect(founder.page.getByText("Hypotheses", { exact: true })).toBeVisible();
   await expect(founder.page.getByText("Your existing customers shrink on net")).toBeVisible();
   await expect(founder.page.getByText("Based on: Your answer: NRR 94%")).toBeVisible();
+  // How we work with companies like this one, and what we'd do after the assessment.
+  await expect(founder.page.getByRole("heading", { name: "How we work with companies like yours" })).toBeVisible();
+  await expect(founder.page.getByText(/^Series A .*companies.*with founder-led sales/)).toBeVisible();
+  await expect(founder.page.getByText("If the assessment confirms that existing customers are where growth is leaking, we'd:")).toBeVisible();
   // Nothing has been charged or unlocked so far.
   {
     const db = new Client({ connectionString: E2E_DATABASE_URL });
