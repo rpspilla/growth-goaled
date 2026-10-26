@@ -1,4 +1,4 @@
-import { isUseCaseId, type UseCaseId } from "@/lib/use-cases/types";
+import { isUseCaseId, USE_CASE_IDS, type UseCaseId } from "@/lib/use-cases/types";
 
 /**
  * Offerings and prices (integer cents), configurable by environment so the
@@ -32,12 +32,11 @@ export function advisoryBookingUrl(): string | null {
 }
 
 /**
- * Use cases whose full assessment can be bought today. Only those with a working analysis
- * pipeline should be listed; the others offer the free Snapshot and show "coming soon".
- * SELLABLE_USE_CASES is a comma-separated list of ids (default: growth_leak).
+ * Use cases whose full assessment can be bought (all six by default). SELLABLE_USE_CASES,
+ * a comma-separated list of ids, narrows it; the rest offer the free Snapshot and "coming soon".
  */
 export function sellableUseCases(): UseCaseId[] {
-  const raw = process.env.SELLABLE_USE_CASES ?? "growth_leak";
+  const raw = process.env.SELLABLE_USE_CASES?.trim() || USE_CASE_IDS.join(",");
   return raw.split(",").map((s) => s.trim()).filter(isUseCaseId);
 }
 

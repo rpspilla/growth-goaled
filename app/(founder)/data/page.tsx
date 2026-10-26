@@ -1,16 +1,13 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
-import { BuildingRefresh } from "@/components/deliverables/BuildingRefresh";
-import { PreliminaryTrigger } from "@/components/deliverables/PreliminaryTrigger";
 import { BaselineMeter } from "@/components/readiness/BaselineMeter";
 import { InboxDropzone } from "@/components/readiness/InboxDropzone";
 import { ItemCard } from "@/components/readiness/ItemCard";
 import { ReadinessTabs } from "@/components/readiness/ReadinessTabs";
 import { SortReview } from "@/components/readiness/SortReview";
-import { isStalled } from "@/lib/data/deliverables";
 import { listDocuments } from "@/lib/data/documents";
 import { founderContext } from "@/lib/data/founder-context";
-import { latestPreliminary } from "@/lib/data/preliminary";
+import { founderAssessment } from "@/lib/data/assessments";
 import { listRegisterItems } from "@/lib/data/registers";
 import { getCategory, getItem, sourcesFor } from "@/lib/readiness";
 import { baselineReadiness } from "@/lib/use-cases/readiness";
@@ -31,15 +28,13 @@ export default async function DataPage() {
   }
   const { company, readiness, blobPrefix } = data;
   const useCase = active.def;
-  const [documents, questions, prelim] = await Promise.all([
+  const [documents, questions, assessment] = await Promise.all([
     listDocuments(company),
     listRegisterItems([company.id], { owner: "founder", status: "open" }),
-    useCase.id === "growth_leak" ? latestPreliminary(company.id) : null,
+    founderAssessment(company.id, useCase.id),
   ]);
   const rows = new Map(readiness.items.map((i) => [i.itemKey, i]));
   const meter = baselineReadiness(useCase, Object.fromEntries(readiness.items.map((i) => [i.itemKey, i.status])));
-  const filesWorking = documents.some((d) => d.status === "uploaded" || d.status === "analyzing" || (d.inbox && (d.sortStatus === "sorting" || d.sortStatus === null)));
-  const prelimState = !prelim ? null : prelim.status === "drafting" || prelim.status === "qa" ? (isStalled(prelim) ? null : "building") : prelim.codeChecksPassed && (prelim.status === "in_review" || prelim.status === "approved") ? "ready" : null;
   const inbox = documents.filter((d) => d.inbox || d.suggestions.some((x) => x.status === "suggested"));
 
   const groups = [
@@ -53,27 +48,11 @@ export default async function DataPage() {
       <PageHeader eyebrow="Step 3 · Data" title={`Data for ${useCase.shortTitle}`} subtitle={`Only what we need to answer “${useCase.question}”`} />
       <ReadinessTabs questions={questions.length} />
 
-      {useCase.id === "growth_leak" && (
-        <>
-          <PreliminaryTrigger filesWorking={filesWorking} />
-          <BuildingRefresh active={prelimState === "building"} />
-          {prelimState && (
-            <Link href="/baseline" className="flex items-center gap-3 rounded-xl border p-4 mb-6" style={{ background: "var(--card)", borderColor: "var(--green)" }}>
-              <span className="flex-1 text-sm" style={{ color: "var(--foreground)" }}>
-                {prelimState === "building" ? "Building a preliminary baseline from what you've shared…" : "A preliminary baseline is ready from what you've shared so far."}
-              </span>
-              <span className="text-sm font-semibold" style={{ color: "var(--green)" }}>{prelimState === "building" ? "Track progress →" : "View it →"}</span>
-            </Link>
-          )}
-        </>
-      )}
-
       <BaselineMeter
         done={meter.done}
         total={meter.total}
         ready={meter.ready}
-        canRequest={useCase.id === "growth_leak"}
-        inProgress={active.status === "baseline_in_review"}
+        assessment={assessment.state}
       />
 
       <InboxDropzone blobPrefix={blobPrefix} />

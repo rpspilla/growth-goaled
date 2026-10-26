@@ -107,7 +107,7 @@ test("founder: free snapshot, $499 assessment, results, optional advisory", asyn
   const leakCard = founder.page.locator("article", { has: founder.page.getByRole("heading", { name: "Where is our growth leaking?" }) });
   await expect(leakCard).toContainText("Recommended");
   await expect(leakCard).toContainText("Free Snapshot · Assessment $499");
-  await expect(founder.page.locator("article", { hasText: "Are we ready to raise a Series A?" })).toContainText("Assessment coming soon");
+  await expect(founder.page.locator("article", { hasText: "Are we ready to raise a Series A?" })).toContainText("Free Snapshot · Assessment $499");
   await leakCard.getByRole("link", { name: /Explore assessment/ }).click();
   await expect(founder.page).toHaveURL(/\/library\/growth_leak$/);
   await expect(founder.page.getByLabel("Pricing")).toContainText("$499");
@@ -192,9 +192,19 @@ test("founder: free snapshot, $499 assessment, results, optional advisory", asyn
   await build.click();
   await expect(founder.page).toHaveURL(/\/baseline/);
 
-  // Nothing is visible to the founder before publishing.
-  await founder.page.goto("/baseline");
-  await expect(founder.page.getByText("An analyst is preparing your reviewed results.")).toBeVisible();
+  // --- Founder: self-service results, built from their answers and data ---
+  await expect(founder.page.getByRole("heading", { name: /1 · Executive summary/ })).toBeVisible({ timeout: 90_000 });
+  await expect(founder.page.getByRole("heading", { name: "Where is our growth leaking?" })).toBeVisible();
+  for (const section of ["Executive summary", "Main findings", "Evidence and supporting metrics", "Diagnosis and implications", "Recommended decision", "Prioritized actions", "Confidence, assumptions and data limitations", "Suggested next steps"]) {
+    await expect(founder.page.getByRole("heading", { name: new RegExp(section) })).toBeVisible();
+  }
+  await expect(founder.page.getByText(/Every figure and statement was checked against your inputs/)).toBeVisible();
+  await expect(founder.page.getByText("Test mode assessment: Where is our growth leaking?")).toBeVisible();
+  await expect(founder.page.getByText(/^Peer reference: E2E Series A founder-led.*approved, cited sources only\./)).toBeVisible();
+  await expect(founder.page.getByText(/Should we hire more salespeople/)).toBeVisible();
+  await founder.page.getByRole("button", { name: "Evidence →" }).first().click();
+  await expect(founder.page.getByRole("dialog", { name: "Sources" })).toContainText("Checked in code against your inputs.");
+  await founder.page.getByRole("button", { name: "Close" }).click();
 
   // --- Advisor: claim; the company shows the founder's five steps ---
   await admin.page.goto("/advisor/unassigned");
@@ -204,6 +214,13 @@ test("founder: free snapshot, $499 assessment, results, optional advisory", asyn
   const mirrored = admin.page.getByRole("navigation", { name: "Steps" });
   for (const label of ["Overview", "Use Case Library", "Data", "Results", "Progress & Tracking"]) await expect(mirrored.getByRole("link", { name: label })).toBeVisible();
   await expect(admin.page.getByText(/Purchased .* · paid/)).toBeVisible();
+  // The advisor can see the same results with the QA checks, and mark them reviewed.
+  await mirrored.getByRole("link", { name: "Results" }).click();
+  await expect(admin.page.getByText("Visible to the founder")).toBeVisible();
+  await expect(admin.page.getByText(/✓ Data consistency/)).toBeVisible();
+  await admin.page.getByLabel("Note for the founder").fill("Checked against your profile.");
+  await admin.page.getByRole("button", { name: "Mark reviewed" }).click();
+  await expect(admin.page.getByText("Reviewed", { exact: true })).toBeVisible();
   await mirrored.getByRole("link", { name: "Use Case Library" }).click();
   await expect(admin.page.getByText("Find out why growth slowed after Q2.")).toBeVisible();
   await expect(admin.page.getByText("Deals stall after the demo.")).toBeVisible();
@@ -212,34 +229,17 @@ test("founder: free snapshot, $499 assessment, results, optional advisory", asyn
   await admin.page.locator("section", { hasText: "Winning ICP" }).getByRole("button", { name: "Grant without payment" }).click();
   await expect(admin.page.getByText(/Granted without payment by E2E Admin .* · E2E pilot/)).toBeVisible();
 
-  // --- Advisor: review, approve, publish ---
-  await admin.page.goto("/advisor/review");
-  await admin.page.getByRole("link", { name: /E2E Analytics/ }).first().click();
-  await expect(admin.page.getByText("Review now")).toBeVisible();
-  await expect(admin.page.getByText("Data consistency")).toBeVisible();
-  await admin.page.getByRole("button", { name: "Approve", exact: true }).click();
-  await admin.page.getByPlaceholder(/Note for the founder/).fill("Checked against your profile.");
-  await admin.page.getByRole("button", { name: "Confirm approval" }).click();
-  await admin.page.getByRole("button", { name: "Publish to founder" }).click();
-  await expect(admin.page.getByText("Published. The founder can see this version.")).toBeVisible();
-
-  // --- Founder: sees the reviewed results ---
-  // The use case switcher follows the advisor's pilot activation; steps 3–5 follow it.
+  // --- Founder: the switcher follows the granted assessment; results now show as reviewed ---
   await founder.page.goto("/data");
   const switcher = founder.page.getByRole("combobox", { name: "Active use case" });
   await switcher.selectOption("winning_icp");
   await expect(founder.page.getByRole("heading", { name: "Data for Winning ICP" })).toBeVisible();
   await switcher.selectOption("growth_leak");
   await expect(founder.page.getByRole("heading", { name: "Data for Growth Leak" })).toBeVisible();
+  await expect(founder.page.getByRole("link", { name: "View your results →" })).toBeVisible();
   await founder.page.goto("/baseline");
-  await expect(founder.page.getByRole("heading", { name: "Where is our growth leaking?" })).toBeVisible();
-  for (const section of ["Executive summary", "Main findings", "Evidence and supporting metrics", "Diagnosis and implications", "Recommended decision", "Prioritized actions", "Confidence, assumptions and data limitations", "Suggested next steps"]) {
-    await expect(founder.page.getByRole("heading", { name: new RegExp(section) })).toBeVisible();
-  }
-  await expect(founder.page.getByText("is the main gap to the top quartile.").first()).toBeVisible();
+  await expect(founder.page.getByText(/Reviewed by E2E Admin/)).toBeVisible();
   await expect(founder.page.getByText(/Checked against your profile\./)).toBeVisible();
-  await expect(founder.page.getByText("ARR Growth").first()).toBeVisible();
-  await expect(founder.page.getByText(/Should we hire more salespeople/)).toBeVisible();
 
   // --- Optional advisory: shown once, never gating the results ---
   await expect(founder.page.getByRole("link", { name: "Explore advisory support →" })).toHaveCount(1);
@@ -262,10 +262,6 @@ test("founder: free snapshot, $499 assessment, results, optional advisory", asyn
   await admin.page.goto("/advisor/portfolio");
   await admin.page.getByRole("link", { name: /E2E Analytics/ }).first().click();
   await expect(admin.page.getByText("Which fix to start with.")).toBeVisible();
-
-  // --- Advisor portfolio reflects it ---
-  await admin.page.goto("/advisor/portfolio");
-  await expect(admin.page.getByRole("link", { name: /E2E Analytics/ })).toContainText("Published");
 
   // --- Analytics picks up the events ---
   await admin.page.goto("/advisor/analytics");

@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
-import { getPublishedBenchmark } from "@/lib/data/benchmark";
+import { assessmentCompletions } from "@/lib/data/assessments";
 import { founderContext } from "@/lib/data/founder-context";
 import { listPayments } from "@/lib/data/payments";
-import { founderBenchmark } from "@/lib/data/preliminary";
 import { getUseCase, isUseCaseId } from "@/lib/use-cases";
 import { assessmentHistory } from "@/lib/use-cases/history";
 
@@ -13,19 +12,8 @@ const date = (d: Date | null) => (d ? d.toLocaleDateString("en-US", { month: "sh
 export default async function AssessmentsPage() {
   const { company, useCases } = await founderContext();
   if (!company) return <div className="p-8"><PageHeader title="Your assessments" subtitle="Your company isn't set up yet." /></div>;
-  const leakOwned = useCases.some((u) => u.useCase === "growth_leak" && u.activatedAt);
-  const [payments, published, leak] = await Promise.all([
-    listPayments(company.id),
-    getPublishedBenchmark(company.id),
-    leakOwned ? founderBenchmark(company) : null,
-  ]);
-  const entries = assessmentHistory(
-    useCases,
-    payments,
-    published?.approval ? { growth_leak: new Date(published.approval.at) } : {},
-    leak?.kind === "preliminary" && leak.view ? ["growth_leak"] : [],
-    isUseCaseId,
-  );
+  const [payments, completed] = await Promise.all([listPayments(company.id), assessmentCompletions(company.id)]);
+  const entries = assessmentHistory(useCases, payments, completed, [], isUseCaseId);
 
   return (
     <div className="p-4 sm:p-8 max-w-5xl">

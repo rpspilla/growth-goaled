@@ -50,7 +50,7 @@ Use two browsers (or a private window): one signed in as **admin** (ryan@growthg
 ## Self-service pricing and customer journey
 - [ ] Stripe on staging: test keys in Vercel Preview; webhook `https://dev.growthgoaled.com/api/stripe/webhook` sends `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `checkout.session.expired`
 - [ ] New founder lands on **Overview**: "Pick a question, get a free Snapshot" highlighted; Data and Results greyed with "Unlocks when you buy an assessment"
-- [ ] **Library**: six cards with the question, the problem, "For: …", key outputs and "Explore assessment"; Growth Leak shows "Free Snapshot · Assessment $499", the other five "Assessment coming soon"
+- [ ] **Library**: six cards with the question, the problem, "For: …", key outputs and "Explore assessment"; all six show "Free Snapshot · Assessment $499"
 - [ ] Open a card: who it's for, what you'll receive, **$499** price box, how it works, data we may ask for. No payment prompt anywhere on this page
 - [ ] Questionnaire: only the challenge, stage and sales model are required; profile questions you've already answered are listed ("From your company profile…") instead of asked; answers save on blur and survive a reload
 - [ ] "See my free Snapshot": **Hypotheses** banner, "Is this the right assessment?" (try Series A readiness while at Series A → suggests Series B), signals each with "Based on: your answer…", and the data it would take to confirm. Stripe dashboard shows no charge so far
@@ -59,8 +59,11 @@ Use two browsers (or a private window): one signed in as **admin** (ryan@growthg
 - [ ] Declined card (4000 0000 0000 0002) → Stripe shows the error; nothing unlocks
 - [ ] Click the buy button twice quickly, or come back and click again within a day → the same Stripe checkout opens (one pending payment in Stripe, not two)
 - [ ] After paying, the Snapshot page shows "You have this assessment · continue" instead of a buy button
-- [ ] Data: "Analyze my data" once the three required items are in → Results ("Analyzing your data…", then preliminary results)
-- [ ] **Results**: eight numbered sections (summary, findings, evidence, diagnosis, decision, actions, confidence, next steps); every finding has "Evidence →" opening the Source Trail; Preliminary label until reviewed; peer columns only when approved reference data exists
+- [ ] Buy and run **at least two different use cases** (e.g. Growth Leak and Hire or Fix): Data shows that use case's items; "Analyze my data" unlocks once the required ones are in → Results ("Analyzing your data…", then results in a few minutes)
+- [ ] **Results**: eight numbered sections (summary, findings, evidence, diagnosis, decision, actions with horizon and KPI, confidence with assumptions and data gaps, next steps); each statement's "Evidence →" opens the Source Trail, including "Your answer" entries; numbers match what you entered or uploaded
+- [ ] With **no matching peer reference data**, results still appear and say plainly that no peer reference is available; with a matching approved cohort, peer median / top quartile columns appear
+- [ ] Add or confirm a figure, then "Re-run with my latest data" → a new version replaces the old one when ready (the old one stays visible meanwhile)
+- [ ] Admin: company → Results step shows the same results, the QA checks, and "Mark reviewed" (with a note) → founder sees "Reviewed by …" and the note
 - [ ] One advisory card at the end ("From $750", "Explore advisory support"); results stay fully visible whether or not you use it
 - [ ] Advisory page: request a session → "We'll email you…"; a second request the same week says you've already asked; admin sees it on the company's Overview
 - [ ] With `ADVISORY_BOOKING_URL` set in Vercel, the advisory page shows "Choose a time" and opens that page

@@ -2,9 +2,8 @@
 
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { db, schema } from "@/lib/db";
+import { schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth/session";
 import { getFounderCompany } from "@/lib/data/companies";
 import {
@@ -22,9 +21,9 @@ import {
   sortDocument,
 } from "@/lib/data/documents";
 import { getReadiness, updateDataItem, type ItemPatch, type UpdateResult } from "@/lib/data/readiness";
-import { createBenchmarkVersion, runBenchmarkPipeline } from "@/lib/data/deliverables";
+import { createAssessmentVersion, runAssessmentPipeline } from "@/lib/data/assessments";
 import { founderContext } from "@/lib/data/founder-context";
-import { setUseCaseStatus } from "@/lib/data/use-cases";
+import { track } from "@/lib/events";
 import { baselineReadiness } from "@/lib/use-cases/readiness";
 
 /** Every action works on the signed-in founder's own company; the client never supplies a company id. */
@@ -141,22 +140,20 @@ export async function reviewPoint(dataPointId: string, decision: "accepted" | "r
 }
 
 /**
- * "Build my baseline": once the active use case's required items are in, starts the
- * draft → QA → advisor review pipeline. Growth Leak uses the benchmark pipeline until U3.
+ * "Analyze my data": once the active assessment's required items are in, runs the assessment
+ * engine (draft → QA → code checks) in the background. Also used to re-run with new data.
  */
-export async function requestBaseline(): Promise<{ ok: true } | { ok: false; error: string }> {
-  const { company } = await founderCompany();
+export async function requestAssessment(): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { user, company } = await founderCompany();
   const { active } = await founderContext();
   if (!active) return { ok: false, error: "Buy an assessment first." };
   const { items } = await getReadiness(company);
   const meter = baselineReadiness(active.def, Object.fromEntries(items.map((i) => [i.itemKey, i.status])));
   if (!meter.ready) return { ok: false, error: "Add the required items first." };
-  if (active.def.id !== "growth_leak") return { ok: false, error: "An analyst will prepare these results from your data." };
-  const version = await createBenchmarkVersion(company);
+  const version = await createAssessmentVersion(company, active.def.id);
   if (!version) return { ok: false, error: "Your data is already being analyzed." };
-  if (company.phase === "intake" || company.phase === "upload") await db.update(schema.companies).set({ phase: "benchmark" }).where(eq(schema.companies.id, company.id));
-  await setUseCaseStatus(company.id, active.def.id, "baseline_in_review");
-  after(() => runBenchmarkPipeline(version.id));
+  await track("analysis_requested", { userId: user.id, companyId: company.id, props: { use_case: active.def.id, version: version.version } });
+  after(() => runAssessmentPipeline(version.id));
   revalidatePath("/", "layout");
   return { ok: true };
 }

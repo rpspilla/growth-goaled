@@ -1,62 +1,78 @@
-import Link from "next/link";
-import { GenerateButton } from "@/components/deliverables/GenerateButton";
-import { STATUS_LABEL } from "@/components/deliverables/status";
-import { benchmarkViewFor, getPublishedBenchmark } from "@/lib/data/benchmark";
-import { getDeliverable, listQueue } from "@/lib/data/deliverables";
+import { QA_CHECKS } from "@/lib/ai/qa";
+import { ApproveAssessment } from "@/components/use-cases/ApproveAssessment";
+import { AssessmentResults } from "@/components/views/AssessmentResults";
+import { db, schema } from "@/lib/db";
+import { assessmentView, latestAssessment } from "@/lib/data/assessments";
+import { isStalled } from "@/lib/data/deliverables";
+import { and, desc, eq, isNotNull } from "drizzle-orm";
 import { targetSummary } from "@/lib/use-cases";
-import { generateBenchmark } from "../../../review/actions";
+import { approveAssessmentAction } from "../actions";
 import { companyContext } from "../context";
 
-export const maxDuration = 300;
-
 const card = { background: "var(--card)", borderColor: "var(--border)" };
+const STATE: Record<string, string> = {
+  drafting: "Drafting",
+  qa: "Checking",
+  in_review: "Visible to the founder",
+  published: "Reviewed",
+  failed: "Failed",
+};
 
-/** Step 4 mirrored. Until U3 the baseline is Growth Leak's benchmark, reviewed in the existing queue. */
-export default async function CompanyBaselinePage({ params }: { params: Promise<{ id: string }> }) {
+/** Step 4 mirrored: the founder's assessment for the active use case, its QA results, and "mark reviewed". */
+export default async function CompanyResultsPage({ params }: { params: Promise<{ id: string }> }) {
   const { company, active } = await companyContext((await params).id);
-  const [versions, published] = await Promise.all([listQueue([company.id]), getPublishedBenchmark(company.id)]);
-  const latest = versions[0];
-  const draftView = !published && latest && latest.status !== "failed" && latest.status !== "stalled" ? await getDeliverable(latest.id).then((d) => (d?.content ? benchmarkViewFor(d) : null)) : null;
-  const bench = published ?? draftView;
+  const d = active ? await latestAssessment(company.id, active.def.id) : null;
+  const [view, qa] = d
+    ? await Promise.all([
+        assessmentView(d),
+        db
+          .select({ qa: schema.reviews.qaResults })
+          .from(schema.reviews)
+          .where(and(eq(schema.reviews.deliverableId, d.id), isNotNull(schema.reviews.qaResults)))
+          .orderBy(desc(schema.reviews.createdAt))
+          .limit(1)
+          .then((r) => r[0]?.qa ?? null),
+      ])
+    : [null, null];
+  const status = d ? (isStalled(d) ? "failed" : d.status) : null;
   const target = targetSummary(active?.objective);
 
   return (
-    <div className="p-8 max-w-5xl space-y-6">
-      <div className="flex items-start justify-between gap-4">
+    <div className="space-y-2">
+      <div className="px-8 pt-8 max-w-5xl space-y-4">
         <div>
-          <div className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: "var(--muted-foreground)" }}>Step 4 · Baseline{active ? ` · ${active.def.shortTitle}` : ""}</div>
-          <h1 className="font-display text-3xl font-normal" style={{ color: "var(--foreground)" }}>{company.name}: baseline</h1>
+          <div className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: "var(--muted-foreground)" }}>Step 4 · Results{active ? ` · ${active.def.shortTitle}` : ""}</div>
+          <h1 className="font-display text-3xl font-normal" style={{ color: "var(--foreground)" }}>{company.name}: results</h1>
           {target && <p className="text-sm mt-1" style={{ color: "var(--muted-foreground)" }}>Founder&apos;s target: {target}</p>}
         </div>
-        <div className="flex flex-col items-end gap-2">
-          {latest && (
-            <Link href={`/advisor/review/${latest.id}`} className="px-5 py-2.5 rounded-lg text-sm font-semibold" style={{ background: "var(--green)", color: "#fff" }}>
-              Benchmark v{latest.version}: {STATUS_LABEL[latest.status]?.label ?? latest.status} →
-            </Link>
-          )}
-          {(!latest || ["failed", "stalled", "published", "changes_requested"].includes(latest.status)) && (
-            <GenerateButton companyId={company.id} label={latest ? "Generate new benchmark" : "Generate benchmark"} generate={generateBenchmark} />
-          )}
-        </div>
-      </div>
-      <div className="rounded-xl border p-5" style={card}>
-        <div className="text-xs font-semibold mb-2" style={{ color: "var(--muted-foreground)" }}>
-          Benchmark position{bench && !published && <span style={{ color: "var(--amber)" }}> · draft</span>}
-        </div>
-        {!bench && <div className="text-sm" style={{ color: "var(--muted-foreground)" }}>No benchmark yet.</div>}
-        {bench?.rows.map((r) => (
-          <div key={r.metric} className="flex justify-between text-sm py-0.5">
-            <span style={{ color: "var(--muted-foreground)" }}>{r.label}</span>
-            <span className="font-mono" style={{ color: r.status === "ahead" ? "var(--green)" : "var(--amber)" }}>
-              {r.value} vs {r.topQuartile}
-            </span>
+        {!active && <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>No purchased assessment yet.</p>}
+        {active && !d && <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>The founder hasn&apos;t run this assessment yet.</p>}
+        {d && (
+          <div className="rounded-xl border p-5 space-y-3" style={card}>
+            <div className="flex items-center gap-3 flex-wrap text-sm">
+              <span className="font-semibold" style={{ color: "var(--foreground)" }}>Version {d.version}</span>
+              <span style={{ color: status === "failed" || d.codeChecksPassed === false ? "var(--red)" : "var(--green)" }}>
+                {d.codeChecksPassed === false ? "Failed the code checks (hidden from the founder)" : STATE[status ?? ""] ?? status}
+              </span>
+            </div>
+            {qa && (
+              <ul className="grid sm:grid-cols-2 gap-2 text-xs">
+                {QA_CHECKS.map((c) => {
+                  const r = qa[c.key];
+                  return (
+                    <li key={c.key} style={{ color: "var(--muted-foreground)" }}>
+                      <span className="font-semibold" style={{ color: r?.result === "pass" ? "var(--green)" : "var(--red)" }}>{r?.result === "pass" ? "✓" : "✗"} {c.key === "benchmark_methodology" ? "Method" : c.label}</span>
+                      {r?.note && ` · ${r.note}`}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {d.status === "in_review" && d.codeChecksPassed && <ApproveAssessment companyId={company.id} deliverableId={d.id} approve={approveAssessmentAction} />}
           </div>
-        ))}
+        )}
       </div>
-      <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-        Use case baselines (KPIs, gap to target and plan) are built through the same draft, QA and review pipeline. Drafts appear in the{" "}
-        <Link href="/advisor/review" style={{ color: "var(--green)" }}>Review Queue</Link>.
-      </p>
+      {view && active && <AssessmentResults title={active.def.question} data={view} nextUseCase={null} advisory={null} />}
     </div>
   );
 }

@@ -189,7 +189,7 @@ export async function benchmarkViewFor(deliverable: typeof schema.deliverables.$
           .join(" · "),
       };
     }
-    return { kind: s.kind, title: s.note ?? "Document", detail: null };
+    return { kind: "document", title: s.note ?? "Document", detail: null };
   };
 
   const claimMap: Record<string, ClaimView> = {};

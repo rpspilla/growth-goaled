@@ -12,8 +12,6 @@ import { getManagedCompany } from "@/lib/data/companies";
 import { deliverableReviews, deliverableRuns, getDeliverable, isStalled, listQueue } from "@/lib/data/deliverables";
 import { benchmarkContentSchema } from "@/lib/deliverables/benchmark";
 import { approve, generateBenchmark, publish, saveEdits, sendBack } from "../actions";
-import { founderCanSeePreliminary } from "@/lib/data/preliminary";
-import { isUseCaseActive } from "@/lib/data/use-cases";
 
 export const maxDuration = 300;
 
@@ -25,7 +23,6 @@ export default async function ReviewPage({ params }: { params: Promise<{ deliver
   if (!/^[0-9a-f-]{36}$/.test(deliverableId)) notFound();
   const d = await getDeliverable(deliverableId);
   const company = d ? await getManagedCompany(user, d.companyId) : null;
-  const growthLeakActive = company ? await isUseCaseActive(company.id, "growth_leak") : false;
   if (!d || !company) notFound();
 
   const [runs, reviews, view, versions] = await Promise.all([deliverableRuns(d.id), deliverableReviews(d.id), d.content ? benchmarkViewFor(d) : null, listQueue([company.id])]);
@@ -56,19 +53,9 @@ export default async function ReviewPage({ params }: { params: Promise<{ deliver
       <Link href="/advisor/review" className="text-xs" style={{ color: "var(--muted-foreground)" }}>← Review Queue</Link>
       <PageHeader title={`${company.name} — Benchmark`} subtitle={<>Version {d.version} · <span style={{ color: s.color, fontWeight: 600 }}>{s.label}</span></>} />
 
-      {d.preliminary && (
-        <div className="rounded-xl border p-4 mb-6 text-sm" style={{ ...card, borderColor: "var(--amber)", color: "var(--foreground)" }}>
-          <span className="font-semibold">Preliminary report</span>, built automatically after the founder&apos;s uploads.{" "}
-          {founderCanSeePreliminary(d)
-            ? growthLeakActive
-              ? "Growth Leak is active for this company, so the founder can see this version now, labelled as not yet advisor-reviewed."
-              : "The founder can see it once Growth Leak is activated, labelled as not yet advisor-reviewed."
-            : d.codeChecksPassed === false
-              ? "It failed the code checks, so the founder can't see it."
-              : "The founder can't see it in this state."}{" "}
-          Publishing an approved version replaces it for the founder.
-        </div>
-      )}
+      <div className="rounded-xl border p-4 mb-6 text-sm" style={{ ...card, color: "var(--muted-foreground)" }}>
+        Founders now see their use case assessment results (built by the assessment engine), not this Benchmark. Benchmark versions are kept for reference data review{d.preliminary ? "; this one was built automatically after uploads" : ""}.
+      </div>
 
       <div className="grid lg:grid-cols-3 gap-6 mb-8">
         <div className="lg:col-span-2 rounded-xl border p-6 space-y-5" style={card}>

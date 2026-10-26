@@ -20,7 +20,8 @@ export type EventName =
   | "use_case_activated"
   | "snapshot_viewed"
   | "advisory_requested"
-  | "advisory_link_opened";
+  | "advisory_link_opened"
+  | "analysis_requested";
 
 /** Records a product analytics event. Never throws: analytics must not break the action it measures. */
 export async function track(name: EventName, p: { userId?: string; companyId?: string; props?: Record<string, unknown> } = {}) {

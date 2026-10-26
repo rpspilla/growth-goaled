@@ -246,11 +246,11 @@ describe("assessment purchase", () => {
     expect((await db().select().from(schema.payments).where(eq(schema.payments.stripeSessionId, "cs_test_1")))[0]!.status).toBe("paid");
   });
 
-  it("only sells assessments that are available", async () => {
-    await expect(createAssessmentCheckout(founder, acme, "series_a_ready", "https://dev.test", fakeStripe({}) as never)).rejects.toThrow("isn't available to buy yet");
-    process.env.SELLABLE_USE_CASES = "growth_leak,series_a_ready";
+  it("sells all six assessments by default, and only those listed when SELLABLE_USE_CASES narrows it", async () => {
+    expect(await createAssessmentCheckout(founder, acme, "series_a_ready", "https://dev.test", fakeStripe({}) as never)).toContain("checkout.stripe.com");
+    process.env.SELLABLE_USE_CASES = "growth_leak";
     try {
-      expect(await createAssessmentCheckout(founder, acme, "series_a_ready", "https://dev.test", fakeStripe({}) as never)).toContain("checkout.stripe.com");
+      await expect(createAssessmentCheckout(founder, acme, "winning_icp", "https://dev.test", fakeStripe({}) as never)).rejects.toThrow("isn't available to buy yet");
     } finally {
       delete process.env.SELLABLE_USE_CASES;
     }

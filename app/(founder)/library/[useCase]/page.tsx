@@ -80,7 +80,9 @@ export default async function UseCasePage({ params }: { params: Promise<{ useCas
               <span className="font-mono text-lg font-semibold" style={{ color: "var(--foreground)" }}>{sellable ? price : "Coming soon"}</span>
             </div>
             <p className="text-xs mb-3" style={{ color: "var(--muted-foreground)" }}>
-              {sellable ? "One-time payment for this question. No subscription, no meeting required." : "The free Snapshot is available now; the full assessment for this question is launching soon."}
+              {sellable
+                ? "One-time payment for this question. Self-service: built from your answers and data, no meeting required."
+                : "The free Snapshot is available now; the full assessment for this question is launching soon."}
             </p>
             <div className="text-xs font-medium" style={{ color: "var(--green)" }}>Growth Snapshot: free</div>
           </div>

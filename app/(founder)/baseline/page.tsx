@@ -1,26 +1,74 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
+import { BuildingRefresh } from "@/components/deliverables/BuildingRefresh";
+import { AnalyzingDots } from "@/components/readiness/DocumentCard";
+import { AdvisoryOffer } from "@/components/use-cases/AdvisoryOffer";
+import { RunAssessmentButton } from "@/components/use-cases/RunAssessmentButton";
+import { AssessmentResults } from "@/components/views/AssessmentResults";
+import { founderAssessment } from "@/lib/data/assessments";
 import { founderContext } from "@/lib/data/founder-context";
-import { targetSummary } from "@/lib/use-cases";
-import { GrowthLeakResults } from "./GrowthLeakResults";
+import { track } from "@/lib/events";
+import { formatPrice, pricing } from "@/lib/pricing";
+import { getUseCase, targetSummary } from "@/lib/use-cases";
+import { sourceTrailOpened } from "./actions";
 
-// Analysis is drafted after the action responds (next/server after()), within this budget.
+// The assessment is drafted after the action responds (next/server after()), within this budget.
 export const maxDuration = 300;
 
-/** Step 4: results for the active (purchased) assessment. */
+const card = { background: "var(--card)", borderColor: "var(--border)" };
+
+/** Step 4: results for the active (purchased) assessment, the same for every use case. */
 export default async function ResultsPage() {
   const { user, company, active } = await founderContext();
   if (!active || !company) redirect("/library");
-  if (active.def.id === "growth_leak") return <GrowthLeakResults user={user} company={company} useCase={active.def} />;
+  const def = active.def;
+  const state = await founderAssessment(company.id, def.id);
+
+  if (state.state === "ready") {
+    const next = def.nextUseCase ? getUseCase(def.nextUseCase) : undefined;
+    await track("deliverable_viewed", { userId: user.id, companyId: company.id, props: { type: "assessment", use_case: def.id, version: state.view.version } });
+    return (
+      <AssessmentResults
+        title={def.question}
+        data={state.view}
+        nextUseCase={next ? { href: `/library/${next.id}`, question: next.question } : null}
+        advisory={<AdvisoryOffer price={formatPrice(pricing().advisoryFromCents)} useCase={def.id} />}
+        actions={
+          <div className="mt-3">
+            <RunAssessmentButton label="Re-run with my latest data" />
+          </div>
+        }
+        onSourceTrail={sourceTrailOpened}
+      />
+    );
+  }
 
   const target = targetSummary(active.objective);
   return (
-    <div className="p-4 sm:p-8 max-w-4xl">
-      <PageHeader eyebrow="Assessment results" title={active.def.question} subtitle="Your results appear here once they're ready." />
-      <div className="rounded-xl border p-6 text-sm space-y-2" style={{ background: "var(--card)", borderColor: "var(--border)", color: "var(--foreground)" }}>
-        <p>An analyst prepares this assessment from the data you share. You&apos;ll see the results here with the evidence behind each finding.</p>
-        {target && <p style={{ color: "var(--muted-foreground)" }}>Your target: {target}</p>}
-      </div>
+    <div className="p-4 sm:p-8 max-w-4xl space-y-6">
+      <BuildingRefresh active={state.state === "building"} />
+      <PageHeader eyebrow="Assessment results" title={def.question} subtitle="Your results appear here as soon as they're ready." />
+      {state.state === "building" && (
+        <div className="rounded-xl border p-6" style={card}>
+          <div className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>Analyzing your data</div>
+          <AnalyzingDots label="Working through your answers and figures, then checking every number..." />
+          <p className="text-xs mt-2" style={{ color: "var(--muted-foreground)" }}>Usually a few minutes. This page updates on its own.</p>
+        </div>
+      )}
+      {state.state === "failed" && (
+        <div className="rounded-xl border p-6 text-sm space-y-3" style={{ ...card, borderColor: "var(--amber)" }}>
+          <p style={{ color: "var(--foreground)" }}>{state.reason}</p>
+          <RunAssessmentButton label="Try again" primary />
+        </div>
+      )}
+      {state.state === "not_started" && (
+        <div className="rounded-xl border p-6 text-sm space-y-3" style={card}>
+          <p style={{ color: "var(--foreground)" }}>Share the data this assessment needs, then press &ldquo;Analyze my data&rdquo;. Your results are built from your answers and data in a few minutes.</p>
+          <Link href="/data" className="inline-block px-4 py-2 rounded-lg text-sm font-semibold" style={{ background: "var(--green)", color: "#fff" }}>Go to Data →</Link>
+        </div>
+      )}
+      {target && <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Your target: {target}</p>}
     </div>
   );
 }

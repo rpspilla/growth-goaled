@@ -140,7 +140,9 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
             ) : sellable ? (
               <>
                 <PurchaseButton useCaseId={def.id} label={`Get the full assessment · ${price}`} checkout={startAssessmentCheckout} />
-                <p className="text-xs mt-2" style={{ color: "var(--muted-foreground)" }}>One-time payment through Stripe. Your assessment opens once Stripe confirms it.</p>
+                <p className="text-xs mt-2" style={{ color: "var(--muted-foreground)" }}>
+                  One-time payment through Stripe. Your assessment opens once Stripe confirms it.
+                </p>
               </>
             ) : (
               <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>

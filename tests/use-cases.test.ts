@@ -151,7 +151,8 @@ describe("Growth Snapshot", () => {
 });
 
 describe("pricing", () => {
-  it("defaults to $499 assessments, $750 advisory and a reserved, unavailable $299 subscription", () => {
+  it("defaults to $499 assessments for all six use cases, $750 advisory and a reserved, unavailable $299 subscription", () => {
+    expect(sellableUseCases()).toEqual([...USE_CASE_IDS]);
     expect(pricing()).toEqual({ assessmentCents: 49_900, advisoryFromCents: 75_000, subscriptionMonthlyCents: 29_900, subscriptionAvailable: false });
     expect(formatPrice(49_900)).toBe("$499");
     expect(formatPrice(75_000)).toBe("$750");
@@ -169,7 +170,7 @@ describe("pricing", () => {
       process.env.ADVISORY_BOOKING_URL = "https://calendly.com/growthgoaled/session";
       expect(advisoryBookingUrl()).toBe("https://calendly.com/growthgoaled/session");
       delete process.env.SELLABLE_USE_CASES;
-      expect(sellableUseCases()).toEqual(["growth_leak"]);
+      expect(sellableUseCases()).toEqual([...USE_CASE_IDS]);
     } finally {
       process.env = env;
     }
@@ -177,18 +178,18 @@ describe("pricing", () => {
 });
 
 describe("results confidence", () => {
-  it("is high only for reviewed results with no unconfirmed figures or gaps", () => {
-    expect(resultConfidence({ reviewed: true, unconfirmed: 0, gaps: 0, metrics: 4 }).level).toBe("High");
+  it("is high when the result rests on enough confirmed figures with no gaps", () => {
+    expect(resultConfidence({ reviewed: false, unconfirmed: 0, gaps: 0, metrics: 4 }).level).toBe("High");
     expect(resultConfidence({ reviewed: true, unconfirmed: 1, gaps: 0, metrics: 4 }).level).toBe("Medium");
-    expect(resultConfidence({ reviewed: false, unconfirmed: 0, gaps: 0, metrics: 4 }).level).toBe("Medium");
     const low = resultConfidence({ reviewed: false, unconfirmed: 2, gaps: 3, metrics: 2 });
     expect(low.level).toBe("Low");
     expect(low.reasons).toEqual([
-      "Built automatically and checked in code; not yet reviewed by an analyst.",
+      "Every figure was checked in code against your inputs.",
       "2 figures were read from your files and not yet confirmed by you.",
-      "3 inputs are still missing (listed under next steps).",
-      "Based on 2 metrics; more data would broaden it.",
+      "3 data gaps limit how far the conclusions go (listed below).",
+      "Based on 2 figures; more data would broaden it.",
     ]);
+    expect(resultConfidence({ reviewed: true, unconfirmed: 0, gaps: 0, metrics: 5 }).reasons[0]).toMatch(/advisor reviewed it/);
   });
 });
 

@@ -7,6 +7,8 @@ import { getManagedCompany } from "@/lib/data/companies";
 import { saveAdvisorSummary, setHealth } from "@/lib/data/portfolio";
 import { updateDataItem, type UpdateResult } from "@/lib/data/readiness";
 import { activateWithoutPayment } from "@/lib/data/use-cases";
+import { approveAssessment } from "@/lib/data/assessments";
+import { getDeliverable } from "@/lib/data/deliverables";
 import { isUseCaseId } from "@/lib/use-cases";
 
 async function managed(companyId: string) {
@@ -54,6 +56,20 @@ export async function activateForCompany(companyId: string, useCase: string, not
   const reason = z.string().trim().max(500).safeParse(note);
   if (!reason.success || !reason.data) return { ok: false, error: "Add a short note saying why (e.g. pilot, partner deal)." };
   await activateWithoutPayment(ctx.user, ctx.company, useCase, reason.data);
+  refresh(companyId);
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/** Marks the founder's assessment version reviewed; the founder sees "Reviewed by …". */
+export async function approveAssessmentAction(companyId: string, deliverableId: string, comment: string): Promise<{ ok: boolean; error?: string }> {
+  const ctx = await managed(companyId);
+  if (!ctx) return { ok: false, error: "Not found." };
+  const id = z.uuid().safeParse(deliverableId);
+  const d = id.success ? await getDeliverable(id.data) : null;
+  if (!d || d.companyId !== ctx.company.id) return { ok: false, error: "Not found." };
+  const ok = await approveAssessment(ctx.user, d.id, z.string().max(2000).parse(comment));
+  if (!ok) return { ok: false, error: "This version can't be marked reviewed." };
   refresh(companyId);
   revalidatePath("/", "layout");
   return { ok: true };

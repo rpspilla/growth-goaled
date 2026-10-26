@@ -1,28 +1,36 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { requestBaseline } from "@/app/(founder)/data/actions";
+import { requestAssessment } from "@/app/(founder)/data/actions";
 
-/** Baseline readiness: how many of the use case's required items are in, and the hand-off once they all are. */
-export function BaselineMeter({
-  done,
-  total,
-  ready,
-  canRequest,
-  inProgress,
-}: {
-  done: number;
-  total: number;
-  ready: boolean;
-  /** The founder can start the build themselves (otherwise the advisor does). */
-  canRequest: boolean;
-  inProgress: boolean;
-}) {
+export type AssessmentState = "not_started" | "building" | "ready" | "failed";
+
+/** Ready for analysis: how many required items are in, and the button that runs (or re-runs) the assessment. */
+export function BaselineMeter({ done, total, ready, assessment }: { done: number; total: number; ready: boolean; assessment: AssessmentState }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const percent = total ? Math.round((done / total) * 100) : 0;
+  const run = (label: string, primary: boolean) => (
+    <button
+      type="button"
+      disabled={!ready || pending}
+      onClick={() =>
+        start(async () => {
+          setError(null);
+          const r = await requestAssessment();
+          if (r.ok) router.push("/baseline");
+          else setError(r.error);
+        })
+      }
+      className="px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
+      style={primary ? { background: "var(--green)", color: "#fff" } : { background: "var(--muted)", color: "var(--foreground)" }}
+    >
+      {pending ? "Starting…" : label}
+    </button>
+  );
 
   return (
     <div className="rounded-xl border p-5 mb-6" style={{ background: "var(--card)", borderColor: ready ? "var(--green)" : "var(--border)" }}>
@@ -36,28 +44,16 @@ export function BaselineMeter({
             <div className="h-2 rounded-full transition-all" style={{ width: `${percent}%`, background: ready ? "var(--green)" : "var(--amber)" }} />
           </div>
         </div>
-        {inProgress ? (
-          <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>Your data is being analyzed.</span>
-        ) : canRequest ? (
-          <button
-            type="button"
-            disabled={!ready || pending}
-            onClick={() =>
-              start(async () => {
-                setError(null);
-                const r = await requestBaseline();
-                if (r.ok) router.push("/baseline");
-                else setError(r.error);
-              })
-            }
-            className="px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
-            style={{ background: "var(--green)", color: "#fff" }}
-          >
-            {pending ? "Starting…" : "Analyze my data"}
-          </button>
-        ) : ready ? (
-          <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>An analyst will prepare your results from this.</span>
-        ) : null}
+        {assessment === "building" ? (
+          <Link href="/baseline" className="text-sm font-semibold" style={{ color: "var(--green)" }}>Analyzing your data… see progress →</Link>
+        ) : assessment === "ready" ? (
+          <div className="flex items-center gap-3 flex-wrap">
+            <Link href="/baseline" className="px-4 py-2 rounded-lg text-sm font-semibold" style={{ background: "var(--green)", color: "#fff" }}>View your results →</Link>
+            {run("Re-run with my latest data", false)}
+          </div>
+        ) : (
+          run(assessment === "failed" ? "Try the analysis again" : "Analyze my data", true)
+        )}
       </div>
       {error && <p className="text-xs mt-2" role="alert" style={{ color: "var(--red)" }}>{error}</p>}
     </div>

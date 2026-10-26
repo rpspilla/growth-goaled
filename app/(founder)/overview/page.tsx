@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { JourneyVisual } from "@/components/use-cases/JourneyVisual";
+import { assessmentCompletions } from "@/lib/data/assessments";
 import { founderContext } from "@/lib/data/founder-context";
 import { getUseCase, targetSummary } from "@/lib/use-cases";
 import { journeyStage, nextAction } from "@/lib/use-cases/steps";
@@ -8,7 +9,7 @@ import { journeyStage, nextAction } from "@/lib/use-cases/steps";
 const STATUS_LINE: Record<string, string> = {
   objective: "Free Snapshot · not purchased",
   active: "Purchased · sharing data",
-  baseline_in_review: "Purchased · being analyzed",
+  baseline_in_review: "Purchased · analysis started",
   tracking: "Complete",
   closed: "Closed",
 };
@@ -19,6 +20,7 @@ export default async function OverviewPage() {
   const started = useCases.find((u) => !u.activatedAt);
   const action = nextAction(state, started ? (getUseCase(started.useCase)?.id ?? null) : null);
   const listed = useCases.filter((u) => getUseCase(u.useCase));
+  const completed = company ? await assessmentCompletions(company.id) : {};
 
   return (
     <div className="p-8 max-w-6xl space-y-8">
@@ -44,7 +46,7 @@ export default async function OverviewPage() {
                     <div className="text-sm font-medium" style={{ color: "var(--foreground)" }}>{def.question}</div>
                     {target && <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>Your target: {target}</div>}
                   </div>
-                  <span className="text-xs" style={{ color: u.activatedAt ? "var(--green)" : "var(--muted-foreground)" }}>{STATUS_LINE[u.status] ?? u.status}</span>
+                  <span className="text-xs" style={{ color: u.activatedAt ? "var(--green)" : "var(--muted-foreground)" }}>{u.activatedAt && completed[u.useCase] ? "Purchased · results ready" : (STATUS_LINE[u.status] ?? u.status)}</span>
                 </Link>
               );
             })}

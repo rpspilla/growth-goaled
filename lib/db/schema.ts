@@ -81,7 +81,7 @@ export const deliverableStatus = pgEnum("deliverable_status", [
   "published",
   "failed",
 ]);
-export const claimSourceKind = pgEnum("claim_source_kind", ["data_point", "benchmark_metric", "document", "methodology"]);
+export const claimSourceKind = pgEnum("claim_source_kind", ["data_point", "benchmark_metric", "document", "methodology", "founder_answer"]);
 export const agentKind = pgEnum("agent_kind", ["draft", "qa", "extract", "research", "sort"]);
 export const agentRunStatus = pgEnum("agent_run_status", ["running", "succeeded", "failed"]);
 export const reviewDecision = pgEnum("review_decision", ["approve", "request_changes", "send_back"]);
@@ -456,6 +456,8 @@ export const deliverables = pgTable(
       .notNull()
       .references(() => companies.id, { onDelete: "cascade" }),
     type: deliverableType("type").notNull(),
+    // Assessments (type "baseline"): the use case they answer (lib/use-cases)
+    useCase: text("use_case"),
     version: integer("version").notNull().default(1),
     status: deliverableStatus("status").notNull().default("drafting"),
     // Validated by the per-type Zod schema before writing
