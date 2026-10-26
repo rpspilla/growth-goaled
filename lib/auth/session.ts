@@ -16,6 +16,15 @@ async function e2eAuthUser(): Promise<{ id: string; email: string; name: string 
   return email && /^[^@\s]+@[^@\s]+$/.test(email) ? { id: `e2e:${email}`, email, name: "" } : null;
 }
 
+/** Unique violation on users_email_idx, wherever the driver nests it. */
+function isEmailTaken(err: unknown): boolean {
+  for (let e: unknown = err; e && typeof e === "object"; e = (e as { cause?: unknown }).cause) {
+    const x = e as { code?: string; constraint?: string; message?: string };
+    if (x.code === "23505" && (x.constraint === "users_email_idx" || x.message?.includes("users_email_idx"))) return true;
+  }
+  return false;
+}
+
 /**
  * The signed-in user's row in our `users` table, created on first sign-in.
  * New users are founders; roles are changed by an admin (or `npm run user:role`).
@@ -25,14 +34,26 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
   const authUser = e2eEnabled() ? await e2eAuthUser() : (await getAuth().getSession()).data?.user;
   if (!authUser) return null;
 
-  const [user] = await db
-    .insert(schema.users)
-    .values({ authUserId: authUser.id, email: authUser.email, name: authUser.name || null })
-    .onConflictDoUpdate({
-      target: schema.users.authUserId,
-      set: { email: authUser.email, name: sql`coalesce(${schema.users.name}, excluded.name)` },
-    })
-    .returning();
+  let user: User | undefined;
+  try {
+    [user] = await db
+      .insert(schema.users)
+      .values({ authUserId: authUser.id, email: authUser.email, name: authUser.name || null })
+      .onConflictDoUpdate({
+        target: schema.users.authUserId,
+        set: { email: authUser.email, name: sql`coalesce(${schema.users.name}, excluded.name)` },
+      })
+      .returning();
+  } catch (err) {
+    if (!isEmailTaken(err)) throw err;
+    // The email already has a row under an earlier auth account (e.g. that account was deleted and
+    // they signed up again). Auth verified this email, so the new account takes the row over.
+    [user] = await db
+      .update(schema.users)
+      .set({ authUserId: authUser.id, updatedAt: new Date() })
+      .where(sql`lower(${schema.users.email}) = lower(${authUser.email})`)
+      .returning();
+  }
   return user ?? null;
 });
 
