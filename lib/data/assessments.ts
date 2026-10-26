@@ -13,9 +13,10 @@ import { claimsFromAssessment, completeness, fallbackAssessment, sanitizeAssessm
 import { track } from "@/lib/events";
 import { getItem } from "@/lib/readiness";
 import { formatMetric, isMetricKey, METRICS, type MetricKey } from "@/lib/metrics";
-import { getUseCase, objectiveFields, type UseCaseDef, type UseCaseId } from "@/lib/use-cases";
+import { assessmentMetrics, getUseCase, objectiveFields, type UseCaseDef, type UseCaseId } from "@/lib/use-cases";
 import { resultConfidence, type Confidence } from "@/lib/use-cases/results";
 import { combineQa, isStalled } from "./deliverables";
+import { figureChoices } from "./figures";
 import { getIntakeAnswers } from "./intake";
 import { getReadiness } from "./readiness";
 import { getCompanyUseCase, setUseCaseStatus } from "./use-cases";
@@ -176,6 +177,9 @@ export async function assembleAssessmentInputs(company: Company, useCase: UseCas
     reference_note: referenceNote,
     open_questions: openQuestions,
     unreadable_files: readiness.files.filter((f) => f.status === "failed").map((f) => f.filename).slice(0, 10),
+    conflicts: (await figureChoices(company, assessmentMetrics(useCase, objective)))
+      .filter((c) => c.state === "conflict")
+      .map((c) => ({ metric: c.metric, label: c.label, values: c.candidates.map((x) => `${x.formatted} in ${x.source === "Your company profile" ? "your company profile" : x.source}`).join(" vs ") })),
     completeness: "partial",
   };
   input.completeness = completeness(input);

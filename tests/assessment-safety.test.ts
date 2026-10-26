@@ -21,6 +21,7 @@ const base: AssessmentInput = {
   reference_note: "No approved peer reference data matches this company yet.",
   open_questions: [],
   unreadable_files: ["board-deck.key"],
+  conflicts: [],
   completeness: "partial",
 };
 

@@ -29,6 +29,8 @@ export type AssessmentInput = {
   open_questions: { type: string; title: string }[];
   /** Files the founder shared that couldn't be read. */
   unreadable_files: string[];
+  /** Metrics where the profile and files disagree and the founder hasn't chosen yet. */
+  conflicts: { metric: string; label: string; values: string }[];
   /** "complete" when all required data is in and confirmed; changes what the plan should look like. */
   completeness: "complete" | "partial" | "minimal";
   /** Present on a second attempt: what the code checks rejected last time. */
@@ -89,6 +91,7 @@ Rules:
 - Never refuse or stop because data is missing or unclear. Produce the best report the inputs allow, be explicit about what you could not determine, and list every gap in data_gaps.
 - When completeness is "complete", the actions must be a clear, sequenced action plan that addresses the underlying constraint you diagnosed (for example retention, if that is what the data shows): concrete steps, each with a horizon and the KPI that will show progress toward the founder's target and date.
 - When completeness is "partial" or "minimal", keep conclusions proportionate, make the first actions about closing the most important gaps, and still give the best guidance the data supports.
+- For metrics listed in conflicts, the founder hasn't confirmed which value is right: say so, don't build a conclusion on either value, and name the conflict in data_gaps.
 - If revision_notes is present, fix exactly what it lists: remove or correct those figures and use only valid ids.
 - Write plainly for a founder. No hype, no consulting jargon.`;
 

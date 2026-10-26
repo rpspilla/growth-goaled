@@ -8,6 +8,10 @@ import { SortReview } from "@/components/readiness/SortReview";
 import { listDocuments } from "@/lib/data/documents";
 import { founderContext } from "@/lib/data/founder-context";
 import { founderAssessment } from "@/lib/data/assessments";
+import { figureChoices } from "@/lib/data/figures";
+import { FigureChecker } from "@/components/use-cases/FigureChecker";
+import { assessmentMetrics } from "@/lib/use-cases";
+import { chooseFigureAction, enterFigureAction } from "../baseline/actions";
 import { listRegisterItems } from "@/lib/data/registers";
 import { getCategory, getItem, sourcesFor } from "@/lib/readiness";
 import { baselineReadiness } from "@/lib/use-cases/readiness";
@@ -28,10 +32,11 @@ export default async function DataPage() {
   }
   const { company, readiness, blobPrefix } = data;
   const useCase = active.def;
-  const [documents, questions, assessment] = await Promise.all([
+  const [documents, questions, assessment, choices] = await Promise.all([
     listDocuments(company),
     listRegisterItems([company.id], { owner: "founder", status: "open" }),
     founderAssessment(company.id, useCase.id),
+    figureChoices(company, assessmentMetrics(useCase, active.objective)),
   ]);
   const rows = new Map(readiness.items.map((i) => [i.itemKey, i]));
   const meter = baselineReadiness(useCase, Object.fromEntries(readiness.items.map((i) => [i.itemKey, i.status])));
@@ -54,6 +59,10 @@ export default async function DataPage() {
         ready={meter.ready}
         assessment={assessment.state}
       />
+
+      <div className="mb-6">
+        <FigureChecker choices={choices} choose={chooseFigureAction} enter={enterFigureAction} />
+      </div>
 
       <InboxDropzone blobPrefix={blobPrefix} />
       <SortReview docs={inbox} />

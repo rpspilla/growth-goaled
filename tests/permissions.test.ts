@@ -18,7 +18,7 @@ const appFiles = walk(path.join(root, "app"));
 const read = (p: string) => readFileSync(p, "utf8");
 const rel = (p: string) => path.relative(root, p);
 
-const GUARDS = /requireRole\(|requireUser\(|founderCompany\(\)|managed\(|managedItemCompany\(|staff\(\)/;
+const GUARDS = /requireRole\(|requireUser\(|founderCompany\(\)|founderMetric\(|managed\(|managedItemCompany\(|staff\(\)/;
 // Shared loaders that call requireRole themselves (asserted below).
 const FOUNDER_CONTEXT = path.join(root, "lib/data/founder-context.ts");
 const COMPANY_CONTEXT = path.join(root, "app/advisor/companies/[id]/context.ts");
@@ -40,7 +40,7 @@ describe("server actions", () => {
   it("helper guards themselves call requireRole", () => {
     for (const file of files) {
       const src = read(file);
-      for (const helper of ["founderCompany", "managed", "managedItemCompany", "staff"]) {
+      for (const helper of ["founderCompany", "founderMetric", "managed", "managedItemCompany", "staff"]) {
         const def = src.match(new RegExp(`(?:async function ${helper}\\(|const ${helper} = \\(\\) =>)[\\s\\S]{0,200}`));
         if (def) expect(def[0], `${rel(file)} ${helper}`).toMatch(/requireRole\(|founderContext\(\)/);
       }

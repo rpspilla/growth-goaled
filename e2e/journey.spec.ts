@@ -207,6 +207,48 @@ test("founder: free snapshot, $499 assessment, results, optional advisory", asyn
   await expect(founder.page.getByRole("dialog", { name: "Sources" })).toContainText("Checked in code against your inputs.");
   await founder.page.getByRole("button", { name: "Close" }).click();
 
+  // --- Founder: the profile and an uploaded file disagree; they pick one and add a missing figure ---
+  {
+    const db = new Client({ connectionString: E2E_DATABASE_URL });
+    await db.connect();
+    const { rows } = await db.query("select id from companies where name = 'E2E Analytics'");
+    const companyId = rows[0].id;
+    const doc = await db.query(
+      "insert into documents (company_id, doc_type, blob_url, filename, mime, size, status) values ($1, 'other', 'e2e://none', 'board-metrics.xlsx', 'text/csv', 1, 'done') returning id",
+      [companyId],
+    );
+    await db.query("insert into data_points (company_id, metric, value, unit, confidence, status, document_id) values ($1, 'nrr', 101, 'percent', 'medium', 'proposed', $2)", [companyId, doc.rows[0].id]);
+    await db.end();
+  }
+  await founder.page.reload();
+  const figures = founder.page.locator("details", { hasText: "Check your figures" });
+  await expect(figures).toHaveAttribute("open", "");
+  await expect(figures).toContainText("1 disagrees");
+  await expect(figures).toContainText("Values disagree");
+  await expect(founder.page.getByText(/NRR has different values \(94% in your company profile vs 101% in board-metrics.xlsx\)/)).toHaveCount(0); // gap only appears after a re-run
+  await figures.getByRole("button", { name: "Use 101% from board-metrics.xlsx for NRR" }).click();
+  await expect(figures.getByText("Figures updated. Re-run the assessment to use them.")).toBeVisible();
+  // A figure the assessment needs but nobody has given yet.
+  const newArr = figures.locator("li", { hasText: "New ARR" }).first();
+  await newArr.getByLabel(/New ARR/).fill("$500K");
+  await newArr.getByRole("button", { name: "Save" }).click();
+  await expect(newArr.getByText("$500K")).toBeVisible();
+  await expect(figures.locator("li", { hasText: "NRR" }).first()).toContainText("Confirmed");
+  // The profile follows the choice.
+  await founder.page.goto("/profile/customers");
+  await expect(founder.page.locator("#intake-nrr")).toHaveValue("101");
+  await founder.page.goto("/baseline");
+  await founder.page.getByRole("button", { name: "Re-run with my latest data" }).click();
+  await expect
+    .poll(async () => {
+      const db = new Client({ connectionString: E2E_DATABASE_URL });
+      await db.connect();
+      const { rows } = await db.query("select count(*)::int as n from deliverables where type = 'baseline' and status = 'in_review'");
+      await db.end();
+      return rows[0].n;
+    }, { timeout: 90_000 })
+    .toBe(2);
+
   // --- Advisor: claim; the company shows the founder's five steps ---
   await admin.page.goto("/advisor/unassigned");
   await admin.page.getByRole("button", { name: /Assign|Claim/ }).first().click();
@@ -268,7 +310,7 @@ test("founder: free snapshot, $499 assessment, results, optional advisory", asyn
 
   // --- Analytics picks up the events ---
   await admin.page.goto("/advisor/analytics");
-  await expect(admin.page.locator("div", { hasText: /^deliverable_published1$/ }).first()).toBeVisible();
+  await expect(admin.page.locator("div", { hasText: /^deliverable_published2$/ }).first()).toBeVisible();
   await expect(admin.page.getByText("Sign-up to first Benchmark")).toBeVisible();
 
   await founder.ctx.close();

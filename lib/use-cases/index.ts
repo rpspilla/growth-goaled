@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { formatMetric, isMetricKey, METRICS } from "@/lib/metrics";
+import { formatMetric, isMetricKey, METRICS, type MetricKey } from "@/lib/metrics";
 import { growthLeak } from "./growth-leak";
 import { seriesAReady, seriesBReady } from "./fundraise";
 import { hireOrFix } from "./hire-or-fix";
@@ -109,4 +109,12 @@ export function targetSummary(objective: Objective | null | undefined): string |
   if (!metric || !isMetricKey(metric) || !objective?.target_value || !Number.isFinite(value)) return null;
   const date = objective.target_date ? ` by ${objective.target_date}` : "";
   return `${METRICS[metric].label} ${formatMetric(metric, value)}${date}`;
+}
+
+/** The figures an assessment relies on: the use case's figures plus the founder's chosen main metric. */
+export function assessmentMetrics(useCase: UseCaseDef, objective: Objective | null | undefined): MetricKey[] {
+  const metrics = new Set<MetricKey>(useCase.figures);
+  const main = objective?.main_metric;
+  if (main && isMetricKey(main)) metrics.add(main);
+  return [...metrics];
 }

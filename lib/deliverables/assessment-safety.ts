@@ -33,6 +33,7 @@ export function systemGaps(input: AssessmentInput): string[] {
   const supplied = input.data_supplied.filter((d) => d.status === "available" || d.status === "partial");
   if (supplied.length && !input.figures.length) gaps.push("We couldn't read figures from the files you shared, so this report rests on your answers and the data you described.");
   for (const f of input.unreadable_files) gaps.push(`We couldn't read ${f}.`);
+  for (const c of input.conflicts) gaps.push(`${c.label} has different values (${c.values}). Choose the right one under "Check your figures".`);
   const unconfirmed = input.figures.filter((f) => !f.confirmed);
   if (unconfirmed.length) gaps.push(`${unconfirmed.map((f) => f.label).join(", ")} ${unconfirmed.length === 1 ? "was" : "were"} read from your files and not yet confirmed by you.`);
   if (!input.founder_answers.length) gaps.push("The questionnaire wasn't answered, so the report can't reflect your goal or context.");
@@ -43,7 +44,7 @@ export function systemGaps(input: AssessmentInput): string[] {
 export function completeness(input: AssessmentInput): Completeness {
   const required = input.data_supplied.filter((d) => d.priority === "required");
   const have = required.filter((d) => d.status === "available").length;
-  if (have === required.length && input.figures.length >= 3 && input.figures.every((f) => f.confirmed) && !input.unreadable_files.length) return "complete";
+  if (have === required.length && input.figures.length >= 3 && input.figures.every((f) => f.confirmed) && !input.unreadable_files.length && !input.conflicts.length) return "complete";
   if (have === 0 && input.figures.length === 0) return "minimal";
   return "partial";
 }

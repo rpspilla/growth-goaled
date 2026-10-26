@@ -32,6 +32,7 @@ export function AssessmentResults({
   advisory,
   actions,
   reviewHref,
+  figures,
   onSourceTrail,
 }: {
   title: string;
@@ -43,6 +44,8 @@ export function AssessmentResults({
   actions?: ReactNode;
   /** Booking link for an advisor review, shown with the gaps when there are any. */
   reviewHref?: string;
+  /** "Check your figures", shown after the gaps. */
+  figures?: ReactNode;
   onSourceTrail?: (claimKey: string) => void;
 }) {
   const [openClaim, setOpenClaimState] = useState<string | null>(null);
@@ -99,6 +102,8 @@ export function AssessmentResults({
           )}
         </div>
       )}
+
+      {figures}
 
       <Section n={1} title="Executive summary">
         <div className="flex gap-3 items-start">

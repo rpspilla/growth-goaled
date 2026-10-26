@@ -7,11 +7,13 @@ import { AdvisoryOffer } from "@/components/use-cases/AdvisoryOffer";
 import { RunAssessmentButton } from "@/components/use-cases/RunAssessmentButton";
 import { AssessmentResults } from "@/components/views/AssessmentResults";
 import { founderAssessment } from "@/lib/data/assessments";
+import { figureChoices } from "@/lib/data/figures";
+import { FigureChecker } from "@/components/use-cases/FigureChecker";
 import { founderContext } from "@/lib/data/founder-context";
 import { track } from "@/lib/events";
 import { advisoryHref, formatPrice, pricing } from "@/lib/pricing";
-import { getUseCase, targetSummary } from "@/lib/use-cases";
-import { sourceTrailOpened } from "./actions";
+import { assessmentMetrics, getUseCase, targetSummary } from "@/lib/use-cases";
+import { chooseFigureAction, enterFigureAction, sourceTrailOpened } from "./actions";
 
 // The assessment is drafted after the action responds (next/server after()), within this budget.
 export const maxDuration = 300;
@@ -23,7 +25,15 @@ export default async function ResultsPage() {
   const { user, company, active } = await founderContext();
   if (!active || !company) redirect("/library");
   const def = active.def;
-  const state = await founderAssessment(company.id, def.id);
+  const [state, choices] = await Promise.all([founderAssessment(company.id, def.id), figureChoices(company, assessmentMetrics(def, active.objective))]);
+  const figures = (
+    <FigureChecker
+      choices={choices}
+      choose={chooseFigureAction}
+      enter={enterFigureAction}
+      rerun={state.state === "building" ? null : <RunAssessmentButton label={state.state === "ready" ? "Re-run with these figures" : "Run the assessment"} primary />}
+    />
+  );
 
   if (state.state === "ready") {
     const next = def.nextUseCase ? getUseCase(def.nextUseCase) : undefined;
@@ -35,6 +45,7 @@ export default async function ResultsPage() {
         nextUseCase={next ? { href: `/library/${next.id}`, question: next.question } : null}
         advisory={<AdvisoryOffer kind={state.view.advisor} price={formatPrice(pricing().advisoryFromCents)} href={advisoryHref(def.id, state.view.advisor)} target={targetSummary(active.objective)} />}
         reviewHref={advisoryHref(def.id, "review")}
+        figures={figures}
         actions={
           <div className="mt-3">
             <RunAssessmentButton label="Re-run with my latest data" />
@@ -50,6 +61,7 @@ export default async function ResultsPage() {
     <div className="p-4 sm:p-8 max-w-4xl space-y-6">
       <BuildingRefresh active={state.state === "building"} />
       <PageHeader eyebrow="Assessment results" title={def.question} subtitle="Your results appear here as soon as they're ready." />
+      {figures}
       {state.state === "building" && (
         <div className="rounded-xl border p-6" style={card}>
           <div className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>Analyzing your data</div>
