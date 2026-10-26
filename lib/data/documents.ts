@@ -12,6 +12,7 @@ import { fetchGoogleExport, parseGoogleLink } from "@/lib/google-link";
 import { AI_MODEL, AI_UNAVAILABLE_FOR_FOUNDERS, isAiConfigError } from "@/lib/ai/config";
 import { extractMetrics, ExtractionError, type ExtractionInput } from "@/lib/ai/extract";
 import { parseCsv, profileSheets } from "@/lib/file-profile";
+import { analyzeSheets } from "@/lib/metrics-engine";
 import { getItem, type CategoryId } from "@/lib/readiness";
 import { classifyFile, ClassifyError, type ClassifyInput } from "@/lib/ai/classify";
 import { mergeSuggestions, suggestFromColumns, suggestFromFilename } from "@/lib/sorting";
@@ -204,32 +205,60 @@ export async function processDocument(documentId: string): Promise<void> {
 
   try {
     const { input, sheets } = await buildInput(doc);
-    // Column and date-range profile is computed in code, before (and independent of) the model.
-    if (sheets) await db.update(schema.documents).set({ profile: profileSheets(sheets) }).where(eq(schema.documents.id, doc.id));
-    const result = await extractMetrics(input);
+    // Tables are profiled and their metrics calculated in code first (lib/metrics-engine); the model
+    // only fills in metrics the calculations couldn't produce, and never overrides a calculated one.
+    const analysis = sheets ? analyzeSheets(sheets) : null;
+    if (sheets) await db.update(schema.documents).set({ profile: profileSheets(sheets), analysis }).where(eq(schema.documents.id, doc.id));
+    const calculatedKeys = new Set(analysis?.metrics.map((m) => m.metric) ?? []);
+    let result: Awaited<ReturnType<typeof extractMetrics>>;
+    try {
+      result = await extractMetrics(input);
+    } catch (err) {
+      if (!calculatedKeys.size) throw err;
+      console.error(`[extract] Document ${doc.id}: model extraction failed; keeping calculated figures`, err);
+      result = { points: [], model: "none", tokensIn: 0, tokensOut: 0 };
+    }
+    const modelPoints = result.points.filter((p) => !calculatedKeys.has(p.metric));
 
     // Replace anything a previous run of this document proposed.
     await db.delete(schema.dataPoints).where(and(eq(schema.dataPoints.documentId, doc.id), eq(schema.dataPoints.status, "proposed")));
 
-    const inserted = result.points.length
-      ? await db
-          .insert(schema.dataPoints)
-          .values(
-            result.points.map((p) => ({
-              companyId: doc.companyId,
-              metric: p.metric,
-              value: p.value,
-              unit: METRICS[p.metric].unit,
-              rawText: p.raw_text.slice(0, 500),
-              period: p.period,
-              documentId: doc.id,
-              page: p.page,
-              confidence: p.confidence,
-              status: "proposed" as const,
-            })),
-          )
-          .returning()
-      : [];
+    const rows = [
+      ...(analysis?.metrics ?? []).map((m) => ({
+        values: {
+          companyId: doc.companyId,
+          metric: m.metric,
+          value: m.value,
+          unit: METRICS[m.metric].unit,
+          rawText: `Calculated: ${m.method}`.slice(0, 500),
+          period: m.period,
+          documentId: doc.id,
+          confidence: (m.sampleSize !== undefined && m.sampleSize < 10 ? "medium" : "high") as "medium" | "high",
+          status: "proposed" as const,
+          origin: "calculated" as const,
+          method: m.method,
+          calc: { ...m.source, sampleSize: m.sampleSize },
+        },
+        inferred: false,
+      })),
+      ...modelPoints.map((p) => ({
+        values: {
+          companyId: doc.companyId,
+          metric: p.metric,
+          value: p.value,
+          unit: METRICS[p.metric].unit,
+          rawText: p.raw_text.slice(0, 500),
+          period: p.period,
+          documentId: doc.id,
+          page: p.page,
+          confidence: p.confidence,
+          status: "proposed" as const,
+          origin: "extracted" as const,
+        },
+        inferred: Boolean(p.inferred),
+      })),
+    ];
+    const inserted = rows.length ? await db.insert(schema.dataPoints).values(rows.map((r) => r.values)).returning() : [];
 
     // Everything already known about this company: intake answers (no document) and other documents' values.
     const earlier = await db
@@ -244,7 +273,7 @@ export async function processDocument(documentId: string): Promise<void> {
       );
 
     const conflicts = findConflicts(inserted, earlier);
-    const assumptions = inserted.filter((p, i) => p.confidence === "low" || result.points[i]?.inferred);
+    const assumptions = inserted.filter((p, i) => p.origin === "extracted" && (p.confidence === "low" || rows[i]?.inferred));
     const fmt = (metric: string, value: number) => (METRICS[metric as MetricKey] ? formatMetric(metric as MetricKey, value) : String(value));
     const label = (metric: string) => METRICS[metric as MetricKey]?.label ?? metric;
     const describe = (d: { value: number; metric: string; period: string | null; documentId: string | null }) =>
@@ -279,7 +308,7 @@ export async function processDocument(documentId: string): Promise<void> {
       .set({
         status: "succeeded",
         model: result.model,
-        output: { data_points: result.points },
+        output: { data_points: result.points, calculated: analysis?.metrics.map((m) => m.metric) ?? [], warnings: analysis?.warnings ?? [] },
         tokensIn: result.tokensIn,
         tokensOut: result.tokensOut,
         durationMs: Date.now() - started,

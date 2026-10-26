@@ -449,7 +449,8 @@ describe("Google links and AI availability", () => {
   it("tells the founder plainly when the AI isn't available, and still offers column matches", async () => {
     h.extract.mockRejectedValue(new AiConfigError("ANTHROPIC_API_KEY contains characters a real key can't"));
     const pathname = `${companyBlobPrefix(acme.id)}inbox/p.csv`;
-    h.blobs.set(pathname, { contentType: "text/csv", body: "Month,Revenue,COGS\n2026-01,100,20\n" });
+    // One month of revenue: nothing the code can calculate on its own.
+    h.blobs.set(pathname, { contentType: "text/csv", body: "Month,Revenue\n2026-01,100\n" });
     const { doc } = await registerDocument(founder, acme, { pathname, filename: "p.csv", docType: "other" });
     await processDocument(doc.id);
     await sortDocument(doc.id, async () => {
@@ -461,5 +462,22 @@ describe("Google links and AI availability", () => {
     expect(view!.error).not.toMatch(/ANTHROPIC_API_KEY/); // config details stay out of the founder's view
     expect(view!.sortStatus).toBe("failed");
     expect(view!.suggestions.some((x) => x.itemKey === "monthly_revenue")).toBe(true);
+  });
+
+  it("still reads a spreadsheet in code when the AI isn't available, and labels the figures as calculated", async () => {
+    h.extract.mockRejectedValue(new AiConfigError("no key"));
+    const pathname = `${companyBlobPrefix(acme.id)}inbox/mrr.csv`;
+    h.blobs.set(pathname, { contentType: "text/csv", body: "Customer,Month,MRR\nA,2026-01,1000\nB,2026-01,500\nA,2026-02,1200\nB,2026-02,0\n" });
+    const { doc } = await registerDocument(founder, acme, { pathname, filename: "mrr.csv", docType: "other" });
+    await processDocument(doc.id);
+    const [view] = await listDocuments(acme);
+    expect(view!.status).toBe("done");
+    const points = await db().select().from(schema.dataPoints).where(eq(schema.dataPoints.documentId, doc.id));
+    const arr = points.find((p) => p.metric === "arr")!;
+    expect(arr).toMatchObject({ value: 14400, origin: "calculated", status: "proposed", period: "Feb 2026" });
+    expect(arr.method).toMatch(/12 × Feb 2026 MRR/);
+    expect(points.find((p) => p.metric === "churned_arr")).toMatchObject({ value: 6000, origin: "calculated" });
+    const [stored] = await db().select({ analysis: schema.documents.analysis }).from(schema.documents).where(eq(schema.documents.id, doc.id));
+    expect(stored!.analysis!.bridge).toMatchObject({ startArr: 18000, churnedArr: 6000, expansionArr: 2400, endArr: 14400 });
   });
 });

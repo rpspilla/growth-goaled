@@ -66,6 +66,9 @@ export const collectionMethod = pgEnum("collection_method", ["file_upload", "man
 export const dataQuality = pgEnum("data_quality", ["unverified", "validated", "estimated"]);
 export const confidence = pgEnum("confidence", ["high", "medium", "low"]);
 export const dataPointStatus = pgEnum("data_point_status", ["proposed", "accepted", "rejected"]);
+/** manual: the founder entered it; extracted: read from a document by the model; calculated: computed in code from the founder's rows. */
+export const dataPointOrigin = pgEnum("data_point_origin", ["manual", "extracted", "calculated"]);
+export const planActionStatus = pgEnum("plan_action_status", ["not_started", "in_progress", "done", "dropped"]);
 export const registerType = pgEnum("register_type", ["missing", "question", "conflict", "assumption", "follow_up"]);
 export const registerStatus = pgEnum("register_status", ["open", "resolved", "unknown"]);
 export const registerOwner = pgEnum("register_owner", ["founder", "advisor"]);
@@ -216,6 +219,8 @@ export const documents = pgTable(
     sortSummary: text("sort_summary"),
     suggestions: jsonb("suggestions").$type<SortSuggestion[]>(),
     sortReviewedAt: timestamp("sort_reviewed_at", { withTimezone: true }),
+    // Deterministic analysis of tabular files (lib/metrics-engine): bridge, segments, monthly series, warnings
+    analysis: jsonb("analysis").$type<import("@/lib/metrics-engine").FileAnalysis>(),
     ...timestamps,
   },
   (t) => [
@@ -308,6 +313,10 @@ export const dataPoints = pgTable(
     confidence: confidence("confidence").notNull(),
     status: dataPointStatus("status").notNull().default("proposed"),
     acceptedBy: uuid("accepted_by").references(() => users.id, { onDelete: "set null" }),
+    origin: dataPointOrigin("origin").notNull().default("manual"),
+    // For calculated figures: the method in plain words, and the sheet/columns/sample it used
+    method: text("method"),
+    calc: jsonb("calc").$type<{ sheet: string; rows: number; columns: string[]; sampleSize?: number }>(),
     ...timestamps,
   },
   (t) => [index("data_points_company_metric_idx").on(t.companyId, t.metric)],
@@ -584,6 +593,40 @@ export const companyUseCases = pgTable(
     ...timestamps,
   },
   (t) => [uniqueIndex("company_use_cases_company_use_case_idx").on(t.companyId, t.useCase)],
+);
+
+/** A founder's committed action plan from an assessment, tracked over time (HANDOFF §13.8). */
+export const planActions = pgTable(
+  "plan_actions",
+  {
+    id: id(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    companyUseCaseId: uuid("company_use_case_id")
+      .notNull()
+      .references(() => companyUseCases.id, { onDelete: "cascade" }),
+    deliverableId: uuid("deliverable_id")
+      .notNull()
+      .references(() => deliverables.id, { onDelete: "cascade" }),
+    priority: integer("priority").notNull(),
+    action: text("action").notNull(),
+    rationale: text("rationale"),
+    timing: text("timing"),
+    role: text("role"),
+    successMetric: text("success_metric"),
+    // Metric key when the success measure is a tracked metric; its value when the plan was committed
+    metric: text("metric"),
+    baselineValue: numeric("baseline_value", { mode: "number" }),
+    baselinePeriod: text("baseline_period"),
+    expectedSignal: text("expected_signal"),
+    risks: text("risks"),
+    status: planActionStatus("status").notNull().default("not_started"),
+    note: text("note"),
+    updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [index("plan_actions_company_use_case_idx").on(t.companyUseCaseId), uniqueIndex("plan_actions_deliverable_priority_idx").on(t.deliverableId, t.priority)],
 );
 
 export const paymentStatus = pgEnum("payment_status", ["pending", "paid", "expired", "failed"]);
