@@ -1,115 +1,116 @@
-# Growth Goaled — Product Spec (v1 build)
+# Growth Goaled — Product Spec
 
-Status: DRAFT for review · Source: Figma Make file "Growth-Goaled-Product-Video" (brief + 17-screen prototype)
+Status: v2 — Use Case Library (Oct 26, 2026). Supersedes the Benchmark-led v1 (Oct 22). Source: Figma Make file "Growth-Goaled-Product-Video" plus owner decisions below.
 
 ## 1. What it is
 
-Growth Goaled is a Growth Intelligence platform for Series A B2B SaaS and AI companies (~$2M–$10M ARR). It tells a founder where their go-to-market engine stands against comparable companies, what is actually constraining growth, and what to do next. Every recommendation is AI-drafted, independently QA-checked, and approved by a human advisor before the founder sees it.
+Growth Goaled is a Growth Intelligence platform for B2B SaaS and AI companies from late seed through Series A (~$1M–$10M ARR). It helps a founder make the handful of high-stakes go-to-market decisions this stage forces: where growth is leaking, whether to hire, who to sell to, when to raise. Each answer comes from the company's own data, analysed with Growth Goaled's advisory method, drafted by AI, independently QA-checked, and approved by a human advisor before the founder sees it.
 
 Promise: **Know where you stand. Know what to fix. Know what comes next.**
 
-Core flow: Company data → GTM profile → Benchmark → Baseline → ICP → Channel Strategy → Hiring Plan → Advisor Review → Action
+### Why a use case library (decision, Oct 26)
+v1 led with a Benchmark against peer cohorts. With a young database the cohorts are thin, so the headline product was weakest exactly when we need it to be strongest. v2 leads with **use cases**: each one answers one founder decision and is useful on day one from the company's own data. Peer and published reference data still appears *inside* each use case as a reference line where it exists, and gets richer as more companies join (the compounding-intelligence story survives — it just isn't load-bearing at launch).
+
+Core flow: **Pick the decision → share the data it needs → Growth Intelligence Analysis → advisor review → action plan**
 
 ## 2. Users
 
 | Role | Who | What they need to do |
 |---|---|---|
-| **Founder** | CEO/founder (sometimes CRO/COO) of a Series A company | Enter company data, upload documents, answer open questions, read approved deliverables, see source trail behind every claim |
-| **Advisor** | Growth Goaled advisor managing a portfolio of ~20–30 companies | See portfolio health, open a company, review AI drafts against QA results, approve / request changes / send back, manage benchmark cohorts |
-| **Admin** (internal, can be same person as advisor in v1) | Growth Goaled team | Manage benchmark data, methodology, users, data quality |
+| **Founder** | CEO/founder (sometimes CRO/COO) of a seed-to-Series A company | Pick the decision they face, share the data it needs, answer open questions, read approved analyses, see the source trail behind every claim |
+| **Advisor** | Growth Goaled advisor managing ~20–30 companies | See portfolio health, open a company, review AI drafts against QA results, approve / request changes / send back, maintain reference data and scoring rubrics |
+| **Admin** | Growth Goaled team | Users, assignment, reference data, system checks |
 
-## 3. Founder jobs (screens from prototype)
+## 3. The Use Case Library (v1 set)
 
-1. **Welcome** — start profile or explore sample company (Acme AI demo stays as a read-only sample).
-2. **Intake** — five sections (Company, Customers, GTM, ICP, Hiring), autosaves, shows % complete, resume later.
-3. **Upload** — board deck, financial model, customer list, GTM plan, sales deck, hiring plan. Google Drive connect. System extracts structured data points and flags assumptions for review.
-4. **Processing** — staged progress while the profile is built.
-5. **Dashboard** — key metrics, Growth Intelligence Score (0–100) with label, strengths / watch areas / priority.
-6. **Benchmark** — cohort definition, metric table vs median and top quartile, ahead/behind indicators, headline insight, methodology link.
-7. **Baseline** — three findings + core diagnosis.
-8. **ICP** — segments with fit scores; click for win rate, ACV, cycle, retention, expansion, benchmark fit; primary ICP recommendation.
-9. **Channel Strategy** — current vs benchmark vs recommended allocation; ranked priorities; reallocation recommendation.
-10. **Hiring Plan** — current vs benchmark team, recommended hires, Q-by-Q timeline.
-11. **Questions / Registers** — data conflicts to resolve (Resolve / Mark unknown / Use uploaded data); registers of missing info, unresolved questions, conflicts, assumptions, follow-ups; reminders.
-12. **Deliverables** — list of all deliverables with status.
-13. **Source Trail** (side panel, everywhere) — sources behind a claim, confidence level, methodology text.
+Each use case is one founder question with: a trigger (when founders come to it), the data items it needs (from the Data Readiness catalogue), the figures computed in code, optional reference data (approved published/advisory figures and/or the advisor's rubric), and a structured output.
 
-## 4. Advisor jobs
+| # | Use case (founder's question) | Typical trigger | Output |
+|---|---|---|---|
+| 1 | **Where is our growth leaking?** | Growth slowing; team disagrees why. Default starting point for founders who aren't sure. | ARR bridge (new / expansion / churn), funnel conversion, the single biggest constraint, and which use case to run next |
+| 2 | **Are we ready to raise a Series A?** | Seed company, 6–12 months before a raise | Readiness by area (Ready / Close / Not yet), what investors will probe, 90-day plan to close gaps, timing vs runway |
+| 3 | **Are we ready to raise a Series B?** | Series A company, 6–12 months before a raise | Same structure as #2 with Series B bars (efficiency, net retention, repeatable GTM) |
+| 4 | **Should we hire more salespeople, or fix what we have first?** | After a raise, or board pressure to grow faster | Hire / don't hire yet, which role, when; capacity and productivity diagnosis; hiring timeline |
+| 5 | **Who are we actually winning with?** | Long cycles, scattered customer base | Segments ranked by fit (win rate, ACV, cycle, retention, expansion), primary ICP, focus recommendation |
+| 6 | **Is our sales repeatable without the founder?** | Founder still closes most deals; considering first sales leader | Handoff readiness score, gaps to close, when and whom to hire (first AE vs sales leader) |
 
-1. **Portfolio** — counts (active, need attention, awaiting founder, in review, complete) + table (company, stage, ARR, growth, health, phase, attention).
-2. **Company View** — metrics, phase, score, benchmark position, current recommendation, open questions, confidence, advisor summary.
-3. **Review Queue** — deliverables awaiting review; Draft Agent and QA Agent status; QA checklist (data consistency, benchmark methodology, source trail, recommendation logic, missing inputs); Approve / Request Changes / Send Back to AI.
-4. **Benchmarks** — cohort library.
-5. **Methodology / Data Quality** — sources, completeness, consistency, confidence with explanations.
+#2 and #3 share one "fundraise readiness" engine with stage-specific bars. Bars are never hard-coded: they come from approved reference rows (published, cited) and the advisor's rubric for that stage.
 
-## 5. Data the app keeps
+Not in v1 (candidates for later): channel/budget allocation (folds into #1 as a recommendation for now), pricing & packaging, adding a product-led motion.
 
-- **companies** — profile fields from intake (name, website, industry, stage, ARR, growth, funding, employees, customers, ACV, NRR, GRR, sales cycle, segment, sales model, founder-led flag), current phase, health, assigned advisor.
-- **users** — name, email, role (founder | advisor | admin).
-- **company_members** — user ↔ company link (founders see only their company; advisors see their portfolio).
-- **intake_responses** — section, field, value, source (manual | extracted), updated_at. Drives % complete.
-- **documents** — company, type, file location, status (uploaded | analyzing | done | failed), uploaded_by.
-- **data_points** — company, metric, value, period, source document/page, confidence, accepted flag. One metric can have several competing data points (that's how conflicts are detected).
-- **register_items** — company, type (missing | question | conflict | assumption | follow_up), description, linked data points, status (open | resolved | unknown), resolution, due/reminder date.
-- **benchmark_cohorts** — name, criteria (stage, ARR range, model, GTM motion), company count, updated_at.
-- **benchmark_metrics** — cohort, metric, median, top quartile, bottom quartile, sample size, source. Aggregates only — never another company's raw data.
-- **deliverables** — company, type (benchmark | baseline | icp | channels | hiring), version, status (drafting | qa | in_review | changes_requested | approved | published), content (structured JSON), score/headline.
-- **sources** — deliverable claim ↔ supporting data points / cohort / methodology, confidence. Powers the Source Trail panel.
-- **reviews** — deliverable version, QA check results, advisor decision, comments, reviewer, timestamp.
-- **benchmark_sources** — name, publisher, URL, year, licence/usage note, type (public | advisory), imported_by.
-- **score_rubrics** — advisor, name, criteria (metric, weight, bands → points), labels by score range. **company_scores** — company, rubric, computed score, override score + note, computed_at.
-- **invites** — email, company, inviting advisor, token, expires_at, accepted_at.
-- **events** — product analytics (see §7).
+## 4. Founder experience
 
-## 6. How the intelligence works (v1)
+1. **Welcome** — start, or explore the sample company (Acme AI, read-only).
+2. **Company profile** — light intake (name, stage, ARR band, model) so we can recommend use cases.
+3. **"What are you trying to decide?"** — the library: six cards, each showing how ready the founder's data is for it. Recommendation: seed / <$3M ARR → #2 and #1; otherwise → #1.
+4. **Use case page** — checklist of only the data this use case needs (reusing Data Readiness upload/sorting), then build. A preliminary analysis is available right after uploads (paid unlock, see §8); the advisor-approved version replaces it.
+5. **Questions / Registers** — conflicts, assumptions and gaps found while reading their data.
+6. **Deliverables** — every analysis, with status and history.
+7. **Source Trail** (side panel, everywhere) — sources behind each claim, confidence, method.
 
-- **Extraction:** uploaded documents → Claude API → structured data points with page-level source and confidence. Conflicts with intake answers create register items automatically.
-- **Draft Agent:** Claude generates each deliverable as structured JSON (not free text) from accepted data points + cohort benchmarks, with every claim linked to sources.
-- **QA Agent:** a separate Claude call checks the draft against the five QA checks and returns pass/fail with notes. It never sees the Draft Agent's reasoning.
-- **Advisor gate:** nothing reaches a founder until an advisor approves it.
-- **Language:** UI says "Growth Intelligence Analysis", never "AI generated this".
-- **Privacy:** company data is never shown to other customers; only aggregated cohort statistics feed benchmarks.
+## 5. Advisor experience
 
-## 7. Growth goal & metrics
+Portfolio, Unassigned, Company view (now shows which use cases each company has started and their status), Review Queue (per use case), **Reference data** (the former Benchmarks library: cohorts, published bars, advisory CSV import, public research — feeds use cases as reference lines), Score Rubrics (now per use case, including Series A and Series B readiness rubrics), Registers, Analytics, Users, Settings.
 
-The near-term goal is to validate the five questions from the brief and convert pilots to paid ($25K+). Product metrics to instrument from day one:
+## 6. Data the app keeps
+
+Unchanged from v1 except:
+- **use cases** are defined in code (a registry), not the database.
+- **company_use_cases** — company, use case, status (not_started | collecting | building | in_review | published), started_at, started_by.
+- **deliverables** — gain a `use_case` key; one deliverable per use case per version. Legacy `benchmark` deliverables stay readable as history.
+- **payments** — unlock is per company per use case.
+- **benchmark_* tables** — kept, presented as "Reference data". A use case can run with zero matching reference rows.
+- **score_rubrics** — gain a `use_case` key so an advisor can keep a rubric per use case (e.g. Series A readiness bars).
+- **metrics dictionary** — extended with the figures the use cases compute (gross margin, new/expansion/churned ARR, pipeline coverage, quota attainment, ramp, founder-closed share, top-customer concentration, runway).
+
+## 7. How the intelligence works
+
+- **Extraction & sorting:** uploads → Claude reads and sorts into the Data Readiness catalogue → structured data points with page-level source and confidence. Conflicts create register items.
+- **Figures in code:** each use case computes its numbers in code from accepted data points. The model never calculates.
+- **Draft Agent:** one shared agent with a per-use-case brief; returns the use case's structured JSON with every claim linked to sources.
+- **QA Agent:** independent call; five checks — data consistency, method (reference data / rubric used correctly), source trail, recommendation logic, missing inputs. Plus code checks: every number traces to an input; every claim has a source.
+- **Advisor gate:** nothing reaches a founder unapproved, except a clearly labelled preliminary version the founder has unlocked.
+- **No reference data? Still useful.** Where no approved reference row exists, the analysis uses the company's own trend and the advisor's rubric, and says plainly that no peer reference is available yet.
+- **Language:** "Growth Intelligence Analysis", never "AI generated this".
+- **Privacy:** company data is never shown to other customers; only aggregates feed reference data.
+
+## 8. Growth goal & metrics
+
+Near-term goal: validate value and willingness to pay, and convert pilots to paid ($25K+ engagements). Instrument:
 
 | Stage | Metric |
 |---|---|
-| Activation | % of invited founders who complete intake ≥ 80% and upload ≥ 1 doc |
-| Time to value | Hours from signup to first approved Benchmark |
+| Activation | % of signups who start a use case; % who reach "data ready" for it |
+| Time to value | Hours from signup to first preliminary analysis; to first approved analysis |
 | Trust | % of source-trail panels opened; % of register items resolved by founder |
-| Advisor leverage | Review turnaround time; % approved without changes |
-| Revenue | Pilot → paid conversion; companies per advisor |
+| Expansion | Use cases per company; % who start a second use case (especially #1 → its recommended next) |
+| Advisor leverage | Review turnaround; % approved without changes |
+| Revenue | Preliminary unlocks per use case; pilot → paid conversion; companies per advisor |
 
-## 8. Design system (from Figma)
+## 9. Design system (from Figma)
 
 - Fonts: Instrument Serif (display), Inter (UI), JetBrains Mono (numbers/labels).
 - Colors: background #F7F8FA, navy #0D1B2A, primary green #155A3C, green-muted #EBF5EF, amber #D97706, red #DC2626, blue #1D4ED8, border #E2E8F0. Radius 8px.
-- Light, premium, generous whitespace, minimal shadows. No glowing/sci-fi AI clichés.
-- Charts: Recharts.
+- Light, premium, generous whitespace, minimal shadows. No glowing/sci-fi AI clichés. Charts: Recharts.
 
-## 9. Tech stack
+## 10. Tech stack
 
-- Next.js (App Router, TypeScript) on Vercel; port the Figma Make React components (React 19 + Tailwind 4) directly.
-- Neon Postgres via the Vercel integration; Drizzle ORM + migrations.
-- Auth: Neon Auth (roles: founder / advisor / admin), email magic link to start.
-- File storage: Vercel Blob for uploads.
-- AI: Claude API (Anthropic Console key in Vercel env vars, server-side only).
-- Environments: `main` → app. (production); `dev` branch → dev. (staging) with its own Neon branch.
+Unchanged: Next.js on Vercel, Neon Postgres + Drizzle, Neon Auth, Vercel Blob, Claude API server-side, Stripe for unlocks. Environments: `main` → app.growthgoaled.com; `dev` → dev.growthgoaled.com, each with its own Neon branch.
 
-## 10. Phasing
+## 11. Phasing
 
-**Phase 1 (first deploy):** auth + roles, intake with autosave, document upload + extraction, registers, advisor portfolio + company view, Benchmark deliverable end-to-end (draft → QA → review → publish) with source trail, sample company (Acme AI) as seeded demo.
+- **Phase 1 (done, Oct 22–24):** foundation, auth/roles, signup/invites, intake, Data Readiness + extraction, registers, reference-data library, Benchmark end to end, portfolio, analytics, preliminary $1 unlock.
+- **Phase 1.5 — Use Case Library (next):** see HANDOFF.md §13. Framework + library, then use cases in order: Where is growth leaking? → Series A / Series B readiness → Hire or fix → Who are we winning with → Founder-led handoff.
+- **Phase 2:** reminders, Google Drive import, score shown on dashboard, use cases 7+.
+- **Phase 3:** methodology / data-quality screens, compounding-intelligence page, billing beyond unlocks.
 
-**Phase 2:** Baseline, ICP, Channel Strategy, Hiring Plan deliverables; dashboard score; reminders; Google Drive connect.
+## 12. Decisions log
 
-**Phase 3:** methodology/data-quality screens, cohort management UI, compounding-intelligence page, billing.
-
-## 11. Decisions (confirmed Oct 22, 2026)
-
-1. **Benchmark data** comes from two places: (a) publicly available benchmark data Claude researches (published SaaS surveys, open datasets), stored as aggregates with full citation; (b) the founder's existing advisory data, imported by CSV. Every benchmark figure carries its source, year, sample size, and an advisor "approved for use" flag. Nothing unapproved feeds a deliverable.
-2. **Growth Intelligence Score** is advisor-defined. Each advisor builds a scoring rubric (metrics, weights, target/threshold bands, score labels). The app computes the score from the rubric; the advisor can override per company with a note.
-3. **Signup:** founders can self-sign-up (creates a new company, lands in an "unassigned" queue for an advisor/admin to claim) AND advisors can invite founders by email (company pre-assigned to that advisor).
-4. **Google Drive:** Phase 2.
-5. **Domains:** marketing site stays at www.growthgoaled.com; app at **app.growthgoaled.com** (production, `main`); staging at **dev.growthgoaled.com** (`dev` branch).
+1. **Reference (benchmark) data** comes from (a) public published data Claude researches, stored as aggregates with full citation, and (b) the owner's advisory data via CSV. Every figure carries source, year, sample size and an advisor "approved" flag. Nothing unapproved feeds an analysis. *(Oct 22)*
+2. **Scoring** is advisor-defined via rubrics; the app computes, the advisor can override with a note. Rubrics are now per use case. *(Oct 22, extended Oct 26)*
+3. **Signup:** founders self-sign-up (unassigned queue) and advisors can invite founders. *(Oct 22)*
+4. **Google Drive:** Phase 2. *(Oct 22)*
+5. **Domains:** www.growthgoaled.com (marketing, untouched), app.growthgoaled.com (prod), dev.growthgoaled.com (staging). *(Oct 22)*
+6. **Preliminary unlock:** founders can unlock a preliminary analysis for $1 via Stripe before advisor review. *(Oct 24, set during build)*
+7. **Product leads with a Use Case Library, not Benchmark.** Benchmark becomes reference data used inside use cases. *(Oct 26)*
+8. **Series A readiness added** as a use case. This widens the target market down to late-seed companies (~$1–3M ARR) raising their A. *(Oct 26)*
