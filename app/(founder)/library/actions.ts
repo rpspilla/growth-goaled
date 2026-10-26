@@ -52,7 +52,7 @@ export async function submitQuestionnaire(useCaseId: string): Promise<{ ok: true
   return { ok: true };
 }
 
-/** Opens Stripe Checkout for the $499 assessment. Payment is confirmed server-side before anything unlocks. */
+/** Opens Stripe Checkout for the assessment (ASSESSMENT_PRICE_CENTS). Payment is confirmed server-side before anything unlocks. */
 export async function startAssessmentCheckout(useCaseId: string): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
   const { user, company } = await founderCompany();
   const def = getUseCase(useCaseId);

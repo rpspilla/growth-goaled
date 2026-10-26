@@ -170,7 +170,7 @@ describe("assessment purchase", () => {
     },
   });
   const activeRows = async () => (await db().select().from(schema.companyUseCases)).filter((r) => r.activatedAt);
-  const paid = { id: "cs_test_1", client_reference_id: "", metadata: {}, amount_total: 49_900, payment_status: "paid" as "paid" | "unpaid" };
+  const paid = { id: "cs_test_1", client_reference_id: "", metadata: {}, amount_total: 14_900, payment_status: "paid" as "paid" | "unpaid" };
 
   it("selecting a use case and answering questions is free: no payment, no entitlement", async () => {
     await saveObjectiveAnswer(acme, "growth_leak", "goal", "Find the leak");
@@ -179,7 +179,7 @@ describe("assessment purchase", () => {
     expect(await getCompanyUseCase(acme.id, "growth_leak")).toMatchObject({ status: "objective", activatedAt: null });
   });
 
-  it("creates a $499 checkout for the company and use case, and grants it only on a matching paid session", async () => {
+  it("creates a $149 checkout for the company and use case, and grants it only on a matching paid session", async () => {
     const stripe = fakeStripe({});
     const url = await createAssessmentCheckout(founder, acme, "growth_leak", "https://dev.test", stripe as never);
     expect(url).toBe("https://checkout.stripe.com/c/pay/cs_test_1");
@@ -187,13 +187,13 @@ describe("assessment purchase", () => {
       { line_items: { price_data: { unit_amount: number } }[]; client_reference_id: string; success_url: string; cancel_url: string; metadata: Record<string, string> },
       { idempotencyKey: string },
     ];
-    expect(args.line_items[0]!.price_data.unit_amount).toBe(49_900);
+    expect(args.line_items[0]!.price_data.unit_amount).toBe(14_900);
     expect(args.client_reference_id).toBe(acme.id);
     expect(args.metadata).toMatchObject({ useCase: "growth_leak", purpose: "assessment", userId: founder.id });
     expect(args.success_url).toBe("https://dev.test/api/checkout/return?use_case=growth_leak&session_id={CHECKOUT_SESSION_ID}");
     expect(args.cancel_url).toBe("https://dev.test/library/growth_leak/snapshot?checkout=cancelled");
     expect(opts.idempotencyKey).toMatch(new RegExp(`^assessment:${acme.id}:growth_leak:`));
-    expect((await db().select().from(schema.payments))[0]).toMatchObject({ status: "pending", amountCents: 49_900, useCase: "growth_leak", purpose: "assessment", checkoutUrl: url });
+    expect((await db().select().from(schema.payments))[0]).toMatchObject({ status: "pending", amountCents: 14_900, useCase: "growth_leak", purpose: "assessment", checkoutUrl: url });
 
     const base = { ...paid, client_reference_id: acme.id, metadata: { companyId: acme.id } };
     expect(await recordPaidSession({ ...base, payment_status: "unpaid" })).toBe(false);

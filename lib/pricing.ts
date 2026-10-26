@@ -5,7 +5,7 @@ import { isUseCaseId, USE_CASE_IDS, type UseCaseId } from "@/lib/use-cases/types
  * price shown is always the price charged. Read on the server only.
  *
  * - Growth Snapshot: free.
- * - Single Assessment: one use case, paid once (ASSESSMENT_PRICE_CENTS, default $499).
+ * - Single Assessment: one use case, paid once (ASSESSMENT_PRICE_CENTS, default $149).
  * - Advisory Session: optional, from ADVISORY_PRICE_CENTS (default $750); booked through
  *   ADVISORY_BOOKING_URL when set, otherwise as a request to the team.
  * - Growth Intelligence subscription: reserved (SUBSCRIPTION_PRICE_CENTS, $299/month). Not
@@ -19,7 +19,7 @@ const cents = (name: string, fallback: number) => {
 export const CURRENCY = "usd";
 
 export const pricing = () => ({
-  assessmentCents: cents("ASSESSMENT_PRICE_CENTS", 49_900),
+  assessmentCents: cents("ASSESSMENT_PRICE_CENTS", 14_900),
   advisoryFromCents: cents("ADVISORY_PRICE_CENTS", 75_000),
   subscriptionMonthlyCents: cents("SUBSCRIPTION_PRICE_CENTS", 29_900),
   subscriptionAvailable: false as const,

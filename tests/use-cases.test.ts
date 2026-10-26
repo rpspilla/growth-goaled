@@ -151,10 +151,10 @@ describe("Growth Snapshot", () => {
 });
 
 describe("pricing", () => {
-  it("defaults to $499 assessments for all six use cases, $750 advisory and a reserved, unavailable $299 subscription", () => {
+  it("defaults to $149 assessments for all six use cases, $750 advisory and a reserved, unavailable $299 subscription", () => {
     expect(sellableUseCases()).toEqual([...USE_CASE_IDS]);
-    expect(pricing()).toEqual({ assessmentCents: 49_900, advisoryFromCents: 75_000, subscriptionMonthlyCents: 29_900, subscriptionAvailable: false });
-    expect(formatPrice(49_900)).toBe("$499");
+    expect(pricing()).toEqual({ assessmentCents: 14_900, advisoryFromCents: 75_000, subscriptionMonthlyCents: 29_900, subscriptionAvailable: false });
+    expect(formatPrice(14_900)).toBe("$149");
     expect(formatPrice(75_000)).toBe("$750");
     expect(formatPrice(1_250)).toBe("$12.50");
   });

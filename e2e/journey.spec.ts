@@ -4,7 +4,7 @@ import { E2E_DATABASE_URL } from "../playwright.config";
 
 /**
  * Founder signs up → Overview → explores the library for free → answers the
- * questionnaire → free Growth Snapshot (no charge) → buys the $499 assessment
+ * questionnaire → free Growth Snapshot (no charge) → buys the $149 assessment
  * (fake Stripe in test mode) → Data → analysis; the advisor sees the same steps,
  * grants a pilot, approves and publishes; the founder reads the results, sees
  * the optional advisory offer once, requests a session, and finds both
@@ -62,7 +62,7 @@ async function fillSection(page: Page) {
   }
 }
 
-test("founder: free snapshot, $499 assessment, results, optional advisory", async ({ browser }) => {
+test("founder: free snapshot, $149 assessment, results, optional advisory", async ({ browser }) => {
   // --- Advisor: a cohort with approved benchmark rows ---
   const admin = await as(browser, ADMIN);
   await admin.page.goto("/advisor/benchmarks");
@@ -98,7 +98,7 @@ test("founder: free snapshot, $499 assessment, results, optional advisory", asyn
   await founder.page.getByRole("button", { name: "Start Your Growth Profile" }).click();
   await expect(founder.page).toHaveURL(/\/overview/);
 
-  // --- Founder: Overview → Library → questionnaire → free Snapshot → $499 purchase → Data ---
+  // --- Founder: Overview → Library → questionnaire → free Snapshot → $149 purchase → Data ---
   const steps = founder.page.getByRole("navigation", { name: "Steps" });
   await expect(steps.getByText("Unlocks when you buy an assessment").first()).toBeVisible();
   await expect(steps.getByRole("link", { name: /Data/ })).toHaveCount(0);
@@ -106,12 +106,12 @@ test("founder: free snapshot, $499 assessment, results, optional advisory", asyn
   await expect(founder.page).toHaveURL(/\/library$/);
   const leakCard = founder.page.locator("article", { has: founder.page.getByRole("heading", { name: "Where is our growth leaking?" }) });
   await expect(leakCard).toContainText("Recommended");
-  await expect(leakCard).toContainText("Free Snapshot · Assessment $499");
-  await expect(founder.page.locator("article", { hasText: "Are we ready to raise a Series A?" })).toContainText("Free Snapshot · Assessment $499");
+  await expect(leakCard).toContainText("Free Snapshot · Assessment $149");
+  await expect(founder.page.locator("article", { hasText: "Are we ready to raise a Series A?" })).toContainText("Free Snapshot · Assessment $149");
   await leakCard.getByRole("link", { name: /Explore assessment/ }).click();
   await expect(founder.page).toHaveURL(/\/library\/growth_leak$/);
-  await expect(founder.page.getByLabel("Pricing")).toContainText("$499");
-  await expect(founder.page.getByRole("button", { name: /payment|\$499/ })).toHaveCount(0); // selecting is free
+  await expect(founder.page.getByLabel("Pricing")).toContainText("$149");
+  await expect(founder.page.getByRole("button", { name: /payment|\$149/ })).toHaveCount(0); // selecting is free
   const snapshotButton = founder.page.getByRole("button", { name: "See my free Snapshot" });
   await expect(snapshotButton).toBeDisabled();
   await founder.page.getByLabel(/What's the challenge you're trying to solve\?/).fill("Find out why growth slowed after Q2.");
@@ -147,7 +147,7 @@ test("founder: free snapshot, $499 assessment, results, optional advisory", asyn
     await db.end();
   }
   await expect(steps.getByRole("link", { name: /Data/ })).toHaveCount(0);
-  await founder.page.getByRole("button", { name: "Get the full assessment · $499" }).click();
+  await founder.page.getByRole("button", { name: "Get the full assessment · $149" }).click();
   await expect(founder.page).toHaveURL(/\/data\?checkout=success/);
   await expect(founder.page.getByRole("heading", { name: "Data for Growth Leak" })).toBeVisible();
   await expect(steps.getByRole("link", { name: /Data/ })).toBeVisible();
@@ -155,7 +155,7 @@ test("founder: free snapshot, $499 assessment, results, optional advisory", asyn
     const db = new Client({ connectionString: E2E_DATABASE_URL });
     await db.connect();
     const { rows } = await db.query("select amount_cents, status, use_case, purpose from payments");
-    expect(rows).toEqual([{ amount_cents: 49900, status: "paid", use_case: "growth_leak", purpose: "assessment" }]);
+    expect(rows).toEqual([{ amount_cents: 14900, status: "paid", use_case: "growth_leak", purpose: "assessment" }]);
     await db.end();
   }
   // Buying again is refused rather than charged twice.
