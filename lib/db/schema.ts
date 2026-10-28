@@ -399,6 +399,8 @@ export const benchmarkSources = pgTable("benchmark_sources", {
   // Required for aggregated customer data before any dataset from it can be published
   consentReference: text("consent_reference"),
   minAggregationSize: integer("min_aggregation_size"),
+  // One of the fixed sources every free Snapshot's peer comparisons are drawn from
+  snapshotSource: boolean("snapshot_source").notNull().default(false),
   ...timestamps,
 });
 
@@ -520,6 +522,9 @@ export const benchmarkRecords = pgTable(
     acvMin: numeric("acv_min", { mode: "number" }),
     acvMax: numeric("acv_max", { mode: "number" }),
     geography: text("geography"),
+    // Founding years the cohort covers (inclusive), e.g. companies founded 2018–2021
+    foundedFrom: integer("founded_from"),
+    foundedTo: integer("founded_to"),
     period: text("period").notNull(),
     periodBasis: benchmarkPeriodBasis("period_basis").notNull(),
     cohortDefinition: text("cohort_definition"),

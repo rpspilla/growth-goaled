@@ -52,6 +52,7 @@ export async function saveSourceAction(_prev: Result<{ id?: string }> | null, fd
     licenceNote: s("licenceNote"),
     allowCustomerDisplay: fd.get("allowCustomerDisplay") === "on",
     allowDerived: fd.get("allowDerived") === "on",
+    snapshotSource: fd.get("snapshotSource") === "on",
     reliability: s("reliability"),
     updateFrequency: s("updateFrequency"),
     reviewIntervalDays: s("reviewIntervalDays").trim() || null,

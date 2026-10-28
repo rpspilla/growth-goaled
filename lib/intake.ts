@@ -46,6 +46,13 @@ export type IntakeField = {
 
 export type IntakeSection = { id: IntakeSectionId; label: string; fields: IntakeField[] };
 
+/** Founding years offered, newest first; the last option covers anything older. */
+const THIS_YEAR = new Date().getUTCFullYear();
+export const FOUNDING_YEARS = [...Array.from({ length: THIS_YEAR - 1990 + 1 }, (_, i) => String(THIS_YEAR - i)), "Before 1990"];
+
+/** The founding year as a number, or null when unknown or "Before 1990". */
+export const foundingYear = (v: IntakeValue | null | undefined): number | null => (typeof v === "string" && /^\d{4}$/.test(v) ? Number(v) : typeof v === "number" ? v : null);
+
 const BASE_SECTIONS: IntakeSection[] = [
   {
     id: "company",
@@ -60,6 +67,15 @@ const BASE_SECTIONS: IntakeSection[] = [
         required: true,
         options: ["AI / Automation", "B2B SaaS", "Fintech", "HealthTech", "Other"],
         column: "industry",
+        help: "Your main market. We compare you with companies in the same industry.",
+      },
+      {
+        id: "founded_year",
+        label: "Founding year",
+        kind: "select",
+        required: true,
+        options: FOUNDING_YEARS,
+        help: "The year the company was started. We compare you with companies founded around the same time.",
       },
       { id: "stage", label: "Stage", kind: "select", required: true, options: ["Pre-seed", "Seed", "Series A", "Series B+"], column: "stage" },
       { id: "arr", label: "ARR ($)", kind: "currency", required: true, placeholder: "4,200,000", metric: "arr", column: "arr" },

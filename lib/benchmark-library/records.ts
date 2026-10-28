@@ -82,6 +82,9 @@ export type RecordInput = {
   acvMin: number | null;
   acvMax: number | null;
   geography: string | null;
+  /** Founding years the cohort covers, inclusive. */
+  foundedFrom: number | null;
+  foundedTo: number | null;
   period: string;
   periodBasis: PeriodBasis;
   cohortDefinition: string | null;
@@ -226,6 +229,18 @@ export function validateRecord(raw: RawRecord): { record: RecordInput | null; is
   };
   const [arrMin, arrMax] = range("arrMin", "arrMax", "ARR");
   const [acvMin, acvMax] = range("acvMin", "acvMax", "ACV");
+  const year = (f: "foundedFrom" | "foundedTo") => {
+    const v = readNumber(raw[f]);
+    if (v === null) return null;
+    if (Number.isNaN(v) || !Number.isInteger(v) || v < 1900 || v > 2100) {
+      err(f, "Founding years must be four-digit years, e.g. 2018.");
+      return null;
+    }
+    return v;
+  };
+  const foundedFrom = year("foundedFrom");
+  const foundedTo = year("foundedTo");
+  if (foundedFrom !== null && foundedTo !== null && foundedFrom > foundedTo) err("foundedFrom", "The first founding year is after the last.");
 
   const period = text(raw.period);
   if (!period) err("period", "Measurement period is required (e.g. FY2025 or 2025-01 to 2025-12).");
@@ -266,6 +281,8 @@ export function validateRecord(raw: RawRecord): { record: RecordInput | null; is
       acvMin,
       acvMax,
       geography: text(raw.geography),
+      foundedFrom,
+      foundedTo,
       period: period!,
       periodBasis: periodBasis!,
       cohortDefinition: text(raw.cohortDefinition),
@@ -280,8 +297,14 @@ export function validateRecord(raw: RawRecord): { record: RecordInput | null; is
 const lc = (s: string | null) => (s ?? "").trim().toLowerCase();
 
 /** The cohort a record describes (everything but the metric and statistic). */
-export function cohortKey(r: Pick<RecordInput, "stages" | "arrMin" | "arrMax" | "industry" | "businessModel" | "pricingModel" | "customerSegment" | "acvMin" | "acvMax" | "geography">): string {
-  return [[...r.stages].sort().join("+"), r.arrMin ?? "", r.arrMax ?? "", lc(r.industry), lc(r.businessModel), lc(r.pricingModel), lc(r.customerSegment), r.acvMin ?? "", r.acvMax ?? "", lc(r.geography)].join("|");
+type CohortFields = Pick<RecordInput, "stages" | "arrMin" | "arrMax" | "industry" | "businessModel" | "pricingModel" | "customerSegment" | "acvMin" | "acvMax" | "geography"> &
+  Partial<Pick<RecordInput, "foundedFrom" | "foundedTo">>;
+
+export function cohortKey(r: CohortFields): string {
+  const base = [[...r.stages].sort().join("+"), r.arrMin ?? "", r.arrMax ?? "", lc(r.industry), lc(r.businessModel), lc(r.pricingModel), lc(r.customerSegment), r.acvMin ?? "", r.acvMax ?? "", lc(r.geography)];
+  // Founding years extend the key only when set, so keys of existing records don't change.
+  if (r.foundedFrom != null || r.foundedTo != null) base.push(`founded:${r.foundedFrom ?? ""}-${r.foundedTo ?? ""}`);
+  return base.join("|");
 }
 
 /** Two records with the same key in one version are duplicates. */
@@ -342,11 +365,19 @@ export function statisticLabel(r: { statistic: Statistic; percentile: number | n
 const usd = (n: number) => (n >= 1_000_000 ? `$${+(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `$${Math.round(n / 1000)}K` : `$${n}`);
 
 /** "Series A · ARR $2M–$10M · B2B SaaS · North America". */
-export function describeCohort(r: Pick<RecordInput, "stages" | "arrMin" | "arrMax" | "industry" | "businessModel" | "pricingModel" | "customerSegment" | "acvMin" | "acvMax" | "geography">): string {
+/** "founded 2018–2021", "founded 2018 or later", or null. */
+export function foundedLabel(from: number | null | undefined, to: number | null | undefined): string | null {
+  if (from != null && to != null) return from === to ? `founded ${from}` : `founded ${from}–${to}`;
+  if (from != null) return `founded ${from} or later`;
+  if (to != null) return `founded ${to} or earlier`;
+  return null;
+}
+
+export function describeCohort(r: CohortFields): string {
   const band = (lo: number | null, hi: number | null, label: string) =>
     lo !== null && hi !== null ? `${label} ${usd(lo)}–${usd(hi)}` : lo !== null ? `${label} ≥ ${usd(lo)}` : hi !== null ? `${label} ≤ ${usd(hi)}` : null;
   return (
-    [r.stages.length ? r.stages.join(" / ") : null, band(r.arrMin, r.arrMax, "ARR"), r.businessModel, r.pricingModel, r.industry, r.customerSegment, band(r.acvMin, r.acvMax, "ACV"), r.geography].filter(Boolean).join(" · ") ||
+    [r.stages.length ? r.stages.join(" / ") : null, band(r.arrMin, r.arrMax, "ARR"), r.businessModel, r.pricingModel, r.industry, foundedLabel(r.foundedFrom, r.foundedTo), r.customerSegment, band(r.acvMin, r.acvMax, "ACV"), r.geography].filter(Boolean).join(" · ") ||
     "All companies in the source (no cohort filters)"
   );
 }

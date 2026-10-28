@@ -49,6 +49,7 @@ export const sourceSchema = z.object({
   consentReference: opt(500),
   minAggregationSize: z.coerce.number().int().min(5).max(100_000).optional().nullable(),
   notes: opt(4000),
+  snapshotSource: z.boolean().optional(),
 });
 export type SourceInput = z.infer<typeof sourceSchema>;
 
@@ -62,7 +63,7 @@ export async function saveSource(actor: User, input: SourceInput, id?: string): 
   if (!isLibraryAdmin(actor)) return denied;
   if (input.kind === "aggregated_customer" && (!input.consentReference || !input.minAggregationSize))
     return { ok: false, error: "Aggregated customer data needs a consent reference and a minimum aggregation size before it can be recorded." };
-  const values = { ...input, reviewIntervalDays: input.reviewIntervalDays ?? null, minAggregationSize: input.minAggregationSize ?? null };
+  const values = { ...input, reviewIntervalDays: input.reviewIntervalDays ?? null, minAggregationSize: input.minAggregationSize ?? null, snapshotSource: input.snapshotSource ?? false };
   if (id) {
     const [row] = await db.update(schema.benchmarkSources).set({ ...values, updatedAt: new Date() }).where(eq(schema.benchmarkSources.id, id)).returning({ id: schema.benchmarkSources.id });
     return row ? { ok: true, id: row.id } : { ok: false, error: "Source not found." };
@@ -200,6 +201,8 @@ export function toRaw(r: RecordRow): RawRecord {
     acvMin: s(r.acvMin),
     acvMax: s(r.acvMax),
     geography: s(r.geography),
+    foundedFrom: s(r.foundedFrom),
+    foundedTo: s(r.foundedTo),
     period: r.period,
     periodBasis: r.periodBasis,
     cohortDefinition: s(r.cohortDefinition),
@@ -602,15 +605,16 @@ function toCandidate(r: RecordRow, v: Version, d: typeof schema.benchmarkDataset
       allowCustomerDisplay: s.allowCustomerDisplay,
       allowDerived: s.allowDerived,
       reviewIntervalDays: s.reviewIntervalDays,
+      snapshotSource: s.snapshotSource,
     },
   };
 }
 
 export type CompanyFigure = { metric: MetricKey; value: number; period: string | null; origin: string };
 
-export function companyProfile(company: Pick<Company, "stage" | "arr" | "revenueBand" | "industry" | "primarySegment">, figures: CompanyFigure[]): CompanyProfile {
+export function companyProfile(company: Pick<Company, "stage" | "arr" | "revenueBand" | "industry" | "primarySegment"> & { foundedYear?: number | null }, figures: CompanyFigure[]): CompanyProfile {
   const fig = (m: MetricKey) => figures.find((f) => f.metric === m)?.value ?? null;
-  return { stage: company.stage, arr: fig("arr") ?? company.arr ?? null, revenueBand: company.revenueBand, industry: company.industry, segment: company.primarySegment, acv: fig("acv") };
+  return { stage: company.stage, arr: fig("arr") ?? company.arr ?? null, revenueBand: company.revenueBand, industry: company.industry, segment: company.primarySegment, acv: fig("acv"), foundedYear: company.foundedYear ?? null };
 }
 
 export type BenchmarkResult = { comparisons: BenchmarkComparison[]; missing: { metric: MetricKey; label: string; reason: string }[] };
@@ -619,7 +623,7 @@ export type BenchmarkResult = { comparisons: BenchmarkComparison[]; missing: { m
  * The comparisons a company's report can show. Sample companies are never benchmarked against
  * the library (it's real data); everything comes from published versions only.
  */
-export async function benchmarkCompany(company: Pick<Company, "id" | "isSample" | "stage" | "arr" | "revenueBand" | "industry" | "primarySegment">, figures: CompanyFigure[]): Promise<BenchmarkResult> {
+export async function benchmarkCompany(company: Pick<Company, "id" | "isSample" | "stage" | "arr" | "revenueBand" | "industry" | "primarySegment"> & { foundedYear?: number | null }, figures: CompanyFigure[]): Promise<BenchmarkResult> {
   const comparable = figures.filter((f) => Number.isFinite(f.value));
   if (company.isSample || !comparable.length) return { comparisons: [], missing: [] };
   const [candidates, overrides] = await Promise.all([

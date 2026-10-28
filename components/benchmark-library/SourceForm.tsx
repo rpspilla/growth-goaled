@@ -18,6 +18,7 @@ type Source = {
   licenceNote: string | null;
   allowCustomerDisplay: boolean;
   allowDerived: boolean;
+  snapshotSource: boolean;
   reliability: string;
   updateFrequency: string | null;
   reviewIntervalDays: number | null;
@@ -96,6 +97,14 @@ export function SourceForm({ source, action }: { source?: Source; action: typeof
           The licence allows derived figures (differences from the company&apos;s value)
         </label>
         <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Both are off until you confirm the licence. Being able to read or download a report doesn&apos;t grant these rights.</p>
+      </fieldset>
+      <fieldset className="rounded-lg border p-3 space-y-2" style={{ borderColor: "var(--border)" }}>
+        <legend className="text-xs font-semibold px-1" style={{ color: "var(--foreground)" }}>Free Snapshot</legend>
+        <label className="flex items-center gap-2 text-sm" style={{ color: "var(--foreground)" }}>
+          <input type="checkbox" name="snapshotSource" defaultChecked={source?.snapshotSource ?? false} />
+          Use for Snapshot peer comparisons (growth, retention and revenue by industry and founding year)
+        </label>
+        <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Every Snapshot draws its peer comparisons from these sources only, so founders are always compared on the same basis. The licence must also allow customer display.</p>
       </fieldset>
       {kind === "aggregated_customer" && (
         <fieldset className="rounded-lg border p-3 space-y-2" style={{ borderColor: "var(--amber)" }}>

@@ -62,23 +62,29 @@ describe("objective form", () => {
     const empty = questionnaire(leak, {});
     expect(empty.fields.filter((f) => f.group === "company").map((f) => f.id)).toEqual([
       "profile.company.stage",
+      "profile.company.founded_year",
       "profile.gtm.model",
       "profile.company.arr_range",
       "profile.company.growth_range",
       "profile.customers.nrr_range",
       "profile.customers.gross_retention_range",
+      "profile.company.industry",
       "profile.company.employees_range",
     ]);
+    const year = empty.fields.find((f) => f.id === "profile.company.founded_year")!;
+    expect(year).toMatchObject({ kind: "select", required: true });
+    expect(year.options![0]!.value).toBe(String(new Date().getUTCFullYear()));
+    expect(year.options!.at(-1)!.value).toBe("Before 1990");
     for (const f of empty.fields.filter((f) => f.id.endsWith("_range"))) {
       expect(f.kind).toBe("select");
       expect(f.help, f.id).toMatch(/\w{3,}.*\./); // every figure we ask for has a simple definition
     }
     expect(empty.fields.find((f) => f.id === "profile.company.employees_range")!.options!.map((o) => o.label)).toEqual(["1–5", "6–10", "11–25", "26–50", "50+"]);
-    expect(empty.fields.filter((f) => f.required).map((f) => f.id)).toEqual(["profile.company.stage", "profile.gtm.model"]);
-    for (const u of USE_CASES) expect(questionnaire(u, {}).fields.map((f) => f.id)).toContain("profile.company.employees_range");
+    expect(empty.fields.filter((f) => f.required).map((f) => f.id)).toEqual(["profile.company.stage", "profile.company.founded_year", "profile.gtm.model"]);
+    for (const u of USE_CASES) expect(questionnaire(u, {}).fields.map((f) => f.id)).toEqual(expect.arrayContaining(["profile.company.founded_year", "profile.company.industry", "profile.company.employees_range"]));
     // An exact figure or a range already given is listed, not asked again.
     const known = questionnaire(leak, { "company.stage": "Seed", "gtm.model": "Founder-led", "company.arr": 2_000_000, "company.growth_range": "25–50%" });
-    expect(known.fields.filter((f) => f.group === "company").map((f) => f.id)).toEqual(["profile.customers.nrr_range", "profile.customers.gross_retention_range", "profile.company.employees_range"]);
+    expect(known.fields.filter((f) => f.group === "company").map((f) => f.id)).toEqual(["profile.company.founded_year", "profile.customers.nrr_range", "profile.customers.gross_retention_range", "profile.company.industry", "profile.company.employees_range"]);
     expect(known.known).toEqual([
       { label: "Stage", value: "Seed" },
       { label: "Sales model", value: "Founder-led" },
@@ -104,8 +110,9 @@ describe("objective form", () => {
   });
 
   it("lists required answers still missing and summarises the founder's target", () => {
-    expect(missingRequired(leak, null)).toEqual(["profile.company.stage", "profile.gtm.model"]);
-    expect(missingRequired(leak, {}, { "company.stage": "Seed", "gtm.model": "Hybrid" })).toEqual([]);
+    expect(missingRequired(leak, null)).toEqual(["profile.company.stage", "profile.company.founded_year", "profile.gtm.model"]);
+    expect(missingRequired(leak, {}, { "company.stage": "Seed", "gtm.model": "Hybrid" })).toEqual(["profile.company.founded_year"]);
+    expect(missingRequired(leak, {}, { "company.stage": "Seed", "company.founded_year": "2019", "gtm.model": "Hybrid" })).toEqual([]);
     const objective = { goal: "Grow", main_metric: "arr", target_value: "5000000", target_date: "2027-06-30" };
     expect(targetSummary(objective)).toBe("ARR $5M by 2027-06-30");
     expect(targetSummary({ main_metric: "arr" })).toBeNull();

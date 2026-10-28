@@ -1,5 +1,5 @@
 import { METRICS, type MetricKey } from "@/lib/metrics";
-import { cohortKey, compatibleBases, describeCohort, expectedUnit, PERIOD_BASIS_LABEL, type RecordInput } from "./records";
+import { cohortKey, compatibleBases, describeCohort, expectedUnit, foundedLabel, PERIOD_BASIS_LABEL, type RecordInput } from "./records";
 
 /**
  * Benchmark retrieval: which published record set (if any) a company's figure may be compared
@@ -24,6 +24,8 @@ export type SourceInfo = {
   allowCustomerDisplay: boolean;
   allowDerived: boolean;
   reviewIntervalDays: number | null;
+  /** One of the fixed sources the free Snapshot's peer comparisons use. */
+  snapshotSource?: boolean;
 };
 
 export type CandidateRecord = RecordInput & {
@@ -44,6 +46,7 @@ export type CompanyProfile = {
   industry: string | null;
   segment: string | null;
   acv: number | null;
+  foundedYear?: number | null;
 };
 
 export type Override = { recordId: string | null; reason: string } | undefined;
@@ -148,12 +151,22 @@ export function cohortFit(r: CandidateRecord, c: CompanyProfile): Fit {
       matched.push(`${label} (${v})`);
     } else caveats.push(`the cohort is ${v} and the company's ${label} isn't confirmed`);
   }
+  if (r.foundedFrom != null || r.foundedTo != null) {
+    const label = foundedLabel(r.foundedFrom, r.foundedTo)!;
+    const y = c.foundedYear ?? null;
+    if (y === null) caveats.push(`the cohort is companies ${label} and the company's founding year isn't known`);
+    else if ((r.foundedFrom != null && y < r.foundedFrom) || (r.foundedTo != null && y > r.foundedTo)) return { excluded: `different founding years (cohort ${label}, company founded ${y})`, score, matched, caveats, explicit };
+    else {
+      score += 1;
+      matched.push(`founding year (${label})`);
+    }
+  }
   if (r.geography) caveats.push(`the cohort covers ${r.geography}; the company's geography isn't checked`);
   return { excluded: null, score, matched, caveats, explicit };
 }
 
 /** Why a record can't be compared with this figure at all, whoever selects it. */
-function incompatible(r: CandidateRecord, metric: MetricKey, purpose: "customer_report" | "internal"): string | null {
+export function incompatible(r: CandidateRecord, metric: MetricKey, purpose: "customer_report" | "internal"): string | null {
   if (r.unit !== expectedUnit(metric)) return `different unit (${r.unit}, expected ${expectedUnit(metric)})`;
   if (!compatibleBases(metric).includes(r.periodBasis)) return `${PERIOD_BASIS_LABEL[r.periodBasis].toLowerCase()} basis doesn't match how ${METRICS[metric].label} is measured`;
   if (r.source.reliability === "unreliable") return "the source is marked unreliable";

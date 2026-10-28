@@ -32,6 +32,8 @@ export const CSV_FIELDS: { column: string; field: CsvField; required: boolean; a
   { column: "acv_min", field: "acvMin", required: false, aliases: [], help: "US dollars" },
   { column: "acv_max", field: "acvMax", required: false, aliases: [], help: "US dollars" },
   { column: "geography", field: "geography", required: false, aliases: ["region"], help: "" },
+  { column: "founded_from", field: "foundedFrom", required: false, aliases: ["founded_min", "founding_year_from"], help: "First founding year the cohort covers, e.g. 2018" },
+  { column: "founded_to", field: "foundedTo", required: false, aliases: ["founded_max", "founding_year_to"], help: "Last founding year the cohort covers, e.g. 2021" },
   { column: "period", field: "period", required: true, aliases: ["measurement_period"], help: "e.g. FY2025 or 2025-01 to 2025-12" },
   { column: "period_basis", field: "periodBasis", required: true, aliases: ["basis"], help: "annual, trailing_12_months, quarterly, monthly, point_in_time or other" },
   { column: "cohort_definition", field: "cohortDefinition", required: false, aliases: ["cohort"], help: "How the source defined the cohort" },

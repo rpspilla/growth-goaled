@@ -46,9 +46,10 @@ export const objectiveFields = (useCase: UseCaseDef): ObjectiveField[] => useCas
 /** Every question an answer may exist for, including retired ones: for reading answers, never for asking. */
 export const answeredObjectiveFields = (useCase: UseCaseDef): ObjectiveField[] => [...retiredFields(useCase), ...objectiveFields(useCase)];
 
-/** Stage and sales model decide whether the assessment fits, so they're required (asked only if the profile lacks them). */
+/** Stage and sales model decide whether the assessment fits, and founding year places the company among its peers, so they're required (asked only if the profile lacks them). */
 export const REQUIRED_PROFILE: readonly ProfileQuestion[] = [
   { section: "company", field: "stage" },
+  { section: "company", field: "founded_year" },
   { section: "gtm", field: "model" },
 ];
 
@@ -58,15 +59,18 @@ export function parseProfileFieldId(id: string): ProfileQuestion | null {
   return m ? { section: m[1]!, field: m[2]! } : null;
 }
 
-/** Asked on every questionnaire, as a range. */
-const EMPLOYEES: ProfileQuestion = { section: "company", field: "employees" };
+/** Asked on every questionnaire: industry (for peer comparisons) and employees (as a range). */
+const ALWAYS: readonly ProfileQuestion[] = [
+  { section: "company", field: "industry" },
+  { section: "company", field: "employees" },
+];
 
 /** Every profile question the use case's questionnaire may ask (figures are asked as ranges). */
-export const profileQuestions = (useCase: UseCaseDef): ProfileQuestion[] => [
-  ...REQUIRED_PROFILE,
-  ...useCase.snapshotProfile,
-  ...(useCase.snapshotProfile.some((q) => q.section === EMPLOYEES.section && q.field === EMPLOYEES.field) ? [] : [EMPLOYEES]),
-];
+export const profileQuestions = (useCase: UseCaseDef): ProfileQuestion[] => {
+  const out = [...REQUIRED_PROFILE, ...useCase.snapshotProfile];
+  for (const q of ALWAYS) if (!out.some((o) => o.section === q.section && o.field === q.field)) out.push(q);
+  return out;
+};
 
 export type Objective = Record<string, string>;
 

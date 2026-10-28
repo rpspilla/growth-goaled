@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
+import { PeerComparisonCard } from "@/components/use-cases/PeerComparisonCard";
 import { PurchaseButton } from "@/components/use-cases/PurchaseButton";
 import { founderContext } from "@/lib/data/founder-context";
 import { getIntakeAnswers } from "@/lib/data/intake";
+import { snapshotPeers } from "@/lib/data/peers";
 import { getReadiness } from "@/lib/data/readiness";
 import { track } from "@/lib/events";
 import { formatPrice, pricing, sellableUseCases } from "@/lib/pricing";
@@ -43,6 +45,7 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
     profile: answers,
     dataStatus: Object.fromEntries(readiness.items.map((i) => [i.itemKey, i.status])),
   });
+  const peers = await snapshotPeers(company, answers);
   const approach = howWeWork({ useCase: def.id, profile: answers, revenueBand: company.revenueBand });
   const suggested = snapshot.fit.suggested ? getUseCase(snapshot.fit.suggested) : undefined;
   const price = formatPrice(pricing().assessmentCents);
@@ -68,7 +71,7 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
           <div className="flex gap-3 items-start rounded-xl px-4 py-3" style={{ background: "var(--amber-muted)" }} role="note">
             <span className="text-sm font-bold shrink-0" style={{ color: "#92400E" }}>Hypotheses</span>
             <span className="text-sm" style={{ color: "#78350F" }}>
-              Early signals from your answers{snapshot.answersOnly ? " (no figures yet)" : ""}, not conclusions. Nothing here has been checked against your data or compared with other companies.
+              Early signals from your answers{snapshot.answersOnly ? " (no figures yet)" : ""}, not conclusions. Nothing here has been checked against your own data yet.
             </span>
           </div>
 
@@ -84,6 +87,16 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
                 </li>
               ))}
             </ul>
+          </section>
+
+          <section aria-labelledby="peers">
+            <h2 id="peers" className="text-xl sm:text-2xl font-semibold" style={{ color: "var(--foreground)" }}>How you compare with peers</h2>
+            <p className="text-base mt-1 mb-4" style={{ color: "var(--muted-foreground)" }}>
+              Growth, retention and revenue against companies in your industry founded around the same time, from the same published sources for every Snapshot. The band shows the peers from bottom to top; the line is the median.
+            </p>
+            <div className="space-y-4">
+              {peers.map((c) => <PeerComparisonCard key={c.key} c={c} />)}
+            </div>
           </section>
 
           <section className="surface surface-pad" style={{ borderColor: snapshot.fit.good ? undefined : "var(--blue)" }} aria-labelledby="fit">

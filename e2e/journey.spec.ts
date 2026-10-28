@@ -78,6 +78,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await admin.page.getByLabel("Reliability").selectOption("reliable");
   await admin.page.getByLabel(/allows showing these values in customer reports/).check();
   await admin.page.getByLabel(/allows derived figures/).check();
+  await admin.page.getByLabel(/Use for Snapshot peer comparisons/).check();
   await admin.page.getByRole("button", { name: "Add source" }).click();
   await expect(admin.page.getByRole("article").filter({ hasText: "E2E advisory survey" })).toContainText("Customer display: allowed");
 
@@ -91,16 +92,23 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
     name: "bench.csv",
     mimeType: "text/csv",
     buffer: Buffer.from(
-      "metric,definition,definition_matches,unit,statistic,percentile,value,stages,arr_min,arr_max,period,period_basis,cohort_definition,sample_size\n" +
-        "nrr,ARR from customers a year ago ÷ their ARR then,yes,percent,median,,104,Series A,2M,10M,FY2025,annual,E2E Series A cohort,40\n" +
-        "nrr,ARR from customers a year ago ÷ their ARR then,yes,percent,percentile,75,119,Series A,2M,10M,FY2025,annual,E2E Series A cohort,40\n" +
-        "nrr,ARR from customers a year ago ÷ their ARR then,yes,dollars,median,,90,Series A,2M,10M,FY2024,annual,E2E Series A cohort,40\n",
+      "metric,definition,definition_matches,unit,statistic,percentile,value,stages,arr_min,arr_max,industry,founded_from,founded_to,period,period_basis,cohort_definition,sample_size\n" +
+        "nrr,ARR from customers a year ago ÷ their ARR then,yes,percent,median,,104,Series A,2M,10M,,,,FY2025,annual,E2E Series A cohort,40\n" +
+        "nrr,ARR from customers a year ago ÷ their ARR then,yes,percent,percentile,75,119,Series A,2M,10M,,,,FY2025,annual,E2E Series A cohort,40\n" +
+        "nrr,ARR from customers a year ago ÷ their ARR then,yes,dollars,median,,90,Series A,2M,10M,,,,FY2024,annual,E2E Series A cohort,40\n" +
+        // Peers by industry and founding year, for the free Snapshot (no growth rows: that comparison stays unavailable).
+        "nrr,ARR from customers a year ago ÷ their ARR then,yes,percent,percentile,25,88,,,,Fintech,2017,2021,FY2025,annual,E2E fintech founded 2017-2021,30\n" +
+        "nrr,ARR from customers a year ago ÷ their ARR then,yes,percent,median,,100,,,,Fintech,2017,2021,FY2025,annual,E2E fintech founded 2017-2021,30\n" +
+        "nrr,ARR from customers a year ago ÷ their ARR then,yes,percent,percentile,75,112,,,,Fintech,2017,2021,FY2025,annual,E2E fintech founded 2017-2021,30\n" +
+        "arr,Annual recurring revenue at year end,yes,usd,percentile,25,1M,,,,Fintech,2017,2021,FY2025,point_in_time,E2E fintech founded 2017-2021,30\n" +
+        "arr,Annual recurring revenue at year end,yes,usd,median,,3M,,,,Fintech,2017,2021,FY2025,point_in_time,E2E fintech founded 2017-2021,30\n" +
+        "arr,Annual recurring revenue at year end,yes,usd,percentile,75,8M,,,,Fintech,2017,2021,FY2025,point_in_time,E2E fintech founded 2017-2021,30\n",
     ),
   });
   await admin.page.getByRole("button", { name: "Preview" }).click();
-  await expect(admin.page.getByText("3 rows: 2 will be imported, 1 rejected")).toBeVisible();
+  await expect(admin.page.getByText("9 rows: 8 will be imported, 1 rejected")).toBeVisible();
   await expect(admin.page.getByText(/Unknown unit "dollars"/)).toBeVisible();
-  await admin.page.getByRole("button", { name: /^Import 2 to draft version 1/ }).click();
+  await admin.page.getByRole("button", { name: /^Import 8 to draft version 1/ }).click();
   await admin.page.getByRole("link", { name: "Review the draft →" }).click();
   await expect(admin.page.getByText("No validation errors.")).toBeVisible();
   await admin.page.getByRole("button", { name: "Validate" }).click();
@@ -108,6 +116,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await admin.page.getByRole("button", { name: "Publish", exact: true }).click();
   await expect(admin.page.getByText("Version 1 published")).toBeVisible();
   // The customer preview uses the same card as reports.
+  await admin.page.locator("select").filter({ hasText: "NRR · Series A" }).selectOption({ label: "NRR · Series A · ARR $2M–$10M · FY2025" });
   await admin.page.getByPlaceholder("e.g. 94").fill("94");
   await expect(admin.page.getByRole("article", { name: "NRR benchmark comparison" })).toContainText("10 pts below");
 
@@ -152,6 +161,9 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await expect(founder.page.locator("#q-profile-company-employees_range option")).toContainText(["Choose…", "1–5", "6–10", "11–25", "26–50", "50+"]);
   await founder.page.getByLabel(/^Stage/).selectOption("Series A");
   await founder.page.getByLabel(/^Sales model/).selectOption("Founder-led");
+  await expect(founder.page.getByRole("button", { name: "See my free Snapshot" })).toBeDisabled(); // founding year is required
+  await founder.page.getByLabel(/^Founding year/).selectOption("2019");
+  await founder.page.getByLabel(/^Industry/).selectOption("Fintech");
   await founder.page.getByLabel("Year-over-year revenue growth").selectOption("50–100%");
   await founder.page.getByLabel("Net revenue retention (NRR)").selectOption("90–100%");
   await founder.page.getByLabel("Number of employees").selectOption("26–50");
@@ -167,6 +179,19 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await expect(founder.page.getByText("Hypotheses", { exact: true })).toBeVisible();
   await expect(founder.page.getByText("Your existing customers shrink on net")).toBeVisible();
   await expect(founder.page.getByText("Based on: Your answer: NRR 90–100%")).toBeVisible();
+  // Peer comparisons: the same fixed sources, the founder's industry and founding year, and plain words when there's nothing to compare.
+  await expect(founder.page.getByRole("heading", { name: "How you compare with peers" })).toBeVisible();
+  const retention = founder.page.getByRole("article", { name: "Retention compared with peers" });
+  await expect(retention).toContainText("Between the bottom quartile and the median");
+  await expect(retention).toContainText("You: 90–100%");
+  await expect(retention).toContainText("Fintech · founded 2017–2021");
+  await expect(retention).toContainText("E2E advisory survey");
+  const revenue = founder.page.getByRole("article", { name: "Revenue compared with peers" });
+  await expect(revenue).toContainText("$3M");
+  await expect(revenue).toContainText("the revenue band you gave at sign-up");
+  await expect(founder.page.getByRole("article", { name: "Growth compared with peers" })).toContainText(
+    "Our comparison sources don't publish growth figures for Fintech companies founded in 2019 yet. An advisor can confirm this comparison for you later.",
+  );
   // How we work with companies like this one, and what we'd do after the assessment.
   await expect(founder.page.getByRole("heading", { name: "How we work with companies like yours" })).toBeVisible();
   await expect(founder.page.getByText(/^Series A .*companies.*with founder-led sales/)).toBeVisible();
