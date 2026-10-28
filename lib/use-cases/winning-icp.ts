@@ -19,7 +19,8 @@ export const winningIcp: UseCaseDef = {
   ],
   snapshotProfile: [{ section: "customers", field: "count" }, { section: "customers", field: "segment" }, { section: "customers", field: "acv" }],
   nextUseCase: "growth_leak",
-  objectiveQuestions: [
+  objectiveQuestions: [],
+  retiredQuestions: [
     { id: "believed_segments", label: "Which segments do you believe are your best?", kind: "textarea", placeholder: "e.g. mid-market fintech, 200–1,000 employees" },
   ],
   requiredItems: ["customer_list", "revenue_by_customer", "industry", "company_size"],

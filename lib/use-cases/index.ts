@@ -40,6 +40,7 @@ function retiredFields(useCase: UseCaseDef): ObjectiveField[] {
     { id: "already_tried", label: "What have you already tried?", kind: "textarea", group: "context" },
     { id: "constraints", label: "Constraints we should know about", kind: "textarea", group: "context" },
     ...(useCase.id === "growth_leak" ? [{ id: "suspected_leak", label: "Where do you think the leak is?", kind: "textarea" as const, group: "challenge" as const }] : []),
+    ...(useCase.retiredQuestions ?? []),
   ];
 }
 

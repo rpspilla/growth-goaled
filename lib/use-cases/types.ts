@@ -46,6 +46,8 @@ export type UseCaseDef = {
   /** Suggested next assessment once this one is done. */
   nextUseCase?: UseCaseId;
   objectiveQuestions: readonly ObjectiveField[];
+  /** Questions this use case used to ask: no longer asked or saved, but earlier answers are still read. */
+  retiredQuestions?: readonly ObjectiveField[];
   requiredItems: readonly string[];
   helpfulItems: readonly string[];
   optionalItems: readonly string[];

@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { ALL_ITEM_KEYS } from "@/lib/readiness";
 import { isMetricKey } from "@/lib/metrics";
-import { getUseCase, isUseCaseId, missingRequired, objectiveFields, parseAnswer, parseProfileFieldId, recommendedUseCases, targetSummary, USE_CASE_IDS, USE_CASES } from "@/lib/use-cases";
+import { answeredObjectiveFields, getUseCase, isUseCaseId, missingRequired, objectiveFields, parseAnswer, parseProfileFieldId, recommendedUseCases, targetSummary, USE_CASE_IDS, USE_CASES } from "@/lib/use-cases";
 import { advisoryBookingUrl, advisoryHref, formatPrice, pricing, sellableUseCases } from "@/lib/pricing";
 import { assessmentHistory } from "@/lib/use-cases/history";
 import { questionnaire } from "@/lib/use-cases/questionnaire";
@@ -102,13 +102,16 @@ describe("objective form", () => {
   });
 
   it("normalises and validates answers", () => {
-    const field = (id: string) => objectiveFields(getUseCase("hire_or_fix")!).find((f) => f.id === id)!;
-    expect(parseAnswer(field("hiring_budget"), " $1,250,000 ")).toBe("1250000");
-    expect(parseAnswer(field("hiring_budget"), "")).toBe("");
-    expect(() => parseAnswer(field("hiring_budget"), "a lot")).toThrow();
-    const date = objectiveFields(getUseCase("founder_handoff")!).find((f) => f.id === "step_back_date")!;
-    expect(parseAnswer(date, "2027-06-30")).toBe("2027-06-30");
-    expect(() => parseAnswer(date, "next year")).toThrow();
+    const money = { id: "budget", label: "Budget", kind: "currency" as const };
+    const when = { id: "when", label: "When", kind: "date" as const };
+    expect(parseAnswer(money, " $1,250,000 ")).toBe("1250000");
+    expect(parseAnswer(money, "")).toBe("");
+    expect(() => parseAnswer(money, "a lot")).toThrow();
+    expect(parseAnswer(when, "2027-06-30")).toBe("2027-06-30");
+    expect(() => parseAnswer(when, "next year")).toThrow();
+    // No use case asks its own questions now; earlier ones are still readable.
+    for (const u of USE_CASES) expect(objectiveFields(u), u.id).toEqual([]);
+    expect(answeredObjectiveFields(getUseCase("hire_or_fix")!).map((f) => f.id)).toEqual(expect.arrayContaining(["goal", "hiring_budget", "roles_considering"]));
   });
 
   it("lists required answers still missing and summarises the founder's target", () => {

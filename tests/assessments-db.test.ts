@@ -13,7 +13,7 @@ import { schema } from "@/lib/db";
 import type { Company, User } from "@/lib/db/schema";
 import type { AssessmentInput, AssessmentOutput } from "@/lib/ai/assessment";
 import { assembleAssessmentInputs, createAssessmentVersion, founderAssessment, runAssessmentPipeline, approveAssessment, assessmentCompletions } from "@/lib/data/assessments";
-import { activateUseCase, saveObjectiveAnswer } from "@/lib/data/use-cases";
+import { activateUseCase } from "@/lib/data/use-cases";
 import { getUseCase } from "@/lib/use-cases";
 
 type DB = typeof import("@/lib/db").db;
@@ -41,9 +41,8 @@ beforeEach(async () => {
     ])
     .returning()) as [User, User];
   [co] = (await db().insert(schema.companies).values({ name: "Hire Co", stage: "Seed", salesModel: "Founder-led" }).returning()) as [Company];
-  await saveObjectiveAnswer(co, "hire_or_fix", "hiring_budget", "300000");
-  // An answer to a question earlier questionnaires asked: no longer asked, still read.
-  await db().update(schema.companyUseCases).set({ objective: { goal: "Decide whether to hire two AEs", hiring_budget: "300000" } }).where(eq(schema.companyUseCases.companyId, co.id));
+  // Answers to questions earlier questionnaires asked: no longer asked, still read.
+  await db().insert(schema.companyUseCases).values({ companyId: co.id, useCase: "hire_or_fix", objective: { goal: "Decide whether to hire two AEs", hiring_budget: "300000" } });
   await db().insert(schema.dataPoints).values([
     { companyId: co.id, metric: "win_rate", value: 18, unit: "percent", confidence: "high", status: "accepted" },
     { companyId: co.id, metric: "sales_cycle_days", value: 94, unit: "days", confidence: "medium", status: "proposed", documentId: null },

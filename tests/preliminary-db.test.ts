@@ -1,6 +1,6 @@
 /** Instant preliminary Benchmark + per-use-case $1 activation, against Postgres (PGlite). Models and Stripe are stubbed. */
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 const h = vi.hoisted(() => ({ db: null as unknown as Record<string | symbol, unknown> }));
 vi.mock("server-only", () => ({}));
@@ -291,18 +291,16 @@ describe("assessment purchase", () => {
     expect((await getCompanyUseCase(acme.id, "growth_leak"))!.activatedAt).toBeTruthy();
   });
 
-  it("saves objective answers one at a time, keeps them through activation, and validates them", async () => {
-    expect(await saveObjectiveAnswer(acme, "hire_or_fix", "hiring_budget", "  $500,000 ")).toEqual({ ok: true, value: "500000" });
-    expect(await saveObjectiveAnswer(acme, "hire_or_fix", "roles_considering", "Two AEs")).toEqual({ ok: true, value: "Two AEs" });
-    expect(await saveObjectiveAnswer(acme, "hire_or_fix", "hiring_budget", "lots")).toMatchObject({ ok: false });
-    expect(await saveObjectiveAnswer(acme, "hire_or_fix", "goal", "Hire")).toMatchObject({ ok: false }); // retired question
+  it("refuses retired questions, and keeps earlier answers through activation", async () => {
+    // Nothing is asked in free text any more: retired and unknown questions are refused.
+    expect(await saveObjectiveAnswer(acme, "hire_or_fix", "hiring_budget", "500000")).toMatchObject({ ok: false });
+    expect(await saveObjectiveAnswer(acme, "hire_or_fix", "goal", "Hire")).toMatchObject({ ok: false });
     expect(await saveObjectiveAnswer(acme, "hire_or_fix", "not_a_question", "x")).toMatchObject({ ok: false });
-    expect(await saveObjectiveAnswer(acme, "growth_leak", "hiring_budget", "1")).toMatchObject({ ok: false }); // another use case's question
+    await startUseCase(acme, "hire_or_fix");
+    // Earlier answers stay with the use case through activation.
+    await db().update(schema.companyUseCases).set({ objective: { hiring_budget: "500000" } }).where(and(eq(schema.companyUseCases.companyId, acme.id), eq(schema.companyUseCases.useCase, "hire_or_fix")));
     let row = await getCompanyUseCase(acme.id, "hire_or_fix");
-    expect(row).toMatchObject({ status: "objective", activatedAt: null, objective: { hiring_budget: "500000", roles_considering: "Two AEs" } });
-    expect(await saveObjectiveAnswer(acme, "hire_or_fix", "roles_considering", "")).toMatchObject({ ok: true });
-    row = await getCompanyUseCase(acme.id, "hire_or_fix");
-    expect(row!.objective).toEqual({ hiring_budget: "500000" });
+    expect(row).toMatchObject({ status: "objective", activatedAt: null, objective: { hiring_budget: "500000" } });
 
     await activateWithoutPayment(advisor, acme, "hire_or_fix", "Pilot");
     row = await getCompanyUseCase(acme.id, "hire_or_fix");
