@@ -25,7 +25,7 @@ export default async function SignUpPage() {
       brand={
         <>
           <Positioning />
-          <div className="mt-10 rounded-2xl p-5 max-w-md" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }} aria-label="What the free Snapshot covers">
+          <div className="mt-10 rounded-2xl p-5 max-w-md hidden lg:block" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }} aria-label="What the free Snapshot covers">
             <div className="text-sm font-semibold" style={{ color: "#3DDC97" }}>Your free Growth Snapshot</div>
             <div className="text-base font-semibold text-white mt-1">“Where is our growth leaking?”</div>
             <ul className="mt-3 space-y-2 text-sm" style={{ color: "#B7C5D4" }}>

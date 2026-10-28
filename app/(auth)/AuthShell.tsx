@@ -25,12 +25,13 @@ export function Points({ items }: { items: string[] }) {
 
 /**
  * Split screen for sign-up, sign-in, invites and the welcome step: what Growth Goaled is on the
- * navy side, the one thing to do on the white side. Stacks on small screens, form second.
+ * navy side, the one thing to do on the white side. On small screens the navy side shrinks to the
+ * headline so the form is on the first screen; the supporting points show from `lg` up.
  */
 export function AuthShell({ brand, children }: { brand: ReactNode; children: ReactNode }) {
   return (
-    <div className="min-h-screen grid lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]" style={{ background: "var(--card)" }}>
-      <div className="relative overflow-hidden px-6 sm:px-12 py-10 lg:py-14 flex flex-col" style={{ background: "var(--navy)" }}>
+    <div className="min-h-screen grid grid-rows-[auto_1fr] lg:grid-rows-1 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]" style={{ background: "var(--card)" }}>
+      <div className="relative overflow-hidden px-6 sm:px-12 py-6 lg:py-14 flex flex-col" style={{ background: "var(--navy)" }}>
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0"
@@ -43,9 +44,9 @@ export function AuthShell({ brand, children }: { brand: ReactNode; children: Rea
           </Link>
           <StagingBadge />
         </div>
-        <div className="relative flex-1 flex flex-col justify-center max-w-xl py-10 lg:py-0">{brand}</div>
+        <div className="relative flex-1 flex flex-col justify-center max-w-xl pt-6 lg:py-0">{brand}</div>
       </div>
-      <div className="flex items-center justify-center px-6 sm:px-12 py-10 lg:py-14">
+      <div className="flex items-start lg:items-center justify-center px-6 sm:px-12 py-8 lg:py-14">
         <div className="w-full max-w-md" style={{ animation: "fadeInUp 0.35s ease-out" }}>{children}</div>
       </div>
     </div>
@@ -56,15 +57,15 @@ export function AuthShell({ brand, children }: { brand: ReactNode; children: Rea
 export function Positioning({ compact = false }: { compact?: boolean }) {
   return (
     <>
-      <div className="text-sm font-semibold mb-4" style={{ color: "#3DDC97" }}>Your Seed &amp; Series A Stage CRO</div>
-      <h1 className="font-display text-4xl sm:text-5xl font-normal leading-[1.08] text-white" style={{ letterSpacing: "-0.015em" }}>
+      <div className="text-sm font-semibold mb-2 sm:mb-4" style={{ color: "#3DDC97" }}>Your Seed &amp; Series A Stage CRO</div>
+      <h1 className="font-display text-3xl sm:text-5xl font-normal leading-[1.08] text-white" style={{ letterSpacing: "-0.015em" }}>
         Find out what&apos;s holding your growth back.
       </h1>
-      <p className="text-lg mt-5" style={{ color: "#B7C5D4" }}>
+      <p className="text-base sm:text-lg mt-3 sm:mt-5" style={{ color: "#B7C5D4" }}>
         CRO-level growth intelligence for Seed and Series A B2B SaaS founders. Find your biggest growth opportunity, decide where your capital goes, and build a more repeatable path to revenue.
       </p>
       {!compact && (
-        <div className="mt-8">
+        <div className="mt-8 hidden lg:block">
           <Points
             items={[
               "Start with the growth question you need answered",

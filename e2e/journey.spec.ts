@@ -192,7 +192,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await expect(founder.page.getByRole("link", { name: /You have this assessment/ })).toBeVisible();
   await expect(founder.page.getByRole("button", { name: /Get the full assessment/ })).toHaveCount(0);
   await founder.page.goto("/overview");
-  await expect(founder.page.getByText("Purchased · sharing data")).toBeVisible();
+  await expect(founder.page.getByText("Sharing data", { exact: true })).toBeVisible();
   await expect(founder.page.getByText("Your target: ARR $6M by 2027-06-30")).toBeVisible();
 
   for (const section of ["company", "customers", "gtm", "icp", "hiring"]) {
@@ -324,7 +324,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
 
   // --- Founder: the switcher follows the granted assessment; results now show as reviewed ---
   await founder.page.goto("/data");
-  const switcher = founder.page.getByRole("combobox", { name: "Active use case" });
+  const switcher = founder.page.getByRole("combobox", { name: "Active question" });
   await switcher.selectOption("winning_icp");
   await expect(founder.page.getByRole("heading", { name: "Data for Winning ICP" })).toBeVisible();
   await switcher.selectOption("growth_leak");
@@ -341,7 +341,12 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await founder.page.getByRole("link", { name: "Book your monthly call →" }).click();
   await expect(founder.page).toHaveURL(/\/advisory\?use_case=growth_leak&kind=monthly/);
   await expect(founder.page.getByRole("heading", { name: "Monthly executive advisor call" })).toBeVisible();
-  await founder.page.getByLabel(/What would you like to work through/).fill("Which fix to start with.");
+  // The textarea is controlled: re-fill until hydration has kept the value.
+  const topic = founder.page.getByLabel(/What would you like to work through/);
+  await expect(async () => {
+    await topic.fill("Which fix to start with.");
+    await expect(topic).toHaveValue("Which fix to start with.", { timeout: 1_000 });
+  }).toPass();
   await founder.page.getByRole("button", { name: "Request a session" }).click();
   await expect(founder.page.getByText(/We'll email you/)).toBeVisible();
   await founder.page.goto("/baseline");

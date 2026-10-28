@@ -77,7 +77,7 @@ export function AssessmentResults({
   actions?: ReactNode;
   /** Booking link for an advisor review, shown with the gaps when there are any. */
   reviewHref?: string;
-  /** "Check your figures", shown after the gaps. */
+  /** "Check your figures", shown with the evidence. */
   figures?: ReactNode;
   /** "Commit to this plan" (or where it's tracked), shown with the plan. */
   commit?: ReactNode;
@@ -162,7 +162,6 @@ export function AssessmentResults({
         </div>
       )}
 
-      {figures}
 
       {/* 2. Why it matters */}
       <Block id="why" title="Why it matters">
@@ -238,6 +237,7 @@ export function AssessmentResults({
         ) : (
           <p className="text-sm" style={muted}>No sufficiently relevant published benchmark matches your company yet, so this judges your figures against your own trend and target, not peers.</p>
         )}
+        {figures}
       </Block>
 
       {/* 4. What to do next */}

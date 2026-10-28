@@ -85,7 +85,7 @@ test("paid steps need a payment Stripe confirmed, never a URL or the browser", a
   await expect(page).toHaveURL(/\/library$/);
   await page.goto("/assessments/open?use_case=growth_leak");
   await expect(page).toHaveURL(/\/assessments$/);
-  await expect(page.getByText("No assessments yet.")).toBeVisible();
+  await expect(page.getByText("No assessments yet", { exact: true })).toBeVisible();
   await ctx.close();
 });
 
