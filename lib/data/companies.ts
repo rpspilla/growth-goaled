@@ -1,18 +1,39 @@
 import "server-only";
 import { and, asc, desc, eq, inArray, isNull, like, not } from "drizzle-orm";
+import { cookies } from "next/headers";
 import { db, schema } from "@/lib/db";
+import { COMPANY_COOKIE } from "@/lib/multi-company";
 import type { Company, User } from "@/lib/db/schema";
 
-/** The company a founder belongs to (first by membership date), or null before one is created. */
-export async function getFounderCompany(user: User): Promise<Company | null> {
-  const [row] = await db
+/** Every company a founder belongs to, oldest membership first. */
+export async function listFounderCompanies(user: Pick<User, "id">): Promise<Company[]> {
+  const rows = await db
     .select({ company: schema.companies })
     .from(schema.companyMembers)
     .innerJoin(schema.companies, eq(schema.companies.id, schema.companyMembers.companyId))
     .where(eq(schema.companyMembers.userId, user.id))
-    .orderBy(asc(schema.companyMembers.createdAt))
-    .limit(1);
-  return row?.company ?? null;
+    .orderBy(asc(schema.companyMembers.createdAt));
+  return rows.map((r) => r.company);
+}
+
+/** The company picked in the switcher (a cookie), if this request has one. Outside a request there is none. */
+async function preferredCompanyId(): Promise<string | undefined> {
+  try {
+    return (await cookies()).get(COMPANY_COOKIE)?.value;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The company a founder is working on: the one picked in the switcher when they're a member of
+ * it, else their first. Null before one is created. The cookie is only a preference: membership
+ * is always checked here, so every page and action stays scoped to the founder's own companies.
+ */
+export async function getFounderCompany(user: User): Promise<Company | null> {
+  const companies = await listFounderCompanies(user);
+  const preferred = companies.length > 1 ? await preferredCompanyId() : undefined;
+  return companies.find((c) => c.id === preferred) ?? companies[0] ?? null;
 }
 
 export type UnassignedCompany = {

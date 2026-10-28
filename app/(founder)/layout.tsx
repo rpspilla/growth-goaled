@@ -1,5 +1,8 @@
 import type { ReactNode } from "react";
 import { founderContext } from "@/lib/data/founder-context";
+import { listFounderCompanies } from "@/lib/data/companies";
+import { canAddCompanies } from "@/lib/multi-company";
+import { CompanySwitcher } from "@/components/shell/CompanySwitcher";
 import { Shell, StagingBadge, UserMenu } from "@/components/shell/Shell";
 import { UseCaseSidebar } from "@/components/shell/UseCaseSidebar";
 import { selectUseCase } from "@/components/shell/actions";
@@ -8,7 +11,7 @@ import { stepStates } from "@/lib/use-cases/steps";
 
 export default async function FounderLayout({ children }: { children: ReactNode }) {
   const { user, company, useCases, active } = await founderContext();
-  const companyName = company?.name ?? "Your company";
+  const companies = await listFounderCompanies(user);
   const options = useCases.filter((u) => u.activatedAt).flatMap((u) => {
     const def = getUseCase(u.useCase);
     return def ? [{ id: def.id, label: def.shortTitle }] : [];
@@ -33,13 +36,7 @@ export default async function FounderLayout({ children }: { children: ReactNode 
       topbar={
         <>
           <div className="flex items-center gap-2 min-w-0">
-            <div
-              className="w-6 h-6 rounded text-xs font-bold flex items-center justify-center"
-              style={{ background: "var(--green-muted)", color: "var(--green)" }}
-            >
-              {companyName[0]?.toUpperCase()}
-            </div>
-            <span className="font-semibold text-base truncate" style={{ color: "var(--foreground)" }}>{companyName}</span>
+            <CompanySwitcher current={company && { id: company.id, name: company.name }} companies={companies.map((c) => ({ id: c.id, name: c.name }))} canAdd={canAddCompanies(user.email)} />
             {company?.stage && (
               <span
                 className="hidden sm:inline text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap"

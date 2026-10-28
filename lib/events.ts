@@ -31,7 +31,8 @@ export type EventName =
   | "signup_link_sent"
   | "signup_failed"
   | "welcome_viewed"
-  | "onboarding_completed";
+  | "onboarding_completed"
+  | "company_added";
 
 /** Records a product analytics event. Never throws: analytics must not break the action it measures. */
 export async function track(name: EventName, p: { userId?: string; companyId?: string; props?: Record<string, unknown> } = {}) {
