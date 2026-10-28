@@ -1,4 +1,5 @@
 import type { MetricKey } from "@/lib/metrics";
+import { RANGES, rangeFieldId } from "@/lib/ranges";
 
 /**
  * Intake form definition: the single source for sections, fields, which are
@@ -37,11 +38,13 @@ export type IntakeField = {
   /** Numeric answers are also stored as an accepted, company-provided data point for this metric. */
   metric?: MetricKey;
   column?: CompanyColumn;
+  /** Set on range fields: the exact field this range stands in for. Never a figure. */
+  rangeOf?: string;
 };
 
 export type IntakeSection = { id: IntakeSectionId; label: string; fields: IntakeField[] };
 
-export const INTAKE_SECTIONS: IntakeSection[] = [
+const BASE_SECTIONS: IntakeSection[] = [
   {
     id: "company",
     label: "Company",
@@ -117,6 +120,21 @@ export const INTAKE_SECTIONS: IntakeSection[] = [
     ],
   },
 ];
+
+/**
+ * Each section plus a range field for every exact figure that has ranges (lib/ranges.ts): optional
+ * selects the questionnaire asks instead of the exact number, and the profile form doesn't show.
+ */
+export const INTAKE_SECTIONS: IntakeSection[] = BASE_SECTIONS.map((s) => ({
+  ...s,
+  fields: [
+    ...s.fields,
+    ...s.fields.flatMap((f): IntakeField[] => {
+      const range = RANGES[`${s.id}.${f.id}`];
+      return range ? [{ id: rangeFieldId(f.id), label: range.label, kind: "select", required: false, options: range.options.map((o) => o.label), rangeOf: f.id }] : [];
+    }),
+  ],
+}));
 
 export const INTAKE_SECTION_IDS = INTAKE_SECTIONS.map((s) => s.id);
 

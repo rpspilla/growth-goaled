@@ -19,9 +19,7 @@ export const growthLeak: UseCaseDef = {
   ],
   snapshotProfile: [{ section: "company", field: "arr" }, { section: "company", field: "growth" }, { section: "customers", field: "nrr" }, { section: "customers", field: "gross_retention" }],
   nextUseCase: "hire_or_fix",
-  objectiveQuestions: [
-    { id: "suspected_leak", label: "Where do you think the leak is?", kind: "textarea", help: "Your hunch is useful; we'll test it against the data.", placeholder: "e.g. deals stall after the demo, or customers don't expand" },
-  ],
+  objectiveQuestions: [],
   requiredItems: ["monthly_revenue", "revenue_by_customer", "churned_revenue"],
   helpfulItems: ["renewals_expansions", "grr_nrr", "opportunities", "stage_conversion", "win_loss"],
   optionalItems: ["leads_by_source"],

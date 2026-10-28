@@ -8,10 +8,8 @@ type SaveResult = { ok: true; value: string } | { ok: false; error: string };
 
 
 const GROUPS: { id: NonNullable<ObjectiveField["group"]>; title: string; caption?: string }[] = [
-  { id: "challenge", title: "Your challenge" },
-  { id: "company", title: "About your company", caption: "Only what we don't have yet. Skip any figure you don't know." },
-  { id: "goal", title: "Your goal (optional)", caption: "Sets the target we'll measure against. Shown as yours, never as our analysis." },
-  { id: "context", title: "Context (optional)" },
+  { id: "challenge", title: "About this question" },
+  { id: "company", title: "About your company", caption: "Pick the closest range; exact figures aren't needed. Skip any you don't know." },
 ];
 
 /**

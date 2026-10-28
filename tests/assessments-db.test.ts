@@ -41,8 +41,9 @@ beforeEach(async () => {
     ])
     .returning()) as [User, User];
   [co] = (await db().insert(schema.companies).values({ name: "Hire Co", stage: "Seed", salesModel: "Founder-led" }).returning()) as [Company];
-  await saveObjectiveAnswer(co, "hire_or_fix", "goal", "Decide whether to hire two AEs");
   await saveObjectiveAnswer(co, "hire_or_fix", "hiring_budget", "300000");
+  // An answer to a question earlier questionnaires asked: no longer asked, still read.
+  await db().update(schema.companyUseCases).set({ objective: { goal: "Decide whether to hire two AEs", hiring_budget: "300000" } }).where(eq(schema.companyUseCases.companyId, co.id));
   await db().insert(schema.dataPoints).values([
     { companyId: co.id, metric: "win_rate", value: 18, unit: "percent", confidence: "high", status: "accepted" },
     { companyId: co.id, metric: "sales_cycle_days", value: 94, unit: "days", confidence: "medium", status: "proposed", documentId: null },
@@ -188,7 +189,7 @@ describe("assessment engine", () => {
     const state = await founderAssessment(empty.id, "winning_icp");
     if (state.state !== "ready") throw new Error(`expected ready, got ${state.state}`);
     expect(state.view.completeness).toBe("minimal");
-    expect(state.view.dataGaps).toEqual(expect.arrayContaining(["The questionnaire wasn't answered, so the report can't reflect your goal or context."]));
+    expect(state.view.dataGaps.some((g) => g.includes("hasn't been shared yet"))).toBe(true);
   });
 
   it("recommends a monthly executive call when the data is complete", async () => {

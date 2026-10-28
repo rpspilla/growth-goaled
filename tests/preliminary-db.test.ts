@@ -16,7 +16,7 @@ import { approveDeliverable, createBenchmarkVersion, publishDeliverable, runBenc
 import { founderBenchmark, startPreliminaryIfDue } from "@/lib/data/preliminary";
 import { CheckoutError, confirmCheckout, createAssessmentCheckout, markSession, recordPaidSession } from "@/lib/data/payments";
 import { createAdvisoryRequest } from "@/lib/data/advisory";
-import { activateUseCase, activateWithoutPayment, getCompanyUseCase, pickActiveUseCase, listCompanyUseCases, saveObjectiveAnswer } from "@/lib/data/use-cases";
+import { activateUseCase, activateWithoutPayment, getCompanyUseCase, pickActiveUseCase, listCompanyUseCases, saveObjectiveAnswer, startUseCase } from "@/lib/data/use-cases";
 import { completionSteps } from "@/lib/completion";
 import { assessReadiness } from "@/lib/readiness-assessment";
 
@@ -173,7 +173,8 @@ describe("assessment purchase", () => {
   const paid = { id: "cs_test_1", client_reference_id: "", metadata: {}, amount_total: 14_900, payment_status: "paid" as "paid" | "unpaid" };
 
   it("selecting a use case and answering questions is free: no payment, no entitlement", async () => {
-    await saveObjectiveAnswer(acme, "growth_leak", "goal", "Find the leak");
+    await startUseCase(acme, "growth_leak");
+    await startUseCase(acme, "growth_leak"); // idempotent
     expect(await db().select().from(schema.payments)).toHaveLength(0);
     expect(await activeRows()).toHaveLength(0);
     expect(await getCompanyUseCase(acme.id, "growth_leak")).toMatchObject({ status: "objective", activatedAt: null });
@@ -289,22 +290,22 @@ describe("assessment purchase", () => {
   });
 
   it("saves objective answers one at a time, keeps them through activation, and validates them", async () => {
-    expect(await saveObjectiveAnswer(acme, "series_a_ready", "goal", "  Raise a $12M Series A  ")).toEqual({ ok: true, value: "Raise a $12M Series A" });
-    expect(await saveObjectiveAnswer(acme, "series_a_ready", "target_value", "$5,000,000")).toEqual({ ok: true, value: "5000000" });
-    expect(await saveObjectiveAnswer(acme, "series_a_ready", "target_value", "lots")).toMatchObject({ ok: false });
-    expect(await saveObjectiveAnswer(acme, "series_a_ready", "main_metric", "made_up")).toMatchObject({ ok: false });
-    expect(await saveObjectiveAnswer(acme, "series_a_ready", "target_date", "2027-13-45")).toMatchObject({ ok: false });
+    expect(await saveObjectiveAnswer(acme, "series_a_ready", "raise_amount", "  $5,000,000 ")).toEqual({ ok: true, value: "5000000" });
+    expect(await saveObjectiveAnswer(acme, "series_a_ready", "raise_close_date", "2027-06-30")).toEqual({ ok: true, value: "2027-06-30" });
+    expect(await saveObjectiveAnswer(acme, "series_a_ready", "raise_amount", "lots")).toMatchObject({ ok: false });
+    expect(await saveObjectiveAnswer(acme, "series_a_ready", "raise_close_date", "2027-13-45")).toMatchObject({ ok: false });
+    expect(await saveObjectiveAnswer(acme, "series_a_ready", "goal", "Raise")).toMatchObject({ ok: false }); // retired question
     expect(await saveObjectiveAnswer(acme, "series_a_ready", "not_a_question", "x")).toMatchObject({ ok: false });
     expect(await saveObjectiveAnswer(acme, "growth_leak", "raise_amount", "1")).toMatchObject({ ok: false }); // another use case's question
     let row = await getCompanyUseCase(acme.id, "series_a_ready");
-    expect(row).toMatchObject({ status: "objective", activatedAt: null, objective: { goal: "Raise a $12M Series A", target_value: "5000000" } });
-    expect(await saveObjectiveAnswer(acme, "series_a_ready", "goal", "")).toMatchObject({ ok: true });
+    expect(row).toMatchObject({ status: "objective", activatedAt: null, objective: { raise_amount: "5000000", raise_close_date: "2027-06-30" } });
+    expect(await saveObjectiveAnswer(acme, "series_a_ready", "raise_close_date", "")).toMatchObject({ ok: true });
     row = await getCompanyUseCase(acme.id, "series_a_ready");
-    expect(row!.objective).toEqual({ target_value: "5000000" });
+    expect(row!.objective).toEqual({ raise_amount: "5000000" });
 
     await activateWithoutPayment(advisor, acme, "series_a_ready", "Pilot");
     row = await getCompanyUseCase(acme.id, "series_a_ready");
-    expect(row).toMatchObject({ status: "active", activation: "advisor", activatedBy: advisor.id, activationNote: "Pilot", objective: { target_value: "5000000" } });
+    expect(row).toMatchObject({ status: "active", activation: "advisor", activatedBy: advisor.id, activationNote: "Pilot", objective: { raise_amount: "5000000" } });
     // A second activation (e.g. a late payment) keeps the original record.
     expect(await activateUseCase(acme.id, "series_a_ready", { activation: "paid", by: founder.id })).toEqual({ activated: false });
     expect((await getCompanyUseCase(acme.id, "series_a_ready"))!.activation).toBe("advisor");
@@ -315,7 +316,7 @@ describe("assessment purchase", () => {
     await activateUseCase(acme.id, "growth_leak", { activation: "paid", by: founder.id });
     await new Promise((r) => setTimeout(r, 5));
     await activateUseCase(acme.id, "hire_or_fix", { activation: "paid", by: founder.id });
-    await saveObjectiveAnswer(acme, "winning_icp", "goal", "Find our ICP");
+    await startUseCase(acme, "winning_icp");
     const rows = await listCompanyUseCases(acme.id);
     expect(pickActiveUseCase(rows, undefined)?.useCase).toBe("hire_or_fix");
     expect(pickActiveUseCase(rows, "growth_leak")?.useCase).toBe("growth_leak");

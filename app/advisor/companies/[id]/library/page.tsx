@@ -1,6 +1,6 @@
 import { ActivateForm } from "@/components/use-cases/ActivateForm";
 import { userName } from "@/lib/data/portfolio";
-import { objectiveFields, recommendedUseCases, USE_CASES } from "@/lib/use-cases";
+import { answeredObjectiveFields, recommendedUseCases, USE_CASES } from "@/lib/use-cases";
 import { activateForCompany } from "../actions";
 import { companyContext } from "../context";
 
@@ -20,7 +20,7 @@ export default async function CompanyLibraryPage({ params }: { params: Promise<{
       </div>
       {USE_CASES.map((def) => {
         const row = useCases.find((u) => u.useCase === def.id);
-        const answers = objectiveFields(def).filter((f) => row?.objective[f.id]);
+        const answers = answeredObjectiveFields(def).filter((f) => row?.objective[f.id]);
         return (
           <section key={def.id} className="rounded-xl border p-5 space-y-3" style={{ ...card, borderColor: row?.activatedAt ? "var(--green)" : "var(--border)" }}>
             <div className="flex items-center gap-2 flex-wrap">

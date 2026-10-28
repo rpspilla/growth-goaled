@@ -33,12 +33,10 @@ describe("assessment safety", () => {
       "We couldn't read board-deck.key.",
       "ARR was read from your files and not yet confirmed by you.",
     ]);
-    expect(systemGaps({ ...base, figures: [], founder_answers: [] })).toEqual(
-      expect.arrayContaining([
-        "We couldn't read figures from the files you shared, so this report rests on your answers and the data you described.",
-        "The questionnaire wasn't answered, so the report can't reflect your goal or context.",
-      ]),
-    );
+    const noAnswers = systemGaps({ ...base, figures: [], founder_answers: [] });
+    expect(noAnswers).toEqual(expect.arrayContaining(["We couldn't read figures from the files you shared, so this report rests on your answers and the data you described."]));
+    // The questionnaire no longer asks for a goal or context, so having no answers isn't a gap.
+    expect(noAnswers.join(" ")).not.toMatch(/questionnaire/);
   });
 
   it("rates completeness", () => {

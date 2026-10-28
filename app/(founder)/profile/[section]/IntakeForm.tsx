@@ -113,8 +113,10 @@ export function IntakeForm({
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              {section.fields.map((f) => {
+              {section.fields.filter((f) => !f.rangeOf).map((f) => {
                 const id = `intake-${f.id}`;
+                // A range picked on a questionnaire, shown until an exact figure replaces it.
+                const range = !values[f.id] ? section.fields.find((r) => r.rangeOf === f.id && values[r.id]) : undefined;
                 const common = {
                   id,
                   name: f.id,
@@ -162,6 +164,7 @@ export function IntakeForm({
                         onBlur={(e) => save(f.id, e.target.value)}
                       />
                     )}
+                    {range && <div className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>You told us {values[range.id]}. Add the exact figure if you know it.</div>}
                     {errors[f.id] && <div className="text-xs mt-1" style={{ color: "var(--red)" }}>{errors[f.id]}</div>}
                   </div>
                 );

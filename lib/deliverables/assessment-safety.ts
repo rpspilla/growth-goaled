@@ -47,7 +47,6 @@ export function systemGaps(input: AssessmentInput): string[] {
   for (const c of input.conflicts) gaps.push(`${c.label} has different values (${c.values}). Choose the right one under "Check your figures".`);
   const unconfirmed = input.figures.filter((f) => !f.confirmed);
   if (unconfirmed.length) gaps.push(`${unconfirmed.map((f) => f.label).join(", ")} ${unconfirmed.length === 1 ? "was" : "were"} read from your files and not yet confirmed by you.`);
-  if (!input.founder_answers.length) gaps.push("The questionnaire wasn't answered, so the report can't reflect your goal or context.");
   return gaps;
 }
 

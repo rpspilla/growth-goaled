@@ -22,29 +22,29 @@ export function recommendedUseCases(company: { stage: string | null; revenueBand
   return early ? ["series_a_ready", "growth_leak"] : ["growth_leak"];
 }
 
-/** Questions every questionnaire asks (HANDOFF §13.4, kept light): only the challenge is required. */
-export function sharedObjectiveFields(useCase: UseCaseDef): ObjectiveField[] {
+/**
+ * Questions earlier questionnaires asked and no longer do (the challenge in free text, the goal and
+ * context). Never asked or saved now, but answers already given are still read: they reach the
+ * assessment and the advisor's view.
+ */
+function retiredFields(useCase: UseCaseDef): ObjectiveField[] {
   return [
-    { id: "goal", label: "What's the challenge you're trying to solve?", kind: "textarea", required: true, group: "challenge", placeholder: "In your own words" },
-    {
-      id: "main_metric",
-      label: "Which metric would tell you it's solved?",
-      kind: "select",
-      group: "goal",
-      options: useCase.figures.map((m) => ({ value: m, label: METRICS[m].label })),
-    },
-    { id: "target_value", label: "Your target value", kind: "number", group: "goal", help: "In the metric's unit: dollars, percent, days, months or a count." },
+    { id: "goal", label: "What's the challenge you're trying to solve?", kind: "textarea", group: "challenge" },
+    { id: "main_metric", label: "Which metric would tell you it's solved?", kind: "select", group: "goal", options: useCase.figures.map((m) => ({ value: m, label: METRICS[m].label })) },
+    { id: "target_value", label: "Your target value", kind: "number", group: "goal" },
     { id: "target_date", label: "By when?", kind: "date", group: "goal" },
     { id: "why_now", label: "Why now?", kind: "textarea", group: "context" },
     { id: "already_tried", label: "What have you already tried?", kind: "textarea", group: "context" },
-    { id: "constraints", label: "Constraints we should know about", kind: "textarea", group: "context", placeholder: "Budget, hiring freeze, board expectations…" },
+    { id: "constraints", label: "Constraints we should know about", kind: "textarea", group: "context" },
+    ...(useCase.id === "growth_leak" ? [{ id: "suspected_leak", label: "Where do you think the leak is?", kind: "textarea" as const, group: "challenge" as const }] : []),
   ];
 }
 
-export const objectiveFields = (useCase: UseCaseDef): ObjectiveField[] => [
-  ...sharedObjectiveFields(useCase),
-  ...useCase.objectiveQuestions.map((q) => ({ ...q, group: q.group ?? ("challenge" as const) })),
-];
+/** The use case's own questions: what the questionnaire asks (company figures are asked separately, as ranges). */
+export const objectiveFields = (useCase: UseCaseDef): ObjectiveField[] => useCase.objectiveQuestions.map((q) => ({ ...q, group: q.group ?? ("challenge" as const) }));
+
+/** Every question an answer may exist for, including retired ones: for reading answers, never for asking. */
+export const answeredObjectiveFields = (useCase: UseCaseDef): ObjectiveField[] => [...retiredFields(useCase), ...objectiveFields(useCase)];
 
 /** Stage and sales model decide whether the assessment fits, so they're required (asked only if the profile lacks them). */
 export const REQUIRED_PROFILE: readonly ProfileQuestion[] = [
@@ -58,8 +58,15 @@ export function parseProfileFieldId(id: string): ProfileQuestion | null {
   return m ? { section: m[1]!, field: m[2]! } : null;
 }
 
-/** Every profile question the use case's questionnaire may ask. */
-export const profileQuestions = (useCase: UseCaseDef): ProfileQuestion[] => [...REQUIRED_PROFILE, ...useCase.snapshotProfile];
+/** Asked on every questionnaire, as a range. */
+const EMPLOYEES: ProfileQuestion = { section: "company", field: "employees" };
+
+/** Every profile question the use case's questionnaire may ask (figures are asked as ranges). */
+export const profileQuestions = (useCase: UseCaseDef): ProfileQuestion[] => [
+  ...REQUIRED_PROFILE,
+  ...useCase.snapshotProfile,
+  ...(useCase.snapshotProfile.some((q) => q.section === EMPLOYEES.section && q.field === EMPLOYEES.field) ? [] : [EMPLOYEES]),
+];
 
 export type Objective = Record<string, string>;
 
@@ -88,7 +95,7 @@ export function parseAnswer(field: ObjectiveField, raw: string): string {
   return field.kind === "number" || field.kind === "currency" ? value.replace(/[,$%\s]/g, "") : value;
 }
 
-/** Required questionnaire answers still empty: the challenge, plus stage and sales model when the profile lacks them. */
+/** Required questionnaire answers still empty: required use-case questions, plus stage and sales model when the profile lacks them. */
 export function missingRequired(
   useCase: UseCaseDef,
   objective: Objective | null | undefined,

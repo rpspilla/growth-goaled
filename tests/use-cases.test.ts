@@ -28,7 +28,6 @@ describe("use case registry", () => {
     expect(u.requiredItems.length).toBeGreaterThan(0);
     for (const m of [...u.figures, ...u.trackableMetrics]) expect(isMetricKey(m), m).toBe(true);
     for (const m of u.trackableMetrics) expect(u.figures).toContain(m);
-    expect(u.objectiveQuestions.length).toBeGreaterThanOrEqual(1);
     expect(u.objectiveQuestions.length).toBeLessThanOrEqual(4);
     const ids = objectiveFields(u).map((f) => f.id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -51,49 +50,59 @@ describe("recommendation", () => {
 
 describe("objective form", () => {
   const leak = getUseCase("growth_leak")!;
-  it("keeps the questionnaire light: only the challenge is required, goal and context are optional", () => {
-    const fields = objectiveFields(leak);
-    expect(fields.filter((f) => f.required).map((f) => f.id)).toEqual(["goal"]);
-    expect(fields.find((f) => f.id === "main_metric")!.options!.map((o) => o.value)).toEqual([...leak.figures]);
-    expect(fields.at(-1)!).toMatchObject({ id: "suspected_leak", group: "challenge" });
+  it("keeps the questionnaire light: no free-text challenge, goal or context questions", () => {
+    expect(objectiveFields(leak)).toEqual([]);
+    for (const u of USE_CASES) {
+      const ids = objectiveFields(u).map((f) => f.id);
+      for (const retired of ["goal", "main_metric", "target_value", "target_date", "why_now", "already_tried", "constraints"]) expect(ids).not.toContain(retired);
+    }
   });
 
-  it("asks only for profile answers we don't have, and requires stage and sales model", () => {
+  it("asks figures as ranges, adds employees everywhere, and skips what's on file", () => {
     const empty = questionnaire(leak, {});
     expect(empty.fields.filter((f) => f.group === "company").map((f) => f.id)).toEqual([
       "profile.company.stage",
       "profile.gtm.model",
-      "profile.company.arr",
-      "profile.company.growth",
-      "profile.customers.nrr",
-      "profile.customers.gross_retention",
+      "profile.company.arr_range",
+      "profile.company.growth_range",
+      "profile.customers.nrr_range",
+      "profile.customers.gross_retention_range",
+      "profile.company.employees_range",
     ]);
-    expect(empty.fields.filter((f) => f.required).map((f) => f.id)).toEqual(["goal", "profile.company.stage", "profile.gtm.model"]);
-    const known = questionnaire(leak, { "company.stage": "Seed", "gtm.model": "Founder-led", "company.arr": 2_000_000 });
-    expect(known.fields.filter((f) => f.group === "company").map((f) => f.id)).toEqual(["profile.company.growth", "profile.customers.nrr", "profile.customers.gross_retention"]);
+    for (const f of empty.fields.filter((f) => f.id.endsWith("_range"))) expect(f.kind).toBe("select");
+    expect(empty.fields.find((f) => f.id === "profile.company.employees_range")!.options!.map((o) => o.label)).toEqual(["1–5", "6–10", "11–25", "26–50", "50+"]);
+    expect(empty.fields.filter((f) => f.required).map((f) => f.id)).toEqual(["profile.company.stage", "profile.gtm.model"]);
+    for (const u of USE_CASES) expect(questionnaire(u, {}).fields.map((f) => f.id)).toContain("profile.company.employees_range");
+    // An exact figure or a range already given is listed, not asked again.
+    const known = questionnaire(leak, { "company.stage": "Seed", "gtm.model": "Founder-led", "company.arr": 2_000_000, "company.growth_range": "25–50%" });
+    expect(known.fields.filter((f) => f.group === "company").map((f) => f.id)).toEqual(["profile.customers.nrr_range", "profile.customers.gross_retention_range", "profile.company.employees_range"]);
     expect(known.known).toEqual([
       { label: "Stage", value: "Seed" },
       { label: "Sales model", value: "Founder-led" },
       { label: "ARR ($)", value: "2,000,000" },
+      { label: "Year-over-year revenue growth", value: "25–50%" },
     ]);
-    expect(parseProfileFieldId("profile.company.stage")).toEqual({ section: "company", field: "stage" });
+    // Revenue given at onboarding isn't asked again.
+    const banded = questionnaire(leak, {}, "3m_10m");
+    expect(banded.fields.map((f) => f.id)).not.toContain("profile.company.arr_range");
+    expect(banded.known).toEqual([{ label: "Annual revenue", value: "$3M–$10M" }]);
+    expect(parseProfileFieldId("profile.company.arr_range")).toEqual({ section: "company", field: "arr_range" });
     expect(parseProfileFieldId("goal")).toBeNull();
   });
 
   it("normalises and validates answers", () => {
-    const field = (id: string) => objectiveFields(leak).find((f) => f.id === id)!;
-    expect(parseAnswer(field("target_value"), " $1,250,000 ")).toBe("1250000");
-    expect(parseAnswer(field("target_value"), "")).toBe("");
-    expect(() => parseAnswer(field("target_value"), "a lot")).toThrow();
-    expect(parseAnswer(field("target_date"), "2027-06-30")).toBe("2027-06-30");
-    expect(() => parseAnswer(field("target_date"), "next year")).toThrow();
-    expect(() => parseAnswer(field("main_metric"), "burn_multiple")).toThrow(); // not a Growth Leak figure
-    expect(() => parseAnswer(field("goal"), "x".repeat(4001))).toThrow();
+    const field = (id: string) => objectiveFields(getUseCase("hire_or_fix")!).find((f) => f.id === id)!;
+    expect(parseAnswer(field("hiring_budget"), " $1,250,000 ")).toBe("1250000");
+    expect(parseAnswer(field("hiring_budget"), "")).toBe("");
+    expect(() => parseAnswer(field("hiring_budget"), "a lot")).toThrow();
+    const date = objectiveFields(getUseCase("founder_handoff")!).find((f) => f.id === "step_back_date")!;
+    expect(parseAnswer(date, "2027-06-30")).toBe("2027-06-30");
+    expect(() => parseAnswer(date, "next year")).toThrow();
   });
 
   it("lists required answers still missing and summarises the founder's target", () => {
-    expect(missingRequired(leak, null)).toEqual(["goal", "profile.company.stage", "profile.gtm.model"]);
-    expect(missingRequired(leak, { goal: "Grow" }, { "company.stage": "Seed", "gtm.model": "Hybrid" })).toEqual([]);
+    expect(missingRequired(leak, null)).toEqual(["profile.company.stage", "profile.gtm.model"]);
+    expect(missingRequired(leak, {}, { "company.stage": "Seed", "gtm.model": "Hybrid" })).toEqual([]);
     const objective = { goal: "Grow", main_metric: "arr", target_value: "5000000", target_date: "2027-06-30" };
     expect(targetSummary(objective)).toBe("ARR $5M by 2027-06-30");
     expect(targetSummary({ main_metric: "arr" })).toBeNull();
@@ -120,6 +129,22 @@ describe("Growth Snapshot", () => {
     expect(snap("growth_leak", { "customers.nrr": 94 }).signals[0]).toMatchObject({ kind: "watch", title: "Your existing customers shrink on net", basis: "Your answer: NRR 94%" });
     const healthy = snap("growth_leak", { "customers.nrr": 112, "company.growth": 30 });
     expect(healthy.signals.map((s) => s.title)).toContain("If there's a leak, it's more likely in new business");
+  });
+
+  it("reads ranges as ranges: a rule fires only when the whole range qualifies, and the range is quoted", () => {
+    expect(snap("growth_leak", { "customers.nrr_range": "90–100%" }).signals[0]).toMatchObject({ kind: "watch", title: "Your existing customers shrink on net", basis: "Your answer: NRR 90–100%" });
+    expect(snap("growth_leak", { "customers.nrr_range": "110–120%" }).signals[0]).toMatchObject({ kind: "positive" });
+    expect(snap("growth_leak", { "customers.gross_retention_range": "90–95%" }).signals[0]!.title).toBe("About 5–10% of starting revenue is lost each year");
+    expect(snap("growth_leak", { "customers.gross_retention_range": "Under 70%" }).signals[0]!.title).toBe("More than 30% of starting revenue is lost each year");
+    expect(snap("growth_leak", { "company.growth_range": "Shrinking" }).signals[0]!.title).toBe("Revenue isn't growing year over year");
+    expect(snap("growth_leak", { "company.growth_range": "25–50%", "customers.nrr_range": "100–110%" }).signals.map((s) => s.title)).toContain("If there's a leak, it's more likely in new business");
+    expect(snap("hire_or_fix", { "gtm.sales_reps_range": "None yet" }).fit.suggested).toBe("founder_handoff");
+    expect(snap("hire_or_fix", { "customers.acv_range": "$15K–$30K" }, { hiring_budget: "300000" }).signals.map((s) => s.title)).toContain("Your hiring budget equals about 10–20 deals at your ACV");
+    expect(snap("winning_icp", { "customers.count_range": "10–19" }).signals[0]!.title).toBe("Segment comparisons will be directional");
+    expect(snap("winning_icp", { "customers.count_range": "20–49" }).signals.map((s) => s.title)).not.toContain("Segment comparisons will be directional");
+    // A range alone still counts as an answer, and an unknown label is ignored.
+    expect(snap("growth_leak", { "company.employees_range": "6–10" }).answersOnly).toBe(false);
+    expect(snap("growth_leak", { "customers.nrr_range": "about 100" }).answersOnly).toBe(true);
   });
 
   it("does simple arithmetic on the founder's numbers, nothing more", () => {
@@ -314,6 +339,8 @@ describe("how we work with companies like yours", () => {
   it("tailors the example to the founder's answers", () => {
     expect(howWeWork({ useCase: "growth_leak", profile: { "customers.nrr": 92 }, revenueBand: null }).example.trigger).toMatch(/existing customers/);
     expect(howWeWork({ useCase: "growth_leak", profile: { "customers.nrr": 110 }, revenueBand: null }).example.trigger).toMatch(/new business/);
+    expect(howWeWork({ useCase: "growth_leak", profile: { "customers.nrr_range": "90–100%" }, revenueBand: null }).example.trigger).toMatch(/existing customers/);
+    expect(howWeWork({ useCase: "growth_leak", profile: { "customers.nrr_range": "110–120%" }, revenueBand: null }).example.trigger).toMatch(/new business/);
     expect(howWeWork({ useCase: "series_a_ready", profile: { "gtm.model": "Founder-led" }, revenueBand: null }).example.trigger).toMatch(/founder-led sales/);
     expect(howWeWork({ useCase: "hire_or_fix", profile: { "gtm.sales_reps": 0 }, revenueBand: null }).example.trigger).toMatch(/first sales hire/);
     expect(howWeWork({ useCase: "growth_leak", profile: {}, revenueBand: null }).audience).toBe("Early-stage B2B software companies");

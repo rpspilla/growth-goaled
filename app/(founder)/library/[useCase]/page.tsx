@@ -19,7 +19,7 @@ export default async function UseCasePage({ params }: { params: Promise<{ useCas
   const { user, company, useCases } = await founderContext();
   const row = useCases.find((u) => u.useCase === def.id);
   const answers = company ? await getIntakeAnswers(company) : {};
-  const { fields, known } = questionnaire(def, answers);
+  const { fields, known } = questionnaire(def, answers, company?.revenueBand ?? null);
   const price = formatPrice(pricing().assessmentCents);
   const sellable = sellableUseCases().includes(def.id);
   if (company) await track("use_case_viewed", { userId: user.id, companyId: company.id, props: { use_case: def.id } });

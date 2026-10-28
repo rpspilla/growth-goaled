@@ -71,6 +71,14 @@ export async function saveObjectiveAnswer(company: Pick<Company, "id">, useCaseI
 }
 
 /**
+ * Records that the founder has started a question (submitted its questionnaire), so it shows on
+ * their home and in their history even when it has no questions of its own to save. No-op if it exists.
+ */
+export async function startUseCase(company: Pick<Company, "id">, useCaseId: UseCaseId): Promise<void> {
+  await db.insert(schema.companyUseCases).values({ companyId: company.id, useCase: useCaseId, objective: {}, objectiveUpdatedAt: new Date() }).onConflictDoNothing();
+}
+
+/**
  * Activates a use case for a company (after payment, or by an advisor for a pilot).
  * Idempotent: an already-active use case keeps its original activation.
  */

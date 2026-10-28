@@ -15,7 +15,7 @@ import { analysisTables, diagnosisInput } from "@/lib/diagnostics/evidence";
 import { track } from "@/lib/events";
 import { getItem } from "@/lib/readiness";
 import { formatMetric, isMetricKey, METRICS, type MetricKey } from "@/lib/metrics";
-import { assessmentMetrics, getUseCase, objectiveFields, type UseCaseDef, type UseCaseId } from "@/lib/use-cases";
+import { assessmentMetrics, getUseCase, answeredObjectiveFields, type UseCaseDef, type UseCaseId } from "@/lib/use-cases";
 import { resultConfidence, type Confidence } from "@/lib/use-cases/results";
 import { combineQa, isStalled } from "./deliverables";
 import { figureChoices } from "./figures";
@@ -89,7 +89,7 @@ export async function assembleAssessmentInputs(company: Company, useCase: UseCas
 
   // Founder answers: the questionnaire for this use case.
   const objective = row?.objective ?? {};
-  const answers = objectiveFields(useCase)
+  const answers = answeredObjectiveFields(useCase)
     .filter((f) => objective[f.id]?.trim())
     .map((f) => ({ id: `answer:${f.id}`, question: f.label, answer: f.options?.find((o) => o.value === objective[f.id])?.label ?? objective[f.id]! }));
   const target =

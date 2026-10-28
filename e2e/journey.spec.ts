@@ -37,7 +37,7 @@ const VALUES: Record<string, string> = {
   "intake-employees": "38",
   "intake-count": "87",
   "intake-acv": "42000",
-  "intake-nrr": "108",
+  "intake-nrr": "94",
   "intake-sales_reps": "5",
 };
 const SELECTS: Record<string, string> = { "intake-stage": "Series A", "intake-model": "Founder-led" };
@@ -143,27 +143,30 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await expect(founder.page.getByRole("button", { name: /payment|\$149/ })).toHaveCount(0); // selecting is free
   const snapshotButton = founder.page.getByRole("button", { name: "See my free Snapshot" });
   await expect(snapshotButton).toBeDisabled();
-  await founder.page.getByLabel(/What's the challenge you're trying to solve\?/).fill("Find out why growth slowed after Q2.");
+  // No free-text challenge, goal or context: just the essentials, with figures as ranges.
+  await expect(founder.page.getByLabel(/challenge you're trying to solve|Where do you think the leak is|Your target value|Why now/)).toHaveCount(0);
+  // Revenue was given at onboarding, so it isn't asked again.
+  await expect(founder.page.getByLabel("Annual recurring revenue (ARR)")).toHaveCount(0);
+  await expect(founder.page.getByText(/Already known from your profile: Annual revenue \$3M–\$10M/)).toBeVisible();
+  await expect(founder.page.locator("#q-profile-company-growth_range option")).toContainText(["Choose…", "Shrinking", "0–25%", "25–50%", "50–100%", "100–200%", "200%+"]);
+  await expect(founder.page.locator("#q-profile-company-employees_range option")).toContainText(["Choose…", "1–5", "6–10", "11–25", "26–50", "50+"]);
   await founder.page.getByLabel(/^Stage/).selectOption("Series A");
   await founder.page.getByLabel(/^Sales model/).selectOption("Founder-led");
-  await founder.page.getByLabel(/^NRR/).fill("94");
-  await founder.page.getByLabel(/Which metric would tell you/).selectOption("arr");
-  await founder.page.getByLabel(/Your target value/).fill("6,000,000");
-  await founder.page.getByLabel("By when?").fill("2027-06-30");
-  await founder.page.getByLabel("Where do you think the leak is?").fill("Deals stall after the demo.");
-  await founder.page.getByLabel("Where do you think the leak is?").blur();
+  await founder.page.getByLabel("Year-over-year revenue growth").selectOption("50–100%");
+  await founder.page.getByLabel("Net revenue retention (NRR)").selectOption("90–100%");
+  await founder.page.getByLabel("Number of employees").selectOption("26–50");
   await expect(founder.page.getByText("Your answers are saved.")).toBeVisible();
-  // Answers survive a reload (autosave); profile answers now show as known instead of being asked again.
+  // Answers survive a reload (autosave), and show as known instead of being asked again.
   await founder.page.reload();
-  await expect(founder.page.getByLabel(/Your target value/)).toHaveValue("6000000");
-  await expect(founder.page.getByText("your target", { exact: true })).toBeVisible();
   await expect(founder.page.getByText(/Already known from your profile: .*Stage Series A/)).toBeVisible();
+  await expect(founder.page.getByText(/Already known from your profile: .*Net revenue retention \(NRR\) 90–100%/)).toBeVisible();
   await expect(founder.page.getByLabel(/^Stage/)).toHaveCount(0);
+  await expect(founder.page.getByLabel("Number of employees")).toHaveCount(0);
   await snapshotButton.click();
   await expect(founder.page).toHaveURL(/\/library\/growth_leak\/snapshot$/);
   await expect(founder.page.getByText("Hypotheses", { exact: true })).toBeVisible();
   await expect(founder.page.getByText("Your existing customers shrink on net")).toBeVisible();
-  await expect(founder.page.getByText("Based on: Your answer: NRR 94%")).toBeVisible();
+  await expect(founder.page.getByText("Based on: Your answer: NRR 90–100%")).toBeVisible();
   // How we work with companies like this one, and what we'd do after the assessment.
   await expect(founder.page.getByRole("heading", { name: "How we work with companies like yours" })).toBeVisible();
   await expect(founder.page.getByText(/^Series A .*companies.*with founder-led sales/)).toBeVisible();
@@ -193,7 +196,6 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await expect(founder.page.getByRole("button", { name: /Get the full assessment/ })).toHaveCount(0);
   await founder.page.goto("/overview");
   await expect(founder.page.getByText("Sharing data", { exact: true })).toBeVisible();
-  await expect(founder.page.getByText("Your target: ARR $6M by 2027-06-30")).toBeVisible();
 
   for (const section of ["company", "customers", "gtm", "icp", "hiring"]) {
     await founder.page.goto(`/profile/${section}`);
@@ -315,8 +317,6 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await admin.page.getByRole("button", { name: "Mark reviewed" }).click();
   await expect(admin.page.getByText("Reviewed", { exact: true })).toBeVisible();
   await mirrored.getByRole("link", { name: "Growth questions" }).click();
-  await expect(admin.page.getByText("Find out why growth slowed after Q2.")).toBeVisible();
-  await expect(admin.page.getByText("Deals stall after the demo.")).toBeVisible();
   // Pilot: grant an assessment without payment, recorded with a note.
   await admin.page.locator("section", { hasText: "Winning ICP" }).getByPlaceholder("Why (e.g. pilot customer)").fill("E2E pilot");
   await admin.page.locator("section", { hasText: "Winning ICP" }).getByRole("button", { name: "Grant without payment" }).click();

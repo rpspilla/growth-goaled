@@ -5,9 +5,10 @@ import { revalidatePath } from "next/cache";
 import { founderContext } from "@/lib/data/founder-context";
 import { getIntakeAnswers, saveIntakeAnswer } from "@/lib/data/intake";
 import { CheckoutError, createAssessmentCheckout } from "@/lib/data/payments";
-import { getCompanyUseCase, saveObjectiveAnswer, type SaveAnswerResult } from "@/lib/data/use-cases";
+import { getCompanyUseCase, saveObjectiveAnswer, startUseCase, type SaveAnswerResult } from "@/lib/data/use-cases";
 import { track } from "@/lib/events";
 import { displayValue, getField } from "@/lib/intake";
+import { rangeFieldId } from "@/lib/ranges";
 import { sellableUseCases } from "@/lib/pricing";
 import { stripeConfigured } from "@/lib/stripe";
 import { getUseCase, isUseCaseId, missingRequired, parseProfileFieldId, profileQuestions } from "@/lib/use-cases";
@@ -28,7 +29,8 @@ export async function saveAnswer(useCaseId: string, fieldId: string, value: stri
   const profile = parseProfileFieldId(fieldId);
   if (profile) {
     const useCase = getUseCase(useCaseId)!;
-    if (!profileQuestions(useCase).some((q) => q.section === profile.section && q.field === profile.field)) return { ok: false, error: "Unknown question." };
+    // The profile question itself, or its range (figures are asked as ranges).
+    if (!profileQuestions(useCase).some((q) => q.section === profile.section && (q.field === profile.field || rangeFieldId(q.field) === profile.field))) return { ok: false, error: "Unknown question." };
     const result = await saveIntakeAnswer(user, company, profile.section, profile.field, value);
     if (!result.ok) return result;
     revalidatePath("/", "layout");
@@ -48,6 +50,7 @@ export async function submitQuestionnaire(useCaseId: string): Promise<{ ok: true
   if (!def) return { ok: false, error: "Unknown use case." };
   const [row, answers] = await Promise.all([getCompanyUseCase(company.id, def.id), getIntakeAnswers(company)]);
   if (missingRequired(def, row?.objective, answers).length) return { ok: false, error: "Please answer the required questions first." };
+  if (!row) await startUseCase(company, def.id);
   await track("objective_saved", { userId: user.id, companyId: company.id, props: { use_case: def.id, answers: Object.keys(row?.objective ?? {}).length } });
   return { ok: true };
 }

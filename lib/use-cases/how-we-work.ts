@@ -1,3 +1,4 @@
+import { findRange } from "@/lib/ranges";
 import type { UseCaseId } from "./types";
 
 /**
@@ -47,8 +48,13 @@ export function howWeWork(input: HowWeWorkInput): HowWeWork {
   const industry = str(p["company.industry"]);
   const segment = str(p["customers.segment"]);
   const model = str(p["gtm.model"]);
-  const nrr = num(p["customers.nrr"]);
-  const reps = num(p["gtm.sales_reps"]);
+  // Exact figure if on file, else the range the founder picked (judged only when the whole range qualifies).
+  const nrrRange = findRange("customers.nrr", p["customers.nrr_range"]);
+  const repsRange = findRange("gtm.sales_reps", p["gtm.sales_reps_range"]);
+  const exactNrr = num(p["customers.nrr"]);
+  const shrinking = exactNrr !== null ? exactNrr < 100 : nrrRange?.hi != null && nrrRange.hi <= 100;
+  const exactReps = num(p["gtm.sales_reps"]);
+  const hasReps = exactReps !== null ? exactReps > 0 : repsRange?.lo != null && repsRange.lo > 0;
   const founderLed = model === "Founder-led";
 
   let audience = `${stage ? `${stage} ` : "Early-stage "}${INDUSTRY[industry ?? ""] ?? "B2B software companies"}`;
@@ -66,7 +72,7 @@ export function howWeWork(input: HowWeWorkInput): HowWeWork {
           "Name the one constraint that explains most of the slowdown, show the evidence, and say how sure we are.",
         ],
         example:
-          nrr !== null && nrr < 100
+          shrinking
             ? {
                 trigger: "If the assessment confirms that existing customers are where growth is leaking, we'd:",
                 steps: [
@@ -126,7 +132,7 @@ export function howWeWork(input: HowWeWorkInput): HowWeWork {
           "Give a clear call: hire now, fix first, or run a small test, with the reasoning behind it.",
         ],
         example:
-          reps !== null && reps > 0
+          hasReps
             ? {
                 trigger: "If the assessment shows your current reps aren't yet at capacity, we'd:",
                 steps: [
