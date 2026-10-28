@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { cohortFit, type CandidateRecord, type CompanyProfile } from "@/lib/benchmark-library/match";
-import { ADVISOR_CONFIRMS, peerComparisons, position, sameIndustry, type PeerFigure } from "@/lib/benchmark-library/peers";
+import { ADVISOR_CONFIRMS, peerComparisons, position, sameIndustry, topQuartileTarget, type PeerFigure } from "@/lib/benchmark-library/peers";
 import { describeCohort, validateRecord } from "@/lib/benchmark-library/records";
 
 const source = (over: Partial<CandidateRecord["source"]> = {}): CandidateRecord["source"] => ({
@@ -103,5 +103,36 @@ describe("Snapshot peer comparisons", () => {
     expect(sameIndustry("B2B SaaS", "SaaS")).toBe(true);
     expect(sameIndustry("HealthTech", "Fintech")).toBe(false);
     expect(sameIndustry("Other", "Other")).toBe(false);
+  });
+
+  describe("top-quartile target when no peer cohort fits", () => {
+    const stageRow = (value: number, over: Partial<CandidateRecord> = {}) =>
+      rec("arr_growth", { statistic: "percentile", percentile: 75 }, value, { stages: ["Series A"], industry: null, foundedFrom: null, foundedTo: null, datasetName: "Stage benchmarks", versionId: "vs", ...over });
+    const co = { stage: "Series A", industry: "HealthTech", foundedYear: 2024 };
+
+    it("states the published top quartile for the company's stage, with its source, and stays transparent", () => {
+      const out = peerComparisons({ ...co, figures: { growth: { lo: 50, hi: 100, exact: null, text: "50–100%", origin: "the range you picked" } } }, [stageRow(150)])[0]!;
+      expect(out).toMatchObject({ status: "unavailable", reason: expect.stringContaining(ADVISOR_CONFIRMS) });
+      if (out.status !== "unavailable") throw new Error();
+      expect(out.target).toMatchObject({
+        statement: "Based on publicly available data from Survey A (2026), a Series A company should be targeting 150% year-over-year ARR growth or more to be in the top quartile.",
+        met: false,
+        cohort: "Series A",
+      });
+    });
+
+    it("prefers the company's industry, never another industry, stage or vintage, and says nothing without a published figure", () => {
+      const own = stageRow(180, { industry: "HealthTech", datasetName: "Z" });
+      expect(topQuartileTarget("arr_growth", co, null, [stageRow(150), own])!.statement).toContain("a Series A HealthTech company should be targeting 180%");
+      expect(topQuartileTarget("arr_growth", co, null, [stageRow(150, { industry: "Fintech" })])).toBeNull();
+      expect(topQuartileTarget("arr_growth", co, null, [stageRow(150, { stages: ["Seed"] })])).toBeNull();
+      expect(topQuartileTarget("arr_growth", co, null, [stageRow(150, { foundedFrom: 2010, foundedTo: 2015 })])).toBeNull();
+      expect(topQuartileTarget("arr_growth", co, null, [rec("arr_growth", { statistic: "median" }, 100, { stages: ["Series A"], industry: null })])).toBeNull();
+      expect(topQuartileTarget("arr_growth", { ...co, stage: null }, null, [stageRow(150)])).toBeNull();
+      expect(topQuartileTarget("arr_growth", co, null, [stageRow(150, { source: source({ snapshotSource: false }) })])).toBeNull();
+      expect(topQuartileTarget("arr_growth", co, null, [stageRow(150, { source: source({ kind: "licensed_dataset" }) })])!.statement).toMatch(/^Based on benchmark data from/);
+      expect(topQuartileTarget("arr_growth", co, exact(200, "200%"), [stageRow(150)])!.met).toBe(true);
+      expect(topQuartileTarget("arr_growth", { ...co, stage: "Series B+" }, null, [stageRow(150, { stages: ["Series B"] })])!.statement).toContain("a Series B+ company");
+    });
   });
 });

@@ -102,13 +102,15 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
         "nrr,ARR from customers a year ago ÷ their ARR then,yes,percent,percentile,75,112,,,,Fintech,2017,2021,FY2025,annual,E2E fintech founded 2017-2021,30\n" +
         "arr,Annual recurring revenue at year end,yes,usd,percentile,25,1M,,,,Fintech,2017,2021,FY2025,point_in_time,E2E fintech founded 2017-2021,30\n" +
         "arr,Annual recurring revenue at year end,yes,usd,median,,3M,,,,Fintech,2017,2021,FY2025,point_in_time,E2E fintech founded 2017-2021,30\n" +
-        "arr,Annual recurring revenue at year end,yes,usd,percentile,75,8M,,,,Fintech,2017,2021,FY2025,point_in_time,E2E fintech founded 2017-2021,30\n",
+        "arr,Annual recurring revenue at year end,yes,usd,percentile,75,8M,,,,Fintech,2017,2021,FY2025,point_in_time,E2E fintech founded 2017-2021,30\n" +
+        // A stage-wide top quartile only: the Snapshot's growth target when no peer cohort fits.
+        "arr_growth,Year-over-year ARR growth,yes,percent,percentile,75,150,Series A,,,,,,FY2025,annual,E2E Series A growth,50\n",
     ),
   });
   await admin.page.getByRole("button", { name: "Preview" }).click();
-  await expect(admin.page.getByText("9 rows: 8 will be imported, 1 rejected")).toBeVisible();
+  await expect(admin.page.getByText("10 rows: 9 will be imported, 1 rejected")).toBeVisible();
   await expect(admin.page.getByText(/Unknown unit "dollars"/)).toBeVisible();
-  await admin.page.getByRole("button", { name: /^Import 8 to draft version 1/ }).click();
+  await admin.page.getByRole("button", { name: /^Import 9 to draft version 1/ }).click();
   await admin.page.getByRole("link", { name: "Review the draft →" }).click();
   await expect(admin.page.getByText("No validation errors.")).toBeVisible();
   await admin.page.getByRole("button", { name: "Validate" }).click();
@@ -189,9 +191,10 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   const revenue = founder.page.getByRole("article", { name: "Revenue compared with peers" });
   await expect(revenue).toContainText("$3M");
   await expect(revenue).toContainText("the revenue band you gave at sign-up");
-  await expect(founder.page.getByRole("article", { name: "Growth compared with peers" })).toContainText(
-    "Our comparison sources don't publish growth figures for Fintech companies founded in 2019 yet. An advisor can confirm this comparison for you later.",
-  );
+  const growth = founder.page.getByRole("article", { name: "Growth compared with peers" });
+  await expect(growth).toContainText("Our comparison sources don't publish growth figures for Fintech companies founded in 2019 yet. An advisor can confirm this comparison for you later.");
+  await expect(growth).toContainText("Based on publicly available data from E2E advisory survey (2026), a Series A company should be targeting 150% year-over-year ARR growth or more to be in the top quartile.");
+  await expect(growth).toContainText("At 50–100%, you're below it.");
   // How we work with companies like this one, and what we'd do after the assessment.
   await expect(founder.page.getByRole("heading", { name: "How we work with companies like yours" })).toBeVisible();
   await expect(founder.page.getByText(/^Series A .*companies.*with founder-led sales/)).toBeVisible();

@@ -1,5 +1,5 @@
-import { formatMetric, type MetricKey } from "@/lib/metrics";
-import { incompatible, type CandidateRecord } from "./match";
+import { formatMetric, METRICS, type MetricKey } from "@/lib/metrics";
+import { incompatible, stagesFor, type CandidateRecord } from "./match";
 import { cohortKey, describeCohort, foundedLabel } from "./records";
 
 /**
@@ -43,7 +43,25 @@ export type PeerComparison =
       source: { name: string; publisher: string | null; year: string | null; attribution: string | null };
       dataset: { name: string; version: number; versionId: string };
     }
-  | { status: "unavailable"; key: PeerKey; title: string; metric: MetricKey; company: PeerFigure | null; reason: string };
+  | { status: "unavailable"; key: PeerKey; title: string; metric: MetricKey; company: PeerFigure | null; reason: string; target: TopQuartileTarget | null };
+
+/**
+ * The fallback when no industry-and-founding-year cohort exists: the top-quartile figure the fixed
+ * Snapshot sources publish for companies at the same stage. Null when they publish none.
+ */
+export type TopQuartileTarget = {
+  statement: string;
+  value: number;
+  formatted: string;
+  /** Whether the company's figure already reaches it; null when unknown or its range straddles it. */
+  met: boolean | null;
+  cohort: string;
+  period: string;
+  sampleSize: number | null;
+  source: { name: string; publisher: string | null; year: string | null; attribution: string | null };
+  dataset: { name: string; version: number; versionId: string };
+  recordId: string;
+};
 
 export const ADVISOR_CONFIRMS = "An advisor can confirm this comparison for you later.";
 
@@ -106,17 +124,80 @@ export function position(f: PeerFigure, s: { bottom: PeerPoint; median: PeerPoin
   return "Your range is open-ended, so we can't place you precisely; an exact figure would";
 }
 
+const TARGET_WORDS: Partial<Record<MetricKey, string>> = { arr_growth: "year-over-year ARR growth", nrr: "net revenue retention", arr: "ARR" };
+const article = (w: string) => (/^[aeiou]/i.test(w) ? "an" : "a");
+
+/**
+ * The top-quartile (or nearest published upper-percentile) figure for the company's stage from the
+ * Snapshot sources. Industry-specific cohorts come first; a cohort naming another industry, or
+ * founding years that exclude the company's, is never used. The choice order is fixed.
+ */
+export function topQuartileTarget(
+  metric: MetricKey,
+  company: { stage: string | null; industry: string | null; foundedYear: number | null },
+  figure: PeerFigure | null,
+  candidates: readonly CandidateRecord[],
+): TopQuartileTarget | null {
+  if (!company.stage) return null;
+  const stages = stagesFor(company.stage);
+  const industryFits = (r: CandidateRecord) => !r.industry || (company.industry ? sameIndustry(company.industry, r.industry) : false);
+  const yearFits = (r: CandidateRecord) => (r.foundedFrom == null && r.foundedTo == null) || company.foundedYear === null || inFounded(r, company.foundedYear);
+  const rows = candidates
+    .filter((r) => r.metric === metric && r.source.snapshotSource && !incompatible(r, metric, "customer_report"))
+    .filter((r) => r.statistic === "percentile" && r.percentile !== null && r.percentile >= 75 && r.value !== null)
+    .filter((r) => r.stages.some((st) => stages.includes(st)) && industryFits(r) && yearFits(r))
+    .sort(
+      (a, b) =>
+        Number(Boolean(b.industry)) - Number(Boolean(a.industry)) ||
+        a.percentile! - b.percentile! ||
+        a.source.name.localeCompare(b.source.name) ||
+        a.datasetName.localeCompare(b.datasetName) ||
+        b.version - a.version ||
+        b.period.localeCompare(a.period),
+    );
+  const r = rows[0];
+  if (!r) return null;
+  const formatted = formatMetric(metric, r.value!);
+  const quartile = r.percentile === 75 ? "top quartile" : `top ${100 - r.percentile!}%`;
+  const basis = r.source.kind === "published_report" ? "publicly available data" : "benchmark data";
+  const year = r.source.publishedOn?.slice(0, 4);
+  const peers = r.industry ? `${company.stage} ${r.industry}` : company.stage;
+  const lo = figure?.exact ?? figure?.lo ?? null;
+  const hi = figure?.exact ?? figure?.hi ?? null;
+  const met = lo !== null && lo >= r.value! ? true : hi !== null && hi < r.value! ? false : null;
+  return {
+    statement: `Based on ${basis} from ${r.source.name}${year ? ` (${year})` : ""}, ${article(peers)} ${peers} company should be targeting ${formatted} ${TARGET_WORDS[metric] ?? METRICS[metric].label} or more to be in the ${quartile}.`,
+    value: r.value!,
+    formatted,
+    met,
+    cohort: describeCohort(r),
+    period: r.period,
+    sampleSize: r.sampleSize,
+    source: { name: r.source.name, publisher: r.source.publisher, year: year ?? null, attribution: r.source.attribution },
+    dataset: { name: r.datasetName, version: r.version, versionId: r.versionId },
+    recordId: r.id,
+  };
+}
+
 /**
  * One comparison per metric. Among cohorts that fit, the choice is fixed: source name, then
  * dataset, the newest published version, the latest period, and the narrowest founding-year span.
  */
 export function peerComparisons(
-  company: { industry: string | null; foundedYear: number | null; figures: Partial<Record<PeerKey, PeerFigure | null>> },
+  company: { industry: string | null; foundedYear: number | null; stage?: string | null; figures: Partial<Record<PeerKey, PeerFigure | null>> },
   candidates: readonly CandidateRecord[],
 ): PeerComparison[] {
   return PEER_METRICS.map(({ key, title, metric }) => {
     const figure = company.figures[key] ?? null;
-    const none = (reason: string): PeerComparison => ({ status: "unavailable", key, title, metric, company: figure, reason: `${reason} ${ADVISOR_CONFIRMS}` });
+    const none = (reason: string): PeerComparison => ({
+      status: "unavailable",
+      key,
+      title,
+      metric,
+      company: figure,
+      reason: `${reason} ${ADVISOR_CONFIRMS}`,
+      target: topQuartileTarget(metric, { stage: company.stage ?? null, industry: company.industry, foundedYear: company.foundedYear }, figure, candidates),
+    });
     if (!company.industry || norm(company.industry) === "other") return none("We don't have an industry to compare you within yet.");
     if (company.foundedYear === null) return none("We don't have your founding year yet.");
 

@@ -61,6 +61,21 @@ export function PeerComparisonCard({ c }: { c: PeerComparison }) {
         <h3 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>{c.title}</h3>
         {c.company && <p className="text-base mt-1" style={{ color: "var(--foreground)" }}>You: {c.company.text} <span style={muted}>({c.company.origin})</span></p>}
         <p className="text-base mt-2" style={muted}>{c.reason}</p>
+        {c.target && (
+          <div className="mt-4 rounded-xl px-4 py-3" style={{ background: "var(--muted)" }}>
+            <p className="text-base font-medium" style={{ color: "var(--foreground)" }}>{c.target.statement}</p>
+            {c.target.met !== null && (
+              <p className="text-sm mt-1" style={{ color: c.target.met ? "var(--green)" : "var(--foreground)" }}>
+                {c.target.met ? `At ${c.company!.text}, you're already there.` : `At ${c.company!.text}, you're below it.`}
+              </p>
+            )}
+            <p className="text-sm mt-2" style={muted}>
+              Peers: {c.target.cohort}
+              {c.target.sampleSize ? ` (${c.target.sampleSize} companies)` : ""}, {c.target.period}. Source: {[c.target.source.name, c.target.source.publisher, c.target.source.year].filter(Boolean).join(", ")}; {c.target.dataset.name}, version {c.target.dataset.version}. A stage-wide figure, not specific to your founding year.
+              {c.target.source.attribution && ` ${c.target.source.attribution}`}
+            </p>
+          </div>
+        )}
       </article>
     );
   }

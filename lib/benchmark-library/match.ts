@@ -84,7 +84,7 @@ const BAND: Record<string, [number, number]> = {
 };
 
 /** Record stages the company's stage counts as (the profile's "Series B+" covers Series B and later). */
-const stagesFor = (stage: string): string[] => (stage === "Series B+" ? ["Series B", "Series C+"] : [stage]);
+export const stagesFor = (stage: string): string[] => (stage === "Series B+" ? ["Series B", "Series C+"] : [stage]);
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 const usd = (n: number) => (n >= 1_000_000 ? `$${+(n / 1_000_000).toFixed(1)}M` : `$${Math.round(n / 1000)}K`);
 

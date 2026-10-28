@@ -28,13 +28,14 @@ function figureFor(key: PeerKey, answers: IntakeAnswers, revenueBand: string | n
 }
 
 /** The Snapshot's three peer comparisons, from the fixed Snapshot sources only. */
-export async function snapshotPeers(company: Pick<Company, "industry" | "revenueBand" | "isSample">, answers: IntakeAnswers): Promise<PeerComparison[]> {
+export async function snapshotPeers(company: Pick<Company, "industry" | "revenueBand" | "isSample" | "stage">, answers: IntakeAnswers): Promise<PeerComparison[]> {
   const industry = typeof answers["company.industry"] === "string" ? (answers["company.industry"] as string) : company.industry;
   const candidates = company.isSample ? [] : (await loadCandidates(PEER_METRICS.map((m) => m.metric))).filter((r) => r.source.snapshotSource);
   return peerComparisons(
     {
       industry: industry ?? null,
       foundedYear: foundingYear(answers["company.founded_year"]),
+      stage: typeof answers["company.stage"] === "string" ? (answers["company.stage"] as string) : company.stage,
       figures: Object.fromEntries(PEER_METRICS.map((m) => [m.key, figureFor(m.key, answers, company.revenueBand)])),
     },
     candidates,
