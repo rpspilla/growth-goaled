@@ -56,7 +56,7 @@ export default async function ResultsPage() {
         commit={<CommitPlanButton key="commit" committedAt={state.view.committedAt} commit={commitPlanAction.bind(null, state.view.deliverableId)} />}
         actions={
           <div key="actions" className="mt-3">
-            <RunAssessmentButton label="Re-run with my latest data" />
+            <RunAssessmentButton label="Re-run my report" primary />
           </div>
         }
         onSourceTrail={sourceTrailOpened}
@@ -88,7 +88,7 @@ export default async function ResultsPage() {
       )}
       {state.state === "not_started" && (
         <div className="rounded-xl border p-6 text-base space-y-4" style={card}>
-          <p style={{ color: "var(--foreground)" }}>Share the data this assessment needs, then press &ldquo;Analyze my data&rdquo;. Your results are built from your answers and data in a few minutes.</p>
+          <p style={{ color: "var(--foreground)" }}>Share the data this assessment needs, then press &ldquo;Run my report&rdquo;. Your results are built from your answers and data in a few minutes.</p>
           <Link href="/data" className="btn btn-primary">Go to Data →</Link>
         </div>
       )}

@@ -249,8 +249,13 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await expect(founder.page.getByText("Why it matters:").first()).toBeVisible();
   await expect(founder.page.getByText("0 of 3 required items in")).toBeVisible();
   // Analysis is never blocked: with data missing it runs on what's shared and lists the gaps.
-  await expect(founder.page.getByRole("button", { name: "Analyze what I've shared" })).toBeEnabled();
-  const build = founder.page.getByRole("button", { name: "Analyze my data" });
+  // Upload and the big run button sit at the top of every Data page.
+  for (const path of ["/data/files", "/data/questions", "/data"]) {
+    await founder.page.goto(path);
+    await expect(founder.page.getByLabel("Upload files: drop them here or press to choose")).toBeVisible();
+    await expect(founder.page.getByRole("button", { name: "Run my report", exact: true })).toBeEnabled();
+  }
+  const build = founder.page.getByRole("button", { name: "Run my report", exact: true });
   const groups = founder.page.getByRole("group", { name: /^Status of / });
   await expect(groups).toHaveCount(9); // 3 required + 5 helpful + 1 optional
   for (let i = 0; i < 3; i++) {
@@ -331,7 +336,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await founder.page.goto("/profile/customers");
   await expect(founder.page.locator("#intake-nrr")).toHaveValue("101");
   await founder.page.goto("/baseline");
-  await founder.page.getByRole("button", { name: "Re-run with my latest data" }).click();
+  await founder.page.getByRole("button", { name: "Re-run my report" }).click();
   await expect
     .poll(async () => {
       const db = new Client({ connectionString: E2E_DATABASE_URL });
@@ -370,7 +375,8 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await expect(founder.page.getByRole("heading", { name: "Data for Repeatable Sales Motion" })).toBeVisible();
   await switcher.selectOption("growth_leak");
   await expect(founder.page.getByRole("heading", { name: "Data for Fix Churn" })).toBeVisible();
-  await expect(founder.page.getByRole("link", { name: "View your results →" })).toBeVisible();
+  await expect(founder.page.getByRole("link", { name: "View your latest results →" })).toBeVisible();
+  await expect(founder.page.getByRole("button", { name: "Re-run my report", exact: true })).toBeVisible();
   await founder.page.goto("/baseline");
   await expect(founder.page.getByText(/Reviewed by E2E Admin/)).toBeVisible();
   await expect(founder.page.getByText(/Checked against your profile\./)).toBeVisible();

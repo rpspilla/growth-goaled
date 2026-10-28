@@ -139,7 +139,7 @@ export async function reviewPoint(dataPointId: string, decision: "accepted" | "r
 }
 
 /**
- * "Analyze my data": runs the assessment engine in the background for the active assessment,
+ * "Run my report": runs the assessment engine in the background for the active assessment,
  * with whatever has been shared so far (missing data is reported as gaps, never a blocker).
  * Also used to re-run with new data.
  */

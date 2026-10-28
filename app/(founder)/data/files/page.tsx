@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/PageHeader";
 import { FileList } from "@/components/readiness/FileList";
-import { InboxDropzone } from "@/components/readiness/InboxDropzone";
+import { DataTopPanel } from "@/components/readiness/DataTopPanel";
 import { ReadinessTabs } from "@/components/readiness/ReadinessTabs";
 import { listDocuments } from "@/lib/data/documents";
 import { loadReadiness } from "../load";
@@ -21,9 +21,9 @@ export default async function FilesPage() {
 
   return (
     <div className="px-4 sm:px-8 py-8 max-w-5xl">
-      <PageHeader eyebrow="Step 3 · Data" title="Your files" subtitle="Everything you've uploaded. Files are private to your company and your advisor." />
+      <PageHeader eyebrow="Step 3 of 5" title="Your files" subtitle="Everything you've uploaded. Files are private to your company and your advisor." />
+      <DataTopPanel />
       <ReadinessTabs />
-      <InboxDropzone blobPrefix={data.blobPrefix} />
       <FileList documents={documents} />
     </div>
   );

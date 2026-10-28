@@ -22,12 +22,11 @@ export function RunAssessmentButton({ label, primary = false }: { label: string;
             else setError(r.error);
           })
         }
-        className="px-3 py-1.5 rounded-md text-xs font-semibold disabled:opacity-50"
-        style={primary ? { background: "var(--green)", color: "#fff" } : { background: "var(--muted)", color: "var(--foreground)" }}
+        className={`btn ${primary ? "btn-primary btn-lg" : "btn-secondary"}`}
       >
-        {pending ? "Starting…" : label}
+        {pending ? "Starting your report…" : label}
       </button>
-      {error && <span className="text-xs" role="alert" style={{ color: "var(--red)" }}>{error}</span>}
+      {error && <span className="text-sm" role="alert" style={{ color: "var(--red)" }}>{error}</span>}
     </span>
   );
 }

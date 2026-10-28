@@ -7,60 +7,56 @@ import { requestAssessment } from "@/app/(founder)/data/actions";
 
 export type AssessmentState = "not_started" | "building" | "ready" | "failed";
 
-/** Ready for analysis: how many required items are in, and the button that runs (or re-runs) the assessment. */
+/**
+ * The run / re-run control at the top of every Data page: one big, obvious button, how ready the
+ * data is, and what running now means. The report is never blocked on missing data.
+ */
 export function BaselineMeter({ done, total, ready, assessment }: { done: number; total: number; ready: boolean; assessment: AssessmentState }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const percent = total ? Math.round((done / total) * 100) : 0;
-  const run = (label: string, primary: boolean) => (
-    <button
-      type="button"
-      disabled={pending}
-      onClick={() =>
-        start(async () => {
-          setError(null);
-          const r = await requestAssessment();
-          if (r.ok) router.push("/baseline");
-          else setError(r.error);
-        })
-      }
-      className="px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
-      style={primary ? { background: "var(--green)", color: "#fff" } : { background: "var(--muted)", color: "var(--foreground)" }}
-    >
-      {pending ? "Starting…" : label}
-    </button>
-  );
+  const label = assessment === "ready" ? "Re-run my report" : assessment === "failed" ? "Run my report again" : "Run my report";
+  const run = () =>
+    start(async () => {
+      setError(null);
+      const r = await requestAssessment();
+      if (r.ok) router.push("/baseline");
+      else setError(r.error);
+    });
 
   return (
-    <div className="rounded-xl border p-5 mb-6" style={{ background: "var(--card)", borderColor: ready ? "var(--green)" : "var(--border)" }}>
-      <div className="flex items-center gap-4 flex-wrap">
-        <div className="flex-1 min-w-56">
-          <div className="label mb-1" style={{ color: "var(--muted-foreground)" }}>Ready for analysis</div>
-          <div className="text-sm mb-2" style={{ color: "var(--foreground)" }}>
-            {ready ? "Ready: everything the assessment needs is in." : `${done} of ${total} required items in`}
-          </div>
-          <div className="h-2 rounded-full" role="meter" aria-label="Ready for analysis" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done} style={{ background: "var(--muted)" }}>
-            <div className="h-2 rounded-full transition-all" style={{ width: `${percent}%`, background: ready ? "var(--green)" : "var(--amber)" }} />
-          </div>
-        </div>
+    <section className="surface p-5 sm:p-6" style={{ borderColor: "var(--green)", boxShadow: "0 0 0 1px var(--green)" }} aria-labelledby="run-report">
+      <h2 id="run-report" className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>
+        {assessment === "ready" ? "Your report" : "Run your report"}
+      </h2>
+      <div className="mt-2 text-base" style={{ color: "var(--foreground)" }}>
+        {ready ? "Ready: everything the assessment needs is in." : `${done} of ${total} required items in`}
+      </div>
+      <div className="h-2 rounded-full mt-2" role="meter" aria-label="Ready for analysis" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done} style={{ background: "var(--muted)" }}>
+        <div className="h-2 rounded-full transition-all" style={{ width: `${percent}%`, background: ready ? "var(--green)" : "var(--amber)" }} />
+      </div>
+
+      <div className="mt-5">
         {assessment === "building" ? (
-          <Link href="/baseline" className="text-sm font-semibold" style={{ color: "var(--green)" }}>Analyzing your data… see progress →</Link>
-        ) : assessment === "ready" ? (
-          <div className="flex items-center gap-3 flex-wrap">
-            <Link href="/baseline" className="px-4 py-2 rounded-lg text-sm font-semibold" style={{ background: "var(--green)", color: "#fff" }}>View your results →</Link>
-            {run("Re-run with my latest data", false)}
-          </div>
+          <Link href="/baseline" className="btn btn-primary btn-lg w-full">Your report is being built · see progress →</Link>
         ) : (
-          run(assessment === "failed" ? "Run the analysis again" : ready ? "Analyze my data" : "Analyze what I've shared", true)
+          <button type="button" disabled={pending} onClick={run} className="btn btn-primary btn-lg w-full text-lg" style={{ minHeight: "3.5rem" }}>
+            {pending ? "Starting your report…" : label}
+          </button>
+        )}
+        {assessment === "ready" && (
+          <Link href="/baseline" className="btn btn-secondary w-full mt-3">View your latest results →</Link>
         )}
       </div>
-      {!ready && assessment !== "building" && (
-        <p className="text-xs mt-2" style={{ color: "var(--muted-foreground)" }}>
-          You can analyze now: the report is built as far as your data allows and lists what&apos;s missing. Adding the required items makes it sharper.
-        </p>
-      )}
-      {error && <p className="text-xs mt-2" role="alert" style={{ color: "var(--red)" }}>{error}</p>}
-    </div>
+      <p className="text-sm mt-3" style={{ color: "var(--muted-foreground)" }}>
+        {assessment === "ready"
+          ? "Re-running builds a new version from everything you've shared, and keeps the previous one."
+          : ready
+            ? "Takes a few minutes. You'll see your results as soon as they're ready."
+            : "You can run it now: the report goes as far as your data allows and lists what's missing. Adding the required items makes it sharper."}
+      </p>
+      {error && <p className="text-sm mt-2" role="alert" style={{ color: "var(--red)" }}>{error}</p>}
+    </section>
   );
 }
