@@ -36,13 +36,13 @@ export default async function PortfolioPage() {
   rows.sort((a, b) => b.attention.length - a.attention.length || a.name.localeCompare(b.name));
 
   return (
-    <div className="p-8 max-w-7xl space-y-6">
+    <div className="px-4 sm:px-8 py-8 max-w-7xl space-y-6">
       <PageHeader
-        title="Portfolio Overview"
+        title="Portfolio overview"
         subtitle={user.role === "admin" ? "Every company on Growth Goaled." : "Companies assigned to you."}
       />
 
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         {[
           { label: "Active companies", value: counts.active, color: "var(--foreground)" },
           { label: "Require attention", value: counts.attention, color: "var(--red)" },
@@ -51,14 +51,15 @@ export default async function PortfolioPage() {
           { label: "Complete", value: counts.complete, color: "var(--green)" },
         ].map(({ label, value, color }) => (
           <div key={label} className="rounded-xl border p-4" style={card}>
-            <div className="font-mono text-2xl font-semibold mb-1" style={{ color }}>{value}</div>
-            <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>{label}</div>
+            <div className="text-3xl font-semibold mb-0.5" style={{ color }}>{value}</div>
+            <div className="text-sm font-medium" style={{ color: "var(--muted-foreground)" }}>{label}</div>
           </div>
         ))}
       </div>
 
-      <div className="rounded-xl border overflow-hidden" style={card}>
-        <div className="grid grid-cols-12 px-5 py-3 border-b text-xs font-semibold uppercase tracking-wider" style={{ borderColor: "var(--border)", background: "var(--muted)", color: "var(--muted-foreground)" }}>
+      <div className="rounded-xl border overflow-x-auto" style={card}>
+        <div className="min-w-[960px]">
+        <div className="grid grid-cols-12 px-5 py-3 border-b label" style={{ borderColor: "var(--border)", background: "var(--muted)", color: "var(--muted-foreground)" }}>
           <div className="col-span-3">Company</div>
           <div className="col-span-1">Stage</div>
           <div className="col-span-1">ARR</div>
@@ -99,19 +100,20 @@ export default async function PortfolioPage() {
             </Link>
           );
         })}
+        </div>
       </div>
 
-      <div className="grid grid-cols-5 gap-6">
-        <div className="col-span-2 rounded-xl border p-5" style={card}>
-            <div className="text-sm font-semibold mb-1" style={{ color: "var(--foreground)" }}>Invite a founder</div>
-            <p className="text-xs mb-4" style={{ color: "var(--muted-foreground)" }}>
+      <div className="grid lg:grid-cols-5 gap-6">
+        <div className="lg:col-span-2 rounded-xl border p-5" style={card}>
+            <h2 className="text-lg font-semibold mb-1" style={{ color: "var(--foreground)" }}>Invite a founder</h2>
+            <p className="text-sm mb-4" style={{ color: "var(--muted-foreground)" }}>
               Creates the company in your portfolio and sends the founder a single-use sign-up link.
             </p>
             <InviteFounderForm />
         </div>
-        <div className="col-span-3">
+        <div className="lg:col-span-3">
           <div className="rounded-xl border overflow-hidden" style={card}>
-            <div className="px-5 py-3 border-b text-xs font-semibold uppercase tracking-wider" style={{ borderColor: "var(--border)", background: "var(--muted)", color: "var(--muted-foreground)" }}>
+            <div className="px-5 py-3 border-b label" style={{ borderColor: "var(--border)", background: "var(--muted)", color: "var(--muted-foreground)" }}>
               Open invites ({invites.length})
             </div>
             {invites.length === 0 && (

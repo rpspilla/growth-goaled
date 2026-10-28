@@ -7,7 +7,7 @@ import { initials } from "@/components/shell/initials";
 function MetricCard({ label, value, sub, trend }: Dashboard["metrics"][number]) {
   return (
     <div className="rounded-xl p-5 border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
-      <div className="text-xs font-medium uppercase tracking-wider mb-2" style={{ color: "var(--muted-foreground)" }}>{label}</div>
+      <div className="label mb-2" style={{ color: "var(--muted-foreground)" }}>{label}</div>
       <div className="font-mono text-2xl font-semibold" style={{ color: "var(--foreground)" }}>{value}</div>
       {sub && (
         <div
@@ -61,7 +61,7 @@ export function DashboardView({ data, hrefFor }: { data: Dashboard; hrefFor: (pa
   return (
     <div className="p-8 max-w-6xl">
       <div className="mb-8">
-        <div className="text-xs font-medium uppercase tracking-wider mb-2" style={{ color: "var(--muted-foreground)" }}>{today()}</div>
+        <div className="label mb-2" style={{ color: "var(--muted-foreground)" }}>{today()}</div>
         <h1 className="font-display text-3xl font-normal mb-1" style={{ color: "var(--foreground)" }}>Welcome back, {data.companyName}</h1>
         <p className="text-base" style={{ color: "var(--muted-foreground)" }}>Here&apos;s where your growth engine stands today.</p>
       </div>
@@ -77,7 +77,7 @@ export function DashboardView({ data, hrefFor }: { data: Dashboard; hrefFor: (pa
       <div className="grid grid-cols-3 gap-6">
         {/* Growth Intelligence Score */}
         <div className="col-span-1 rounded-xl border p-6 flex flex-col" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
-          <div className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "var(--muted-foreground)" }}>
+          <div className="label mb-4" style={{ color: "var(--muted-foreground)" }}>
             Growth Intelligence Score
           </div>
           {data.score ? (

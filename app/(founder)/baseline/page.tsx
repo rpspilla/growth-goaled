@@ -62,33 +62,33 @@ export default async function ResultsPage() {
 
   const target = targetSummary(active.objective);
   return (
-    <div className="p-4 sm:p-8 max-w-4xl space-y-6">
+    <div className="px-4 sm:px-8 py-8 max-w-4xl space-y-6">
       <BuildingRefresh active={state.state === "building"} />
       <PageHeader eyebrow="Assessment results" title={def.question} subtitle="Your results appear here as soon as they're ready." />
       {figures}
       {state.state === "building" && (
         <div className="rounded-xl border p-6" style={card}>
-          <div className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>Analyzing your data</div>
+          <div className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>Analyzing your data</div>
           <AnalyzingDots label="Working through your answers and figures, then checking every number..." />
-          <p className="text-xs mt-2" style={{ color: "var(--muted-foreground)" }}>Usually a few minutes. This page updates on its own.</p>
+          <p className="text-sm mt-2" style={{ color: "var(--muted-foreground)" }}>Usually a few minutes. This page updates on its own.</p>
         </div>
       )}
       {state.state === "failed" && (
-        <div className="rounded-xl border p-6 text-sm space-y-3" style={{ ...card, borderColor: "var(--amber)" }}>
+        <div className="rounded-xl border p-6 text-base space-y-3" style={{ ...card, borderColor: "var(--amber)" }}>
           <p style={{ color: "var(--foreground)" }}>{state.reason}</p>
           <div className="flex items-center gap-4 flex-wrap">
             <RunAssessmentButton label="Run it again" primary />
-            <a href={advisoryHref(def.id, "review")} className="text-sm font-semibold" style={{ color: "var(--green)" }}>Book time with an executive advisor →</a>
+            <a href={advisoryHref(def.id, "review")} className="link">Book time with an executive advisor →</a>
           </div>
         </div>
       )}
       {state.state === "not_started" && (
-        <div className="rounded-xl border p-6 text-sm space-y-3" style={card}>
+        <div className="rounded-xl border p-6 text-base space-y-4" style={card}>
           <p style={{ color: "var(--foreground)" }}>Share the data this assessment needs, then press &ldquo;Analyze my data&rdquo;. Your results are built from your answers and data in a few minutes.</p>
-          <Link href="/data" className="inline-block px-4 py-2 rounded-lg text-sm font-semibold" style={{ background: "var(--green)", color: "#fff" }}>Go to Data →</Link>
+          <Link href="/data" className="btn btn-primary">Go to Data →</Link>
         </div>
       )}
-      {target && <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Your target: {target}</p>}
+      {target && <p className="text-base" style={{ color: "var(--muted-foreground)" }}>Your target: {target}</p>}
     </div>
   );
 }

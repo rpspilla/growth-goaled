@@ -49,7 +49,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ deliver
     !r ? <span style={{ color: "var(--muted-foreground)" }}>Not run</span> : r.status === "succeeded" ? <span style={{ color: "var(--green)" }}>Complete ✓</span> : r.status === "failed" ? <span style={{ color: "var(--red)" }}>Failed</span> : <span style={{ color: "var(--amber)" }}>Running...</span>;
 
   return (
-    <div className="p-8 max-w-7xl">
+    <div className="px-4 sm:px-8 py-8 max-w-7xl">
       <Link href="/advisor/review" className="text-xs" style={{ color: "var(--muted-foreground)" }}>← Review Queue</Link>
       <PageHeader title={`${company.name} — Benchmark`} subtitle={<>Version {d.version} · <span style={{ color: s.color, fontWeight: 600 }}>{s.label}</span></>} />
 
@@ -155,7 +155,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ deliver
 
       {view ? (
         <section>
-          <div className="text-xs font-semibold uppercase tracking-wider mb-2 px-1" style={{ color: "var(--amber)" }}>Draft preview · what the founder will see once published</div>
+          <div className="label mb-2 px-1" style={{ color: "var(--amber)" }}>Draft preview · what the founder will see once published</div>
           <div className="rounded-xl border" style={{ borderColor: "var(--amber)" }}>
             <BenchmarkView data={view} companyName={company.name} scoreBreakdown={null} />
           </div>

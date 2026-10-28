@@ -12,8 +12,6 @@ import { getUseCase } from "@/lib/use-cases";
 import { questionnaire } from "@/lib/use-cases/questionnaire";
 import { saveAnswer, submitQuestionnaire } from "../actions";
 
-const card = { background: "var(--card)", borderColor: "var(--border)" };
-
 /** Step 2: what the assessment is, who it's for, what it costs, and the free questionnaire. Nothing here charges. */
 export default async function UseCasePage({ params }: { params: Promise<{ useCase: string }> }) {
   const def = getUseCase((await params).useCase);
@@ -26,27 +24,38 @@ export default async function UseCasePage({ params }: { params: Promise<{ useCas
   const sellable = sellableUseCases().includes(def.id);
   if (company) await track("use_case_viewed", { userId: user.id, companyId: company.id, props: { use_case: def.id } });
 
+  const journey = ["Answer a few questions", "See your free Snapshot", `Full assessment from your data${sellable ? ` · ${price}` : ""}`];
   return (
-    <div className="p-4 sm:p-8 max-w-6xl">
-      <Link href="/library" className="text-xs" style={{ color: "var(--muted-foreground)" }}>← Use Case Library</Link>
-      <PageHeader eyebrow={def.shortTitle} title={def.question} subtitle={def.description} />
+    <div className="px-4 sm:px-8 py-8 max-w-6xl">
+      <Link href="/library" className="text-sm link">← All growth questions</Link>
+      <div className="mt-4">
+        <PageHeader eyebrow={def.shortTitle} title={def.question} subtitle={def.description} />
+      </div>
+
+      <ol className="flex flex-wrap gap-x-6 gap-y-2 -mt-3 mb-8 text-sm" aria-label="How this works">
+        {journey.map((step, i) => (
+          <li key={step} className="flex items-center gap-2" aria-current={i === 0 && !row?.activatedAt ? "step" : undefined}>
+            <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: i === 0 ? "var(--green)" : "var(--muted)", color: i === 0 ? "#fff" : "var(--muted-foreground)" }}>{i + 1}</span>
+            <span style={{ color: i === 0 ? "var(--foreground)" : "var(--muted-foreground)", fontWeight: i === 0 ? 600 : 400 }}>{step}</span>
+            {i === 2 && <span style={{ color: "var(--muted-foreground)" }}>(optional)</span>}
+          </li>
+        ))}
+      </ol>
 
       {row?.activatedAt && (
-        <div className="rounded-xl border p-4 mb-6 flex items-center gap-3 flex-wrap" style={{ ...card, borderColor: "var(--green)" }}>
-          <span className="flex-1 text-sm" style={{ color: "var(--foreground)" }}>You have this assessment. Your answers below are saved and you can still edit them.</span>
-          <Link href="/data" className="px-4 py-2 rounded-lg text-sm font-semibold" style={{ background: "var(--green)", color: "#fff" }}>Continue your assessment →</Link>
+        <div className="surface p-5 mb-6 flex items-center gap-4 flex-wrap" style={{ borderColor: "var(--green)" }}>
+          <span className="flex-1 text-base" style={{ color: "var(--foreground)" }}>You have this assessment. Your answers are saved and you can still edit them.</span>
+          <Link href="/data" className="btn btn-primary">Continue your assessment →</Link>
         </div>
       )}
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        <section className="lg:col-span-2 rounded-xl border p-5 sm:p-6 order-2 lg:order-1" style={card} aria-labelledby="questionnaire">
-          <h2 id="questionnaire" className="text-lg font-semibold mb-1" style={{ color: "var(--foreground)" }}>Start with a few questions</h2>
-          <p className="text-sm mb-5" style={{ color: "var(--muted-foreground)" }}>
-            Free, and saved as you go. Your answers tell us whether this assessment fits and give you a first Growth Snapshot.
-          </p>
+      <div className="grid lg:grid-cols-[minmax(0,1fr)_20rem] gap-8 items-start">
+        <section className="surface surface-pad" aria-labelledby="questionnaire">
+          <h2 id="questionnaire" className="text-xl sm:text-2xl font-semibold" style={{ color: "var(--foreground)" }}>Start with a few questions</h2>
+          <p className="text-base mt-1 mb-6" style={{ color: "var(--muted-foreground)" }}>Free and saved as you go. Your answers produce your Growth Snapshot and tell us whether this is the right question.</p>
           {known.length > 0 && (
-            <p className="text-xs mb-5" style={{ color: "var(--muted-foreground)" }}>
-              From your company profile: {known.map((k) => `${k.label} ${k.value}`).join(" · ")} · <Link href="/profile" style={{ color: "var(--green)" }}>edit</Link>
+            <p className="text-sm mb-6 rounded-lg px-4 py-3" style={{ background: "var(--muted)", color: "var(--muted-foreground)" }}>
+              Already known from your profile: {known.map((k) => `${k.label} ${k.value}`).join(" · ")} · <Link href="/profile" className="link">edit</Link>
             </p>
           )}
           {company ? (
@@ -59,41 +68,44 @@ export default async function UseCasePage({ params }: { params: Promise<{ useCas
               snapshotHref={`/library/${def.id}/snapshot`}
             />
           ) : (
-            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Your company isn&apos;t set up yet.</p>
+            <p className="text-base" style={{ color: "var(--muted-foreground)" }}>Your company isn&apos;t set up yet.</p>
           )}
         </section>
 
-        <aside className="space-y-6 order-1 lg:order-2">
-          <div className="rounded-xl border p-5" style={card}>
-            <div className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--muted-foreground)" }}>Who it&apos;s for</div>
-            <p className="text-sm" style={{ color: "var(--foreground)" }}>{def.forWho}</p>
+        <aside className="surface surface-pad space-y-6 lg:sticky lg:top-6">
+          <div>
+            <div className="label mb-1">You&apos;ll decide</div>
+            <p className="text-base" style={{ color: "var(--foreground)" }}>{def.decision}</p>
           </div>
-          <div className="rounded-xl border p-5" style={card}>
-            <div className="text-sm font-semibold mb-2" style={{ color: "var(--foreground)" }}>What you&apos;ll receive</div>
-            <ul className="text-sm space-y-1" style={{ color: "var(--muted-foreground)" }}>
-              {def.youGet.map((g) => <li key={g}>• {g}</li>)}
+          <div>
+            <div className="label mb-2">The full assessment gives you</div>
+            <ul className="text-sm space-y-1.5" style={{ color: "var(--foreground)" }}>
+              {def.youGet.map((g) => (
+                <li key={g} className="flex gap-2"><span style={{ color: "var(--green)" }} aria-hidden>✓</span><span>{g}</span></li>
+              ))}
             </ul>
           </div>
-          <div className="rounded-xl border p-5" style={card} aria-label="Pricing">
-            <div className="flex items-baseline justify-between mb-1">
-              <span className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>Full assessment</span>
-              <span className="font-mono text-lg font-semibold" style={{ color: "var(--foreground)" }}>{sellable ? price : "Coming soon"}</span>
+          <div className="pt-5 border-t" style={{ borderColor: "var(--border)" }} aria-label="Pricing">
+            <div className="flex items-baseline justify-between">
+              <span className="text-base font-semibold" style={{ color: "var(--foreground)" }}>Growth Snapshot</span>
+              <span className="text-base font-semibold" style={{ color: "var(--green)" }}>Free</span>
             </div>
-            <p className="text-xs mb-3" style={{ color: "var(--muted-foreground)" }}>
-              {sellable
-                ? "One-time payment for this question. Self-service: built from your answers and data, no meeting required."
-                : "The free Snapshot is available now; the full assessment for this question is launching soon."}
+            <div className="flex items-baseline justify-between mt-1">
+              <span className="text-base font-semibold" style={{ color: "var(--foreground)" }}>Full assessment</span>
+              <span className="text-base font-semibold" style={{ color: "var(--foreground)" }}>{sellable ? price : "Coming soon"}</span>
+            </div>
+            <p className="text-sm mt-2" style={{ color: "var(--muted-foreground)" }}>
+              {sellable ? "One-time, for this question. Built from your answers and data; no meeting needed. You decide after seeing the Snapshot." : "The free Snapshot is available now; the full assessment for this question is launching soon."}
             </p>
-            <div className="text-xs font-medium" style={{ color: "var(--green)" }}>Growth Snapshot: free</div>
           </div>
-          <div className="rounded-xl border p-5" style={card}>
-            <div className="text-sm font-semibold mb-3" style={{ color: "var(--foreground)" }}>How it works</div>
-            <HowItWorks price={price} sellable={sellable} />
-          </div>
-          <div className="rounded-xl border p-5" style={card}>
-            <div className="text-sm font-semibold mb-3" style={{ color: "var(--foreground)" }}>Data we may ask for</div>
-            <DataNeeded useCase={def} />
-          </div>
+          <details className="disclosure pt-5 border-t" style={{ borderColor: "var(--border)" }}>
+            <summary className="text-sm">How it works</summary>
+            <div className="mt-3"><HowItWorks price={price} sellable={sellable} /></div>
+          </details>
+          <details className="disclosure">
+            <summary className="text-sm">Data we may ask for</summary>
+            <div className="mt-3"><DataNeeded useCase={def} /></div>
+          </details>
         </aside>
       </div>
     </div>

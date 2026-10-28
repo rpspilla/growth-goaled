@@ -7,6 +7,7 @@ export const winningIcp: UseCaseDef = {
   question: "Who are we actually winning with?",
   description: "Ranks your customer segments by how well you win, keep and grow them, so you know where to focus.",
   forWho: "Companies with a scattered customer base, long sales cycles or an unclear ideal customer profile.",
+  decision: "Which customers to focus on, and which to stop chasing.",
   whenUseful: "You sell to several kinds of customer and want to focus sales and marketing on the segments that win, stay and grow.",
   youGet: [
     "Customer segments ranked by commercial attractiveness",

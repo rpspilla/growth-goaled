@@ -7,6 +7,7 @@ export const founderHandoff: UseCaseDef = {
   question: "Is our sales repeatable without the founder?",
   description: "Measures how much your sales depend on you and what has to be in place before someone else can sell.",
   forWho: "Founders who personally close most deals and are considering a first AE or sales leader.",
+  decision: "Whether to document the process, hire a first AE, or bring in a sales leader.",
   whenUseful: "You still close many of the deals yourself and want to know what it takes for the team to win without you.",
   youGet: [
     "Founder dependence across the sales process",

@@ -23,7 +23,7 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
   const base = `/advisor/companies/${company.id}`;
 
   return (
-    <div className="p-8 max-w-6xl space-y-6">
+    <div className="px-4 sm:px-8 py-8 max-w-6xl space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 mb-2 flex-wrap">
@@ -48,12 +48,12 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
         </ul>
       )}
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {CARDS.map((m) => {
           const v = metrics.get(m);
           return (
             <div key={m} className="rounded-xl border p-4" style={card}>
-              <div className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: "var(--muted-foreground)" }}>{m === "arr_growth" ? "Growth" : m.toUpperCase()}</div>
+              <div className="label mb-1" style={{ color: "var(--muted-foreground)" }}>{m === "arr_growth" ? "Growth" : m.toUpperCase()}</div>
               <div className="font-mono text-xl font-semibold" style={{ color: v ? "var(--foreground)" : "var(--muted-foreground)" }}>{v ? formatMetric(m, v.value) : "—"}</div>
             </div>
           );
@@ -62,7 +62,7 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
 
 
       <section>
-        <h2 className="text-sm font-semibold mb-2" style={{ color: "var(--foreground)" }}>Use cases</h2>
+        <h2 className="text-lg font-semibold mb-2" style={{ color: "var(--foreground)" }}>Growth questions</h2>
         <div className="rounded-xl border divide-y" style={card}>
           {useCases.length === 0 && (
             <div className="p-4 text-sm" style={{ color: "var(--muted-foreground)" }}>
@@ -76,15 +76,15 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
             const step = STEPS[n]!;
             const target = targetSummary(u.objective);
             return [
-              <div key={u.id} className="flex items-center gap-4 px-4 py-3 text-sm" style={{ borderColor: "var(--border)" }}>
+              <div key={u.id} className="flex items-center gap-4 px-4 py-3 text-base flex-wrap" style={{ borderColor: "var(--border)" }}>
                 <div className="flex-1">
                   <div className="font-medium" style={{ color: "var(--foreground)" }}>{def.shortTitle}</div>
-                  <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+                  <div className="text-sm" style={{ color: "var(--muted-foreground)" }}>
                     {u.activatedAt ? `Purchased ${u.activatedAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} · ${u.activation === "advisor" ? "granted by advisor" : "paid"}` : "Free Snapshot only"}
                     {target && ` · founder's target: ${target}`}
                   </div>
                 </div>
-                <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>Step {n + 1} · {step.label}</span>
+                <span className="text-sm font-medium" style={{ color: "var(--muted-foreground)" }}>Step {n + 1} · {step.label}</span>
               </div>,
             ];
           })}
@@ -93,7 +93,7 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
 
       {advisory.length > 0 && (
         <section>
-          <h2 className="text-sm font-semibold mb-2" style={{ color: "var(--foreground)" }}>Advisory requests</h2>
+          <h2 className="text-lg font-semibold mb-2" style={{ color: "var(--foreground)" }}>Advisory requests</h2>
           <div className="rounded-xl border divide-y" style={card}>
             {advisory.map((a) => (
               <div key={a.id} className="px-4 py-3 text-sm" style={{ borderColor: "var(--border)" }}>
@@ -111,7 +111,7 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
 
       <div className="grid md:grid-cols-3 gap-6">
         <div className="rounded-xl border p-5" style={card}>
-          <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--muted-foreground)" }}>Growth Intelligence Score</div>
+          <div className="label mb-3" style={{ color: "var(--muted-foreground)" }}>Growth Intelligence Score</div>
           <div className="font-mono text-4xl font-semibold mb-1" style={{ color: "var(--foreground)" }}>{row?.score != null ? Math.round(row.score) : "—"}</div>
           {row?.score != null && (
             <div className="h-1.5 rounded-full mb-2" style={{ background: "var(--muted)" }}>

@@ -41,7 +41,7 @@ export default async function RegistersPage({ searchParams }: { searchParams: Pr
   });
 
   return (
-    <div className="p-8 max-w-6xl">
+    <div className="px-4 sm:px-8 py-8 max-w-6xl">
       <PageHeader title="Registers" subtitle="Open questions, conflicts and assumptions across your portfolio." />
 
       {companies.length === 0 ? (

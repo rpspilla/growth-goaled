@@ -37,7 +37,7 @@ export function SourceTrailPanel({ claim, onClose, note = "QA Agent verified; ap
         <div className="space-y-5">
           <div className="text-sm leading-relaxed" style={{ color: "var(--foreground)" }}>{claim.text}</div>
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--muted-foreground)" }}>
+            <div className="label mb-3" style={{ color: "var(--muted-foreground)" }}>
               Data Sources
             </div>
             {evidence.map((s, i) => (
@@ -62,7 +62,7 @@ export function SourceTrailPanel({ claim, onClose, note = "QA Agent verified; ap
           </div>
           {methodology?.detail && (
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--muted-foreground)" }}>
+              <div className="label mb-2" style={{ color: "var(--muted-foreground)" }}>
                 Cohort Matching Methodology
               </div>
               <p className="text-sm leading-relaxed" style={{ color: "var(--foreground)" }}>{methodology.detail}</p>

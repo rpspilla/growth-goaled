@@ -10,9 +10,9 @@ export default async function CompanyProgressPage({ params }: { params: Promise<
   const { company, active } = await companyContext((await params).id);
   const view = active ? await progressView(company, active.def.id) : null;
   return (
-    <div className="p-8 max-w-4xl space-y-6">
+    <div className="px-4 sm:px-8 py-8 max-w-4xl space-y-6">
       <div>
-        <div className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: "var(--muted-foreground)" }}>Step 5 · Progress &amp; Tracking{active ? ` · ${active.def.shortTitle}` : ""}</div>
+        <div className="label mb-1" style={{ color: "var(--muted-foreground)" }}>Step 5 · Progress &amp; Tracking{active ? ` · ${active.def.shortTitle}` : ""}</div>
         <h1 className="font-display text-3xl font-normal" style={{ color: "var(--foreground)" }}>{company.name}: progress</h1>
       </div>
       {!view ? (
@@ -30,7 +30,7 @@ export default async function CompanyProgressPage({ params }: { params: Promise<
           </div>
           {view.metrics.length > 0 && (
             <div className="rounded-xl border p-5 text-sm" style={card}>
-              <div className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--muted-foreground)" }}>Metrics against baseline</div>
+              <div className="label mb-2" style={{ color: "var(--muted-foreground)" }}>Metrics against baseline</div>
               <ul className="space-y-1">
                 {view.metrics.map((m) => (
                   <li key={m.metric} style={{ color: "var(--foreground)" }}>
@@ -42,7 +42,7 @@ export default async function CompanyProgressPage({ params }: { params: Promise<
             </div>
           )}
           <div className="rounded-xl border p-5 text-sm" style={card}>
-            <div className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--muted-foreground)" }}>Plan</div>
+            <div className="label mb-2" style={{ color: "var(--muted-foreground)" }}>Plan</div>
             <ol className="space-y-2">
               {view.actions.map((a) => (
                 <li key={a.id} style={{ color: "var(--foreground)" }}>

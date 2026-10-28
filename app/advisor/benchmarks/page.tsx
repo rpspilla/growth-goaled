@@ -21,7 +21,7 @@ const STATUS_LABEL = { proposed: "Proposed (not used until approved)", approved:
 function MetricsTable({ rows, readOnly }: { rows: MetricRow[]; readOnly: boolean }) {
   return (
     <div className="rounded-xl border overflow-hidden" style={card}>
-      <div className="grid grid-cols-12 px-4 py-2 border-b text-xs font-semibold uppercase tracking-wider" style={{ borderColor: "var(--border)", background: "var(--muted)", color: "var(--muted-foreground)" }}>
+      <div className="grid grid-cols-12 px-4 py-2 border-b label" style={{ borderColor: "var(--border)", background: "var(--muted)", color: "var(--muted-foreground)" }}>
         <div className="col-span-3">Metric</div>
         <div className="col-span-1 text-right">P25</div>
         <div className="col-span-1 text-right">Median</div>
@@ -81,7 +81,7 @@ export default async function BenchmarksPage({ searchParams }: { searchParams: P
   const tab = (active: boolean) => ({ background: active ? "var(--card)" : "transparent", color: active ? "var(--foreground)" : "var(--muted-foreground)" });
 
   return (
-    <div className="p-8 max-w-7xl">
+    <div className="px-4 sm:px-8 py-8 max-w-7xl">
       <PageHeader title="Benchmark Library" subtitle="Cohorts, sources and benchmark rows. Only approved rows are ever used by agents or shown to founders." />
 
       <div className="flex gap-1 mb-6 p-1 rounded-lg" style={{ background: "var(--muted)", width: "fit-content" }}>

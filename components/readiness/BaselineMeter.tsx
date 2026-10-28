@@ -36,7 +36,7 @@ export function BaselineMeter({ done, total, ready, assessment }: { done: number
     <div className="rounded-xl border p-5 mb-6" style={{ background: "var(--card)", borderColor: ready ? "var(--green)" : "var(--border)" }}>
       <div className="flex items-center gap-4 flex-wrap">
         <div className="flex-1 min-w-56">
-          <div className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--muted-foreground)" }}>Ready for analysis</div>
+          <div className="label mb-1" style={{ color: "var(--muted-foreground)" }}>Ready for analysis</div>
           <div className="text-sm mb-2" style={{ color: "var(--foreground)" }}>
             {ready ? "Ready: everything the assessment needs is in." : `${done} of ${total} required items in`}
           </div>

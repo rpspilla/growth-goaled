@@ -9,7 +9,7 @@ import { MobileNav } from "./MobileNav";
 export function Shell({ sidebar, topbar, children }: { sidebar: ReactNode; topbar: ReactNode; children: ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden">
-      <aside className="hidden md:flex flex-col w-56 shrink-0 h-full" style={{ background: "var(--navy)", color: "#C8D3E0" }}>
+      <aside className="hidden md:flex flex-col w-64 shrink-0 h-full" style={{ background: "var(--navy)", color: "#C8D3E0" }}>
         <div className="px-5 pt-6 pb-5 border-b" style={{ borderColor: "#1E3347" }}>
           <div className="flex items-center gap-2.5">
             <div
@@ -18,7 +18,10 @@ export function Shell({ sidebar, topbar, children }: { sidebar: ReactNode; topba
             >
               G
             </div>
-            <span className="font-semibold text-white text-sm tracking-tight">Growth Goaled</span>
+            <div className="leading-tight">
+              <div className="font-semibold text-white text-base tracking-tight">Growth Goaled</div>
+              <div className="text-xs" style={{ color: "#8FA3B8" }}>Your Seed &amp; Series A CRO</div>
+            </div>
           </div>
         </div>
         {sidebar}
@@ -26,7 +29,7 @@ export function Shell({ sidebar, topbar, children }: { sidebar: ReactNode; topba
 
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <header
-          className="flex items-center h-14 px-4 md:px-6 border-b shrink-0 min-w-0"
+          className="flex items-center h-16 px-4 md:px-8 border-b shrink-0 min-w-0"
           style={{ background: "var(--card)", borderColor: "var(--border)" }}
         >
           <MobileNav>{sidebar}</MobileNav>
@@ -56,19 +59,19 @@ export function UserMenu({ name, email, color, profileHref }: { name: string | n
   return (
     <div className="flex items-center gap-3">
       {profileHref && (
-        <Link href={profileHref} className="text-xs whitespace-nowrap" style={{ color: "var(--muted-foreground)" }}>
+        <Link href={profileHref} className="text-sm whitespace-nowrap hover:underline" style={{ color: "var(--muted-foreground)" }}>
           <span className="hidden sm:inline">Company </span>profile
         </Link>
       )}
       <div
         title={email}
-        className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
+        className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
         style={{ background: color === "navy" ? "var(--navy)" : "var(--green)", color: "#fff" }}
       >
         {initials(name, email)}
       </div>
       <form action={signOut}>
-        <button type="submit" className="text-xs whitespace-nowrap" style={{ color: "var(--muted-foreground)" }}>
+        <button type="submit" className="text-sm whitespace-nowrap hover:underline" style={{ color: "var(--muted-foreground)" }}>
           Sign out
         </button>
       </form>

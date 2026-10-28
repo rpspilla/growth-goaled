@@ -45,7 +45,7 @@ export function SummaryEditor({
   return (
     <div className="rounded-xl border-l-4 p-5" style={{ background: "var(--navy)", borderLeftColor: "var(--green)" }}>
       <div className="flex items-center justify-between mb-2">
-        <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--green)" }}>Advisor summary · internal</div>
+        <div className="label" style={{ color: "var(--green)" }}>Advisor summary · internal</div>
         {!editing && (
           <button onClick={() => setEditing(true)} className="text-xs" style={{ color: "#7A98B4" }}>Edit</button>
         )}

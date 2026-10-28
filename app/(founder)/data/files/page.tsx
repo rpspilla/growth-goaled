@@ -12,7 +12,7 @@ export default async function FilesPage() {
   const data = await loadReadiness();
   if (!data) {
     return (
-      <div className="p-8 max-w-4xl">
+      <div className="px-4 sm:px-8 py-8 max-w-4xl">
         <PageHeader title="Your files" subtitle="Your company isn't set up yet." />
       </div>
     );
@@ -20,7 +20,7 @@ export default async function FilesPage() {
   const documents = await listDocuments(data.company);
 
   return (
-    <div className="p-8 max-w-5xl">
+    <div className="px-4 sm:px-8 py-8 max-w-5xl">
       <PageHeader eyebrow="Step 3 · Data" title="Your files" subtitle="Everything you've uploaded. Files are private to your company and your advisor." />
       <ReadinessTabs />
       <InboxDropzone blobPrefix={data.blobPrefix} />

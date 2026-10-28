@@ -13,6 +13,7 @@ export const seriesAReady: UseCaseDef = {
   question: "Are we ready to raise a Series A?",
   description: "Tests your metrics against what Series A investors look for and shows the gaps to close before you raise.",
   forWho: "Seed-stage companies roughly 6–12 months before a Series A raise.",
+  decision: "Whether to start raising now, and what to fix first.",
   whenUseful: "You're planning a Series A in the next 6–18 months and want to know which bars you meet and which gaps to close first.",
   youGet: [
     "Readiness by dimension: growth, retention, revenue quality, efficiency, GTM repeatability, runway",
@@ -52,6 +53,7 @@ export const seriesBReady: UseCaseDef = {
   question: "Are we ready to raise a Series B?",
   description: "Tests your growth, retention and efficiency against stage-appropriate Series B criteria and shows what to fix first.",
   forWho: "Series A companies roughly 6–12 months before a Series B raise.",
+  decision: "Whether your growth story supports a Series B now, and what to strengthen.",
   whenUseful: "You've raised a Series A, are scaling go-to-market, and want to know how investors will read your efficiency and forecastability.",
   youGet: [
     "Readiness against stage-appropriate criteria",

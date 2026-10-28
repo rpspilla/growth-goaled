@@ -19,6 +19,8 @@ const read = (p: string) => readFileSync(p, "utf8");
 const rel = (p: string) => path.relative(root, p);
 
 const GUARDS = /requireRole\(|requireUser\(|founderCompany\(\)|founderMetric\(|managed\(|managedItemCompany\(|staff\(\)/;
+// Actions visitors call before they have an account. Each must accept only fixed values (z.enum).
+const PUBLIC_ACTIONS: Record<string, string> = { trackSignupEvent: "Sign-up funnel events from signed-out visitors; fixed names only, no personal data." };
 // Shared loaders that call requireRole themselves (asserted below).
 const FOUNDER_CONTEXT = path.join(root, "lib/data/founder-context.ts");
 const COMPANY_CONTEXT = path.join(root, "app/advisor/companies/[id]/context.ts");
@@ -33,6 +35,10 @@ describe("server actions", () => {
     const bodies = src.split(/\nexport async function /).slice(1);
     for (const body of bodies) {
       const name = body.slice(0, body.indexOf("("));
+      if (PUBLIC_ACTIONS[name]) {
+        it(`${rel(file)} › ${name} is public by design and accepts only fixed values`, () => expect(body).toMatch(/z\.enum\(/));
+        continue;
+      }
       it(`${rel(file)} › ${name} checks the caller`, () => expect(body).toMatch(GUARDS));
     }
   }

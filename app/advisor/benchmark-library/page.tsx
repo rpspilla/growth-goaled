@@ -18,7 +18,7 @@ const metricName = (m: string) => (isMetricKey(m) ? METRICS[m].label : m);
 function Stat({ label, value, note }: { label: string; value: string | number; note?: string }) {
   return (
     <div className="rounded-xl border p-4" style={card}>
-      <div className="text-xs uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>{label}</div>
+      <div className="text-sm font-semibold" style={{ color: "var(--muted-foreground)" }}>{label}</div>
       <div className="text-2xl font-semibold mt-1" style={{ color: "var(--foreground)" }}>{value}</div>
       {note && <div className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>{note}</div>}
     </div>
@@ -60,7 +60,7 @@ export default async function BenchmarkLibraryPage({ searchParams }: { searchPar
       </div>
 
       <section aria-labelledby="coverage" className="space-y-3">
-        <h2 id="coverage" className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Coverage and quality</h2>
+        <h2 id="coverage" className="label" style={{ color: "var(--muted-foreground)" }}>Coverage and quality</h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <Stat label="Published datasets" value={overview.publishedDatasets} note={`${overview.publishedRecords} records`} />
           <Stat label="Metrics covered" value={overview.publishedMetrics} note={overview.sources.length ? `Sources: ${overview.sources.join(", ")}` : "No published sources yet"} />
@@ -114,7 +114,7 @@ export default async function BenchmarkLibraryPage({ searchParams }: { searchPar
       </section>
 
       <section aria-labelledby="datasets" className="space-y-3">
-        <h2 id="datasets" className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Datasets</h2>
+        <h2 id="datasets" className="label" style={{ color: "var(--muted-foreground)" }}>Datasets</h2>
         <form className="rounded-xl border p-4 grid sm:grid-cols-4 lg:grid-cols-8 gap-2 items-end" style={card} role="search">
           <label className="text-xs sm:col-span-2" style={{ color: "var(--muted-foreground)" }}>Search<input name="q" defaultValue={sp.q} placeholder="Name, source, metric" className={`${inputClass} mt-1`} style={inputStyle} /></label>
           <label className="text-xs" style={{ color: "var(--muted-foreground)" }}>Source
@@ -146,7 +146,7 @@ export default async function BenchmarkLibraryPage({ searchParams }: { searchPar
         <div className="rounded-xl border overflow-x-auto" style={card}>
           <table className="w-full text-sm min-w-[860px]">
             <thead>
-              <tr className="text-left text-xs uppercase tracking-wider" style={{ background: "var(--muted)", color: "var(--muted-foreground)" }}>
+              <tr className="text-left text-sm font-semibold" style={{ background: "var(--muted)", color: "var(--muted-foreground)" }}>
                 <th className="py-2 px-3 font-semibold">Dataset</th>
                 <th className="py-2 px-3 font-semibold">Source</th>
                 <th className="py-2 px-3 font-semibold">Status</th>

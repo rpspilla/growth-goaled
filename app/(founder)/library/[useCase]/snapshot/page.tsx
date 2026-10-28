@@ -14,7 +14,6 @@ import { howWeWork } from "@/lib/use-cases/how-we-work";
 import { growthSnapshot } from "@/lib/use-cases/snapshot";
 import { startAssessmentCheckout } from "../../actions";
 
-const card = { background: "var(--card)", borderColor: "var(--border)" };
 const KIND = {
   watch: { label: "Worth investigating", color: "var(--amber)" },
   positive: { label: "Looks healthy", color: "var(--green)" },
@@ -51,107 +50,104 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
   const message = checkout ? CHECKOUT_MESSAGE[checkout] : undefined;
   await track("snapshot_viewed", { userId: user.id, companyId: company.id, props: { use_case: def.id, signals: snapshot.signals.length } });
 
+  const watch = snapshot.signals.filter((x) => x.kind === "watch").length;
   return (
-    <div className="p-4 sm:p-8 max-w-6xl">
-      <Link href={`/library/${def.id}`} className="text-xs" style={{ color: "var(--muted-foreground)" }}>← Edit your answers</Link>
-      <PageHeader eyebrow={`Growth Snapshot · ${def.shortTitle}`} title={def.question} subtitle="A free first look based on what you've told us." />
-      {message && <p className="text-sm mb-4" role="status" style={{ color: message.color }}>{message.text}</p>}
+    <div className="px-4 sm:px-8 py-8 max-w-6xl">
+      <Link href={`/library/${def.id}`} className="text-sm link">← Edit your answers</Link>
+      <div className="mt-4">
+        <PageHeader
+          eyebrow={`Your free Growth Snapshot · ${def.shortTitle}`}
+          title={def.question}
+          subtitle={watch ? `${watch} ${watch === 1 ? "thing looks" : "things look"} worth investigating, based on your answers.` : "A first look based on your answers."}
+        />
+      </div>
+      {message && <p className="text-base mb-6 -mt-4" role="status" style={{ color: message.color }}>{message.text}</p>}
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="rounded-xl border p-4 text-sm flex gap-3 items-start" style={{ ...card, borderColor: "var(--amber)" }}>
-            <span className="text-xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded shrink-0" style={{ background: "var(--amber-muted)", color: "var(--amber)" }}>Hypotheses</span>
-            <span style={{ color: "var(--foreground)" }}>
-              These are early signals from your answers{snapshot.answersOnly ? " (no figures yet)" : ""}, not conclusions. Nothing here has been checked against your data or compared with other companies.
+      <div className="grid lg:grid-cols-[minmax(0,1fr)_21rem] gap-8 items-start">
+        <div className="space-y-8 min-w-0">
+          <div className="flex gap-3 items-start rounded-xl px-4 py-3" style={{ background: "var(--amber-muted)" }} role="note">
+            <span className="text-sm font-bold shrink-0" style={{ color: "#92400E" }}>Hypotheses</span>
+            <span className="text-sm" style={{ color: "#78350F" }}>
+              Early signals from your answers{snapshot.answersOnly ? " (no figures yet)" : ""}, not conclusions. Nothing here has been checked against your data or compared with other companies.
             </span>
           </div>
 
-          <section className="rounded-xl border p-5" style={{ ...card, borderColor: snapshot.fit.good ? "var(--border)" : "var(--blue)" }}>
-            <h2 className="text-sm font-semibold mb-1" style={{ color: "var(--foreground)" }}>Is this the right assessment?</h2>
-            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>{snapshot.fit.note}</p>
-            {suggested && (
-              <Link href={`/library/${suggested.id}`} className="inline-block mt-2 text-sm font-semibold" style={{ color: "var(--green)" }}>
-                Look at {suggested.shortTitle} →
-              </Link>
-            )}
-          </section>
-
-          <section>
-            <h2 className="text-sm font-semibold mb-3" style={{ color: "var(--foreground)" }}>What your answers suggest</h2>
-            <ul className="space-y-3">
-              {snapshot.signals.map((s) => (
-                <li key={s.title} className="rounded-xl border p-4" style={card}>
-                  <div className="text-xs font-semibold mb-1" style={{ color: KIND[s.kind].color }}>{KIND[s.kind].label}</div>
-                  <div className="text-sm font-semibold mb-1" style={{ color: "var(--foreground)" }}>{s.title}</div>
-                  <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>{s.detail}</p>
-                  <p className="text-xs mt-2" style={{ color: "var(--muted-foreground)" }}>Based on: {s.basis}</p>
+          <section aria-labelledby="signals">
+            <h2 id="signals" className="text-xl sm:text-2xl font-semibold mb-4" style={{ color: "var(--foreground)" }}>What your answers suggest</h2>
+            <ul className="space-y-4">
+              {snapshot.signals.map((x) => (
+                <li key={x.title} className="surface p-5" style={{ borderLeft: `4px solid ${KIND[x.kind].color}` }}>
+                  <div className="text-sm font-semibold mb-1" style={{ color: KIND[x.kind].color }}>{KIND[x.kind].label}</div>
+                  <div className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>{x.title}</div>
+                  <p className="text-base mt-1" style={{ color: "var(--muted-foreground)" }}>{x.detail}</p>
+                  <p className="text-sm mt-3" style={{ color: "var(--muted-foreground)" }}>Based on: {x.basis}</p>
                 </li>
               ))}
             </ul>
           </section>
 
-          <section className="rounded-xl border p-5" style={card} aria-labelledby="how-we-work">
-            <h2 id="how-we-work" className="text-sm font-semibold mb-1" style={{ color: "var(--foreground)" }}>How we work with companies like yours</h2>
-            <p className="text-xs mb-3" style={{ color: "var(--muted-foreground)" }}>{approach.audience}</p>
-            <ul className="text-sm space-y-1.5 mb-5" style={{ color: "var(--foreground)" }}>
-              {approach.approach.map((a) => (
-                <li key={a} className="flex gap-2">
-                  <span aria-hidden style={{ color: "var(--green)" }}>•</span>
-                  <span>{a}</span>
-                </li>
-              ))}
-            </ul>
-            <div className="rounded-lg p-4" style={{ background: "var(--muted)" }}>
-              <div className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--green)" }}>For example, after the assessment</div>
-              <p className="text-sm font-medium mb-2" style={{ color: "var(--foreground)" }}>{approach.example.trigger}</p>
-              <ol className="text-sm space-y-1.5 list-decimal pl-5" style={{ color: "var(--foreground)" }}>
-                {approach.example.steps.map((s) => <li key={s}>{s}</li>)}
-              </ol>
-            </div>
+          <section className="surface surface-pad" style={{ borderColor: snapshot.fit.good ? undefined : "var(--blue)" }} aria-labelledby="fit">
+            <h2 id="fit" className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>Is this the right question?</h2>
+            <p className="text-base mt-1" style={{ color: "var(--muted-foreground)" }}>{snapshot.fit.note}</p>
+            {suggested && <Link href={`/library/${suggested.id}`} className="inline-block mt-3 link">Look at {suggested.shortTitle} →</Link>}
           </section>
 
-          <section className="rounded-xl border p-5" style={card}>
-            <h2 className="text-sm font-semibold mb-1" style={{ color: "var(--foreground)" }}>What it would take to confirm</h2>
-            <p className="text-xs mb-3" style={{ color: "var(--muted-foreground)" }}>The full assessment tests these against your own data. It needs at least:</p>
-            <ul className="text-sm space-y-1">
+          <section className="surface surface-pad" aria-labelledby="confirm">
+            <h2 id="confirm" className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>What it would take to confirm</h2>
+            <p className="text-base mt-1 mb-4" style={{ color: "var(--muted-foreground)" }}>The full assessment tests these against your own data. It needs at least:</p>
+            <ul className="space-y-2">
               {snapshot.dataNeeded.map((d) => (
-                <li key={d.key} style={{ color: "var(--foreground)" }}>
-                  <span aria-hidden style={{ color: d.have ? "var(--green)" : "var(--muted-foreground)" }}>{d.have ? "✓ " : "○ "}</span>
+                <li key={d.key} className="flex items-center gap-3 text-base" style={{ color: "var(--foreground)" }}>
+                  <span aria-hidden className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: d.have ? "var(--green)" : "var(--muted)", color: d.have ? "#fff" : "var(--muted-foreground)" }}>{d.have ? "✓" : ""}</span>
                   {getItem(d.key)?.name ?? d.key}
-                  {d.have && <span className="text-xs" style={{ color: "var(--muted-foreground)" }}> · already shared</span>}
+                  {d.have && <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>already shared</span>}
                 </li>
               ))}
             </ul>
+          </section>
+
+          <section className="surface surface-pad" aria-labelledby="how-we-work">
+            <h2 id="how-we-work" className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>How we work with companies like yours</h2>
+            <p className="text-base mt-1 mb-4" style={{ color: "var(--muted-foreground)" }}>{approach.audience}</p>
+            <ul className="text-base space-y-2 mb-5" style={{ color: "var(--foreground)" }}>
+              {approach.approach.map((a) => (
+                <li key={a} className="flex gap-2.5"><span aria-hidden style={{ color: "var(--green)" }}>✓</span><span>{a}</span></li>
+              ))}
+            </ul>
+            <details open className="disclosure rounded-xl p-4" style={{ background: "var(--muted)" }}>
+              <summary className="text-base">For example, after the assessment</summary>
+              <p className="text-base font-medium mt-3 mb-2" style={{ color: "var(--foreground)" }}>{approach.example.trigger}</p>
+              <ol className="text-base space-y-1.5 list-decimal pl-5" style={{ color: "var(--foreground)" }}>
+                {approach.example.steps.map((x) => <li key={x}>{x}</li>)}
+              </ol>
+            </details>
           </section>
         </div>
 
-        <aside className="space-y-6">
-          <div className="rounded-xl border p-5 lg:sticky lg:top-6" style={{ ...card, borderColor: "var(--green)" }} aria-label="Full assessment">
-            <div className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--green)" }}>Full assessment</div>
-            <div className="font-display text-xl mb-1" style={{ color: "var(--foreground)" }}>{def.shortTitle}</div>
-            <div className="font-mono text-2xl font-semibold mb-3" style={{ color: "var(--foreground)" }}>{sellableUseCases().includes(def.id) ? price : "Coming soon"}</div>
-            <ul className="text-sm space-y-1 mb-4" style={{ color: "var(--muted-foreground)" }}>
-              {def.youGet.map((g) => <li key={g}>• {g}</li>)}
-            </ul>
-            {row?.activatedAt ? (
-              <Link href="/data" className="block text-center px-5 py-2.5 rounded-lg text-sm font-semibold" style={{ background: "var(--green)", color: "#fff" }}>
-                You have this assessment · continue →
-              </Link>
-            ) : sellable ? (
-              <>
-                <PurchaseButton useCaseId={def.id} label={`Get the full assessment · ${price}`} checkout={startAssessmentCheckout} />
-                <p className="text-xs mt-2" style={{ color: "var(--muted-foreground)" }}>
-                  One-time payment through Stripe. Your assessment opens once Stripe confirms it.
-                </p>
-              </>
-            ) : (
-              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-                {sellableUseCases().includes(def.id)
-                  ? "Payments aren't set up in this environment yet."
-                  : "The full assessment for this question is launching soon. Your answers are saved, so you'll be ready when it does."}
-              </p>
-            )}
+        <aside className="surface surface-pad lg:sticky lg:top-6" style={{ borderColor: "var(--green)", boxShadow: "0 0 0 1px var(--green)" }} aria-label="Full assessment">
+          <div className="label" style={{ color: "var(--green)" }}>Next step: the full assessment</div>
+          <div className="flex items-baseline justify-between mt-2">
+            <span className="font-display text-2xl" style={{ color: "var(--foreground)" }}>{def.shortTitle}</span>
+            <span className="text-2xl font-semibold" style={{ color: "var(--foreground)" }}>{sellableUseCases().includes(def.id) ? price : "Soon"}</span>
           </div>
+          <p className="text-sm mt-2 mb-4" style={{ color: "var(--muted-foreground)" }}>Tests these hypotheses against your own data and gives you a decision and a 30–90 day plan.</p>
+          <ul className="text-sm space-y-1.5 mb-5" style={{ color: "var(--foreground)" }}>
+            {def.youGet.map((g) => (
+              <li key={g} className="flex gap-2"><span aria-hidden style={{ color: "var(--green)" }}>✓</span><span>{g}</span></li>
+            ))}
+          </ul>
+          {row?.activatedAt ? (
+            <Link href="/data" className="btn btn-primary btn-lg w-full">You have this assessment · continue →</Link>
+          ) : sellable ? (
+            <>
+              <PurchaseButton useCaseId={def.id} label={`Get the full assessment · ${price}`} checkout={startAssessmentCheckout} />
+              <p className="text-sm mt-3" style={{ color: "var(--muted-foreground)" }}>One-time payment through Stripe. No subscription. Your assessment opens as soon as Stripe confirms it.</p>
+            </>
+          ) : (
+            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+              {sellableUseCases().includes(def.id) ? "Payments aren't set up in this environment yet." : "The full assessment for this question is launching soon. Your answers are saved, so you'll be ready when it does."}
+            </p>
+          )}
         </aside>
       </div>
     </div>

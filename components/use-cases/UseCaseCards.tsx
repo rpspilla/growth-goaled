@@ -1,9 +1,13 @@
 import Link from "next/link";
+import { Pill } from "@/components/ui/Pill";
 import type { UseCaseDef } from "@/lib/use-cases";
 
 export type CardState = "active" | "started" | null;
 
-/** Library cards: the founder's question, the problem, who it's for, key outputs, and what it costs. */
+/**
+ * The library: each card is a question the founder is facing, when to ask it, the decision it
+ * settles, and one clear way to start. Recommended questions come first.
+ */
 export function UseCaseCards({
   useCases,
   recommended,
@@ -20,40 +24,46 @@ export function UseCaseCards({
   price?: string | null;
   sellable?: readonly string[];
 }) {
+  const ordered = [...useCases].sort((a, b) => Number(recommended.includes(b.id)) - Number(recommended.includes(a.id)));
   return (
-    <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-      {useCases.map((u) => {
+    <div className="grid md:grid-cols-2 gap-5">
+      {ordered.map((u) => {
         const state = states[u.id];
+        const isRecommended = recommended.includes(u.id);
+        const cta = state === "active" ? "Open your assessment" : state === "started" ? "Continue" : "Start with a free Snapshot";
         return (
           <article
             key={u.id}
-            className="rounded-xl border p-5 flex flex-col"
-            style={{ background: "var(--card)", borderColor: recommended.includes(u.id) ? "var(--green)" : "var(--border)" }}
+            className="surface p-6 flex flex-col hover:shadow-md"
+            style={{ borderColor: isRecommended ? "var(--green)" : undefined, boxShadow: isRecommended ? "0 0 0 1px var(--green)" : undefined }}
           >
-            <div className="flex items-center gap-2 mb-2 min-h-5 flex-wrap">
-              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>{u.shortTitle}</span>
-              {recommended.includes(u.id) && (
-                <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: "var(--green-muted)", color: "var(--green)" }}>Recommended</span>
-              )}
-              {state === "active" && <span className="ml-auto text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: "var(--green)", color: "#fff" }}>Purchased</span>}
-              {state === "started" && <span className="ml-auto text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: "var(--amber-muted)", color: "var(--amber)" }}>Started</span>}
-            </div>
-            <h2 className="font-display text-xl mb-2" style={{ color: "var(--foreground)" }}>{u.question}</h2>
-            <p className="text-sm mb-2" style={{ color: "var(--muted-foreground)" }}>{u.description}</p>
-            <p className="text-xs mb-3" style={{ color: "var(--foreground)" }}><span className="font-semibold">For: </span>{u.forWho}</p>
-            <div className="text-xs font-semibold mb-1" style={{ color: "var(--foreground)" }}>Key outputs</div>
-            <ul className="text-xs space-y-0.5 mb-4" style={{ color: "var(--muted-foreground)" }}>
-              {u.youGet.slice(0, 4).map((g) => <li key={g}>• {g}</li>)}
-            </ul>
-            <div className="mt-auto flex items-center justify-between gap-3 pt-3 border-t" style={{ borderColor: "var(--border)" }}>
-              {price !== null && price !== undefined ? (
-                <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-                  Free Snapshot · {sellable?.includes(u.id) ? `Assessment ${price}` : "Assessment coming soon"}
-                </span>
-              ) : <span />}
-              <Link href={hrefFor(u.id)} className="text-sm font-semibold shrink-0" style={{ color: "var(--green)" }} aria-label={`Explore assessment: ${u.question}`}>
-                {state === "active" ? "Open →" : "Explore assessment →"}
+            {(isRecommended || state) && (
+              <div className="flex items-center gap-2 mb-3 flex-wrap">
+                {isRecommended && <Pill tone="green">Recommended for you</Pill>}
+                {state === "active" && <Pill tone="green">Purchased</Pill>}
+                {state === "started" && <Pill tone="amber">In progress</Pill>}
+              </div>
+            )}
+            <h2 className="font-display text-2xl leading-tight" style={{ color: "var(--foreground)" }}>{u.question}</h2>
+            <dl className="mt-4 space-y-3 text-base">
+              <div>
+                <dt className="label">Use it when</dt>
+                <dd style={{ color: "var(--foreground)" }}>{u.forWho}</dd>
+              </div>
+              <div>
+                <dt className="label">You&apos;ll decide</dt>
+                <dd style={{ color: "var(--foreground)" }}>{u.decision}</dd>
+              </div>
+            </dl>
+            <div className="mt-auto pt-6 flex items-center justify-between gap-3 flex-wrap">
+              <Link href={hrefFor(u.id)} className={`btn ${state === "active" || isRecommended ? "btn-primary" : "btn-secondary"}`} aria-label={`${cta}: ${u.question}`}>
+                {cta} →
               </Link>
+              {price !== null && price !== undefined && (
+                <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+                  {sellable?.includes(u.id) ? `Snapshot free · Assessment ${price}` : "Snapshot free · Assessment coming soon"}
+                </span>
+              )}
             </div>
           </article>
         );

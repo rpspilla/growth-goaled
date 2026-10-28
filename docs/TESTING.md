@@ -11,7 +11,9 @@ Use two browsers (or a private window): one signed in as **admin** (ryan@growthg
 - Founder figures entered in the company profile count as *accepted*; figures read from files are *proposed* until accepted.
 
 ## Sign-in and onboarding (M1, M3)
-- [ ] Founder sign-up with magic link lands on `/welcome`, not a loop
+- [ ] Founder sign-up asks for email only, shows inline errors for a bad address, and the magic link lands on `/welcome`, not a loop
+- [ ] Finishing `/welcome` as a new founder lands on `/library?welcome=1` with the "Last step: pick a question" banner
+- [ ] `/advisor/analytics` shows the sign-up funnel with counts for each step
 - [ ] `/welcome`: name, title, company, website, **Annual Revenue** buckets (<$1M … $20M–$50M); then lands on Overview
 - [ ] New company appears in admin's `/advisor/unassigned`; claim it (admin can assign to another advisor)
 - [ ] Advisor invite: invite an email to a company, the email arrives (Resend), the link signs them in to that company
@@ -60,7 +62,7 @@ Use two browsers (or a private window): one signed in as **admin** (ryan@growthg
 - [ ] Click the buy button twice quickly, or come back and click again within a day → the same Stripe checkout opens (one pending payment in Stripe, not two)
 - [ ] After paying, the Snapshot page shows "You have this assessment · continue" instead of a buy button
 - [ ] Buy and run **at least two different use cases** (e.g. Growth Leak and Hire or Fix): Data shows that use case's items; "Analyze my data" unlocks once the required ones are in → Results ("Analyzing your data…", then results in a few minutes)
-- [ ] **Results** is a Decision Brief with nine numbered sections (Executive decision, Where you are now, Diagnosis, Evidence/assumptions/confidence, Options, Recommendation, 30–90 day plan, What would change this recommendation, Follow-up); each statement's "Evidence →" opens the Source Trail, including "Your answer" and "Calculated from your data" entries; numbers match what you entered or uploaded
+- [ ] **Results** opens on **The answer** (decision, certainty, first action), then Why it matters, What the evidence shows (each item labelled Your data / Calculated / Interpretation / Hypothesis), What to do next (with Commit to this plan) and Explore the details (collapsible: options, other explanations, what would change this, follow-up, all figures, calculations, assumptions and method); each statement's "Evidence →" opens the Source Trail, including "Your answer" and "Calculated from your data" entries; numbers match what you entered or uploaded
 - [ ] **Calculated figures**: upload a CSV of MRR by customer by month (customers down, months across, 13 months) → on Results, "Where you are now" shows ARR, NRR, GRR, new/expansion/churned ARR marked "Calculated from your file" with the period and method in words; section 4's "Calculations from your files" shows the ARR bridge; check one NRR by hand ((start + expansion − contraction − churn) ÷ start)
 - [ ] With a revenue-by-customer file showing churn bigger than new business, the Diagnosis names lost revenue from existing customers, with a certainty chip (Established / Leading explanation / Not yet established) and a "Fastest test"; with too little data it says "Not yet established" rather than picking a cause
 - [ ] Plan actions show Who only when the brief can tell (otherwise "Your call"), and the signal to look for is labelled "(proposed)"

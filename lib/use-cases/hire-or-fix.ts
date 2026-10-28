@@ -7,6 +7,7 @@ export const hireOrFix: UseCaseDef = {
   question: "Should we hire more salespeople, or fix what we have first?",
   description: "Tells you whether more sales hires will add revenue, or whether pipeline, conversion or process limits need fixing first.",
   forWho: "Companies considering more sales hires, often after a raise or under board pressure to accelerate growth.",
+  decision: "Hire more salespeople now, fix the process first, or test before deciding.",
   whenUseful: "You're about to add sales headcount and want to be sure the current team, pipeline and process can carry it.",
   youGet: [
     "Pipeline sufficiency, sales productivity and capacity",

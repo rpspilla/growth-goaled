@@ -3,10 +3,10 @@ import type { UseCaseId } from "./types";
 /** The five founder steps (HANDOFF §13.2). Steps 3–5 follow the active use case. */
 export const STEPS = [
   { key: "overview", label: "Overview", path: "/overview" },
-  { key: "library", label: "Use Case Library", path: "/library" },
+  { key: "library", label: "Growth questions", path: "/library" },
   { key: "data", label: "Data", path: "/data" },
   { key: "baseline", label: "Results", path: "/baseline" },
-  { key: "progress", label: "Progress & Tracking", path: "/progress" },
+  { key: "progress", label: "Action plan", path: "/progress" },
 ] as const;
 
 export type StepKey = (typeof STEPS)[number]["key"];

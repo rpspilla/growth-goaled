@@ -10,7 +10,7 @@ function Kind({ children, tone }: { children: string; tone: "observed" | "benchm
     derived: { background: "var(--amber-muted)", color: "var(--amber)" },
     interpretation: { background: "var(--muted)", color: "var(--muted-foreground)" },
   }[tone];
-  return <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded whitespace-nowrap" style={style}>{children}</span>;
+  return <span className="text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap" style={style}>{children}</span>;
 }
 
 /**

@@ -80,3 +80,41 @@ export function computeAnalytics(input: AnalyticsInput) {
     eventCounts30d: counts,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Sign-up and activation funnel
+// ---------------------------------------------------------------------------
+
+export type FunnelEvent = { name: string; userId: string | null; props: Record<string, unknown> | null };
+
+/**
+ * Each step of the founder journey, from the sign-up page to opening results. Anonymous steps count
+ * events (visitors have no account yet); later steps count distinct people, so reloads don't inflate them.
+ */
+export const FUNNEL_STEPS = [
+  { key: "signup_viewed", label: "Viewed the sign-up page", unit: "views", distinct: false },
+  { key: "signup_started", label: "Started the form", unit: "visitors", distinct: false },
+  { key: "signup_link_sent", label: "Sign-in link sent", unit: "visitors", distinct: false },
+  { key: "welcome_viewed", label: "Confirmed their email", unit: "people", distinct: true },
+  { key: "onboarding_completed", label: "Set up their company", unit: "people", distinct: true },
+  { key: "objective_saved", label: "Started a growth question", unit: "people", distinct: true },
+  { key: "snapshot_viewed", label: "Saw their free Snapshot (first value)", unit: "people", distinct: true },
+  { key: "checkout_started", label: "Started checkout", unit: "people", distinct: true },
+  { key: "use_case_activated", label: "Bought an assessment", unit: "people", distinct: true },
+  { key: "deliverable_viewed", label: "Opened their results", unit: "people", distinct: true },
+] as const;
+
+export function computeFunnel(events: FunnelEvent[]) {
+  const steps = FUNNEL_STEPS.map((s) => {
+    const own = events.filter((e) => e.name === s.key && (s.key !== "deliverable_viewed" || e.props?.type === "assessment") && (s.key !== "welcome_viewed" || e.props?.new_company === true));
+    const value = s.distinct ? new Set(own.map((e) => e.userId).filter(Boolean)).size : own.length;
+    return { key: s.key, label: s.label, unit: s.unit, value };
+  });
+  const failures = events.filter((e) => e.name === "signup_failed");
+  const reasons: Record<string, number> = {};
+  for (const f of failures) {
+    const r = typeof f.props?.reason === "string" ? f.props.reason : "unknown";
+    reasons[r] = (reasons[r] ?? 0) + 1;
+  }
+  return { steps, failures: failures.length, reasons };
+}

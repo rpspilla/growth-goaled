@@ -98,7 +98,7 @@ export function BenchmarkView({
           <div className="rounded-xl border overflow-hidden" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
             <div className="grid grid-cols-4 px-5 py-3 border-b" style={{ borderColor: "var(--border)", background: "var(--muted)" }}>
               {["Metric", companyName, "Top Quartile", "Status"].map((h) => (
-                <div key={h} className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>
+                <div key={h} className="label" style={{ color: "var(--muted-foreground)" }}>
                   {h}
                 </div>
               ))}
@@ -134,7 +134,7 @@ export function BenchmarkView({
 
           {/* Key insight */}
           <div className="rounded-xl p-5 border-l-4" style={{ background: "var(--navy)", borderLeftColor: "var(--green)" }}>
-            <div className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--green)" }}>
+            <div className="label mb-2" style={{ color: "var(--green)" }}>
               Growth Intelligence Analysis
             </div>
             <p className="text-base font-medium leading-relaxed mb-2" style={{ color: "#E2EAF4" }}>{data.insight.headline}</p>

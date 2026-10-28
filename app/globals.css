@@ -10,7 +10,9 @@
   --secondary: #EEF2F7;
   --secondary-foreground: #334155;
   --muted: #F1F5F9;
-  --muted-foreground: #64748B;
+  /* Darker than slate-500 so secondary text stays readable (≈6:1 on the page background). */
+  --muted-foreground: #4F5D6E;
+  --subtle-foreground: #6B7889;
   --accent: #155A3C;
   --accent-foreground: #FFFFFF;
   --border: #E2E8F0;
@@ -28,6 +30,22 @@
   --red-muted: #FEE2E2;
   --blue: #1D4ED8;
   --blue-muted: #EFF6FF;
+}
+
+/*
+ * Type scale. The smallest sizes are nudged up from Tailwind's defaults so labels and supporting
+ * text stay comfortably readable everywhere: xs 13px (metadata only), sm 15px (supporting text),
+ * base 16px (body), lg 18px, xl 20px, 2xl 24px (section headings), 3xl 32px (page headings).
+ */
+@theme {
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.25rem;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.5rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.65rem;
+  --text-3xl: 2rem;
+  --text-3xl--line-height: 2.4rem;
 }
 
 @theme inline {
@@ -55,7 +73,82 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
 
 /* Smooth transitions */
-a, button { transition: all 0.15s ease; }
+a, button { transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease; }
+
+/* Visible keyboard focus everywhere */
+:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/*
+ * Shared building blocks. Pages use these instead of re-styling the same things inline, so buttons,
+ * surfaces and disclosures look and behave the same across founder and advisor screens.
+ */
+@layer components {
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.6rem;
+    font-weight: 600;
+    font-size: 0.9375rem;
+    line-height: 1.25rem;
+    padding: 0.625rem 1.1rem;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+  .btn-lg { font-size: 1rem; padding: 0.85rem 1.5rem; border-radius: 0.7rem; }
+  .btn-sm { font-size: 0.875rem; padding: 0.4rem 0.8rem; }
+  .btn-primary { background: var(--green); color: #fff; box-shadow: 0 1px 2px rgba(13, 27, 42, 0.12); }
+  .btn-primary:hover:not(:disabled) { background: var(--green-light); }
+  .btn-primary:active:not(:disabled) { transform: translateY(1px); }
+  .btn-secondary { background: var(--card); color: var(--foreground); border: 1px solid var(--border); }
+  .btn-secondary:hover:not(:disabled) { border-color: #CBD5E1; background: var(--muted); }
+  .btn-ghost { color: var(--green); padding-left: 0.25rem; padding-right: 0.25rem; }
+  .btn-ghost:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 3px; }
+
+  .surface { background: var(--card); border: 1px solid var(--border); border-radius: 1rem; }
+  .surface-pad { padding: 1.5rem; }
+  @media (min-width: 640px) { .surface-pad { padding: 1.75rem; } }
+
+  /* Small sentence-case label above a value or section (replaces tiny all-caps labels). */
+  .label { font-size: 0.8125rem; line-height: 1.25rem; font-weight: 600; color: var(--muted-foreground); }
+
+  .link { color: var(--green); font-weight: 600; }
+  .link:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+  .field {
+    width: 100%;
+    border-radius: 0.6rem;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--foreground);
+    font-size: 1rem;
+    padding: 0.7rem 0.85rem;
+  }
+  .field:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px var(--ring); }
+  .field[aria-invalid="true"] { border-color: var(--red); }
+
+  /* Progressive disclosure: <details class="disclosure"><summary>…</summary>…</details> */
+  .disclosure > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; font-weight: 600; color: var(--foreground); }
+  .disclosure > summary::-webkit-details-marker { display: none; }
+  .disclosure > summary::before {
+    content: "";
+    width: 0.5rem;
+    height: 0.5rem;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(-45deg);
+    transition: transform 0.15s ease;
+    flex-shrink: 0;
+    opacity: 0.6;
+  }
+  .disclosure[open] > summary::before { transform: rotate(45deg); }
+}
 
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }

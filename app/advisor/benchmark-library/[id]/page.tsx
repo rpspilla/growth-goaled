@@ -22,7 +22,7 @@ function Section({ title, children, aside }: { title: string; children: React.Re
   return (
     <section className="rounded-xl border p-5" style={card} aria-label={title}>
       <div className="flex items-center gap-3 mb-3">
-        <h2 className="flex-1 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>{title}</h2>
+        <h2 className="flex-1 label" style={{ color: "var(--muted-foreground)" }}>{title}</h2>
         {aside}
       </div>
       {children}

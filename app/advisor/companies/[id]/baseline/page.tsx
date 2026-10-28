@@ -52,24 +52,25 @@ export default async function CompanyResultsPage({ params }: { params: Promise<{
 
   return (
     <div className="space-y-2">
-      <div className="px-8 pt-8 max-w-5xl space-y-4">
+      <div className="px-4 sm:px-8 pt-8 max-w-5xl space-y-4">
         <div>
-          <div className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: "var(--muted-foreground)" }}>Step 4 · Results{active ? ` · ${active.def.shortTitle}` : ""}</div>
+          <div className="label mb-1" style={{ color: "var(--muted-foreground)" }}>Step 4 · Results{active ? ` · ${active.def.shortTitle}` : ""}</div>
           <h1 className="font-display text-3xl font-normal" style={{ color: "var(--foreground)" }}>{company.name}: results</h1>
-          {target && <p className="text-sm mt-1" style={{ color: "var(--muted-foreground)" }}>Founder&apos;s target: {target}</p>}
+          {target && <p className="text-base mt-1" style={{ color: "var(--muted-foreground)" }}>Founder&apos;s target: {target}</p>}
         </div>
         {!active && <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>No purchased assessment yet.</p>}
         {active && !d && <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>The founder hasn&apos;t run this assessment yet.</p>}
         {d && (
-          <div className="rounded-xl border p-5 space-y-3" style={card}>
-            <div className="flex items-center gap-3 flex-wrap text-sm">
+          <div className="rounded-xl border p-5 space-y-3" style={{ ...card, borderStyle: "dashed" }} aria-label="Review and checks (advisor only)">
+            <div className="label">Advisor only · not shown to the founder</div>
+            <div className="flex items-center gap-3 flex-wrap text-base">
               <span className="font-semibold" style={{ color: "var(--foreground)" }}>Version {d.version}</span>
               <span style={{ color: status === "failed" || d.codeChecksPassed === false ? "var(--red)" : "var(--green)" }}>
                 {d.codeChecksPassed === false ? "Failed the code checks (hidden from the founder)" : STATE[status ?? ""] ?? status}
               </span>
             </div>
             {qa && (
-              <ul className="grid sm:grid-cols-2 gap-2 text-xs">
+              <ul className="grid sm:grid-cols-2 gap-2 text-sm">
                 {QA_CHECKS.map((c) => {
                   const r = qa[c.key];
                   return (
@@ -86,6 +87,11 @@ export default async function CompanyResultsPage({ params }: { params: Promise<{
         )}
         {active && <BenchmarkChoices companyId={company.id} rows={choices} save={setBenchmarkChoice} />}
       </div>
+      {view && active && (
+        <div className="px-4 sm:px-8 pt-6 max-w-5xl">
+          <div className="border-t pt-4 label" style={{ borderColor: "var(--border)" }}>What the founder sees</div>
+        </div>
+      )}
       {view && active && <AssessmentResults title={active.def.question} data={view} nextUseCase={null} advisory={null} />}
     </div>
   );

@@ -40,14 +40,14 @@ export default async function CompanyDataPage({ params }: { params: Promise<{ id
   reviewItems.sort((x, y) => (order.get(x.key) ?? 0) - (order.get(y.key) ?? 0));
 
   return (
-    <div className="p-8 max-w-6xl space-y-6">
+    <div className="px-4 sm:px-8 py-8 max-w-6xl space-y-6">
       <div>
-        <div className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: "var(--muted-foreground)" }}>Step 3 · Data{active ? ` · ${active.def.shortTitle}` : ""}</div>
+        <div className="label mb-1" style={{ color: "var(--muted-foreground)" }}>Step 3 · Data{active ? ` · ${active.def.shortTitle}` : ""}</div>
         <h1 className="font-display text-3xl font-normal" style={{ color: "var(--foreground)" }}>{company.name}: data</h1>
       </div>
       <div className="grid md:grid-cols-3 gap-6">
         <div className="rounded-xl border p-5" style={card}>
-          <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--muted-foreground)" }}>Data readiness</div>
+          <div className="label mb-3" style={{ color: "var(--muted-foreground)" }}>Data readiness</div>
           <div className="space-y-2 text-xs">
             {[
               ["Required items supplied", `${a.collection.requiredPercent}%`],

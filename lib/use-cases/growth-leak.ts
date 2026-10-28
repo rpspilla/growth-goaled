@@ -7,6 +7,7 @@ export const growthLeak: UseCaseDef = {
   question: "Where is our growth leaking?",
   description: "Finds where revenue growth is being lost (pipeline, conversion, retention or expansion) so you fix the right thing first.",
   forWho: "Founders whose growth is slowing and who aren't sure why. The best place to start if you're unsure which question to ask.",
+  decision: "Which part of growth to fix first: new business, retention or expansion.",
   whenUseful: "Growth has slowed or stalled and you're not sure whether the problem is pipeline, conversion, retention or expansion.",
   youGet: [
     "Your key growth and retention metrics, with the evidence behind each figure",

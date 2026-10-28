@@ -115,7 +115,7 @@ export function ItemCard({
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>{def.name}</span>
               <span
-                className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded"
+                className="text-xs font-semibold px-1.5 py-0.5 rounded"
                 style={{ background: "var(--muted)", color: def.required ? "var(--foreground)" : "var(--muted-foreground)" }}
               >
                 {def.required ? "Required" : "Optional"}

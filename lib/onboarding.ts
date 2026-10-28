@@ -34,7 +34,13 @@ const website = z
 
 export const staffProfileSchema = z.object({ name, title });
 
-export const founderOnboardingSchema = staffProfileSchema.extend({
+/** Invited founders (their company already exists) only confirm their name; title is optional. */
+export const founderProfileSchema = z.object({ name, title: z.string().trim().max(120).optional().transform((v) => v || null) });
+
+/** Founders: only what the first growth question needs. Title is optional (it can be added later). */
+export const founderOnboardingSchema = z.object({
+  name,
+  title: z.string().trim().max(120).optional().transform((v) => v || null),
   companyName: z.string().trim().min(1, "Enter your company name.").max(160),
   website,
   revenueBand: z.enum(bandValues, { error: "Choose your annual revenue." }),

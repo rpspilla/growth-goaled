@@ -23,7 +23,15 @@ export type EventName =
   | "advisory_link_opened"
   | "analysis_requested"
   | "plan_committed"
-  | "plan_action_updated";
+  | "plan_action_updated"
+  // Sign-up funnel (anonymous until the account exists; no email or name is stored)
+  | "signup_viewed"
+  | "signup_started"
+  | "signup_submitted"
+  | "signup_link_sent"
+  | "signup_failed"
+  | "welcome_viewed"
+  | "onboarding_completed";
 
 /** Records a product analytics event. Never throws: analytics must not break the action it measures. */
 export async function track(name: EventName, p: { userId?: string; companyId?: string; props?: Record<string, unknown> } = {}) {

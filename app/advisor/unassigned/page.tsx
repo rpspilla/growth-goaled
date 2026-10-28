@@ -12,7 +12,7 @@ export default async function UnassignedPage() {
   const [companies, staff] = await Promise.all([listUnassignedCompanies(), user.role === "admin" ? listStaff() : []]);
 
   return (
-    <div className="p-8 max-w-6xl">
+    <div className="px-4 sm:px-8 py-8 max-w-6xl">
       <PageHeader title="Unassigned Companies" subtitle="Founders who signed up on their own. Claim a company to add it to your portfolio." />
 
       {companies.length === 0 ? (
@@ -22,7 +22,7 @@ export default async function UnassignedPage() {
       ) : (
         <div className="rounded-xl border overflow-hidden" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
           <div
-            className="grid grid-cols-12 px-5 py-3 border-b text-xs font-semibold uppercase tracking-wider"
+            className="grid grid-cols-12 px-5 py-3 border-b label"
             style={{ borderColor: "var(--border)", background: "var(--muted)", color: "var(--muted-foreground)" }}
           >
             <div className="col-span-4">Company</div>

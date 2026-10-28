@@ -41,7 +41,7 @@ export default async function ReviewQueuePage() {
   const history = items.filter((i) => !open.includes(i));
 
   return (
-    <div className="p-8 max-w-6xl">
+    <div className="px-4 sm:px-8 py-8 max-w-6xl">
       <PageHeader title="Review Queue" subtitle="AI-generated deliverables awaiting advisor review before release to founders." />
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">

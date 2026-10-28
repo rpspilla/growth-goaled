@@ -6,7 +6,6 @@ import type { ObjectiveField } from "@/lib/use-cases";
 
 type SaveResult = { ok: true; value: string } | { ok: false; error: string };
 
-const inputStyle = { background: "var(--background)", borderColor: "var(--border)", color: "var(--foreground)" };
 
 const GROUPS: { id: NonNullable<ObjectiveField["group"]>; title: string; caption?: string }[] = [
   { id: "challenge", title: "Your challenge" },
@@ -94,8 +93,8 @@ export function QuestionnaireForm({
         if (!groupFields.length) return null;
         return (
           <fieldset key={g.id} className="space-y-4">
-            <legend className="text-sm font-semibold mb-1" style={{ color: "var(--foreground)" }}>{g.title}</legend>
-            {g.caption && <p className="text-xs -mt-2" style={{ color: "var(--muted-foreground)" }}>{g.caption}</p>}
+            <legend className="text-lg font-semibold mb-1" style={{ color: "var(--foreground)" }}>{g.title}</legend>
+            {g.caption && <p className="text-sm -mt-2" style={{ color: "var(--muted-foreground)" }}>{g.caption}</p>}
             {groupFields.map((f) => {
               const id = `q-${f.id.replace(/\./g, "-")}`;
               const common = {
@@ -107,13 +106,12 @@ export function QuestionnaireForm({
                 "aria-invalid": Boolean(errors[f.id]),
                 "aria-describedby": errors[f.id] ? `${id}-error` : f.help ? `${id}-help` : undefined,
                 onBlur: () => void persist(f),
-                className: "w-full rounded-lg border px-3 py-2 text-sm",
-                style: inputStyle,
+                className: "field",
               };
               const onChange = (e: { target: { value: string } }) => setValues((v) => ({ ...v, [f.id]: e.target.value }));
               return (
                 <div key={f.id}>
-                  <label htmlFor={id} className="block text-sm font-medium mb-1" style={{ color: "var(--foreground)" }}>
+                  <label htmlFor={id} className="block text-base font-semibold mb-1.5" style={{ color: "var(--foreground)" }}>
                     {f.label}
                     {f.required && <span style={{ color: "var(--red)" }}> *</span>}
                     {f.id === "target_value" && (
@@ -136,8 +134,8 @@ export function QuestionnaireForm({
                   ) : (
                     <input {...common} type={f.kind === "date" ? "date" : "text"} inputMode={f.kind === "number" || f.kind === "currency" ? "decimal" : undefined} onChange={onChange} />
                   )}
-                  {f.help && <p id={`${id}-help`} className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>{f.help}</p>}
-                  {errors[f.id] && <p id={`${id}-error`} className="text-xs mt-1" role="alert" style={{ color: "var(--red)" }}>{errors[f.id]}</p>}
+                  {f.help && <p id={`${id}-help`} className="text-sm mt-1" style={{ color: "var(--muted-foreground)" }}>{f.help}</p>}
+                  {errors[f.id] && <p id={`${id}-error`} className="text-sm mt-1" role="alert" style={{ color: "var(--red)" }}>{errors[f.id]}</p>}
                 </div>
               );
             })}
@@ -145,7 +143,7 @@ export function QuestionnaireForm({
         );
       })}
 
-      <div className="text-xs h-4" aria-live="polite" style={{ color: "var(--muted-foreground)" }}>
+      <div className="text-sm h-5" aria-live="polite" style={{ color: "var(--muted-foreground)" }}>
         {saving > 0 ? "Saving…" : status === "Saved" ? "Your answers are saved. You can come back and edit them any time." : ""}
       </div>
 
@@ -153,15 +151,14 @@ export function QuestionnaireForm({
         <button
           type="submit"
           disabled={pending || missing.length > 0}
-          className="px-5 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50"
-          style={{ background: "var(--green)", color: "#fff" }}
+          className="btn btn-primary btn-lg"
         >
           {pending ? "Preparing your Snapshot…" : "See my free Snapshot"}
         </button>
         {missing.length > 0 && (
-          <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Still needed: {missing.map((f) => f.label.replace(/\?.*$/, "?")).join(" · ")}</p>
+          <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Still needed: {missing.map((f) => f.label.replace(/\?.*$/, "?")).join(" · ")}</p>
         )}
-        {submitError && <p className="text-xs" role="alert" style={{ color: "var(--red)" }}>{submitError}</p>}
+        {submitError && <p className="text-sm" role="alert" style={{ color: "var(--red)" }}>{submitError}</p>}
       </div>
     </form>
   );

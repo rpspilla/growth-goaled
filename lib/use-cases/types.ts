@@ -36,6 +36,8 @@ export type UseCaseDef = {
   description: string;
   /** Who it's designed for. */
   forWho: string;
+  /** The decision it helps the founder make, in one line (shown on the library card). */
+  decision: string;
   whenUseful: string;
   /** Key outputs of the full assessment. */
   youGet: readonly string[];

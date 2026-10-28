@@ -13,16 +13,16 @@ export function CommitPlanButton({ committedAt, commit }: { committedAt: string 
   const router = useRouter();
   if (committedAt) {
     return (
-      <div className="rounded-lg p-3 text-sm flex items-center gap-3 flex-wrap" style={{ background: "var(--green-muted)", color: "var(--foreground)" }}>
+      <div className="rounded-xl px-5 py-4 text-base flex items-center gap-3 flex-wrap" style={{ background: "var(--green-muted)", color: "var(--foreground)" }}>
         <span className="flex-1">
           <span style={{ color: "var(--green)" }}>✓</span> You committed to this plan on {new Date(committedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}.
         </span>
-        <Link href="/progress" className="text-sm font-semibold" style={{ color: "var(--green)" }}>Track progress →</Link>
+        <Link href="/progress" className="btn btn-primary btn-sm">Track progress →</Link>
       </div>
     );
   }
   return (
-    <div className="rounded-lg border p-3 text-sm flex items-center gap-3 flex-wrap" style={{ borderColor: "var(--border)" }}>
+    <div className="surface px-5 py-4 text-base flex items-center gap-4 flex-wrap">
       <span className="flex-1" style={{ color: "var(--muted-foreground)" }}>
         Commit to this plan to track each action and its metric against today&apos;s baseline, and get a reminder of when to reassess.
       </span>
@@ -37,12 +37,11 @@ export function CommitPlanButton({ committedAt, commit }: { committedAt: string 
             else setError(r.error);
           })
         }
-        className="px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
-        style={{ background: "var(--green)", color: "#fff" }}
+        className="btn btn-primary"
       >
         {pending ? "Saving…" : "Commit to this plan"}
       </button>
-      {error && <span className="text-xs w-full" role="alert" style={{ color: "var(--red)" }}>{error}</span>}
+      {error && <span className="text-sm w-full" role="alert" style={{ color: "var(--red)" }}>{error}</span>}
     </div>
   );
 }

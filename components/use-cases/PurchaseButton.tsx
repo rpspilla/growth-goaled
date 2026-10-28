@@ -27,12 +27,11 @@ export function PurchaseButton({
             else setError(res.error);
           })
         }
-        className="w-full px-5 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50"
-        style={{ background: "var(--green)", color: "#fff" }}
+        className="btn btn-primary btn-lg w-full"
       >
         {pending ? "Opening secure checkout…" : label}
       </button>
-      {error && <p className="text-xs" role="alert" style={{ color: "var(--red)" }}>{error}</p>}
+      {error && <p className="text-sm" role="alert" style={{ color: "var(--red)" }}>{error}</p>}
     </div>
   );
 }

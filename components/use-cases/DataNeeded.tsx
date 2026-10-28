@@ -12,7 +12,7 @@ export function DataNeeded({ useCase }: { useCase: UseCaseDef }) {
     <div className="space-y-3">
       {groups.map((g) => (
         <div key={g.title}>
-          <div className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--muted-foreground)" }}>{g.title}</div>
+          <div className="label mb-1" style={{ color: "var(--muted-foreground)" }}>{g.title}</div>
           <ul className="text-sm space-y-0.5">
             {g.keys.map((k) => (
               <li key={k} style={{ color: "var(--foreground)", fontWeight: g.bold ? 600 : 400 }}>{getItem(k)?.name ?? k}</li>

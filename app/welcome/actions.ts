@@ -7,7 +7,8 @@ import { db, schema } from "@/lib/db";
 import { requireUser } from "@/lib/auth/session";
 import { getFounderCompany } from "@/lib/data/companies";
 import { homePathFor } from "@/lib/access";
-import { founderOnboardingSchema, needsOnboarding, staffProfileSchema } from "@/lib/onboarding";
+import { track } from "@/lib/events";
+import { founderOnboardingSchema, founderProfileSchema, needsOnboarding, staffProfileSchema } from "@/lib/onboarding";
 
 export type OnboardingState = { errors?: Record<string, string> };
 
@@ -25,7 +26,7 @@ export async function completeOnboarding(_prev: OnboardingState, formData: FormD
   if (!needsOnboarding(user)) redirect(homePathFor(user.role));
 
   const raw = Object.fromEntries(formData);
-  const profileUpdate = (name: string, title: string) =>
+  const profileUpdate = (name: string, title: string | null) =>
     db.update(schema.users).set({ name, title, onboardedAt: new Date() }).where(eq(schema.users.id, user.id));
 
   // A founder attached to a company (via invite) only completes their profile;
@@ -40,11 +41,14 @@ export async function completeOnboarding(_prev: OnboardingState, formData: FormD
       db.insert(schema.companyMembers).values({ companyId, userId: user.id, memberRole: "owner" }),
       profileUpdate(name, title),
     ]);
-  } else {
-    const parsed = staffProfileSchema.safeParse(raw);
-    if (!parsed.success) return { errors: fieldErrors(parsed.error.issues) };
-    await profileUpdate(parsed.data.name, parsed.data.title);
+    await track("onboarding_completed", { userId: user.id, companyId, props: { revenue_band: revenueBand } });
+    // Straight to the first real step: choosing the growth question to answer.
+    redirect("/library?welcome=1");
   }
 
+  const parsed = (user.role === "founder" ? founderProfileSchema : staffProfileSchema).safeParse(raw);
+  if (!parsed.success) return { errors: fieldErrors(parsed.error.issues) };
+  await profileUpdate(parsed.data.name, parsed.data.title);
+  await track("onboarding_completed", { userId: user.id, props: { role: user.role } });
   redirect(homePathFor(user.role));
 }

@@ -49,7 +49,7 @@ function Row({ companyId, item, review }: { companyId: string; item: ReviewItem;
         <div className="flex-1 min-w-0">
           <div className="text-sm" style={{ color: "var(--foreground)" }}>
             {item.name}
-            {item.required && <span className="text-[10px] ml-1.5 uppercase font-semibold" style={{ color: "var(--muted-foreground)" }}>req</span>}
+            {item.required && <span className="text-xs ml-1.5 font-semibold" style={{ color: "var(--muted-foreground)" }}>req</span>}
           </div>
           <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>
             <span style={{ color: STATUS_COLOR[item.status] }}>{ITEM_STATUS_LABEL[item.status]}</span>
@@ -94,7 +94,7 @@ export function ReadinessReview({ companyId, items, review }: { companyId: strin
   return (
     <div className="rounded-xl border overflow-hidden" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
       <div className="flex items-center gap-2 px-4 py-3 border-b" style={{ borderColor: "var(--border)", background: "var(--muted)" }}>
-        <span className="text-xs font-semibold uppercase tracking-wider flex-1" style={{ color: "var(--muted-foreground)" }}>Data items</span>
+        <span className="label flex-1" style={{ color: "var(--muted-foreground)" }}>Data items</span>
         {(["supplied", "gaps", "all"] as const).map((f) => (
           <button key={f} onClick={() => setFilter(f)} className="text-xs px-2.5 py-1 rounded-full capitalize" style={{ background: filter === f ? "var(--foreground)" : "transparent", color: filter === f ? "var(--background)" : "var(--muted-foreground)" }}>
             {f === "supplied" ? "To validate" : f === "gaps" ? "Required gaps" : "All"}

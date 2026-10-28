@@ -3,65 +3,45 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
 import { homePathFor } from "@/lib/access";
 import { needsOnboarding } from "@/lib/onboarding";
-import { StagingBadge } from "@/components/shell/Shell";
 import { getFounderCompany } from "@/lib/data/companies";
+import { track } from "@/lib/events";
+import { AuthShell, Points } from "../(auth)/AuthShell";
 import { WelcomeForm } from "./WelcomeForm";
 
-export const metadata: Metadata = { title: "Welcome · Growth Goaled" };
+export const metadata: Metadata = { title: "Set up your company · Growth Goaled" };
 
-/** First-sign-in form: profile for everyone, plus company basics for founders. */
+/** First sign-in: founders set up their company (step 2 of 3); advisors and invited founders confirm their profile. */
 export default async function WelcomePage() {
   const user = await requireUser({ allowIncomplete: true });
   if (!needsOnboarding(user)) redirect(homePathFor(user.role));
   const isFounder = user.role === "founder";
   // Invited founders already have a company, so they only complete their profile.
   const company = isFounder ? await getFounderCompany(user) : null;
+  const askCompany = isFounder && !company;
+  await track("welcome_viewed", { userId: user.id, props: { role: user.role, new_company: askCompany } });
 
   return (
-    <div className="relative min-h-screen flex flex-col items-center justify-center px-8 py-16 overflow-hidden" style={{ background: "var(--navy)" }}>
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{ backgroundImage: "radial-gradient(ellipse 80% 60% at 50% 40%, rgba(21,90,60,0.18) 0%, transparent 70%)" }}
-      />
-      <div className="absolute top-6 left-6 flex items-center gap-2.5">
-        <div className="w-7 h-7 rounded-md flex items-center justify-center text-xs font-bold" style={{ background: "var(--green)", color: "#fff" }}>
-          G
-        </div>
-        <span className="font-semibold text-white text-sm tracking-tight">Growth Goaled</span>
-        <StagingBadge />
-      </div>
-
-      <div className="relative w-full max-w-lg" style={{ animation: "fadeInUp 0.4s ease-out" }}>
-        <div
-          className="mx-auto mb-6 w-fit inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium"
-          style={{ background: "rgba(21,90,60,0.3)", color: "#6EE7A8", border: "1px solid rgba(21,90,60,0.5)" }}
-        >
-          {isFounder ? "Growth Intelligence Platform" : user.role === "admin" ? "Admin" : "Advisor"}
-        </div>
-        <h1 className="font-display text-4xl font-normal mb-3 leading-tight text-center" style={{ color: "#FFFFFF" }}>
-          {isFounder ? (
-            <>
-              Let&apos;s understand
-              <br />
-              <em>your growth engine.</em>
-            </>
-          ) : (
-            <>
-              Welcome to <em>Growth Goaled.</em>
-            </>
-          )}
-        </h1>
-        <p className="text-sm mb-8 text-center" style={{ color: "#7A98B4" }}>
-          {isFounder
-            ? company
-              ? `A few details about you to finish setting up ${company.name}.`
-              : "A few details about you and your company to set up your profile."
-            : "Tell founders who's reviewing their analysis."}
-        </p>
-        <div className="rounded-xl p-6" style={{ background: "var(--card)" }}>
-          <WelcomeForm isFounder={isFounder} askCompany={isFounder && !company} defaultName={user.name ?? ""} />
-        </div>
-      </div>
-    </div>
+    <AuthShell
+      brand={
+        askCompany ? (
+          <>
+            <div className="text-sm font-semibold mb-4" style={{ color: "#3DDC97" }}>Step 2 of 3 · Your company</div>
+            <h1 className="font-display text-4xl sm:text-5xl font-normal leading-[1.08] text-white">Two quick details, then your first growth question.</h1>
+            <p className="text-lg mt-5 mb-8" style={{ color: "#B7C5D4" }}>We use your revenue range to suggest the right questions for your stage. Everything else can wait until it&apos;s needed.</p>
+            <Points items={["Next: pick the growth question you want answered", "Then: a few questions and your free Growth Snapshot", "Nothing is charged unless you choose a full assessment"]} />
+          </>
+        ) : (
+          <>
+            <div className="text-sm font-semibold mb-4" style={{ color: "#3DDC97" }}>{isFounder ? "Welcome" : user.role === "admin" ? "Admin" : "Advisor"}</div>
+            <h1 className="font-display text-4xl sm:text-5xl font-normal leading-[1.08] text-white">{company ? `Welcome to ${company.name}.` : "Welcome to Growth Goaled."}</h1>
+            <p className="text-lg mt-5" style={{ color: "#B7C5D4" }}>{isFounder ? "Confirm your name and you're in." : "Tell founders who's reviewing their analysis."}</p>
+          </>
+        )
+      }
+    >
+      <h2 className="text-2xl sm:text-3xl font-semibold" style={{ color: "var(--foreground)", letterSpacing: "-0.01em" }}>{askCompany ? "Set up your company" : "Your profile"}</h2>
+      <p className="text-base mt-2 mb-6" style={{ color: "var(--muted-foreground)" }}>{askCompany ? "Takes about a minute." : "One step and you're in."}</p>
+      <WelcomeForm isFounder={isFounder} askCompany={askCompany} defaultName={user.name ?? ""} />
+    </AuthShell>
   );
 }

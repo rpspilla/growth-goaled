@@ -4,96 +4,51 @@ import { useActionState } from "react";
 import { REVENUE_BANDS } from "@/lib/onboarding";
 import { completeOnboarding, type OnboardingState } from "./actions";
 
-const inputClass = "w-full px-3 py-2.5 rounded-lg border text-sm outline-none focus:ring-2";
-const inputStyle = { background: "var(--muted)", borderColor: "var(--border)", color: "var(--foreground)" };
-
-function Field({
-  id,
-  label,
-  error,
-  children,
-}: {
-  id: string;
-  label: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
+function Field({ id, label, hint, error, children }: { id: string; label: string; hint?: string; error?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label htmlFor={id} className="text-xs font-medium block mb-1.5" style={{ color: "var(--muted-foreground)" }}>
+      <label htmlFor={id} className="block text-sm font-semibold mb-1.5" style={{ color: "var(--foreground)" }}>
         {label}
+        {hint && <span className="font-normal" style={{ color: "var(--muted-foreground)" }}> · {hint}</span>}
       </label>
       {children}
-      {error && <div className="text-xs mt-1" style={{ color: "var(--red)" }}>{error}</div>}
+      {error && <p id={`${id}-error`} className="text-sm mt-1.5" style={{ color: "var(--red)" }}>{error}</p>}
     </div>
   );
 }
 
-export function WelcomeForm({
-  isFounder,
-  askCompany,
-  defaultName,
-}: {
-  isFounder: boolean;
-  askCompany: boolean;
-  defaultName: string;
-}) {
+/** Only what's needed now. Values are kept if a field fails validation. */
+export function WelcomeForm({ isFounder, askCompany, defaultName }: { isFounder: boolean; askCompany: boolean; defaultName: string }) {
   const [state, action, pending] = useActionState<OnboardingState, FormData>(completeOnboarding, {});
   const e = state.errors ?? {};
+  const invalid = (k: string) => (e[k] ? { "aria-invalid": true, "aria-describedby": `${k}-error` } : {});
 
   return (
-    <form action={action} className="space-y-4">
-      <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>
-        About you
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <Field id="name" label="Your name" error={e.name}>
-          <input id="name" name="name" defaultValue={defaultName} autoComplete="name" required className={inputClass} style={inputStyle} />
-        </Field>
-        <Field id="title" label="Your title" error={e.title}>
-          <input
-            id="title"
-            name="title"
-            placeholder={isFounder ? "CEO & Co-founder" : "Lead Advisor"}
-            autoComplete="organization-title"
-            required
-            className={inputClass}
-            style={inputStyle}
-          />
-        </Field>
-      </div>
-
+    <form action={action} className="space-y-5" noValidate>
+      <Field id="name" label="Your name" error={e.name}>
+        <input id="name" name="name" defaultValue={defaultName} autoComplete="name" required className="field" {...invalid("name")} />
+      </Field>
       {askCompany && (
         <>
-          <div className="text-xs font-semibold uppercase tracking-wider pt-2" style={{ color: "var(--muted-foreground)" }}>
-            Your company
-          </div>
           <Field id="companyName" label="Company name" error={e.companyName}>
-            <input id="companyName" name="companyName" autoComplete="organization" required className={inputClass} style={inputStyle} />
+            <input id="companyName" name="companyName" autoComplete="organization" required className="field" {...invalid("companyName")} />
           </Field>
-          <div className="grid grid-cols-2 gap-4">
-            <Field id="website" label="Website" error={e.website}>
-              <input id="website" name="website" placeholder="acme.com" autoComplete="url" className={inputClass} style={inputStyle} />
-            </Field>
-            <Field id="revenueBand" label="Annual revenue" error={e.revenueBand}>
-              <select id="revenueBand" name="revenueBand" defaultValue="" required className={inputClass} style={inputStyle}>
-                <option value="" disabled>Select…</option>
-                {REVENUE_BANDS.map((b) => (
-                  <option key={b.value} value={b.value}>{b.label}</option>
-                ))}
-              </select>
-            </Field>
-          </div>
+          <Field id="revenueBand" label="Annual revenue" error={e.revenueBand}>
+            <select id="revenueBand" name="revenueBand" defaultValue="" required className="field" {...invalid("revenueBand")}>
+              <option value="" disabled>Choose a range</option>
+              {REVENUE_BANDS.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
+            </select>
+          </Field>
+          <Field id="website" label="Website" hint="optional" error={e.website}>
+            <input id="website" name="website" placeholder="acme.com" autoComplete="url" className="field" {...invalid("website")} />
+          </Field>
         </>
       )}
-
-      <button
-        type="submit"
-        disabled={pending}
-        className="w-full py-3 rounded-lg font-semibold text-sm transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-60"
-        style={{ background: "var(--green)", color: "#fff" }}
-      >
-        {pending ? "Saving…" : isFounder ? "Start Your Growth Profile" : "Continue to Portfolio"}
+      <Field id="title" label="Your title" hint={isFounder ? "optional" : undefined} error={e.title}>
+        <input id="title" name="title" placeholder={isFounder ? "CEO & Co-founder" : "Lead Advisor"} autoComplete="organization-title" required={!isFounder} className="field" {...invalid("title")} />
+      </Field>
+      <button type="submit" disabled={pending} className="btn btn-primary btn-lg w-full">
+        {pending ? "Saving…" : askCompany ? "Continue to growth questions" : isFounder ? "Continue" : "Continue to Portfolio"}
       </button>
     </form>
   );

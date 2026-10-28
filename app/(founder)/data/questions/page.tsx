@@ -10,11 +10,11 @@ export default async function QuestionsPage() {
   const user = await requireRole(["founder"]);
   const company = await getFounderCompany(user);
   const header = <PageHeader eyebrow="Step 3 · Data" title="Needs your answer" subtitle="Resolving these will improve the accuracy of your Growth Intelligence profile." />;
-  if (!company) return <div className="p-8 max-w-4xl">{header}</div>;
+  if (!company) return <div className="px-4 sm:px-8 py-8 max-w-4xl">{header}</div>;
 
   const [items, files] = await Promise.all([listRegisterItems([company.id], { owner: "founder" }), listCompanyFiles(company)]);
   return (
-    <div className="p-8 max-w-6xl">
+    <div className="px-4 sm:px-8 py-8 max-w-6xl">
       {header}
       <ReadinessTabs questions={items.length} />
       <QuestionsView items={items} files={files} resolve={resolveQuestion} />

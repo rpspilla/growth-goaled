@@ -25,7 +25,7 @@ export default async function DataPage() {
   const [data, { active }] = await Promise.all([loadReadiness(), founderContext()]);
   if (!data || !active) {
     return (
-      <div className="p-8 max-w-4xl">
+      <div className="px-4 sm:px-8 py-8 max-w-4xl">
         <PageHeader title="Data" subtitle="Your company isn't set up yet. Contact your advisor if this persists." />
       </div>
     );
@@ -49,7 +49,7 @@ export default async function DataPage() {
   ].filter((g) => g.keys.length);
 
   return (
-    <div className="p-8 max-w-5xl">
+    <div className="px-4 sm:px-8 py-8 max-w-5xl">
       <PageHeader eyebrow="Step 3 · Data" title={`Data for ${useCase.shortTitle}`} subtitle={`Only what we need to answer “${useCase.question}”`} />
       <ReadinessTabs questions={questions.length} />
 
@@ -68,15 +68,15 @@ export default async function DataPage() {
       <SortReview docs={inbox} />
 
       {questions.length > 0 && (
-        <Link href="/data/questions" className="block rounded-xl border p-4 mb-6 text-sm" style={{ background: "var(--card)", borderColor: "var(--amber)", color: "var(--foreground)" }}>
+        <Link href="/data/questions" className="block rounded-xl border p-4 mb-6 text-base font-semibold" style={{ background: "var(--card)", borderColor: "var(--amber)", color: "var(--foreground)" }}>
           {questions.length} {questions.length === 1 ? "question needs" : "questions need"} your answer →
         </Link>
       )}
 
       {groups.map((g) => (
         <section key={g.title} className="mb-8">
-          <h2 className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>{g.title} ({g.keys.length})</h2>
-          <p className="text-xs mb-3" style={{ color: "var(--muted-foreground)" }}>{g.caption}</p>
+          <h2 className="text-xl font-semibold" style={{ color: "var(--foreground)" }}>{g.title} ({g.keys.length})</h2>
+          <p className="text-base mt-0.5 mb-3" style={{ color: "var(--muted-foreground)" }}>{g.caption}</p>
           <div className="space-y-3">
             {g.keys.flatMap((key) => {
               const def = getItem(key);

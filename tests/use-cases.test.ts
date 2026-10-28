@@ -230,7 +230,7 @@ describe("assessment history", () => {
 describe("five steps", () => {
   it("locks Data and Baseline until a use case is active, and Progress until the baseline is approved", () => {
     const none = stepStates(null);
-    expect(none.map((s) => s.label)).toEqual(["Overview", "Use Case Library", "Data", "Results", "Progress & Tracking"]);
+    expect(none.map((s) => s.label)).toEqual(["Overview", "Growth questions", "Data", "Results", "Action plan"]);
     expect(none.filter((s) => s.locked).map((s) => s.key)).toEqual(["data", "baseline", "progress"]);
     expect(none.find((s) => s.key === "data")!.lockedReason).toBe("Unlocks when you buy an assessment");
     expect(none.find((s) => s.key === "baseline")!.label).toBe("Results");

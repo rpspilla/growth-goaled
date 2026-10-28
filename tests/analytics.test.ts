@@ -42,3 +42,23 @@ describe("computeAnalytics", () => {
     expect(a.hoursToFirstBenchmark.value).toBeNull();
   });
 });
+
+describe("sign-up funnel", () => {
+  it("counts anonymous steps by event and later steps by distinct founder", async () => {
+    const { computeFunnel } = await import("@/lib/analytics");
+    const e = (name: string, userId: string | null = null, props: Record<string, unknown> | null = null) => ({ name, userId, props });
+    const f = computeFunnel([
+      e("signup_viewed"), e("signup_viewed"), e("signup_viewed"),
+      e("signup_started"), e("signup_started"),
+      e("signup_link_sent"),
+      e("signup_failed", null, { reason: "invalid_email" }),
+      e("welcome_viewed", "u1", { new_company: true }), e("welcome_viewed", "u1", { new_company: true }), e("welcome_viewed", "u2", { new_company: false }),
+      e("onboarding_completed", "u1"),
+      e("snapshot_viewed", "u1"), e("snapshot_viewed", "u1"),
+      e("deliverable_viewed", "u1", { type: "benchmark" }),
+    ]);
+    const v = Object.fromEntries(f.steps.map((s) => [s.key, s.value]));
+    expect(v).toMatchObject({ signup_viewed: 3, signup_started: 2, signup_link_sent: 1, welcome_viewed: 1, onboarding_completed: 1, snapshot_viewed: 1, deliverable_viewed: 0 });
+    expect(f).toMatchObject({ failures: 1, reasons: { invalid_email: 1 } });
+  });
+});

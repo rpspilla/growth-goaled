@@ -1,8 +1,8 @@
 import "server-only";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, gte, inArray } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { answerKey } from "@/lib/intake";
-import { computeAnalytics } from "@/lib/analytics";
+import { computeAnalytics, computeFunnel, FUNNEL_STEPS } from "@/lib/analytics";
 
 /** Derived metrics across real (non-sample) companies. Admin only; callers check the role. */
 export async function loadAnalytics() {
@@ -40,4 +40,16 @@ export async function loadAnalytics() {
     })),
     published,
   });
+}
+
+/** The sign-up → first value → purchase funnel over the last 30 days, founders only (staff and sample excluded). */
+export async function loadFunnel() {
+  const since = new Date(Date.now() - 30 * 86_400_000);
+  const names = [...FUNNEL_STEPS.map((s) => s.key), "signup_failed"];
+  const rows = await db
+    .select({ name: schema.events.name, userId: schema.events.userId, props: schema.events.props, role: schema.users.role })
+    .from(schema.events)
+    .leftJoin(schema.users, eq(schema.users.id, schema.events.userId))
+    .where(and(inArray(schema.events.name, names), gte(schema.events.createdAt, since)));
+  return computeFunnel(rows.filter((r) => !r.role || r.role === "founder").map((r) => ({ name: r.name, userId: r.userId, props: (r.props as Record<string, unknown> | null) ?? null })));
 }
