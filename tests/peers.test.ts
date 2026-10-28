@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { cohortFit, type CandidateRecord, type CompanyProfile } from "@/lib/benchmark-library/match";
+import { t2d3Target } from "@/lib/benchmark-library/reference";
 import { ADVISOR_CONFIRMS, peerComparisons, position, sameIndustry, topQuartileTarget, type PeerFigure } from "@/lib/benchmark-library/peers";
 import { describeCohort, validateRecord } from "@/lib/benchmark-library/records";
 
@@ -61,19 +62,40 @@ describe("Snapshot peer comparisons", () => {
   });
 
   it("is transparent when there's no industry, founding year or published cohort, and never borrows another industry or vintage", () => {
-    for (const c of peerComparisons(company({ industry: null }), records)) expect(c).toMatchObject({ status: "unavailable", reason: expect.stringContaining(ADVISOR_CONFIRMS) });
-    for (const c of peerComparisons(company({ foundedYear: null }), records)) expect(c.status).toBe("unavailable");
-    for (const c of peerComparisons(company({ industry: "Other" }), records)) expect(c.status).toBe("unavailable");
+    for (const c of peerComparisons(company({ industry: null }), records)) expect(c).toMatchObject({ status: expect.stringMatching(/reference|trajectory/), reason: expect.stringContaining(ADVISOR_CONFIRMS) });
+    for (const c of peerComparisons(company({ foundedYear: null }), records)) expect(c.status).not.toBe("compared");
+    for (const c of peerComparisons(company({ industry: "Other" }), records)) expect(c.status).not.toBe("compared");
     const other = peerComparisons(company({ industry: "HealthTech" }), records)[0]!;
-    expect(other).toMatchObject({ status: "unavailable", reason: `Our comparison sources don't publish growth figures for HealthTech companies founded in 2019 yet. ${ADVISOR_CONFIRMS}` });
-    expect(peerComparisons(company({ foundedYear: 2012 }), records)[0]!.status).toBe("unavailable");
+    expect(other).toMatchObject({ status: "reference", reason: `Our comparison sources don't publish growth figures for HealthTech companies founded in 2019 yet. ${ADVISOR_CONFIRMS}` });
+    expect(peerComparisons(company({ foundedYear: 2012 }), records)[0]!.status).toBe("reference");
     // A cohort without founding years isn't a founding-year comparison.
-    expect(peerComparisons(company(), cohort("nrr", [90, 100, 110], { foundedFrom: null, foundedTo: null }))[1]!.status).toBe("unavailable");
+    expect(peerComparisons(company(), cohort("nrr", [90, 100, 110], { foundedFrom: null, foundedTo: null }))[1]!.status).toBe("reference");
+  });
+
+  it("falls back to Growth Goaled's standard reference, labelled as an assumption, when no data fits", () => {
+    const [growth, retention, revenue] = peerComparisons(
+      { industry: "HealthTech", foundedYear: 2024, stage: "Seed", figures: { growth: exact(60, "60%"), grossRetention: { lo: 90, hi: 95, exact: null, text: "5–10%", origin: "the range you picked" }, revenue: { lo: 1_000_000, hi: 3_000_000, exact: null, text: "$1M–$3M", origin: "" } } },
+      [],
+    );
+    expect(growth).toMatchObject({ status: "reference", metric: "arr_growth", position: "Between the median and the top quartile", reference: { bottom: { formatted: "20–25%" }, median: { formatted: "40–45%" }, top: { formatted: "80–120%" } } });
+    expect(growth!.status === "reference" && growth!.basis).toMatch(/assumption/);
+    expect(retention).toMatchObject({ status: "reference", metric: "grr", company: { text: "5–10%" }, position: "Between the median and the top quartile", reference: { metricLabel: "Annual gross revenue churn", bottom: { formatted: "over 20%" }, median: { formatted: "10–12%" }, top: { formatted: "about 5%" } } });
+    expect(revenue).toMatchObject({ status: "trajectory", target: "reach $3M–$9M ARR next year" });
+    // A published stage figure beats the assumption.
+    const stageP75 = rec("arr_growth", { statistic: "percentile", percentile: 75 }, 150, { stages: ["Seed"], industry: null, foundedFrom: null, foundedTo: null });
+    expect(peerComparisons({ industry: "HealthTech", foundedYear: 2024, stage: "Seed", figures: {} }, [stageP75])[0]!.status).toBe("unavailable");
+  });
+
+  it("sets T2D3 targets: triple below $6M ARR, double from there, and reach $1–2M first", () => {
+    expect(t2d3Target({ lo: 2_000_000, hi: 2_000_000, exact: 2_000_000 })).toBe("reach $6M ARR next year (triple today's)");
+    expect(t2d3Target({ lo: 12_000_000, hi: 12_000_000, exact: 12_000_000 })).toBe("reach $24M ARR next year (double today's)");
+    expect(t2d3Target({ lo: 0, hi: 1_000_000, exact: null })).toMatch(/^reach \$1–2M ARR/);
+    expect(t2d3Target({ lo: 20_000_000, hi: null, exact: null })).toBe("reach at least $40M ARR next year");
   });
 
   it("uses only the fixed Snapshot sources whose licence allows customer display", () => {
-    expect(peerComparisons(company(), cohort("nrr", [90, 100, 110], { source: source({ snapshotSource: false }) }))[1]!.status).toBe("unavailable");
-    expect(peerComparisons(company(), cohort("nrr", [90, 100, 110], { source: source({ allowCustomerDisplay: false }) }))[1]!.status).toBe("unavailable");
+    expect(peerComparisons(company(), cohort("nrr", [90, 100, 110], { source: source({ snapshotSource: false }) }))[1]!.status).toBe("reference");
+    expect(peerComparisons(company(), cohort("nrr", [90, 100, 110], { source: source({ allowCustomerDisplay: false }) }))[1]!.status).toBe("reference");
   });
 
   it("picks the same cohort every time, whatever order the records arrive in", () => {
@@ -87,7 +109,7 @@ describe("Snapshot peer comparisons", () => {
   it("still shows the peers when the company's figure is missing, and needs both a bottom and a top", () => {
     const c = peerComparisons(company({ figures: {} }), records)[0]!;
     expect(c).toMatchObject({ status: "compared", company: null, position: null });
-    expect(peerComparisons(company(), [rec("nrr", { statistic: "median" }, 100)])[1]!.status).toBe("unavailable");
+    expect(peerComparisons(company(), [rec("nrr", { statistic: "median" }, 100)])[1]!.status).toBe("reference");
   });
 
   it("places a range only when it falls in one band", () => {

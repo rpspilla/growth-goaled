@@ -152,7 +152,7 @@ export const INTAKE_SECTIONS: IntakeSection[] = BASE_SECTIONS.map((s) => {
       ...fields,
       ...fields.flatMap((f): IntakeField[] => {
         const range = RANGES[`${s.id}.${f.id}`];
-        return range ? [{ id: rangeFieldId(f.id), label: range.label, kind: "select", required: false, options: range.options.map((o) => o.label), rangeOf: f.id, help: f.help }] : [];
+        return range ? [{ id: rangeFieldId(f.id), label: range.label, kind: "select", required: false, options: range.options.map((o) => o.label), rangeOf: f.id, help: range.help ?? f.help }] : [];
       }),
     ],
   };

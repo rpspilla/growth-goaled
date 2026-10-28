@@ -7,7 +7,7 @@ export type Range = { label: string; lo: number | null; hi: number | null };
 
 const r = (label: string, lo: number | null, hi: number | null): Range => ({ label, lo, hi });
 
-export const RANGES: Readonly<Record<string, { label: string; options: readonly Range[] }>> = {
+export const RANGES: Readonly<Record<string, { label: string; options: readonly Range[]; help?: string }>> = {
   "company.arr": {
     label: "Annual recurring revenue (ARR)",
     options: [r("Under $250K", 0, 250_000), r("$250K–$1M", 250_000, 1_000_000), r("$1M–$3M", 1_000_000, 3_000_000), r("$3M–$5M", 3_000_000, 5_000_000), r("$5M–$10M", 5_000_000, 10_000_000), r("$10M–$20M", 10_000_000, 20_000_000), r("$20M+", 20_000_000, null)],
@@ -36,9 +36,12 @@ export const RANGES: Readonly<Record<string, { label: string; options: readonly 
     label: "Net revenue retention (NRR)",
     options: [r("Under 80%", null, 80), r("80–90%", 80, 90), r("90–100%", 90, 100), r("100–110%", 100, 110), r("110–120%", 110, 120), r("120%+", 120, null)],
   },
+  // Asked as annual gross churn (what founders know); the bounds stay on the gross retention scale
+  // (100% minus churn), so "5–10%" churn is 90–95% gross retention.
   "customers.gross_retention": {
-    label: "Gross revenue retention",
-    options: [r("Under 70%", null, 70), r("70–80%", 70, 80), r("80–90%", 80, 90), r("90–95%", 90, 95), r("95–100%", 95, 100)],
+    label: "Annual gross revenue churn",
+    options: [r("Under 2%", 98, 100), r("2–5%", 95, 98), r("5–10%", 90, 95), r("10–20%", 80, 90), r("Over 20%", null, 80)],
+    help: "The share of last year's recurring revenue you lost to cancellations and downgrades, before any upsells. 100% minus this is your gross revenue retention.",
   },
   "customers.sales_cycle": {
     label: "Average sales cycle",

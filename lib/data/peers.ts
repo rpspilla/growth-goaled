@@ -9,15 +9,16 @@ import { loadCandidates } from "./benchmark-library";
 
 /** Revenue bands from onboarding, as ranges. */
 const BAND_RANGE: Record<string, [number, number]> = { lt_1m: [0, 1_000_000], "1m_3m": [1_000_000, 3_000_000], "3m_10m": [3_000_000, 10_000_000], "10m_20m": [10_000_000, 20_000_000], "20m_50m": [20_000_000, 50_000_000] };
-const PROFILE_KEY: Record<PeerKey, string> = { growth: "company.growth", retention: "customers.nrr", revenue: "company.arr" };
+const PROFILE_KEY: Record<PeerKey | "grossRetention", string> = { growth: "company.growth", retention: "customers.nrr", revenue: "company.arr", grossRetention: "customers.gross_retention" };
 
 /** The company's figure for a comparison: the exact profile figure, else the range it picked, else (revenue) its onboarding band. */
-function figureFor(key: PeerKey, answers: IntakeAnswers, revenueBand: string | null): PeerFigure | null {
-  const metric = PEER_METRICS.find((m) => m.key === key)!.metric;
+function figureFor(key: PeerKey | "grossRetention", answers: IntakeAnswers, revenueBand: string | null): PeerFigure | null {
+  const metric = key === "grossRetention" ? "grr" : PEER_METRICS.find((m) => m.key === key)!.metric;
   const profileKey = PROFILE_KEY[key];
   const exact = answers[profileKey];
   const n = typeof exact === "number" ? exact : typeof exact === "string" && exact.trim() ? Number(exact.replace(/[,$%\s]/g, "")) : NaN;
-  if (Number.isFinite(n)) return { lo: n, hi: n, exact: n, text: formatMetric(metric, n), origin: "your company profile" };
+  // Gross retention is shown as churn (100% minus it), the way the questionnaire asks for it.
+  if (Number.isFinite(n)) return { lo: n, hi: n, exact: n, text: key === "grossRetention" ? `${+(100 - n).toFixed(1)}%` : formatMetric(metric, n), origin: "your company profile" };
   const [section, field] = profileKey.split(".") as [string, string];
   const label = answers[`${section}.${rangeFieldId(field)}`];
   const range = findRange(profileKey, label);
@@ -36,7 +37,7 @@ export async function snapshotPeers(company: Pick<Company, "industry" | "revenue
       industry: industry ?? null,
       foundedYear: foundingYear(answers["company.founded_year"]),
       stage: typeof answers["company.stage"] === "string" ? (answers["company.stage"] as string) : company.stage,
-      figures: Object.fromEntries(PEER_METRICS.map((m) => [m.key, figureFor(m.key, answers, company.revenueBand)])),
+      figures: { ...Object.fromEntries(PEER_METRICS.map((m) => [m.key, figureFor(m.key, answers, company.revenueBand)])), grossRetention: figureFor("grossRetention", answers, company.revenueBand) },
     },
     candidates,
   );

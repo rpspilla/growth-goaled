@@ -1,4 +1,6 @@
-import type { PeerComparison } from "@/lib/benchmark-library/peers";
+import type { PeerComparison, PeerFigure, PeerPoint } from "@/lib/benchmark-library/peers";
+import { T2D3 } from "@/lib/benchmark-library/reference";
+import { formatMetric } from "@/lib/metrics";
 
 const muted = { color: "var(--muted-foreground)" };
 
@@ -7,7 +9,9 @@ const muted = { color: "var(--muted-foreground)" };
  * tick, and the company as a dot (exact figure) or a bar (a range it picked). Drawn in HTML so
  * labels keep their text size on any screen; every value is also written out below the strip.
  */
-function Strip({ c }: { c: Extract<PeerComparison, { status: "compared" }> }) {
+type StripData = { title: string; bottom: PeerPoint; median: PeerPoint | null; top: PeerPoint; company: PeerFigure | null; position: string | null };
+
+function Strip({ c }: { c: StripData }) {
   const f = c.company;
   const values = [c.bottom.value, c.top.value, c.median?.value, f?.lo, f?.hi].filter((v): v is number => typeof v === "number" && Number.isFinite(v));
   let lo = Math.min(...values);
@@ -53,38 +57,9 @@ function Strip({ c }: { c: Extract<PeerComparison, { status: "compared" }> }) {
   );
 }
 
-/** The Snapshot's peer comparison for one metric, or a plain statement of why there isn't one. */
-export function PeerComparisonCard({ c }: { c: PeerComparison }) {
-  if (c.status === "unavailable") {
-    return (
-      <article className="surface p-5" aria-label={`${c.title} compared with peers`}>
-        <h3 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>{c.title}</h3>
-        {c.company && <p className="text-base mt-1" style={{ color: "var(--foreground)" }}>You: {c.company.text} <span style={muted}>({c.company.origin})</span></p>}
-        <p className="text-base mt-2" style={muted}>{c.reason}</p>
-        {c.target && (
-          <div className="mt-4 rounded-xl px-4 py-3" style={{ background: "var(--muted)" }}>
-            <p className="text-base font-medium" style={{ color: "var(--foreground)" }}>{c.target.statement}</p>
-            {c.target.met !== null && (
-              <p className="text-sm mt-1" style={{ color: c.target.met ? "var(--green)" : "var(--foreground)" }}>
-                {c.target.met ? `At ${c.company!.text}, you're already there.` : `At ${c.company!.text}, you're below it.`}
-              </p>
-            )}
-            <p className="text-sm mt-2" style={muted}>
-              Peers: {c.target.cohort}
-              {c.target.sampleSize ? ` (${c.target.sampleSize} companies)` : ""}, {c.target.period}. Source: {[c.target.source.name, c.target.source.publisher, c.target.source.year].filter(Boolean).join(", ")}; {c.target.dataset.name}, version {c.target.dataset.version}. A stage-wide figure, not specific to your founding year.
-              {c.target.source.attribution && ` ${c.target.source.attribution}`}
-            </p>
-          </div>
-        )}
-      </article>
-    );
-  }
+function Spread({ c, note }: { c: StripData; note?: string }) {
   return (
-    <article className="surface p-5" aria-label={`${c.title} compared with peers`}>
-      <div className="flex items-baseline justify-between gap-3 flex-wrap">
-        <h3 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>{c.title}</h3>
-        <span className="text-sm" style={muted}>{formatMetricLabel(c)}</span>
-      </div>
+    <>
       <p className="text-base font-medium mt-1" style={{ color: "var(--foreground)" }}>
         {c.position ?? "Add your figure to see where you sit."}
       </p>
@@ -96,6 +71,106 @@ export function PeerComparisonCard({ c }: { c: PeerComparison }) {
         <div><dt style={muted}>Median</dt><dd className="font-semibold" style={{ color: "var(--foreground)" }}>{c.median?.formatted ?? "Not published"}</dd></div>
         <div><dt style={muted}>{c.top.label}</dt><dd className="font-semibold" style={{ color: "var(--foreground)" }}>{c.top.formatted}</dd></div>
       </dl>
+      {note && <p className="text-sm mt-2" style={muted}>{note}</p>}
+    </>
+  );
+}
+
+const Header = ({ title, label }: { title: string; label?: string }) => (
+  <div className="flex items-baseline justify-between gap-3 flex-wrap">
+    <h3 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>{title}</h3>
+    {label && <span className="text-sm" style={muted}>{label}</span>}
+  </div>
+);
+const You = ({ f }: { f: PeerFigure | null }) =>
+  f ? <p className="text-base mt-1" style={{ color: "var(--foreground)" }}>You: {f.text} <span style={muted}>({f.origin})</span></p> : null;
+const Assumption = ({ children }: { children: React.ReactNode }) => (
+  <div className="mt-4 rounded-xl px-4 py-3" style={{ background: "var(--muted)" }}>
+    <div className="text-sm font-semibold mb-1" style={{ color: "var(--amber)" }}>Standard reference · an assumption</div>
+    {children}
+  </div>
+);
+
+/** The Snapshot's peer comparison for one metric, or a plain statement of why there isn't one and the best figure that does exist. */
+export function PeerComparisonCard({ c }: { c: PeerComparison }) {
+  const label = `${c.title} compared with peers`;
+  if (c.status === "unavailable") {
+    return (
+      <article className="surface p-5" aria-label={label}>
+        <Header title={c.title} />
+        <You f={c.company} />
+        <p className="text-base mt-2" style={muted}>{c.reason}</p>
+        <div className="mt-4 rounded-xl px-4 py-3" style={{ background: "var(--muted)" }}>
+          <p className="text-base font-medium" style={{ color: "var(--foreground)" }}>{c.target.statement}</p>
+          {c.target.met !== null && (
+            <p className="text-sm mt-1" style={{ color: c.target.met ? "var(--green)" : "var(--foreground)" }}>
+              {c.target.met ? `At ${c.company!.text}, you're already there.` : `At ${c.company!.text}, you're below it.`}
+            </p>
+          )}
+          <p className="text-sm mt-2" style={muted}>
+            Peers: {c.target.cohort}
+            {c.target.sampleSize ? ` (${c.target.sampleSize} companies)` : ""}, {c.target.period}. Source: {[c.target.source.name, c.target.source.publisher, c.target.source.year].filter(Boolean).join(", ")}; {c.target.dataset.name}, version {c.target.dataset.version}. A stage-wide figure, not specific to your founding year.
+            {c.target.source.attribution && ` ${c.target.source.attribution}`}
+          </p>
+        </div>
+      </article>
+    );
+  }
+  if (c.status === "reference") {
+    const r = c.reference;
+    return (
+      <article className="surface p-5" aria-label={label}>
+        <Header title={c.title} label={r.metricLabel} />
+        <p className="text-base mt-2" style={muted}>{c.reason}</p>
+        <Assumption>
+          <Spread c={{ title: c.title, bottom: r.bottom, median: r.median, top: r.top, company: c.company, position: c.company ? c.position : `Add your ${r.metricLabel.toLowerCase()} to see where you sit.` }} note={r.elite} />
+          <p className="text-sm mt-2" style={muted}>{c.basis}</p>
+        </Assumption>
+      </article>
+    );
+  }
+  if (c.status === "trajectory") {
+    return (
+      <article className="surface p-5" aria-label={label}>
+        <Header title={c.title} label="ARR" />
+        <You f={c.company} />
+        <p className="text-base mt-2" style={muted}>{c.reason}</p>
+        <Assumption>
+          <p className="text-base font-medium" style={{ color: "var(--foreground)" }}>
+            Top-quartile venture-backed companies follow the T2D3 path: triple ARR for two years, then double it for three. On that path you&apos;d aim to {c.target}.
+          </p>
+          <div className="overflow-x-auto mt-3">
+            <table className="w-full text-sm min-w-[420px]">
+              <caption className="sr-only">The T2D3 path from $1M and from $2M ARR</caption>
+              <thead>
+                <tr className="text-left" style={muted}>
+                  <th className="py-1.5 pr-2 font-semibold">Year</th>
+                  <th className="py-1.5 pr-2 font-semibold">Phase</th>
+                  <th className="py-1.5 pr-2 font-semibold">From $1M</th>
+                  <th className="py-1.5 font-semibold">From $2M</th>
+                </tr>
+              </thead>
+              <tbody>
+                {T2D3.map((y) => (
+                  <tr key={y.year} className="border-t" style={{ borderColor: "var(--border)", color: "var(--foreground)" }}>
+                    <td className="py-1.5 pr-2">Year {y.year}</td>
+                    <td className="py-1.5 pr-2">{y.phase} · {y.multiplier}×</td>
+                    <td className="py-1.5 pr-2 font-semibold">{formatMetric("arr", y.from1m)}</td>
+                    <td className="py-1.5 font-semibold">{formatMetric("arr", y.from2m)}{y.year === 1 ? " (common Series A entry point)" : ""}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-sm mt-2" style={muted}>{c.basis}</p>
+        </Assumption>
+      </article>
+    );
+  }
+  return (
+    <article className="surface p-5" aria-label={label}>
+      <Header title={c.title} label={c.metric === "arr" ? "ARR" : c.metric === "nrr" ? "Net revenue retention" : "Year-over-year ARR growth"} />
+      <Spread c={c} />
       <p className="text-sm mt-3" style={muted}>
         Peers: {c.cohort}
         {c.sampleSize ? ` (${c.sampleSize} companies)` : ""}, {c.period}. Source: {[c.source.name, c.source.publisher, c.source.year].filter(Boolean).join(", ")}; {c.dataset.name}, version {c.dataset.version}.
@@ -105,5 +180,3 @@ export function PeerComparisonCard({ c }: { c: PeerComparison }) {
     </article>
   );
 }
-
-const formatMetricLabel = (c: Extract<PeerComparison, { status: "compared" }>) => (c.metric === "arr" ? "ARR" : c.metric === "nrr" ? "Net revenue retention" : "Year-over-year ARR growth");

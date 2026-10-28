@@ -1,6 +1,7 @@
 import { formatMetric, METRICS, type MetricKey } from "@/lib/metrics";
 import { incompatible, stagesFor, type CandidateRecord } from "./match";
 import { cohortKey, describeCohort, foundedLabel } from "./records";
+import { GROSS_CHURN_REFERENCE, GROWTH_REFERENCE, REFERENCE_BASIS, t2d3Target, type ReferenceSpread } from "./reference";
 
 /**
  * The free Snapshot's peer comparisons: growth, retention and revenue against companies in the
@@ -23,7 +24,7 @@ export type PeerKey = (typeof PEER_METRICS)[number]["key"];
 /** The company's own figure: exact (lo = hi) or a range it picked. */
 export type PeerFigure = { lo: number | null; hi: number | null; exact: number | null; text: string; origin: string };
 
-export type PeerPoint = { label: string; value: number; formatted: string; recordId: string };
+export type PeerPoint = { label: string; value: number; formatted: string; recordId?: string };
 
 export type PeerComparison =
   | {
@@ -43,7 +44,10 @@ export type PeerComparison =
       source: { name: string; publisher: string | null; year: string | null; attribution: string | null };
       dataset: { name: string; version: number; versionId: string };
     }
-  | { status: "unavailable"; key: PeerKey; title: string; metric: MetricKey; company: PeerFigure | null; reason: string; target: TopQuartileTarget | null };
+  | { status: "unavailable"; key: PeerKey; title: string; metric: MetricKey; company: PeerFigure | null; reason: string; target: TopQuartileTarget }
+  /** No data fits at all: Growth Goaled's standard reference (an assumption), shown as such. */
+  | { status: "reference"; key: PeerKey; title: string; metric: MetricKey; company: PeerFigure | null; reason: string; reference: ReferenceSpread; position: string | null; basis: string }
+  | { status: "trajectory"; key: PeerKey; title: string; metric: MetricKey; company: PeerFigure | null; reason: string; target: string; basis: string };
 
 /**
  * The fallback when no industry-and-founding-year cohort exists: the top-quartile figure the fixed
@@ -184,20 +188,22 @@ export function topQuartileTarget(
  * dataset, the newest published version, the latest period, and the narrowest founding-year span.
  */
 export function peerComparisons(
-  company: { industry: string | null; foundedYear: number | null; stage?: string | null; figures: Partial<Record<PeerKey, PeerFigure | null>> },
+  company: { industry: string | null; foundedYear: number | null; stage?: string | null; figures: Partial<Record<PeerKey | "grossRetention", PeerFigure | null>> },
   candidates: readonly CandidateRecord[],
 ): PeerComparison[] {
   return PEER_METRICS.map(({ key, title, metric }) => {
     const figure = company.figures[key] ?? null;
-    const none = (reason: string): PeerComparison => ({
-      status: "unavailable",
-      key,
-      title,
-      metric,
-      company: figure,
-      reason: `${reason} ${ADVISOR_CONFIRMS}`,
-      target: topQuartileTarget(metric, { stage: company.stage ?? null, industry: company.industry, foundedYear: company.foundedYear }, figure, candidates),
-    });
+    // Nothing for the industry and founding years: say so, then the best figure that does exist —
+    // a published stage top quartile, else Growth Goaled's standard reference (labelled an assumption).
+    const none = (why: string): PeerComparison => {
+      const reason = `${why} ${ADVISOR_CONFIRMS}`;
+      const target = topQuartileTarget(metric, { stage: company.stage ?? null, industry: company.industry, foundedYear: company.foundedYear }, figure, candidates);
+      if (target) return { status: "unavailable", key, title, metric, company: figure, reason, target };
+      if (key === "revenue") return { status: "trajectory", key, title, metric, company: figure, reason, target: figure ? t2d3Target(figure) : "reach $1–2M ARR, where the T2D3 path starts", basis: REFERENCE_BASIS };
+      const [refMetric, reference, own]: [MetricKey, ReferenceSpread, PeerFigure | null] =
+        key === "growth" ? ["arr_growth", GROWTH_REFERENCE, figure] : ["grr", GROSS_CHURN_REFERENCE, company.figures.grossRetention ?? null];
+      return { status: "reference", key, title, metric: refMetric, company: own, reason, reference, position: own ? position(own, reference) : null, basis: REFERENCE_BASIS };
+    };
     if (!company.industry || norm(company.industry) === "other") return none("We don't have an industry to compare you within yet.");
     if (company.foundedYear === null) return none("We don't have your founding year yet.");
 

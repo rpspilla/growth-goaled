@@ -92,7 +92,7 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
           <section aria-labelledby="peers">
             <h2 id="peers" className="text-xl sm:text-2xl font-semibold" style={{ color: "var(--foreground)" }}>How you compare with peers</h2>
             <p className="text-base mt-1 mb-4" style={{ color: "var(--muted-foreground)" }}>
-              Growth, retention and revenue against companies in your industry founded around the same time, from the same published sources for every Snapshot. The band shows the peers from bottom to top; the line is the median.
+              Growth, retention and revenue against companies in your industry founded around the same time, from the same sources for every Snapshot. Where no data fits yet, we say so and show Growth Goaled's standard reference instead, labelled as an assumption. The band shows the bottom to top quartile; the line is the median.
             </p>
             <div className="space-y-4">
               {peers.map((c) => <PeerComparisonCard key={c.key} c={c} />)}

@@ -40,7 +40,7 @@ export function questionnaire(useCase: UseCaseDef, answers: IntakeAnswers, reven
         label: range.label,
         kind: "select",
         options: range.options.map((o) => ({ value: o.label, label: o.label })),
-        help: field.help,
+        help: range.help ?? field.help,
         group: "company",
       });
       continue;

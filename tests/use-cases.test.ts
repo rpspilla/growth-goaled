@@ -71,6 +71,8 @@ describe("objective form", () => {
       "profile.company.industry",
       "profile.company.employees_range",
     ]);
+    expect(empty.fields.find((f) => f.id === "profile.customers.gross_retention_range")).toMatchObject({ label: "Annual gross revenue churn", help: expect.stringMatching(/^The share of last year's recurring revenue you lost/) });
+    expect(empty.fields.find((f) => f.id === "profile.customers.gross_retention_range")!.options!.map((o) => o.label)).toEqual(["Under 2%", "2–5%", "5–10%", "10–20%", "Over 20%"]);
     const year = empty.fields.find((f) => f.id === "profile.company.founded_year")!;
     expect(year).toMatchObject({ kind: "select", required: true });
     expect(year.options![0]!.value).toBe(String(new Date().getUTCFullYear()));
@@ -144,8 +146,10 @@ describe("Growth Snapshot", () => {
   it("reads ranges as ranges: a rule fires only when the whole range qualifies, and the range is quoted", () => {
     expect(snap("growth_leak", { "customers.nrr_range": "90–100%" }).signals[0]).toMatchObject({ kind: "watch", title: "Your existing customers shrink on net", basis: "Your answer: NRR 90–100%" });
     expect(snap("growth_leak", { "customers.nrr_range": "110–120%" }).signals[0]).toMatchObject({ kind: "positive" });
-    expect(snap("growth_leak", { "customers.gross_retention_range": "90–95%" }).signals[0]!.title).toBe("About 5–10% of starting revenue is lost each year");
-    expect(snap("growth_leak", { "customers.gross_retention_range": "Under 70%" }).signals[0]!.title).toBe("More than 30% of starting revenue is lost each year");
+    // Asked as annual gross churn; read as gross retention (100% minus churn).
+    expect(snap("growth_leak", { "customers.gross_retention_range": "5–10%" }).signals[0]).toMatchObject({ title: "About 5–10% of starting revenue is lost each year", basis: "Your answer: annual gross churn 5–10%" });
+    expect(snap("growth_leak", { "customers.gross_retention_range": "Over 20%" }).signals[0]!.title).toBe("More than 20% of starting revenue is lost each year");
+    expect(snap("growth_leak", { "customers.gross_retention_range": "Under 2%" }).signals[0]!.title).toBe("Up to 2% of starting revenue is lost each year");
     expect(snap("growth_leak", { "company.growth_range": "Shrinking" }).signals[0]!.title).toBe("Revenue isn't growing year over year");
     expect(snap("growth_leak", { "company.growth_range": "25–50%", "customers.nrr_range": "100–110%" }).signals.map((s) => s.title)).toContain("If there's a leak, it's more likely in new business");
     expect(snap("hire_or_fix", { "gtm.sales_reps_range": "None yet" }).fit.suggested).toBe("founder_handoff");

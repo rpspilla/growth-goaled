@@ -101,7 +101,7 @@ export function growthSnapshot(input: SnapshotInput, now = new Date()): Snapshot
       : grr.hi !== null && grr.hi >= 100 ? `Up to ${100 - grr.lo}%`
       : `About ${100 - grr.hi!}–${100 - grr.lo}%`;
     if (grr && lost)
-      signals.push({ kind: "info", title: `${lost} of starting revenue is lost each year`, detail: "That's churn plus downgrades, before expansion. The assessment shows which customers it comes from.", basis: `Your answer: gross retention ${grr.text}` });
+      signals.push({ kind: "info", title: `${lost} of starting revenue is lost each year`, detail: "That's churn plus downgrades, before expansion. The assessment shows which customers it comes from.", basis: grr.exact !== null ? `Your answer: gross retention ${grr.text}` : `Your answer: annual gross churn ${grr.text}` });
   };
   const growthSignal = () => {
     if (growth && (growth.exact !== null ? growth.exact <= 0 : growth.hi !== null && growth.hi <= 0))
