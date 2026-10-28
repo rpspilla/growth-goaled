@@ -9,8 +9,8 @@ import { PeerComparisonCard } from "./PeerComparisonCard";
 export function PeerComparisons({ peers, level = 2 }: { peers: PeerComparison[]; level?: 2 | 3 }) {
   const Heading = level === 2 ? "h2" : "h3";
   return (
-    <section aria-labelledby="peers">
-      <Heading id="peers" className={level === 2 ? "text-xl sm:text-2xl font-semibold" : "text-lg font-semibold"} style={{ color: "var(--foreground)" }}>
+    <section id="peers-section" aria-labelledby="peers" className="scroll-mt-24">
+      <Heading id="peers" className={level === 2 ? "scroll-mt-24 text-xl sm:text-2xl font-semibold" : "text-lg font-semibold"} style={{ color: "var(--foreground)" }}>
         How you compare with peers
       </Heading>
       <p className="text-base mt-1 mb-4" style={{ color: "var(--muted-foreground)" }}>

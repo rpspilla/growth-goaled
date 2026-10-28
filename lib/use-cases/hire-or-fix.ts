@@ -21,13 +21,19 @@ export const hireOrFix: UseCaseDef = {
   nextUseCase: "winning_icp",
   objectiveQuestions: [],
   salesCallsToPublish: 3,
+  dimensions: [
+    { id: "capacity", title: "Team capacity", summary: "What your current sellers produce, and how much more they could carry.", items: ["roster", "sales_capacity", "targets"] },
+    { id: "pipeline", title: "Pipeline and conversion", summary: "Whether there's enough pipeline, converting well enough, for new hires to work.", items: ["opportunities", "stage_conversion", "win_loss", "sales_cycle"] },
+    { id: "sales_calls", title: "Sales call reviews", summary: "Whether your sales process is clear enough on calls for a new hire to follow.", items: ["sales_calls"] },
+    { id: "hiring", title: "Hiring profile", summary: "Who to hire, when, and at what cost.", items: ["open_roles", "compensation", "hiring_dates_comp"] },
+  ],
   retiredQuestions: [
     { id: "hiring_budget", label: "Hiring budget for the next 12 months", kind: "currency", placeholder: "e.g. 600000", help: "What you can spend on new sales hires over the next year: salaries, commission and recruiting." },
     { id: "roles_considering", label: "Which roles are you considering?", kind: "textarea", placeholder: "e.g. 2 AEs and an SDR, or a VP Sales" },
   ],
   requiredItems: ["roster", "sales_capacity", "opportunities", "win_loss"],
   helpfulItems: ["sales_calls", "targets", "opp_value_dates", "sales_cycle", "compensation"],
-  optionalItems: ["hiring_dates_comp", "open_roles"],
+  optionalItems: ["hiring_dates_comp", "open_roles", "stage_conversion"],
   itemWhy: {
     sales_calls: "With 3 or more recorded calls your report publishes straight away; with fewer, an advisor reviews it before you see it.",
     roster: "Who sells today, so we can measure each rep's output and ramp.",

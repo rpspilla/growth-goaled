@@ -124,12 +124,14 @@ export function fallbackAssessment(input: AssessmentInput): AssessmentOutput {
         text: e.text,
         status: e.kind === "calculated" ? "calculated" : e.kind === "inference" ? "inference" : /not confirmed/.test(e.text) ? "hypothesis" : "verified",
         bearing: top?.supporting.includes(e.id) ? "supports" : top?.contradicting.includes(e.id) ? "contradicts" : "context",
+        dimension: null,
         sources: [e.id],
       }))
     : input.figures.slice(0, 6).map((f) => ({
         text: `${f.label} is ${f.value}${f.confirmed ? "" : " (read from your file, not yet confirmed)"}.`,
         status: f.origin === "calculated" ? "calculated" : f.confirmed ? "verified" : "hypothesis",
         bearing: "context",
+        dimension: null,
         sources: [f.id],
       }));
 
@@ -161,9 +163,23 @@ export function fallbackAssessment(input: AssessmentInput): AssessmentOutput {
       ? { option: options[0]!.option, why: "The calculated evidence points to it more than to the alternatives; the first action checks it quickly.", sources: options[0]!.sources }
       : { option: options[1]!.option, why: "The data can't yet separate the possible explanations, so acting now risks fixing the wrong thing.", sources: anchor },
     action_plan: [
-      ...(top ? [{ priority: 1, action: top.test, rationale: "Confirms or rules out the leading explanation quickly.", timing: "next_30_days" as const, role: null, success_metric: "A clear answer on whether this is the main constraint", metric_key: null, expected_signal: "The pattern either holds across accounts or it doesn't.", dependencies_risks: "Needs the underlying records to hand.", sources: cite(top) }] : []),
-      { priority: top ? 2 : 1, action: "Share the missing required data and confirm the figures read from your files.", rationale: "The full analysis depends on it.", timing: "next_30_days", role: null, success_metric: "All required data marked available", metric_key: null, expected_signal: "No open gaps under Data.", dependencies_risks: "Someone needs time to export the data.", sources: anchor },
-      { priority: top ? 3 : 2, action: "Re-run the assessment once the data is in.", rationale: "You'll get the full written brief and plan.", timing: "days_31_60", role: null, success_metric: "A complete brief", metric_key: null, expected_signal: "A firmer diagnosis.", dependencies_risks: "Depends on the step above.", sources: anchor },
+      ...(top ? [{ priority: 1, action: top.test, rationale: "Confirms or rules out the leading explanation quickly.", timing: "next_30_days" as const, role: null, success_metric: "A clear answer on whether this is the main constraint", metric_key: null, expected_signal: "The pattern either holds across accounts or it doesn't.", dependencies_risks: "Needs the underlying records to hand.", dimension: null, sources: cite(top) }] : []),
+      { priority: top ? 2 : 1, action: "Share the missing required data and confirm the figures read from your files.", rationale: "The full analysis depends on it.", timing: "next_30_days", role: null, success_metric: "All required data marked available", metric_key: null, expected_signal: "No open gaps under Data.", dependencies_risks: "Someone needs time to export the data.", dimension: null, sources: anchor },
+      { priority: top ? 3 : 2, action: "Re-run the assessment once the data is in.", rationale: "You'll get the full written brief and plan.", timing: "days_31_60", role: null, success_metric: "A complete brief", metric_key: null, expected_signal: "A firmer diagnosis.", dependencies_risks: "Depends on the step above.", dimension: null, sources: anchor },
+      // One first step per plan dimension, so the plan keeps its shape even without the written analysis.
+      ...(input.plan_dimensions ?? []).map((d, i) => ({
+        priority: (top ? 4 : 3) + i,
+        action: `Share and review the data for ${d.title.toLowerCase()}.`,
+        rationale: d.summary,
+        timing: (["next_30_days", "days_31_60", "days_61_90"] as const)[Math.min(i, 2)]!,
+        role: null,
+        success_metric: `${d.title}: data shared and reviewed`,
+        metric_key: null,
+        expected_signal: "A first read on this area in the next version of the plan.",
+        dependencies_risks: "Needs the data listed for this area.",
+        dimension: d.id,
+        sources: anchor,
+      })),
     ],
     change_triggers: [{ if_this: "Confirmed figures or new data point to a different constraint", then_this: "The recommendation changes to address that constraint instead." }],
     follow_up: {

@@ -97,7 +97,7 @@ describe("assessment safety", () => {
 
   it("drops statements that fail the checks instead of the whole brief", () => {
     const out = fallbackAssessment(base);
-    out.evidence.push({ text: "Peers churn 5%.", status: "inference", bearing: "supports", sources: ["nope"] });
+    out.evidence.push({ text: "Peers churn 5%.", status: "inference", bearing: "supports", dimension: null, sources: ["nope"] });
     out.diagnosis.primary = { candidate_id: null, title: "Growth fell 40%.", explanation: "", sources: ["dp1"] };
     out.change_triggers.push({ if_this: "NRR falls below 85%", then_this: "Switch focus." });
     const check = checkDraft(claimsFromAssessment(out), [94, 2_100_000], new Set(["dp1", "dp2", "answer:goal", ...base.data_supplied.map((d) => d.id)]));

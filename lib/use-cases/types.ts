@@ -18,6 +18,12 @@ export type ObjectiveField = {
   group?: "challenge" | "company" | "goal" | "context";
 };
 
+/**
+ * One area the plan works across (e.g. ICP, sales call reviews). The results present the problem,
+ * then a staged plan per dimension with what was found and the data behind it, linked for updating.
+ */
+export type PlanDimension = { id: string; title: string; summary: string; items: readonly string[] };
+
 /** A company-profile question reused from the intake (lib/intake.ts); answers save to the profile. */
 export type ProfileQuestion = { section: string; field: string };
 
@@ -60,6 +66,8 @@ export type UseCaseDef = {
    * it's held until an advisor reviews it. Unset: always published once it passes the checks.
    */
   salesCallsToPublish?: number;
+  /** The dimensions the plan is organised around, in order. Without them, results use the general layout. */
+  dimensions?: readonly PlanDimension[];
   /** Shown in the library as "Coming soon": no questionnaire, Snapshot, purchase or grant yet. */
   comingSoon?: boolean;
 };

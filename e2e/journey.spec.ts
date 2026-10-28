@@ -257,7 +257,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   }
   const build = founder.page.getByRole("button", { name: "Run my report", exact: true });
   const groups = founder.page.getByRole("group", { name: /^Status of / });
-  await expect(groups).toHaveCount(10); // 3 required + 6 helpful + 1 optional
+  await expect(groups).toHaveCount(15); // 3 required + 6 helpful + 6 optional
   for (let i = 0; i < 3; i++) {
     const button = groups.nth(i).getByRole("button", { name: "Available", exact: true });
     await button.click();
@@ -280,19 +280,31 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await expect(founder.page).toHaveURL(/\/baseline/);
 
   // --- Founder: self-service results, built from their answers and data ---
-  await expect(founder.page.getByRole("heading", { name: "The answer", exact: true })).toBeVisible({ timeout: 90_000 });
+  await expect(founder.page.getByRole("heading", { name: "Based on your data, this is the problem" })).toBeVisible({ timeout: 90_000 });
   await expect(founder.page.getByRole("heading", { name: "How do I fix churn?" })).toBeVisible();
-  // The Decision Brief, in reading order: the answer first, the depth on demand.
-  for (const section of ["The answer", "Why it matters", "What the evidence shows", "What to do next", "Explore the details"]) {
-    await expect(founder.page.getByRole("heading", { name: section, exact: true })).toBeVisible();
+  // The problem, then the plan staged across the use case's dimensions, each with the data behind it.
+  await expect(founder.page.getByText(/The solution lives across 4 dimensions: churn and at-risk accounts, onboarding and adoption, expansion and sales call reviews\. Below you.ll find an initial staging of a plan/)).toBeVisible();
+  for (const dim of ["Churn and at-risk accounts", "Onboarding and adoption", "Expansion", "Sales call reviews"]) {
+    const section = founder.page.getByRole("region", { name: dim, exact: true });
+    await expect(section).toBeVisible();
+    await expect(section.getByRole("heading", { name: "Staged plan" })).toBeVisible();
+    await expect(section.getByRole("heading", { name: /^Data behind this/ })).toBeVisible();
   }
+  const calls = founder.page.getByRole("region", { name: "Sales call reviews", exact: true });
+  await expect(calls.getByRole("link", { name: "Update Recorded sales calls" })).toHaveAttribute("href", "/data#item-sales_calls");
+  await expect(founder.page.getByRole("heading", { name: "Explore the details", exact: true })).toBeVisible();
   for (const detail of ["Options considered", "What would change this recommendation", "Follow-up and when to reassess", "Assumptions, gaps and method"]) {
     await expect(founder.page.locator("summary", { hasText: detail })).toBeVisible();
   }
   await expect(founder.page.getByText(/every statement was checked against your inputs/)).toBeVisible();
-  // The paid assessment shows the same peer comparisons as the Snapshot.
+  // Peer comparisons live on the Overview; the assessment links to them.
+  await expect(founder.page.getByRole("heading", { name: "How you compare with peers" })).toHaveCount(0);
+  await expect(founder.page.getByRole("link", { name: /See how you compare with peers/ })).toHaveAttribute("href", "/overview#peers");
+  await founder.page.getByRole("link", { name: /See how you compare with peers/ }).click();
+  await expect(founder.page).toHaveURL(/\/overview#peers/);
   await expect(founder.page.getByRole("heading", { name: "How you compare with peers" })).toBeVisible();
   await expect(founder.page.getByRole("article", { name: "Retention compared with peers" })).toContainText("Fintech · founded 2017–2021");
+  await founder.page.goto("/baseline");
   await expect(founder.page.getByText("Test mode brief: How do I fix churn?")).toBeVisible();
   // Benchmark comparison from the library: observed, benchmark, derived and interpretation, with the source.
   const nrrCard = founder.page.getByRole("article", { name: "NRR benchmark comparison" });
@@ -311,9 +323,13 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await expect(founder.page.getByText(/You committed to this plan on/)).toBeVisible();
   await founder.page.getByRole("link", { name: "Track progress →" }).click();
   await expect(founder.page.getByRole("heading", { name: "Action plan", exact: true })).toBeVisible();
-  await expect(founder.page.getByRole("heading", { name: /Plan · 0 of 2 done/ })).toBeVisible();
+  // One staged action per dimension at least.
+  const planHeading = founder.page.getByRole("heading", { name: /Plan · 0 of \d+ done/ });
+  await expect(planHeading).toBeVisible();
+  const total = Number((await planHeading.textContent())!.match(/of (\d+) done/)![1]);
+  expect(total).toBeGreaterThanOrEqual(4);
   await founder.page.getByLabel("Status").first().selectOption("done");
-  await expect(founder.page.getByRole("heading", { name: /Plan · 1 of 2 done/ })).toBeVisible();
+  await expect(founder.page.getByRole("heading", { name: new RegExp(`Plan · 1 of ${total} done`) })).toBeVisible();
   await expect(founder.page.getByRole("button", { name: "Reassess now" })).toBeVisible();
   await founder.page.goto("/baseline");
 
@@ -409,7 +425,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await founder.page.getByRole("button", { name: "Request a session" }).click();
   await expect(founder.page.getByText(/We'll email you/)).toBeVisible();
   await founder.page.goto("/baseline");
-  await expect(founder.page.getByRole("heading", { name: "The answer", exact: true })).toBeVisible();
+  await expect(founder.page.getByRole("heading", { name: "Based on your data, this is the problem" })).toBeVisible();
 
   // --- Assessment history ---
   await founder.page.goto("/assessments");

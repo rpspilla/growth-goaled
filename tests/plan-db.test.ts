@@ -78,10 +78,10 @@ const draft = async (i: AssessmentInput) => {
   const output: AssessmentOutput = {
     executive_decision: { decision: "Fix retention before adding acquisition spend.", conclusion: `NRR is ${nrr.value}.`, sources: [nrr.id, `candidate:${top.id}`] },
     diagnosis: { primary: { candidate_id: top.id, title: top.title, explanation: "Losses from the base outweigh new business.", sources: [`candidate:${top.id}`, ...top.supporting] }, alternatives: [], how_to_distinguish: top.test },
-    evidence: [{ text: "Churn and contraction were $10.8K of ARR.", status: "calculated", bearing: "supports", sources: ["analysis:0"] }],
+    evidence: [{ text: "Churn and contraction were $10.8K of ARR.", status: "calculated", bearing: "supports", dimension: null, sources: ["analysis:0"] }],
     alternatives: [{ option: "Fix retention", upside: "Stops the leak.", downside: "Slower new growth.", implications: "Focus CS.", sources: [nrr.id] }],
     recommendation: { option: "Fix retention", why: "It's the larger loss.", sources: [nrr.id] },
-    action_plan: [{ priority: 1, action: "Interview churned customers.", rationale: "Find the cause.", timing: "next_30_days", role: null, success_metric: "NRR", metric_key: "nrr", expected_signal: "NRR rising.", dependencies_risks: "Access to churned accounts.", sources: [nrr.id] }],
+    action_plan: [{ priority: 1, action: "Interview churned customers.", rationale: "Find the cause.", timing: "next_30_days", role: null, success_metric: "NRR", metric_key: "nrr", expected_signal: "NRR rising.", dependencies_risks: "Access to churned accounts.", dimension: null, sources: [nrr.id] }],
     change_triggers: [{ if_this: "Churn turns out to be one-off", then_this: "Shift to acquisition." }],
     follow_up: { metrics: [{ metric_key: "nrr", label: "NRR", why: "The constraint." }], revisit_in_days: 30, revisit_trigger: "A large account gives notice." },
     assumptions: [],

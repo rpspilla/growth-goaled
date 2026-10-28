@@ -63,6 +63,8 @@ export type AssessmentInput = {
   completeness: "complete" | "partial" | "minimal";
   /** Metric keys the plan can name as success metrics (tracked on Progress). */
   trackable_metrics?: string[];
+  /** The areas the plan is organised around (e.g. ICP, sales call reviews), with the data items behind each. */
+  plan_dimensions?: { id: string; title: string; summary: string; items: string[] }[];
   /** Present on a second attempt: what the code checks rejected last time. */
   revision_notes?: string;
 };
@@ -76,7 +78,9 @@ export const assessmentOutputSchema = z.object({
     alternatives: z.array(z.object({ candidate_id: z.string().nullable(), title: z.string(), assessment: z.string(), sources })),
     how_to_distinguish: z.string().nullable(),
   }),
-  evidence: z.array(z.object({ text: z.string(), status: z.enum(["verified", "calculated", "inference", "hypothesis"]), bearing: z.enum(["supports", "contradicts", "context"]), sources })),
+  evidence: z.array(
+    z.object({ text: z.string(), status: z.enum(["verified", "calculated", "inference", "hypothesis"]), bearing: z.enum(["supports", "contradicts", "context"]), dimension: z.string().nullable(), sources }),
+  ),
   alternatives: z.array(z.object({ option: z.string(), upside: z.string(), downside: z.string(), implications: z.string(), sources })),
   recommendation: z.object({ option: z.string(), why: z.string(), sources }),
   action_plan: z.array(
@@ -90,6 +94,7 @@ export const assessmentOutputSchema = z.object({
       metric_key: z.string().nullable(),
       expected_signal: z.string(),
       dependencies_risks: z.string(),
+      dimension: z.string().nullable(),
       sources,
     }),
   ),
@@ -134,6 +139,7 @@ Rules:
 - alternatives: 2–4 realistic options for the decision (including doing nothing or gathering more evidence when relevant), each with upside, downside and implications. Quantify only with input numbers.
 - recommendation: the option you recommend and why it beats the others.
 - action_plan: 3–6 actions over 30–90 days, priority 1 first. role only when the input makes it clear, else null. success_metric names what to measure; metric_key is one of trackable_metrics when it fits, else null. expected_signal says what progress would look like, framed as a recommendation, not a fact. Include dependencies and risks.
+- plan_dimensions: when given, the plan is organised around them. Give every action, and every evidence item that bears on one area, the id of its dimension (dimension); use null only for something that genuinely spans several. Every dimension needs at least one action: where the data for a dimension is missing, the action is to gather it and what to look for. Stage actions across the 30–90 days so each dimension has a sensible first step. Without plan_dimensions, dimension is always null.
 - change_triggers: 2–4 pieces of new evidence or circumstances that would change the recommendation.
 - follow_up: the metrics to monitor, when to revisit (days), and what should trigger an earlier revisit.
 - Benchmarks (reference) were matched and calculated in code: quote their values, differences and positions exactly as written, with the cohort, period and source. Call a "directional" comparison directional. A gap to a benchmark is not by itself a root cause: tie any recommendation to the company's own evidence. If reference is empty, say plainly that no relevant benchmark is available; don't imply peer comparisons.

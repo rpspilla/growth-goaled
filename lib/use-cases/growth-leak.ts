@@ -21,9 +21,15 @@ export const growthLeak: UseCaseDef = {
   nextUseCase: "hire_or_fix",
   objectiveQuestions: [],
   salesCallsToPublish: 3,
+  dimensions: [
+    { id: "retention", title: "Churn and at-risk accounts", summary: "Which customers you lose or shrink, what they have in common, and who's at risk next.", items: ["churned_revenue", "revenue_by_customer", "grr_nrr", "churn"] },
+    { id: "onboarding", title: "Onboarding and adoption", summary: "Whether new customers get to value quickly enough to stay.", items: ["onboarding", "activation", "active_usage"] },
+    { id: "expansion", title: "Expansion", summary: "Whether customers who stay also grow, and what drives it.", items: ["renewals_expansions", "contract_metrics"] },
+    { id: "sales_calls", title: "Sales call reviews", summary: "Whether what's promised on sales calls matches what customers get, a common cause of early churn.", items: ["sales_calls"] },
+  ],
   requiredItems: ["monthly_revenue", "revenue_by_customer", "churned_revenue"],
   helpfulItems: ["sales_calls", "renewals_expansions", "grr_nrr", "opportunities", "stage_conversion", "win_loss"],
-  optionalItems: ["leads_by_source"],
+  optionalItems: ["leads_by_source", "churn", "onboarding", "activation", "active_usage", "contract_metrics"],
   itemWhy: {
     sales_calls: "With 3 or more recorded calls your report publishes straight away; with fewer, an advisor reviews it before you see it.",
     monthly_revenue: "Builds your ARR and growth trend, the line we're explaining.",

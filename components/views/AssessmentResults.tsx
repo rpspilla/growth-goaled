@@ -8,6 +8,22 @@ import { Pill, type Tone } from "@/components/ui/Pill";
 import type { ResultsView } from "@/lib/data/assessments";
 
 const muted = { color: "var(--muted-foreground)" };
+
+export type DataItemState = "in" | "partial" | "missing" | "not_shared" | "not_applicable";
+/** A plan dimension with the data items behind it, each linked to where it's updated. */
+export type DimensionView = { id: string; title: string; summary: string; items: { key: string; name: string; state: DataItemState; href: string }[] };
+const ITEM_STATE: Record<DataItemState, { label: string; tone: Tone }> = {
+  in: { label: "In", tone: "green" },
+  partial: { label: "Partly in", tone: "amber" },
+  missing: { label: "Missing", tone: "red" },
+  not_shared: { label: "Not shared yet", tone: "neutral" },
+  not_applicable: { label: "Not applicable", tone: "neutral" },
+};
+const STAGES = [
+  { timing: "next_30_days", label: "Days 1–30" },
+  { timing: "days_31_60", label: "Days 31–60" },
+  { timing: "days_61_90", label: "Days 61–90" },
+] as const;
 const fg = { color: "var(--foreground)" };
 
 const TIMING = { next_30_days: "Days 1–30", days_31_60: "Days 31–60", days_61_90: "Days 61–90" } as const;
@@ -66,7 +82,8 @@ export function AssessmentResults({
   reviewHref,
   figures,
   commit,
-  peers,
+  compareHref,
+  dimensions,
   onSourceTrail,
 }: {
   title: string;
@@ -82,8 +99,10 @@ export function AssessmentResults({
   figures?: ReactNode;
   /** "Commit to this plan" (or where it's tracked), shown with the plan. */
   commit?: ReactNode;
-  /** Growth, retention and revenue against peers (or the standard reference), shown with the evidence. */
-  peers?: ReactNode;
+  /** Where the peer comparisons live (the Overview); linked from the evidence. */
+  compareHref?: string;
+  /** The plan's dimensions, with the data behind each: when given, the results are organised around them. */
+  dimensions?: DimensionView[];
   onSourceTrail?: (claimKey: string) => void;
 }) {
   const [openClaim, setOpenClaimState] = useState<string | null>(null);
@@ -97,6 +116,38 @@ export function AssessmentResults({
         Evidence →
       </button>
     ) : null;
+  const actionItem = (a: ResultsView["plan"][number]) => (
+    <li key={a.claimKey} className="p-5" style={{ borderColor: "var(--border)" }}>
+      <div className="flex gap-4 items-start">
+        <span className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0" style={{ background: a.priority === 1 ? "var(--green)" : "var(--muted)", color: a.priority === 1 ? "#fff" : "var(--foreground)" }}>{a.priority}</span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-base font-semibold" style={fg}>{a.action}</span>
+            <Pill>{TIMING[a.timing]}</Pill>
+          </div>
+          <p className="text-base mt-1" style={muted}>{a.rationale}</p>
+          <details className="disclosure mt-2">
+            <summary className="text-sm" style={{ color: "var(--green)" }}>Measure, owner and risks</summary>
+            <dl className="grid sm:grid-cols-[9rem_1fr] gap-x-3 gap-y-1.5 text-sm mt-2">
+              <dt className="font-semibold" style={fg}>Who</dt>
+              <dd style={muted}>{a.role ?? "Your call: the brief doesn't assign an owner"}</dd>
+              {a.successMetric && (<><dt className="font-semibold" style={fg}>Measure</dt><dd style={muted}>{a.successMetric}{a.metricLabel ? ` (tracked: ${a.metricLabel})` : ""}</dd></>)}
+              {a.expectedSignal && (<><dt className="font-semibold" style={fg}>Signal to look for</dt><dd style={muted}>{a.expectedSignal} <span className="italic">(proposed)</span></dd></>)}
+              {a.dependenciesRisks && (<><dt className="font-semibold" style={fg}>Depends on / risks</dt><dd style={muted}>{a.dependenciesRisks}</dd></>)}
+            </dl>
+          </details>
+        </div>
+        {evidence(a.claimKey)}
+      </div>
+    </li>
+  );
+  const evidenceRow = (e: ResultsView["evidence"][number]) => (
+    <li key={e.claimKey} className="p-4 sm:px-5 flex gap-3 items-start flex-wrap sm:flex-nowrap" style={{ borderColor: "var(--border)" }}>
+      {e.bearing === "contradicts" ? <Pill tone="red">Points against</Pill> : <Pill tone={KIND[e.status]!.tone}>{KIND[e.status]!.label}</Pill>}
+      <span className="flex-1 text-base min-w-0" style={fg}>{e.text}</span>
+      {evidence(e.claimKey)}
+    </li>
+  );
   const certainty = data.certainty ? CERTAINTY[data.certainty] : null;
   const { confidence } = data;
   const confTone: Tone = confidence.level === "High" ? "green" : confidence.level === "Medium" ? "amber" : "red";
@@ -106,6 +157,181 @@ export function AssessmentResults({
   const hasPrevious = data.baseline.some((r) => r.previous);
   const against = data.evidence.filter((e) => e.bearing === "contradicts");
   const forIt = data.evidence.filter((e) => e.bearing !== "contradicts");
+
+  const keyNumbers = (
+    <>
+        {keyFigures.length > 0 && (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {keyFigures.map((r) => (
+              <div key={r.metric} className="surface p-4">
+                <div className="text-sm font-semibold" style={muted}>{r.label}</div>
+                <div className="text-2xl font-semibold mt-0.5" style={fg}>{r.value}</div>
+                <div className="text-sm mt-1" style={muted}>{r.period && r.period !== "Current" ? `${r.period} · ` : ""}{ORIGIN[r.origin]}</div>
+                {(!r.confirmed || r.stale) && <div className="text-sm mt-0.5" style={{ color: "var(--amber)" }}>{!r.confirmed ? "Not confirmed yet" : "Over 90 days old"}</div>}
+                {r.previous && (
+                  <div className="text-sm mt-0.5" style={{ color: r.previous.direction === "better" ? "var(--green)" : r.previous.direction === "worse" ? "var(--red)" : "var(--muted-foreground)" }}>
+                    {r.previous.direction === "better" ? "▲" : r.previous.direction === "worse" ? "▼" : "="} last brief {r.previous.value}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+    </>
+  );
+  const benchmarkNote = (
+    <>
+        {data.benchmarks.length > 0 || data.benchmarkGaps.length > 0 ? (
+          <BenchmarkComparisons comparisons={data.benchmarks} gaps={data.benchmarkGaps} />
+        ) : data.reference ? (
+          <p className="text-sm" style={muted}>
+            Peer reference: {data.reference.name}
+            {data.reference.companyCount ? ` (${data.reference.companyCount} companies)` : ""}
+            {data.reference.sources.length ? `; source: ${data.reference.sources.join("; ")}` : ""}. Approved, cited reference data only.
+          </p>
+        ) : (
+          <p className="text-sm" style={muted}>No sufficiently relevant published benchmark matches your company yet, so this judges your figures against your own trend and target, not peers.</p>
+        )}
+    </>
+  );
+  // The plan organised around its dimensions: the problem, then each dimension's findings, staged
+  // actions and the data behind it (linked to update), then anything that spans them all.
+  const dims = dimensions ?? [];
+  const dimIds = new Set(dims.map((d) => d.id));
+  const shared = { plan: data.plan.filter((a) => !a.dimension || !dimIds.has(a.dimension)), evidence: data.evidence.filter((e) => !e.dimension || !dimIds.has(e.dimension)) };
+  const listNames = (names: string[]) => (names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`);
+  const dimensionView = (
+    <>
+      <section aria-labelledby="the-problem" className="surface p-6 sm:p-8 -mt-4" style={{ borderColor: "var(--green)", boxShadow: "0 0 0 1px var(--green)" }}>
+        <div className="flex items-center gap-2 flex-wrap mb-4">
+          <h2 id="the-problem" className="label" style={{ color: "var(--green)" }}>Based on your data, this is the problem</h2>
+          {certainty && <Pill tone={certainty.tone}>Diagnosis: {certainty.label}</Pill>}
+          <Pill tone={confTone}>Confidence in your inputs: {confidence.level}</Pill>
+        </div>
+        <div className="flex gap-4 items-start">
+          <p className="flex-1 font-display text-3xl sm:text-4xl leading-tight" style={fg}>{data.diagnosis.primary.title}</p>
+          {evidence(data.diagnosis.primary.claimKey)}
+        </div>
+        <p className="text-lg mt-3 max-w-3xl" style={muted}>{data.diagnosis.primary.explanation}</p>
+        <p className="text-lg mt-5 max-w-3xl font-medium" style={fg}>
+          The solution lives across {dims.length} dimensions: {listNames(dims.map((d) => d.title.toLowerCase()))}. Below you&apos;ll find an initial staging of a plan to address the issues and get you where you want to be.
+        </p>
+        <ol className="mt-5 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {dims.map((d, i) => {
+            const n = data.plan.filter((a) => a.dimension === d.id).length;
+            return (
+              <li key={d.id}>
+                <a href={`#dim-${d.id}`} className="block h-full rounded-xl px-4 py-3 hover:bg-[var(--muted)]" style={{ border: "1px solid var(--border)" }}>
+                  <span className="text-sm font-bold" style={{ color: "var(--green)" }}>{i + 1}</span>
+                  <span className="block text-base font-semibold" style={fg}>{d.title}</span>
+                  <span className="block text-sm" style={muted}>{n} {n === 1 ? "action" : "actions"}</span>
+                </a>
+              </li>
+            );
+          })}
+        </ol>
+        <p className="text-base mt-5" style={fg}>
+          <span className="font-semibold">Our recommendation: </span>
+          {data.executiveDecision.decision}
+        </p>
+      </section>
+
+      {(data.degraded || data.dataGaps.length > 0) && (
+        <div className="rounded-xl px-5 py-4 -mt-6" role="note" style={{ background: "var(--amber-muted)" }}>
+          <div className="text-base font-semibold" style={{ color: "#78350F" }}>
+            {data.degraded ? "A partial brief: the full analysis couldn't be completed this time." : `Built as far as your data allows: ${data.dataGaps.length} ${data.dataGaps.length === 1 ? "gap" : "gaps"} limit how far it goes.`}
+          </div>
+          <ul className="text-sm mt-1.5 space-y-0.5" style={{ color: "#78350F" }}>
+            {data.dataGaps.slice(0, 3).map((g) => <li key={g}>• {g}</li>)}
+            {data.dataGaps.length > 3 && <li>• and {data.dataGaps.length - 3} more under “Assumptions, gaps and method”</li>}
+          </ul>
+          {reviewHref && <a href={reviewHref} className="inline-block mt-2 text-sm font-semibold underline" style={{ color: "#78350F" }}>Book time with an executive advisor to review it →</a>}
+        </div>
+      )}
+
+      <Block id="numbers" title="The numbers behind it">
+        {keyNumbers}
+        {benchmarkNote}
+        {compareHref && (
+          <p className="text-base">
+            <Link href={compareHref} className="link">See how you compare with peers on growth, retention and revenue →</Link>
+          </p>
+        )}
+        {figures}
+      </Block>
+
+      {dims.map((d, i) => {
+        const actions = data.plan.filter((a) => a.dimension === d.id);
+        const found = data.evidence.filter((e) => e.dimension === d.id);
+        const gapsIn = d.items.filter((it) => it.state !== "in" && it.state !== "not_applicable").length;
+        return (
+          <section key={d.id} id={`dim-${d.id}`} aria-labelledby={`dim-${d.id}-title`} className="surface p-5 sm:p-6 scroll-mt-24">
+            <div className="flex items-start gap-4">
+              <span className="w-9 h-9 rounded-full flex items-center justify-center text-base font-bold shrink-0" style={{ background: "var(--green)", color: "#fff" }}>{i + 1}</span>
+              <div className="flex-1 min-w-0">
+                <h2 id={`dim-${d.id}-title`} className="text-xl sm:text-2xl font-semibold" style={fg}>{d.title}</h2>
+                <p className="text-base mt-1" style={muted}>{d.summary}</p>
+              </div>
+            </div>
+
+            <div className="mt-5">
+              <h3 className="text-base font-semibold" style={fg}>What we found</h3>
+              {found.length ? (
+                <ul className="mt-2 rounded-xl divide-y" style={{ border: "1px solid var(--border)", borderColor: "var(--border)" }}>{found.map(evidenceRow)}</ul>
+              ) : (
+                <p className="text-base mt-1" style={muted}>Nothing in your data speaks to this yet{gapsIn ? ": the data below would." : "."}</p>
+              )}
+            </div>
+
+            <div className="mt-5">
+              <h3 className="text-base font-semibold" style={fg}>Staged plan</h3>
+              {actions.length ? (
+                <div className="mt-2 space-y-4">
+                  {STAGES.map((st) => {
+                    const here = actions.filter((a) => a.timing === st.timing);
+                    if (!here.length) return null;
+                    return (
+                      <div key={st.timing}>
+                        <div className="label mb-1">{st.label}</div>
+                        <ol className="rounded-xl divide-y" style={{ border: "1px solid var(--border)", borderColor: "var(--border)" }}>{here.map(actionItem)}</ol>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-base mt-1" style={muted}>No actions in this area yet. Share the data below and re-run your report to stage them.</p>
+              )}
+            </div>
+
+            <div className="mt-5 rounded-xl p-4" style={{ background: "var(--muted)" }}>
+              <div className="flex items-center gap-3 flex-wrap">
+                <h3 className="text-base font-semibold flex-1" style={fg}>Data behind this{gapsIn ? ` · ${gapsIn} to add` : ""}</h3>
+                {d.items[0] && <Link href={d.items[0].href.replace(/#.*$/, "")} className="text-sm link">Upload files →</Link>}
+              </div>
+              <ul className="mt-2 space-y-1.5">
+                {d.items.map((it) => (
+                  <li key={it.key} className="flex items-center gap-3 text-base flex-wrap">
+                    <span className="flex-1 min-w-0" style={fg}>{it.name}</span>
+                    <Pill tone={ITEM_STATE[it.state].tone}>{ITEM_STATE[it.state].label}</Pill>
+                    <Link href={it.href} className="text-sm link" aria-label={`Update ${it.name}`}>Update</Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        );
+      })}
+
+      {(shared.plan.length > 0 || shared.evidence.length > 0) && (
+        <Block id="across" title="Across all areas">
+          {shared.evidence.length > 0 && <ul className="surface divide-y" style={{ borderColor: "var(--border)" }}>{shared.evidence.map(evidenceRow)}</ul>}
+          {shared.plan.length > 0 && <ol className="surface divide-y" style={{ borderColor: "var(--border)" }}>{shared.plan.map(actionItem)}</ol>}
+        </Block>
+      )}
+
+      {commit}
+    </>
+  );
 
   return (
     <div className="px-4 sm:px-8 py-8 max-w-5xl space-y-12">
@@ -131,6 +357,10 @@ export function AssessmentResults({
         {actions}
       </header>
 
+      {dimensions ? (
+        dimensionView
+      ) : (
+      <>
       {/* 1. The answer */}
       <section aria-labelledby="the-answer" className="surface p-6 sm:p-8 -mt-4" style={{ borderColor: "var(--green)", boxShadow: "0 0 0 1px var(--green)" }}>
         <div className="flex items-center gap-2 flex-wrap mb-4">
@@ -196,23 +426,7 @@ export function AssessmentResults({
 
       {/* 3. What the evidence shows */}
       <Block id="evidence" title="What the evidence shows">
-        {keyFigures.length > 0 && (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {keyFigures.map((r) => (
-              <div key={r.metric} className="surface p-4">
-                <div className="text-sm font-semibold" style={muted}>{r.label}</div>
-                <div className="text-2xl font-semibold mt-0.5" style={fg}>{r.value}</div>
-                <div className="text-sm mt-1" style={muted}>{r.period && r.period !== "Current" ? `${r.period} · ` : ""}{ORIGIN[r.origin]}</div>
-                {(!r.confirmed || r.stale) && <div className="text-sm mt-0.5" style={{ color: "var(--amber)" }}>{!r.confirmed ? "Not confirmed yet" : "Over 90 days old"}</div>}
-                {r.previous && (
-                  <div className="text-sm mt-0.5" style={{ color: r.previous.direction === "better" ? "var(--green)" : r.previous.direction === "worse" ? "var(--red)" : "var(--muted-foreground)" }}>
-                    {r.previous.direction === "better" ? "▲" : r.previous.direction === "worse" ? "▼" : "="} last brief {r.previous.value}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+        {keyNumbers}
         <ul className="surface divide-y" style={{ borderColor: "var(--border)" }}>
           {forIt.map((e) => (
             <li key={e.claimKey} className="p-4 sm:px-5 flex gap-3 items-start flex-wrap sm:flex-nowrap" style={{ borderColor: "var(--border)" }}>
@@ -229,52 +443,24 @@ export function AssessmentResults({
             </li>
           ))}
         </ul>
-        {data.benchmarks.length > 0 || data.benchmarkGaps.length > 0 ? (
-          <BenchmarkComparisons comparisons={data.benchmarks} gaps={data.benchmarkGaps} />
-        ) : data.reference ? (
-          <p className="text-sm" style={muted}>
-            Peer reference: {data.reference.name}
-            {data.reference.companyCount ? ` (${data.reference.companyCount} companies)` : ""}
-            {data.reference.sources.length ? `; source: ${data.reference.sources.join("; ")}` : ""}. Approved, cited reference data only.
+        {benchmarkNote}
+        {compareHref && (
+          <p className="text-base">
+            <Link href={compareHref} className="link">See how you compare with peers on growth, retention and revenue →</Link>
           </p>
-        ) : (
-          <p className="text-sm" style={muted}>No sufficiently relevant published benchmark matches your company yet, so this judges your figures against your own trend and target, not peers.</p>
         )}
-        {peers}
         {figures}
       </Block>
 
       {/* 4. What to do next */}
       <Block id="plan" title="What to do next" lead="Your 30–90 day plan, most important first. Targets and signals are our proposals; owners are your call.">
         <ol className="surface divide-y" style={{ borderColor: "var(--border)" }}>
-          {data.plan.map((a) => (
-            <li key={a.claimKey} className="p-5" style={{ borderColor: "var(--border)" }}>
-              <div className="flex gap-4 items-start">
-                <span className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0" style={{ background: a.priority === 1 ? "var(--green)" : "var(--muted)", color: a.priority === 1 ? "#fff" : "var(--foreground)" }}>{a.priority}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-base font-semibold" style={fg}>{a.action}</span>
-                    <Pill>{TIMING[a.timing]}</Pill>
-                  </div>
-                  <p className="text-base mt-1" style={muted}>{a.rationale}</p>
-                  <details className="disclosure mt-2">
-                    <summary className="text-sm" style={{ color: "var(--green)" }}>Measure, owner and risks</summary>
-                    <dl className="grid sm:grid-cols-[9rem_1fr] gap-x-3 gap-y-1.5 text-sm mt-2">
-                      <dt className="font-semibold" style={fg}>Who</dt>
-                      <dd style={muted}>{a.role ?? "Your call: the brief doesn't assign an owner"}</dd>
-                      {a.successMetric && (<><dt className="font-semibold" style={fg}>Measure</dt><dd style={muted}>{a.successMetric}{a.metricLabel ? ` (tracked: ${a.metricLabel})` : ""}</dd></>)}
-                      {a.expectedSignal && (<><dt className="font-semibold" style={fg}>Signal to look for</dt><dd style={muted}>{a.expectedSignal} <span className="italic">(proposed)</span></dd></>)}
-                      {a.dependenciesRisks && (<><dt className="font-semibold" style={fg}>Depends on / risks</dt><dd style={muted}>{a.dependenciesRisks}</dd></>)}
-                    </dl>
-                  </details>
-                </div>
-                {evidence(a.claimKey)}
-              </div>
-            </li>
-          ))}
+          {data.plan.map(actionItem)}
         </ol>
         {commit}
       </Block>
+      </>
+      )}
 
       {/* 5. Explore the details */}
       <Block id="details" title="Explore the details">

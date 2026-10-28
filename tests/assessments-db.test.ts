@@ -71,8 +71,8 @@ const goodDraft = async (i: AssessmentInput) => {
       how_to_distinguish: null,
     },
     evidence: [
-      { text: "You have a hiring budget ready.", status: "verified", bearing: "context", sources: ["answer:hiring_budget"] },
-      { text: `Win rate is ${win.value}.`, status: "verified", bearing: "supports", sources: [win.id] },
+      { text: "You have a hiring budget ready.", status: "verified", bearing: "context", dimension: "hiring", sources: ["answer:hiring_budget"] },
+      { text: `Win rate is ${win.value}.`, status: "verified", bearing: "supports", dimension: "made_up", sources: [win.id] },
     ],
     alternatives: [
       { option: "Hire now", upside: "More capacity.", downside: "Splits a weak pipeline.", implications: "Higher burn.", sources: [win.id] },
@@ -80,8 +80,8 @@ const goodDraft = async (i: AssessmentInput) => {
     ],
     recommendation: { option: "Fix first, then hire.", why: "Conversion is the constraint.", sources: [win.id] },
     action_plan: [
-      { priority: 2, action: "Review lost deals.", rationale: "Find the pattern.", timing: "next_30_days", role: null, success_metric: "Loss reasons logged", metric_key: null, expected_signal: "A clear pattern.", dependencies_risks: "CRM hygiene.", sources: [win.id] },
-      { priority: 1, action: "Tighten qualification.", rationale: "Raises win rate within 90 days.", timing: "days_61_90", role: "Founder", success_metric: "Win rate", metric_key: "win_rate", expected_signal: "Win rate rising.", dependencies_risks: "None.", sources: [win.id] },
+      { priority: 2, action: "Review lost deals.", rationale: "Find the pattern.", timing: "next_30_days", role: null, success_metric: "Loss reasons logged", metric_key: null, expected_signal: "A clear pattern.", dependencies_risks: "CRM hygiene.", dimension: "pipeline", sources: [win.id] },
+      { priority: 1, action: "Tighten qualification.", rationale: "Raises win rate within 90 days.", timing: "days_61_90", role: "Founder", success_metric: "Win rate", metric_key: "win_rate", expected_signal: "Win rate rising.", dependencies_risks: "None.", dimension: null, sources: [win.id] },
     ],
     change_triggers: [{ if_this: "Win rate rises", then_this: "Start hiring." }],
     follow_up: { metrics: [{ metric_key: "win_rate", label: "Win rate", why: "The constraint." }], revisit_in_days: 45, revisit_trigger: "A big swing in win rate." },
@@ -122,6 +122,9 @@ describe("assessment engine", () => {
     expect(view.executiveDecision.decision).toBe("Fix conversion before hiring.");
     expect(view.plan.map((a) => [a.priority, a.action])).toEqual([[1, "Tighten qualification."], [2, "Review lost deals."]]); // ordered by priority
     expect(view.plan[0]).toMatchObject({ metricKey: "win_rate", metricLabel: "Win Rate", role: "Founder" });
+    // Actions and evidence keep their plan dimension; an id that isn't one of the use case's is dropped.
+    expect(view.plan.map((a) => a.dimension)).toEqual([null, "pipeline"]);
+    expect(view.evidence.map((e) => e.dimension)).toEqual(["hiring", null]);
     expect(view.baseline.find((e) => e.label === "Win Rate")).toMatchObject({ value: "18%", confirmed: true, origin: "manual", topQuartile: null, previous: null, stale: false });
     expect(view.certainty).not.toBeNull();
     expect(view.reference).toBeNull();
@@ -140,7 +143,7 @@ describe("assessment engine", () => {
     await activateUseCase(co.id, "hire_or_fix", { activation: "paid", by: founder.id });
     const bad = async (i: AssessmentInput) => {
       const d = await goodDraft(i);
-      d.output.evidence.push({ text: "Peers win 32% of deals.", status: "inference", bearing: "supports", sources: ["made-up-id"] });
+      d.output.evidence.push({ text: "Peers win 32% of deals.", status: "inference", bearing: "supports", dimension: null, sources: ["made-up-id"] });
       return d;
     };
     // Revised on the second attempt: the notes say exactly what failed.
@@ -245,7 +248,7 @@ describe("assessment engine", () => {
 
     const cites = async (i: AssessmentInput) => {
       const d = await goodDraft(i);
-      d.output.evidence.push({ text: `Win rate is 3 pts below the cohort median of 21%.`, status: "calculated", bearing: "supports", sources: [i.reference[0]!.id] });
+      d.output.evidence.push({ text: `Win rate is 3 pts below the cohort median of 21%.`, status: "calculated", bearing: "supports", dimension: null, sources: [i.reference[0]!.id] });
       return d;
     };
     const v = (await createAssessmentVersion(co, "hire_or_fix"))!;

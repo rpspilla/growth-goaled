@@ -108,7 +108,8 @@ export function ItemCard({
   const listId = `sources-${def.key}`;
 
   return (
-    <div className="rounded-xl border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+    // Anchored so the results page can link straight to an item to update it.
+    <div id={`item-${def.key}`} className="rounded-xl border scroll-mt-24" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
       <div className="p-4">
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0">

@@ -6,6 +6,9 @@ import { Section } from "@/components/ui/Section";
 import { Sparkline } from "@/components/ui/Sparkline";
 import { assessmentCompletions, founderAssessment } from "@/lib/data/assessments";
 import { founderContext } from "@/lib/data/founder-context";
+import { getIntakeAnswers } from "@/lib/data/intake";
+import { snapshotPeers } from "@/lib/data/peers";
+import { PeerComparisons } from "@/components/use-cases/PeerComparisons";
 import { companyPerformance } from "@/lib/data/performance";
 import { progressView } from "@/lib/data/plan";
 import { formatMetric } from "@/lib/metrics";
@@ -48,11 +51,12 @@ export default async function OverviewPage() {
   const state = active && { useCase: active.def.id, status: active.status };
   const started = useCases.find((u) => !u.activatedAt);
   const action = nextAction(state, started ? (getUseCase(started.useCase)?.id ?? null) : null);
-  const [brief, plan, perf, completed] = await Promise.all([
+  const [brief, plan, perf, completed, peers] = await Promise.all([
     company && active ? founderAssessment(company.id, active.def.id) : null,
     company && active ? progressView(company, active.def.id) : null,
     company ? companyPerformance(company) : null,
     company ? assessmentCompletions(company.id) : ({} as Partial<Record<string, Date>>),
+    company ? getIntakeAnswers(company).then((a) => snapshotPeers(company, a)) : null,
   ]);
   const view = brief?.state === "ready" ? brief.view : null;
   const headline = HEADLINE_METRICS.filter((m) => perf?.metrics.has(m)).slice(0, 4).map((m) => perf!.metrics.get(m)!);
@@ -164,6 +168,8 @@ export default async function OverviewPage() {
           </ol>
         </Section>
       )}
+
+      {peers && peers.length > 0 && <PeerComparisons peers={peers} />}
 
       {useCases.length > 0 && (
       <Section id="questions" title="Your growth questions" aside={<Link href="/library" className="link text-sm">Explore other questions →</Link>}>

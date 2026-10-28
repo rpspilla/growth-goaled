@@ -374,3 +374,24 @@ describe("metric definitions", () => {
     for (const u of USE_CASES) for (const q of u.objectiveQuestions) if (q.kind === "currency" || q.kind === "number" || /share|%/.test(q.placeholder ?? "")) expect(q.help, `${u.id}.${q.id}`).toBeTruthy();
   });
 });
+
+describe("plan dimensions", () => {
+  it("cover repeatable sales motion with ICP, sales calls, channels and hiring", () => {
+    expect(getUseCase("winning_icp")!.dimensions!.map((d) => d.id)).toEqual(["icp", "sales_calls", "channels", "hiring"]);
+  });
+
+  it("only name data items the use case asks for, with unique ids", () => {
+    for (const u of USE_CASES) {
+      if (!u.dimensions) continue;
+      const asked = new Set([...u.requiredItems, ...u.helpfulItems, ...u.optionalItems]);
+      expect(new Set(u.dimensions.map((d) => d.id)).size, u.id).toBe(u.dimensions.length);
+      for (const d of u.dimensions) {
+        expect(d.items.length, `${u.id}.${d.id}`).toBeGreaterThan(0);
+        for (const k of d.items) {
+          expect(ALL_ITEM_KEYS, `${u.id}.${d.id}.${k}`).toContain(k);
+          expect(asked.has(k), `${u.id}.${d.id}.${k}`).toBe(true);
+        }
+      }
+    }
+  });
+});

@@ -199,6 +199,7 @@ export async function assembleAssessmentInputs(company: Company, useCase: UseCas
       .map((c) => ({ metric: c.metric, label: c.label, values: c.candidates.map((x) => `${x.formatted} in ${x.source === "Your company profile" ? "your company profile" : x.source}`).join(" vs ") })),
     completeness: "partial",
     trackable_metrics: [...wanted],
+    ...(useCase.dimensions ? { plan_dimensions: useCase.dimensions.map((d) => ({ id: d.id, title: d.title, summary: d.summary, items: d.items.map((k) => `item:${k}`) })) } : {}),
   };
   input.completeness = completeness(input);
 
@@ -269,6 +270,9 @@ export function contentFromAssessment(
   degraded = false,
 ): BriefContent {
   const key = (k: string | null) => (k && isMetricKey(k) ? k : null);
+  // Only the use case's own dimensions; anything else is treated as spanning several.
+  const dims = new Set((getUseCase(useCase)?.dimensions ?? []).map((d) => d.id));
+  const dim = (d: string | null | undefined) => (d && dims.has(d) ? d : null);
   return {
     format: "brief",
     useCase,
@@ -285,7 +289,7 @@ export function contentFromAssessment(
       howToDistinguish: out.diagnosis.how_to_distinguish,
       unknowns: inputs.unknowns,
     },
-    evidence: out.evidence.map((e, i) => ({ text: e.text, status: e.status, bearing: e.bearing, claimKey: `evidence.${i}` })),
+    evidence: out.evidence.map((e, i) => ({ text: e.text, status: e.status, bearing: e.bearing, dimension: dim(e.dimension), claimKey: `evidence.${i}` })),
     analyses: inputs.analyses,
     alternatives: out.alternatives.map((a, i) => ({ option: a.option, upside: a.upside, downside: a.downside, implications: a.implications, claimKey: `option.${i}` })),
     recommendation: { option: out.recommendation.option, why: out.recommendation.why, claimKey: "recommendation" },
@@ -300,6 +304,7 @@ export function contentFromAssessment(
         metricKey: key(a.metric_key),
         expectedSignal: a.expected_signal,
         dependenciesRisks: a.dependencies_risks,
+        dimension: dim(a.dimension),
         claimKey: `action.${i}`,
       }))
       .sort((a, b) => a.priority - b.priority)

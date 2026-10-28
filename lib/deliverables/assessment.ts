@@ -69,7 +69,16 @@ export const briefContentSchema = z.object({
     howToDistinguish: z.string().nullable(),
     unknowns: z.array(z.string()),
   }),
-  evidence: z.array(z.object({ text: z.string(), status: z.enum(["verified", "calculated", "inference", "hypothesis"]), bearing: z.enum(["supports", "contradicts", "context"]), claimKey })),
+  evidence: z.array(
+    z.object({
+      text: z.string(),
+      status: z.enum(["verified", "calculated", "inference", "hypothesis"]),
+      bearing: z.enum(["supports", "contradicts", "context"]),
+      /** The plan dimension it bears on, or null (spans several, or the use case has none). */
+      dimension: z.string().nullable().default(null),
+      claimKey,
+    }),
+  ),
   /** Tables computed in code from the founder's files (ARR bridge, segments, pipeline). */
   analyses: z.array(z.object({ title: z.string(), rows: z.array(z.string()) })),
   alternatives: z.array(z.object({ option: z.string(), upside: z.string(), downside: z.string(), implications: z.string(), claimKey })),
@@ -85,6 +94,7 @@ export const briefContentSchema = z.object({
       metricKey: metricKey.nullable(),
       expectedSignal: z.string(),
       dependenciesRisks: z.string(),
+      dimension: z.string().nullable().default(null),
       claimKey,
     }),
   ),
@@ -132,7 +142,7 @@ export function parseBrief(content: unknown): BriefContent | null {
     certainty: null,
     executiveDecision: { decision: c.summary.headline, conclusion: c.summary.body, claimKey: c.summary.claimKey },
     diagnosis: { primary: { title: "Diagnosis", explanation: c.diagnosis.text, claimKey: c.diagnosis.claimKey }, alternatives: [], howToDistinguish: null, unknowns: [] },
-    evidence: c.findings.map((f) => ({ text: f.text, status: "inference" as const, bearing: f.kind === "concern" ? ("supports" as const) : ("context" as const), claimKey: f.claimKey })),
+    evidence: c.findings.map((f) => ({ text: f.text, status: "inference" as const, bearing: f.kind === "concern" ? ("supports" as const) : ("context" as const), dimension: null, claimKey: f.claimKey })),
     analyses: [],
     alternatives: [],
     recommendation: { option: c.decision.text, why: "", claimKey: c.decision.claimKey },
@@ -146,6 +156,7 @@ export function parseBrief(content: unknown): BriefContent | null {
       metricKey: null,
       expectedSignal: "",
       dependenciesRisks: "",
+      dimension: null,
       claimKey: a.claimKey,
     })),
     changeTriggers: [],

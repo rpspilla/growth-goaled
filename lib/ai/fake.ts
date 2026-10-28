@@ -54,17 +54,19 @@ export function fakeAssessment(input: AssessmentInput): AssessmentOutput {
       how_to_distinguish: top?.test ?? null,
     },
     evidence: [
-      { text: fig ? `${fig.label}: ${fig.value}.` : "Few figures were available.", status: fig?.origin === "calculated" ? "calculated" : "verified", bearing: "supports", sources: cite },
-      ...(answer ? [{ text: `You told us: ${answer.answer.slice(0, 120)}`, status: "verified" as const, bearing: "context" as const, sources: [answer.id] }] : []),
+      { text: fig ? `${fig.label}: ${fig.value}.` : "Few figures were available.", status: fig?.origin === "calculated" ? "calculated" : "verified", bearing: "supports", dimension: input.plan_dimensions?.[0]?.id ?? null, sources: cite },
+      ...(answer ? [{ text: `You told us: ${answer.answer.slice(0, 120)}`, status: "verified" as const, bearing: "context" as const, dimension: null, sources: [answer.id] }] : []),
     ],
     alternatives: [
       { option: "Fix the main constraint first", upside: "Addresses the cause.", downside: "Slower to add capacity.", implications: "Hold new spend until it moves.", sources: cite },
       { option: "Gather more evidence", upside: "A firmer answer.", downside: "Delays action.", implications: "Share the missing data.", sources: cite },
     ],
     recommendation: { option: "Fix the main constraint first", why: "The evidence points there.", sources: cite },
-    action_plan: [
-      { priority: 1, action: "Address the main constraint first.", rationale: "It explains most of the gap.", timing: "next_30_days", role: null, success_metric: fig?.label ?? "Main constraint", metric_key: tracked?.metric ?? null, expected_signal: "The figure moves in the right direction.", dependencies_risks: "Needs an owner.", sources: cite },
-      { priority: 2, action: "Review progress against your target.", rationale: "Keeps the plan honest.", timing: "days_61_90", role: null, success_metric: "Progress review held", metric_key: null, expected_signal: "A clear read on progress.", dependencies_risks: "None.", sources: cite },
+    action_plan: input.plan_dimensions?.length
+      ? input.plan_dimensions.map((d, i) => ({ priority: i + 1, action: `Start on ${d.title.toLowerCase()}.`, rationale: d.summary, timing: (["next_30_days", "days_31_60", "days_61_90"] as const)[Math.min(i, 2)]!, role: null, success_metric: d.title, metric_key: null, expected_signal: "A first result in this area.", dependencies_risks: "Needs the data for this area.", dimension: d.id, sources: cite }))
+      : [
+      { priority: 1, action: "Address the main constraint first.", rationale: "It explains most of the gap.", timing: "next_30_days", role: null, success_metric: fig?.label ?? "Main constraint", metric_key: tracked?.metric ?? null, expected_signal: "The figure moves in the right direction.", dependencies_risks: "Needs an owner.", dimension: null, sources: cite },
+      { priority: 2, action: "Review progress against your target.", rationale: "Keeps the plan honest.", timing: "days_61_90", role: null, success_metric: "Progress review held", metric_key: null, expected_signal: "A clear read on progress.", dependencies_risks: "None.", dimension: null, sources: cite },
     ],
     change_triggers: [{ if_this: "New data points to a different constraint", then_this: "Revisit the recommendation." }],
     follow_up: { metrics: tracked ? [{ metric_key: tracked.metric, label: tracked.label, why: "The main figure for this decision." }] : [], revisit_in_days: 30, revisit_trigger: "A sharp move in a key figure." },
