@@ -494,11 +494,36 @@ export async function runAssessmentPipeline(deliverableId: string, deps: Assessm
     await db.update(schema.agentRuns).set({ status: "failed", error: why, output: { code, notes }, durationMs: Date.now() - started }).where(eq(schema.agentRuns.id, qaRun));
   }
   await db.insert(schema.reviews).values({ deliverableId, version: d.version, qaResults });
-  await db.update(schema.deliverables).set({ status: "in_review", codeChecksPassed: true }).where(and(eq(schema.deliverables.id, deliverableId), eq(schema.deliverables.status, "qa")));
-  await track("deliverable_published", { companyId: company.id, props: { type: "assessment", use_case: useCase.id, automated: true, degraded, completeness: inputs.input.completeness } });
+  // Too few recorded sales calls for this question: hold it for an advisor before the founder sees it.
+  const reviewRequired = useCase.salesCallsToPublish !== undefined && (await salesCallCount(company)) < useCase.salesCallsToPublish;
+  await db.update(schema.deliverables).set({ status: "in_review", codeChecksPassed: true, reviewRequired }).where(and(eq(schema.deliverables.id, deliverableId), eq(schema.deliverables.status, "qa")));
+  await track(reviewRequired ? "deliverable_held_for_review" : "deliverable_published", { companyId: company.id, props: { type: "assessment", use_case: useCase.id, automated: true, degraded, completeness: inputs.input.completeness } });
 }
 
 /** An advisor or admin marks a version reviewed (founders then see "Reviewed by …"). Access is checked by the caller. */
+/** Assessments held for an advisor's review before the founder sees them, for these companies. */
+export async function heldAssessments(companyIds: string[]) {
+  if (!companyIds.length) return [];
+  const rows = await db
+    .select({ d: schema.deliverables, name: schema.companies.name })
+    .from(schema.deliverables)
+    .innerJoin(schema.companies, eq(schema.companies.id, schema.deliverables.companyId))
+    .where(and(inArray(schema.deliverables.companyId, companyIds), eq(schema.deliverables.type, TYPE), eq(schema.deliverables.status, "in_review"), eq(schema.deliverables.reviewRequired, true)))
+    .orderBy(desc(schema.deliverables.updatedAt));
+  return rows.map(({ d, name }) => ({ id: d.id, companyId: d.companyId, companyName: name, useCase: d.useCase, version: d.version, updatedAt: d.updatedAt }));
+}
+
+/** Recorded sales calls the company has shared: files filed under "Recorded sales calls". */
+export async function salesCallCount(company: Pick<Company, "id">): Promise<number> {
+  const readiness = await getReadiness(company as Company);
+  return readiness.files.filter((f) => f.itemKeys.includes("sales_calls")).length;
+}
+
+/** Shown to the founder: passed the checks, and either needs no review or an advisor has reviewed it. */
+const founderCanSee = (d: Pick<Deliverable, "codeChecksPassed" | "status" | "reviewRequired">) =>
+  d.codeChecksPassed === true && (d.status === "approved" || d.status === "published" || (d.status === "in_review" && !d.reviewRequired));
+const heldForReview = (d: Pick<Deliverable, "codeChecksPassed" | "status" | "reviewRequired">) => d.codeChecksPassed === true && d.status === "in_review" && d.reviewRequired;
+
 export async function approveAssessment(actor: User, deliverableId: string, comment: string | null): Promise<boolean> {
   const [d] = await db.select().from(schema.deliverables).where(eq(schema.deliverables.id, deliverableId)).limit(1);
   if (!d || d.type !== TYPE || d.status !== "in_review" || !d.codeChecksPassed) return false;
@@ -748,7 +773,10 @@ export type FounderAssessment =
   | { state: "not_started" }
   | { state: "building" }
   | { state: "failed"; reason: string }
-  | { state: "ready"; view: ResultsView; completedAt: Date };
+  /** Built, but held for an advisor's review before the founder sees it. */
+  | { state: "in_review" }
+  /** `newerInReview`: a newer version is with an advisor; this is the last one they reviewed or published. */
+  | { state: "ready"; view: ResultsView; completedAt: Date; newerInReview?: boolean };
 
 /** What the founder's Results step shows for one purchased assessment. */
 export async function founderAssessment(companyId: string, useCase: UseCaseId): Promise<FounderAssessment> {
@@ -757,8 +785,15 @@ export async function founderAssessment(companyId: string, useCase: UseCaseId): 
     .from(schema.deliverables)
     .where(and(eq(schema.deliverables.companyId, companyId), eq(schema.deliverables.type, TYPE), eq(schema.deliverables.useCase, useCase)))
     .orderBy(desc(schema.deliverables.version));
-  const visible = rows.find((d) => d.codeChecksPassed === true && (d.status === "in_review" || d.status === "approved" || d.status === "published"));
+  const visible = rows.find(founderCanSee);
   const latest = rows[0];
+  const held = rows.find(heldForReview);
+  // The newest finished version is with an advisor: show the last one they can see, or say it's in review.
+  if (held && (!visible || held.version > visible.version) && (!latest || latest.id === held.id || latest.status !== "drafting")) {
+    const view = visible ? await assessmentView(visible) : null;
+    if (view) return { state: "ready", view, completedAt: visible!.updatedAt, newerInReview: true };
+    return { state: "in_review" };
+  }
   // A newer version being built doesn't hide the one they already have.
   if (visible && (!latest || latest.id === visible.id || latest.status !== "drafting")) {
     const view = await assessmentView(visible);
@@ -785,12 +820,12 @@ export async function founderAssessment(companyId: string, useCase: UseCaseId): 
 /** When each purchased assessment's results first became visible (for history). */
 export async function assessmentCompletions(companyId: string): Promise<Partial<Record<string, Date>>> {
   const rows = await db
-    .select({ useCase: schema.deliverables.useCase, at: schema.deliverables.updatedAt, passed: schema.deliverables.codeChecksPassed, status: schema.deliverables.status })
+    .select({ useCase: schema.deliverables.useCase, at: schema.deliverables.updatedAt, codeChecksPassed: schema.deliverables.codeChecksPassed, status: schema.deliverables.status, reviewRequired: schema.deliverables.reviewRequired })
     .from(schema.deliverables)
     .where(and(eq(schema.deliverables.companyId, companyId), eq(schema.deliverables.type, TYPE)));
   const out: Partial<Record<string, Date>> = {};
   for (const r of rows) {
-    if (!r.useCase || !r.passed || !["in_review", "approved", "published"].includes(r.status)) continue;
+    if (!r.useCase || !founderCanSee(r)) continue;
     if (!out[r.useCase] || r.at < out[r.useCase]!) out[r.useCase] = r.at;
   }
   return out;

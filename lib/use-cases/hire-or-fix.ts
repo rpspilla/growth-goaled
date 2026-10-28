@@ -20,14 +20,16 @@ export const hireOrFix: UseCaseDef = {
   snapshotProfile: [{ section: "gtm", field: "sales_reps" }, { section: "customers", field: "sales_cycle" }, { section: "customers", field: "acv" }, { section: "company", field: "arr" }],
   nextUseCase: "winning_icp",
   objectiveQuestions: [],
+  salesCallsToPublish: 3,
   retiredQuestions: [
     { id: "hiring_budget", label: "Hiring budget for the next 12 months", kind: "currency", placeholder: "e.g. 600000", help: "What you can spend on new sales hires over the next year: salaries, commission and recruiting." },
     { id: "roles_considering", label: "Which roles are you considering?", kind: "textarea", placeholder: "e.g. 2 AEs and an SDR, or a VP Sales" },
   ],
   requiredItems: ["roster", "sales_capacity", "opportunities", "win_loss"],
-  helpfulItems: ["targets", "opp_value_dates", "sales_cycle", "compensation"],
+  helpfulItems: ["sales_calls", "targets", "opp_value_dates", "sales_cycle", "compensation"],
   optionalItems: ["hiring_dates_comp", "open_roles"],
   itemWhy: {
+    sales_calls: "With 3 or more recorded calls your report publishes straight away; with fewer, an advisor reviews it before you see it.",
     roster: "Who sells today, so we can measure each rep's output and ramp.",
     sales_capacity: "Quota and attainment: is the current team at capacity?",
     opportunities: "Pipeline coverage: is there enough pipeline for more reps?",

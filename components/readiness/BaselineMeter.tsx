@@ -5,18 +5,32 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { requestAssessment } from "@/app/(founder)/data/actions";
 
-export type AssessmentState = "not_started" | "building" | "ready" | "failed";
+export type AssessmentState = "not_started" | "building" | "ready" | "failed" | "in_review";
 
 /**
  * The run / re-run control at the top of every Data page: one big, obvious button, how ready the
  * data is, and what running now means. The report is never blocked on missing data.
  */
-export function BaselineMeter({ done, total, ready, assessment }: { done: number; total: number; ready: boolean; assessment: AssessmentState }) {
+export function BaselineMeter({
+  done,
+  total,
+  ready,
+  assessment,
+  calls,
+}: {
+  done: number;
+  total: number;
+  ready: boolean;
+  assessment: AssessmentState;
+  /** Recorded sales calls shared, and how many publish the report without an advisor's review. */
+  calls?: { count: number; needed: number };
+}) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const percent = total ? Math.round((done / total) * 100) : 0;
-  const label = assessment === "ready" ? "Re-run my report" : assessment === "failed" ? "Run my report again" : "Run my report";
+  const label = assessment === "ready" || assessment === "in_review" ? "Re-run my report" : assessment === "failed" ? "Run my report again" : "Run my report";
+  const enoughCalls = !calls || calls.count >= calls.needed;
   const run = () =>
     start(async () => {
       setError(null);
@@ -36,6 +50,18 @@ export function BaselineMeter({ done, total, ready, assessment }: { done: number
       <div className="h-2 rounded-full mt-2" role="meter" aria-label="Ready for analysis" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done} style={{ background: "var(--muted)" }}>
         <div className="h-2 rounded-full transition-all" style={{ width: `${percent}%`, background: ready ? "var(--green)" : "var(--amber)" }} />
       </div>
+
+      {calls && (
+        <div className="mt-4 rounded-lg px-3 py-2.5 text-sm" style={{ background: enoughCalls ? "var(--green-muted)" : "var(--amber-muted)", color: "var(--foreground)" }}>
+          <span className="font-semibold">Recorded sales calls: {calls.count} of {calls.needed}.</span>{" "}
+          {enoughCalls
+            ? "Your report publishes as soon as it's ready."
+            : `With fewer than ${calls.needed}, an advisor reviews your report before you see it. Upload call recordings or transcripts above to skip the wait.`}
+        </div>
+      )}
+      {assessment === "in_review" && (
+        <p className="mt-4 text-sm font-medium" style={{ color: "var(--foreground)" }}>Your latest report is with an advisor for review. You&apos;ll see it as soon as they&apos;ve reviewed it.</p>
+      )}
 
       <div className="mt-5">
         {assessment === "building" ? (

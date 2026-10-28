@@ -277,6 +277,14 @@ export const CATEGORIES: CategoryDef[] = [
         fields: [{ label: "loss reason", match: ["reason", "lost reason", "loss"] }],
       },
       {
+        key: "sales_calls",
+        name: "Recorded sales calls",
+        description: "Recordings or transcripts of recent sales calls: discovery, demo or negotiation.",
+        why: "Shows what actually happens on calls (qualification, messaging and objections), so the advice rests on more than the numbers.",
+        required: false,
+        followUp: "Upload at least 3 recent sales call recordings or transcripts. Exports from Gong, Chorus, Zoom or Fathom all work.",
+      },
+      {
         key: "sales_cycle",
         name: "Average and median sales cycle",
         description: "How long deals take to close, if you already report it.",

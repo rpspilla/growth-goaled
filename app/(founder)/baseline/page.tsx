@@ -55,7 +55,12 @@ export default async function ResultsPage() {
         peers={<PeerComparisons key="peers" level={3} peers={await snapshotPeers(company, await getIntakeAnswers(company))} />}
         commit={<CommitPlanButton key="commit" committedAt={state.view.committedAt} commit={commitPlanAction.bind(null, state.view.deliverableId)} />}
         actions={
-          <div key="actions" className="mt-3">
+          <div key="actions" className="mt-4 space-y-3">
+            {state.newerInReview && (
+              <p className="rounded-lg px-4 py-3 text-base" role="status" style={{ background: "var(--blue-muted)", color: "var(--foreground)" }}>
+                A newer version of this report is with an advisor for review. This is your latest reviewed report; you&apos;ll see the new one as soon as it&apos;s reviewed.
+              </p>
+            )}
             <RunAssessmentButton label="Re-run my report" primary />
           </div>
         }
@@ -84,6 +89,22 @@ export default async function ResultsPage() {
             <RunAssessmentButton label="Run it again" primary />
             <a href={advisoryHref(def.id, "review")} className="link">Book time with an executive advisor →</a>
           </div>
+        </div>
+      )}
+      {state.state === "in_review" && (
+        <div className="rounded-xl border p-6 space-y-3" style={{ ...card, borderColor: "var(--blue)" }}>
+          <div className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>Your report is with an advisor for review</div>
+          <p className="text-base" style={{ color: "var(--foreground)" }}>
+            {def.salesCallsToPublish
+              ? `Reports for this question publish straight away when at least ${def.salesCallsToPublish} recorded sales calls are shared. With fewer, an advisor checks the report first. You'll see it as soon as they've reviewed it.`
+              : "An advisor is checking it before it's shared. You'll see it as soon as they've reviewed it."}
+          </p>
+          {def.salesCallsToPublish && (
+            <p className="text-base" style={{ color: "var(--muted-foreground)" }}>
+              Rather not wait? Upload {def.salesCallsToPublish} recorded sales calls (recordings or transcripts) on the Data step, then re-run your report.
+            </p>
+          )}
+          <Link href="/data" className="btn btn-primary">Go to Data →</Link>
         </div>
       )}
       {state.state === "not_started" && (

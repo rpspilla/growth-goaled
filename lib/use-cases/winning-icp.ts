@@ -20,13 +20,15 @@ export const winningIcp: UseCaseDef = {
   snapshotProfile: [{ section: "customers", field: "count" }, { section: "customers", field: "segment" }, { section: "customers", field: "acv" }],
   nextUseCase: "growth_leak",
   objectiveQuestions: [],
+  salesCallsToPublish: 3,
   retiredQuestions: [
     { id: "believed_segments", label: "Which segments do you believe are your best?", kind: "textarea", placeholder: "e.g. mid-market fintech, 200–1,000 employees" },
   ],
   requiredItems: ["customer_list", "revenue_by_customer", "industry", "company_size"],
-  helpfulItems: ["contract_metrics", "use_case", "start_term", "status_renewal", "win_loss"],
+  helpfulItems: ["sales_calls", "contract_metrics", "use_case", "start_term", "status_renewal", "win_loss"],
   optionalItems: ["opp_value_dates"],
   itemWhy: {
+    sales_calls: "With 3 or more recorded calls your report publishes straight away; with fewer, an advisor reviews it before you see it.",
     customer_list: "The customers we segment.",
     revenue_by_customer: "Value per segment: ACV and expansion.",
     industry: "One of the main ways to segment customers.",

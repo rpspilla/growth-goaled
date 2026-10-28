@@ -257,13 +257,25 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   }
   const build = founder.page.getByRole("button", { name: "Run my report", exact: true });
   const groups = founder.page.getByRole("group", { name: /^Status of / });
-  await expect(groups).toHaveCount(9); // 3 required + 5 helpful + 1 optional
+  await expect(groups).toHaveCount(10); // 3 required + 6 helpful + 1 optional
   for (let i = 0; i < 3; i++) {
     const button = groups.nth(i).getByRole("button", { name: "Available", exact: true });
     await button.click();
     await expect(button).toHaveAttribute("aria-pressed", "true");
   }
   await expect(founder.page.getByText("Ready: everything the assessment needs is in.")).toBeVisible();
+  // Fewer than 3 recorded sales calls would hold the report for an advisor; this founder shares three.
+  await expect(founder.page.getByText("Recorded sales calls: 0 of 3.")).toBeVisible();
+  {
+    const db = new Client({ connectionString: E2E_DATABASE_URL });
+    await db.connect();
+    const { rows } = await db.query("select id from companies where name = 'E2E Analytics'");
+    for (let i = 1; i <= 3; i++)
+      await db.query("insert into documents (company_id, doc_type, blob_url, filename, mime, size, status, data_item_keys) values ($1, 'other', $2, $3, 'audio/mpeg', 1, 'done', '{sales_calls}')", [rows[0].id, `e2e://call-${i}`, `discovery-call-${i}.mp3`]);
+    await db.end();
+  }
+  await founder.page.reload();
+  await expect(founder.page.getByText("Recorded sales calls: 3 of 3.")).toBeVisible();
   await build.click();
   await expect(founder.page).toHaveURL(/\/baseline/);
 

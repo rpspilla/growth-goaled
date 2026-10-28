@@ -55,6 +55,11 @@ export type UseCaseDef = {
   itemWhy: Readonly<Record<string, string>>;
   figures: readonly MetricKey[];
   trackableMetrics: readonly MetricKey[];
+  /**
+   * Recorded sales calls needed for the report to publish straight to the founder. With fewer,
+   * it's held until an advisor reviews it. Unset: always published once it passes the checks.
+   */
+  salesCallsToPublish?: number;
   /** Shown in the library as "Coming soon": no questionnaire, Snapshot, purchase or grant yet. */
   comingSoon?: boolean;
 };

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { and, count, eq, isNull } from "drizzle-orm";
+import { and, count, eq, isNull, or } from "drizzle-orm";
 import { requireRole } from "@/lib/auth/session";
 import { db, schema } from "@/lib/db";
 import type { User } from "@/lib/db/schema";
@@ -19,7 +19,8 @@ async function getBadges(user: User): Promise<AdvisorBadges> {
     .select({ n: count() })
     .from(deliverables)
     .innerJoin(companies, eq(companies.id, deliverables.companyId))
-    .where(and(eq(deliverables.status, "in_review"), scope));
+    // Benchmarks always wait for review; assessments only when held (e.g. too few recorded sales calls).
+    .where(and(eq(deliverables.status, "in_review"), or(eq(deliverables.type, "benchmark"), eq(deliverables.reviewRequired, true)), scope));
 
   return { unassigned: unassigned?.n ?? 0, review: review?.n ?? 0 };
 }

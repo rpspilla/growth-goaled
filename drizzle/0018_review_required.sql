@@ -1,0 +1,1 @@
+ALTER TABLE "deliverables" ADD COLUMN "review_required" boolean DEFAULT false NOT NULL;

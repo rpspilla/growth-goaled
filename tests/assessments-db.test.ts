@@ -32,7 +32,7 @@ beforeAll(async () => {
 }, 60_000);
 
 beforeEach(async () => {
-  for (const t of [schema.benchmarkUsages, schema.benchmarkOverrides, schema.benchmarkImports, schema.benchmarkRecords, schema.benchmarkDatasetVersions, schema.benchmarkDatasets, schema.dataItems, schema.claimSources, schema.claims, schema.reviews, schema.agentRuns, schema.deliverables, schema.companyUseCases, schema.dataPoints, schema.benchmarkMetrics, schema.benchmarkSources, schema.benchmarkCohorts, schema.events, schema.companies, schema.users]) await db().delete(t);
+  for (const t of [schema.benchmarkUsages, schema.benchmarkOverrides, schema.benchmarkImports, schema.benchmarkRecords, schema.benchmarkDatasetVersions, schema.benchmarkDatasets, schema.dataItems, schema.claimSources, schema.claims, schema.reviews, schema.agentRuns, schema.deliverables, schema.companyUseCases, schema.dataPoints, schema.benchmarkMetrics, schema.benchmarkSources, schema.benchmarkCohorts, schema.events, schema.documents, schema.companies, schema.users]) await db().delete(t);
   [founder, advisor] = (await db()
     .insert(schema.users)
     .values([
@@ -48,7 +48,14 @@ beforeEach(async () => {
     { companyId: co.id, metric: "sales_cycle_days", value: 94, unit: "days", confidence: "medium", status: "proposed", documentId: null },
     { companyId: co.id, metric: "sales_reps", value: 3, unit: "count", confidence: "high", status: "accepted" },
   ]);
+  await addCalls(co, 3); // enough recorded sales calls for reports to publish straight away
 });
+
+/** Recorded sales calls filed under the "sales_calls" item. */
+async function addCalls(company: Company, n: number) {
+  for (let i = 0; i < n; i++)
+    await db().insert(schema.documents).values({ companyId: company.id, docType: "other", blobUrl: `e2e://call-${company.id}-${i}`, filename: `discovery-call-${i}.mp3`, mime: "audio/mpeg", size: 1, status: "done", dataItemKeys: ["sales_calls"] });
+}
 
 const hire = getUseCase("hire_or_fix")!;
 
@@ -185,6 +192,9 @@ describe("assessment engine", () => {
     await activateUseCase(empty.id, "winning_icp", { activation: "advisor", by: advisor.id, note: "test" });
     const v = (await createAssessmentVersion(empty, "winning_icp"))!;
     await runAssessmentPipeline(v.id, { draft: async () => { throw new Error("nothing to go on"); }, qa });
+    // No recorded sales calls: held for an advisor first.
+    expect(await founderAssessment(empty.id, "winning_icp")).toEqual({ state: "in_review" });
+    await approveAssessment(advisor, v.id, null);
     const state = await founderAssessment(empty.id, "winning_icp");
     if (state.state !== "ready") throw new Error(`expected ready, got ${state.state}`);
     expect(state.view.completeness).toBe("minimal");
@@ -245,5 +255,43 @@ describe("assessment engine", () => {
     expect(state.view.benchmarks).toEqual([expect.objectContaining({ metric: "win_rate", benchmark: expect.objectContaining({ dataset: expect.objectContaining({ name: "Seed win rates", version: 1, versionId: ds.versionId }) }) })]);
     expect(state.view.claims["evidence.2"]!.sources.map((s) => s.kind)).toContain("benchmark_record");
     expect((await lib.getDataset(ds.id))!.usage).toEqual([expect.objectContaining({ company: "Hire Co", useCase: "hire_or_fix", metrics: ["win_rate"] })]);
+  });
+});
+
+describe("advisor review when sales calls are missing", () => {
+  it("holds the report from the founder until an advisor reviews it, unless 3 recorded calls were shared", async () => {
+    const [low] = (await db().insert(schema.companies).values({ name: "Few Calls Co", stage: "Seed" }).returning()) as [Company];
+    await activateUseCase(low.id, "hire_or_fix", { activation: "paid", by: founder.id });
+    await addCalls(low, 2);
+    const v = (await createAssessmentVersion(low, "hire_or_fix"))!;
+    await runAssessmentPipeline(v.id, { draft: goodDraft, qa });
+    const [d] = await db().select().from(schema.deliverables).where(eq(schema.deliverables.id, v.id));
+    expect(d).toMatchObject({ status: "in_review", codeChecksPassed: true, reviewRequired: true });
+    expect(await founderAssessment(low.id, "hire_or_fix")).toEqual({ state: "in_review" });
+    expect(await assessmentCompletions(low.id)).toEqual({});
+    // The advisor marks it reviewed: now the founder sees it.
+    expect(await approveAssessment(advisor, v.id, "Checked")).toBe(true);
+    expect((await founderAssessment(low.id, "hire_or_fix")).state).toBe("ready");
+    // With a third call, the next version publishes straight away.
+    await addCalls(low, 1);
+    const v2 = (await createAssessmentVersion(low, "hire_or_fix"))!;
+    await runAssessmentPipeline(v2.id, { draft: goodDraft, qa });
+    const [d2] = await db().select().from(schema.deliverables).where(eq(schema.deliverables.id, v2.id));
+    expect(d2!.reviewRequired).toBe(false);
+    const after = await founderAssessment(low.id, "hire_or_fix");
+    expect(after.state === "ready" && after.view.version).toBe(2);
+  });
+
+  it("keeps showing the last reviewed version while a newer one waits for review", async () => {
+    const [mid] = (await db().insert(schema.companies).values({ name: "Mid Co", stage: "Seed" }).returning()) as [Company];
+    await activateUseCase(mid.id, "hire_or_fix", { activation: "paid", by: founder.id });
+    const v1 = (await createAssessmentVersion(mid, "hire_or_fix"))!;
+    await runAssessmentPipeline(v1.id, { draft: goodDraft, qa });
+    await approveAssessment(advisor, v1.id, null);
+    const v2 = (await createAssessmentVersion(mid, "hire_or_fix"))!;
+    await runAssessmentPipeline(v2.id, { draft: goodDraft, qa });
+    const state = await founderAssessment(mid.id, "hire_or_fix");
+    expect(state).toMatchObject({ state: "ready", newerInReview: true });
+    expect(state.state === "ready" && state.view.version).toBe(1);
   });
 });

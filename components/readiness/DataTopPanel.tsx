@@ -1,7 +1,7 @@
 import { BaselineMeter } from "@/components/readiness/BaselineMeter";
 import { InboxDropzone } from "@/components/readiness/InboxDropzone";
 import { SortReview } from "@/components/readiness/SortReview";
-import { founderAssessment } from "@/lib/data/assessments";
+import { founderAssessment, salesCallCount } from "@/lib/data/assessments";
 import { listDocuments } from "@/lib/data/documents";
 import { founderContext } from "@/lib/data/founder-context";
 import { baselineReadiness } from "@/lib/use-cases/readiness";
@@ -14,7 +14,8 @@ import { loadReadiness } from "@/app/(founder)/data/load";
 export async function DataTopPanel() {
   const [data, { active }] = await Promise.all([loadReadiness(), founderContext()]);
   if (!data || !active) return null;
-  const [documents, assessment] = await Promise.all([listDocuments(data.company), founderAssessment(data.company.id, active.def.id)]);
+  const needed = active.def.salesCallsToPublish;
+  const [documents, assessment, callCount] = await Promise.all([listDocuments(data.company), founderAssessment(data.company.id, active.def.id), needed ? salesCallCount(data.company) : 0]);
   const meter = baselineReadiness(active.def, Object.fromEntries(data.readiness.items.map((i) => [i.itemKey, i.status])));
   const inbox = documents.filter((d) => d.inbox || d.suggestions.some((x) => x.status === "suggested"));
   return (
@@ -24,7 +25,7 @@ export async function DataTopPanel() {
         <SortReview docs={inbox} />
       </div>
       <div className="lg:sticky lg:top-6">
-        <BaselineMeter done={meter.done} total={meter.total} ready={meter.ready} assessment={assessment.state} />
+        <BaselineMeter done={meter.done} total={meter.total} ready={meter.ready} assessment={assessment.state} calls={needed ? { count: callCount, needed } : undefined} />
       </div>
     </div>
   );

@@ -670,6 +670,8 @@ export const deliverables = pgTable(
     preliminary: boolean("preliminary").notNull().default(false),
     // Set after QA: true when the code checks (figures traced, claims sourced) all passed
     codeChecksPassed: boolean("code_checks_passed"),
+    // Held for an advisor's review before the founder sees it (e.g. built with fewer than the required sales calls)
+    reviewRequired: boolean("review_required").notNull().default(false),
     ...timestamps,
   },
   (t) => [

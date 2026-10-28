@@ -69,7 +69,11 @@ export default async function CompanyResultsPage({ params }: { params: Promise<{
             <div className="flex items-center gap-3 flex-wrap text-base">
               <span className="font-semibold" style={{ color: "var(--foreground)" }}>Version {d.version}</span>
               <span style={{ color: status === "failed" || d.codeChecksPassed === false ? "var(--red)" : "var(--green)" }}>
-                {d.codeChecksPassed === false ? "Failed the code checks (hidden from the founder)" : STATE[status ?? ""] ?? status}
+                {d.codeChecksPassed === false
+                  ? "Failed the code checks (hidden from the founder)"
+                  : d.reviewRequired && d.status === "in_review"
+                    ? "Waiting for your review: hidden from the founder until you mark it reviewed (fewer than the required recorded sales calls)"
+                    : STATE[status ?? ""] ?? status}
               </span>
             </div>
             {qa && (

@@ -43,6 +43,7 @@ const NAME_HINTS: { pattern: RegExp; items: string[] }[] = [
   { pattern: /\b(org ?chart|headcount|roster|team)\b/i, items: ["org_chart", "roster"] },
   { pattern: /\b(hiring|recruit)\b/i, items: ["open_roles", "hiring_dates_comp"] },
   { pattern: /\b(board|deck|investor update)\b/i, items: ["targets"] },
+  { pattern: /\b(sales calls?|calls?|recordings?|transcripts?|gong|chorus|fathom|zoom)\b/i, items: ["sales_calls"] },
 ];
 
 /** Low-confidence guesses from the file name, for files we can't read. */

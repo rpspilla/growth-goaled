@@ -7,6 +7,7 @@ export type EventName =
   | "extraction_completed"
   | "register_item_resolved"
   | "deliverable_published"
+  | "deliverable_held_for_review"
   | "deliverable_viewed"
   | "source_trail_opened"
   | "review_decision"

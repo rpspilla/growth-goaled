@@ -20,10 +20,12 @@ export const growthLeak: UseCaseDef = {
   snapshotProfile: [{ section: "company", field: "arr" }, { section: "company", field: "growth" }, { section: "customers", field: "nrr" }, { section: "customers", field: "gross_retention" }],
   nextUseCase: "hire_or_fix",
   objectiveQuestions: [],
+  salesCallsToPublish: 3,
   requiredItems: ["monthly_revenue", "revenue_by_customer", "churned_revenue"],
-  helpfulItems: ["renewals_expansions", "grr_nrr", "opportunities", "stage_conversion", "win_loss"],
+  helpfulItems: ["sales_calls", "renewals_expansions", "grr_nrr", "opportunities", "stage_conversion", "win_loss"],
   optionalItems: ["leads_by_source"],
   itemWhy: {
+    sales_calls: "With 3 or more recorded calls your report publishes straight away; with fewer, an advisor reviews it before you see it.",
     monthly_revenue: "Builds your ARR and growth trend, the line we're explaining.",
     revenue_by_customer: "Splits growth into new, expansion and churned revenue (the ARR bridge).",
     churned_revenue: "Shows how much growth leaks out through lost and shrinking customers.",
