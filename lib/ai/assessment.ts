@@ -25,8 +25,25 @@ export type AssessmentInput = {
   figures: { id: string; metric: string; label: string; value: string; lower_is_better: boolean; confirmed: boolean; period: string | null; origin?: string; method?: string | null; sample_size?: number | null }[];
   /** ids "item:<key>": what data the founder has supplied for this question */
   data_supplied: { id: string; item: string; priority: "required" | "helpful" | "optional"; status: string; coverage: string | null; files: number; columns: string[] }[];
-  /** ids are approved reference rows; empty when no approved reference data matches */
-  reference: { id: string; metric: string; label: string; median: string | null; top_quartile: string; source: string | null }[];
+  /**
+   * Benchmark comparisons computed in code from published Benchmark Library records (ids are
+   * record ids). Empty when no sufficiently relevant benchmark exists. `quality` "directional"
+   * means the cohort or definition match is weak; say so whenever you use it.
+   */
+  reference: {
+    id: string;
+    metric: string;
+    label: string;
+    quality: "strong" | "directional";
+    company_value: string;
+    benchmark_values: string[];
+    difference: string | null;
+    position: string | null;
+    cohort: string;
+    period: string;
+    source: string;
+    limitations: string[];
+  }[];
   reference_note: string;
   /** Rule-based diagnosis from code. Candidate ids "candidate:<id>", evidence ids "ev:<n>". */
   diagnosis?: {
@@ -93,7 +110,7 @@ export const ASSESSMENT_BRIEFS: Record<UseCaseId, string> = {
   growth_leak:
     "Decide where growth is leaking and what to do first. Use the ARR bridge (new, expansion, contraction, churn), pipeline generation and conversion, sales-cycle changes, channels, segments and retention. Name the most consequential constraint with its evidence and competing explanations, the next investigation or intervention, and which assessment to run next if appropriate.",
   series_a_ready:
-    "Decide whether to start a Series A process now, and what to fix first. Judge readiness area by area: revenue traction and growth consistency, retention and expansion, GTM repeatability, sales efficiency and customer concentration, team and operating discipline, runway and timing. Give likely investor questions, material evidence gaps and a 90-day preparation plan. Never present a universal threshold as a requirement; compare only with reference rows given, otherwise with the company's own trend.",
+    "Decide whether to start a Series A process now, and what to fix first. Judge readiness area by area: revenue traction and growth consistency, retention and expansion, GTM repeatability, sales efficiency and customer concentration, team and operating discipline, runway and timing. Give likely investor questions, material evidence gaps and a 90-day preparation plan. Never present a universal threshold as a requirement; compare only with the benchmark comparisons given, otherwise with the company's own trend.",
   series_b_ready:
     "Decide whether the business can support a Series B narrative now. Judge sustained growth and retention, repeatable acquisition and expansion, revenue quality and efficiency, sales and organisational scalability, forecasting reliability, capital needs and operating leverage. These are Series B questions: emphasise durability, efficiency and predictability over early traction. Give risks to the narrative, the evidence needed, and a preparation plan.",
   hire_or_fix:
@@ -106,7 +123,7 @@ export const ASSESSMENT_BRIEFS: Record<UseCaseId, string> = {
 
 const SYSTEM = `You are Growth Goaled's Draft Agent. You write a Decision Brief that helps a founder make one growth decision, from evidence prepared in code.
 
-The input has the company's figures (each with origin, method and period), tables computed from their files (analyses), approved peer reference rows (possibly none), the founder's answers and target, and a rule-based diagnosis: ranked candidate constraints with supporting, contradicting and context evidence, and a certainty set by rule.
+The input has the company's figures (each with origin, method and period), tables computed from their files (analyses), benchmark comparisons computed in code from the published Benchmark Library (possibly none), the founder's answers and target, and a rule-based diagnosis: ranked candidate constraints with supporting, contradicting and context evidence, and a certainty set by rule.
 
 Rules:
 - Never calculate or estimate figures. Use only numbers in the input, written as they appear there. You may state a simple difference between two input figures. Never invent benchmarks, "typical" values, owners, deadlines or results.
@@ -119,7 +136,7 @@ Rules:
 - action_plan: 3–6 actions over 30–90 days, priority 1 first. role only when the input makes it clear, else null. success_metric names what to measure; metric_key is one of trackable_metrics when it fits, else null. expected_signal says what progress would look like, framed as a recommendation, not a fact. Include dependencies and risks.
 - change_triggers: 2–4 pieces of new evidence or circumstances that would change the recommendation.
 - follow_up: the metrics to monitor, when to revisit (days), and what should trigger an earlier revisit.
-- If reference is empty, say plainly that no peer reference is available; don't imply peer comparisons.
+- Benchmarks (reference) were matched and calculated in code: quote their values, differences and positions exactly as written, with the cohort, period and source. Call a "directional" comparison directional. A gap to a benchmark is not by itself a root cause: tie any recommendation to the company's own evidence. If reference is empty, say plainly that no relevant benchmark is available; don't imply peer comparisons.
 - Never refuse or stop because data is missing: be explicit about what you couldn't determine and list every gap in data_gaps. For metrics in conflicts, don't conclude on either value.
 - When completeness is "complete", the plan must be a clear, sequenced plan against the diagnosed constraint (for example retention, if that is what the evidence shows). When "partial" or "minimal", keep conclusions proportionate and make the first actions about closing the most important gaps.
 - If revision_notes is present, fix exactly what it lists.
@@ -166,7 +183,7 @@ const QA_SYSTEM = `You are Growth Goaled's QA Agent. You independently check a f
 
 Run five checks. Each is pass or fail with a short, specific note:
 - data_consistency: every figure appears in the input (or is a simple difference between two input figures) and is described correctly, with the right period.
-- method: the brief respects the rule-based certainty, uses reference data only where given and correctly (lower-is-better respected), treats the founder's target as theirs, and labels inferences and hypotheses as such.
+- method: the brief respects the rule-based certainty, uses benchmark comparisons only where given, quotes them exactly, labels directional ones and doesn't treat a benchmark gap as proof of cause, treats the founder's target as theirs, and labels inferences and hypotheses as such.
 - source_trail: each statement cites ids that actually support it, and contradicting evidence isn't hidden.
 - recommendation_logic: the recommendation follows from the evidence, is compared fairly with the alternatives, and the plan addresses the diagnosed constraint.
 - missing_inputs: data gaps and open questions that could change the conclusion are acknowledged.

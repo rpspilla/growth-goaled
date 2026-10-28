@@ -43,7 +43,7 @@ test("signed-out visitors go to sign-in", async ({ page }) => {
 
 test("founders can't open advisor pages", async ({ browser }) => {
   const { ctx, page } = await as(browser, "access-founder@e2e.test");
-  for (const path of ["/advisor/portfolio", "/advisor/benchmarks", "/advisor/analytics", `/advisor/companies/${companyId}`]) {
+  for (const path of ["/advisor/portfolio", "/advisor/benchmarks", "/advisor/benchmark-library", "/advisor/benchmark-library/sources", "/advisor/analytics", `/advisor/companies/${companyId}`]) {
     await page.goto(path);
     await expect(page, path).toHaveURL(/\/overview$/);
   }
@@ -91,10 +91,14 @@ test("paid steps need a payment Stripe confirmed, never a URL or the browser", a
 
 test("advisors can't open founder or admin pages, or companies not assigned to them", async ({ browser }) => {
   const { ctx, page } = await as(browser, "access-advisor@e2e.test");
-  for (const path of ["/data", "/data/questions", "/baseline", "/advisor/analytics", "/advisor/users"]) {
+  for (const path of ["/data", "/data/questions", "/baseline", "/advisor/analytics", "/advisor/users", "/advisor/benchmark-library/new"]) {
     await page.goto(path);
     await expect(page, path).toHaveURL(/\/advisor\/portfolio$/);
   }
+  // The Benchmark Library is read-only for advisors.
+  await page.goto("/advisor/benchmark-library");
+  await expect(page.getByText("Read only: administrators manage the library.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "New dataset" })).toHaveCount(0);
   for (const step of ["", "/library", "/data", "/baseline", "/progress"]) {
     const res = await page.goto(`/advisor/companies/${companyId}${step}`);
     expect(res?.status(), step).toBe(404);

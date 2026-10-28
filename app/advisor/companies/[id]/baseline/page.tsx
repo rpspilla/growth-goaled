@@ -6,7 +6,10 @@ import { assessmentView, latestAssessment } from "@/lib/data/assessments";
 import { isStalled } from "@/lib/data/deliverables";
 import { and, desc, eq, isNotNull } from "drizzle-orm";
 import { targetSummary } from "@/lib/use-cases";
-import { approveAssessmentAction } from "../actions";
+import { approveAssessmentAction, setBenchmarkChoice } from "../actions";
+import { BenchmarkChoices, type ChoiceRow } from "@/components/benchmark-library/BenchmarkChoices";
+import { benchmarkOptions, companyFigures } from "@/lib/data/benchmark-library";
+import { KEY_METRICS } from "@/lib/diagnostics";
 import { companyContext } from "../context";
 
 const card = { background: "var(--card)", borderColor: "var(--border)" };
@@ -35,6 +38,16 @@ export default async function CompanyResultsPage({ params }: { params: Promise<{
       ])
     : [null, null];
   const status = d ? (isStalled(d) ? "failed" : d.status) : null;
+  // Benchmark choices for the metrics this assessment compares.
+  const figures = active ? await companyFigures(company.id, [...new Set([...active.def.figures, ...KEY_METRICS[active.def.id]])]) : [];
+  const choices: ChoiceRow[] = (await benchmarkOptions(company, figures)).map((o) => ({
+    metric: o.metric,
+    label: o.label,
+    auto: o.auto.status === "matched" ? `${o.auto.records[0]!.datasetName} v${o.auto.records[0]!.version} · ${o.auto.records[0]!.period}` : o.auto.reason,
+    autoQuality: o.auto.status === "matched" ? o.auto.quality : null,
+    current: o.override ? { choice: o.override.recordId ?? "none", reason: o.override.reason } : null,
+    options: o.options,
+  }));
   const target = targetSummary(active?.objective);
 
   return (
@@ -71,6 +84,7 @@ export default async function CompanyResultsPage({ params }: { params: Promise<{
             {d.status === "in_review" && d.codeChecksPassed && <ApproveAssessment companyId={company.id} deliverableId={d.id} approve={approveAssessmentAction} />}
           </div>
         )}
+        {active && <BenchmarkChoices companyId={company.id} rows={choices} save={setBenchmarkChoice} />}
       </div>
       {view && active && <AssessmentResults title={active.def.question} data={view} nextUseCase={null} advisory={null} />}
     </div>

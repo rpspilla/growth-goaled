@@ -5,11 +5,11 @@ import { db, schema } from "@/lib/db";
 import type { Company, QaResults, User } from "@/lib/db/schema";
 import { AI_MODEL, aiProblemForStaff, isAiConfigError } from "@/lib/ai/config";
 import { AssessmentDraftError, AssessmentQaError, ASSESSMENT_BRIEFS, draftAssessment, qaAssessment, type AssessmentInput, type AssessmentOutput } from "@/lib/ai/assessment";
-import { matchCohort } from "@/lib/cohort-match";
 import { parseBrief, type BriefContent } from "@/lib/deliverables/assessment";
 import { allowedNumbers, checkDraft, numbersIn, type ClaimForCheck, type CodeCheckResult } from "@/lib/deliverables/checks";
 export { claimsFromAssessment };
 import { claimsFromAssessment, completeness, fallbackAssessment, sanitizeAssessment, systemGaps } from "@/lib/deliverables/assessment-safety";
+import { benchmarkCompany, recordUsage } from "./benchmark-library";
 import { diagnose, KEY_METRICS, type Figure } from "@/lib/diagnostics";
 import { analysisTables, diagnosisInput } from "@/lib/diagnostics/evidence";
 import { track } from "@/lib/events";
@@ -45,6 +45,8 @@ export type AssessmentInputs = {
   analyses: { title: string; rows: string[] }[];
   unknowns: string[];
   reference: BriefContent["reference"];
+  benchmarks: BriefContent["benchmarks"];
+  benchmarkGaps: BriefContent["benchmarkGaps"];
   methodology: string;
   validIds: Set<string>;
   dataPointIds: Set<string>;
@@ -117,47 +119,15 @@ export async function assembleAssessmentInputs(company: Company, useCase: UseCas
     };
   });
 
-  // Approved reference rows from the best-matching cohort, if any. None is a valid outcome.
-  const approved = await db
-    .select({ metric: schema.benchmarkMetrics, cohort: schema.benchmarkCohorts, source: schema.benchmarkSources })
-    .from(schema.benchmarkMetrics)
-    .innerJoin(schema.benchmarkCohorts, eq(schema.benchmarkCohorts.id, schema.benchmarkMetrics.cohortId))
-    .leftJoin(schema.benchmarkSources, eq(schema.benchmarkSources.id, schema.benchmarkMetrics.sourceId))
-    .where(and(eq(schema.benchmarkMetrics.status, "approved"), eq(schema.benchmarkCohorts.isSample, company.isSample), isNotNull(schema.benchmarkMetrics.p75)))
-    .orderBy(desc(schema.benchmarkMetrics.createdAt));
-  const byCohort = new Map<string, { cohort: (typeof approved)[number]["cohort"]; rows: Map<string, (typeof approved)[number]> }>();
-  for (const r of approved) {
-    const entry = byCohort.get(r.cohort.id) ?? { cohort: r.cohort, rows: new Map() };
-    if (!entry.rows.has(r.metric.metric)) entry.rows.set(r.metric.metric, r);
-    byCohort.set(r.cohort.id, entry);
-  }
-  const match = figures.length
-    ? matchCohort(
-        { stage: company.stage, arr: latest.get("arr")?.value ?? company.arr ?? null, revenueBand: company.revenueBand, salesModel: company.salesModel, industry: company.industry, primarySegment: company.primarySegment },
-        [...byCohort.values()].map((c) => ({ id: c.cohort.id, name: c.cohort.name, criteria: c.cohort.criteria, approvedMetrics: [...c.rows.keys()] })),
-        figures.map((f) => f.metric),
-      )
-    : null;
-  const chosen = match ? byCohort.get(match.cohortId) : undefined;
-  const refRows = chosen
-    ? match!.overlap.filter(isMetricKey).flatMap((metric) => {
-        const r = chosen.rows.get(metric);
-        return r && r.metric.p75 != null ? [{ metric, row: r }] : [];
-      })
-    : [];
-  const reference: BriefContent["reference"] = chosen && refRows.length
-    ? {
-        cohortId: chosen.cohort.id,
-        name: chosen.cohort.name,
-        companyCount: chosen.cohort.companyCount,
-        rows: refRows.map((r) => ({ metric: r.metric, benchmarkMetricId: r.row.metric.id })),
-        matched: match!.matched,
-        unmatched: match!.unmatched,
-      }
-    : null;
-  const referenceNote = reference
-    ? `Peer reference: ${reference.name}${reference.companyCount ? ` (${reference.companyCount} companies)` : ""}, approved and cited.${reference.unmatched.length ? ` An imperfect match: not matched on ${reference.unmatched.join("; ")}.` : ""}`
-    : "No approved peer reference data matches this company yet, so this assessment uses the company's own figures, answers and target.";
+  // Benchmarks from the published Benchmark Library: matched and calculated in code. None is a valid outcome.
+  const bench = await benchmarkCompany(
+    company,
+    figures.map((f) => ({ metric: f.metric, value: f.value, period: f.point.period, origin: f.point.origin })),
+  );
+  const strong = bench.comparisons.filter((c) => c.quality === "strong").length;
+  const referenceNote = bench.comparisons.length
+    ? `Benchmarks: ${bench.comparisons.length} comparison${bench.comparisons.length === 1 ? "" : "s"} from the Benchmark Library (${strong} strong, ${bench.comparisons.length - strong} directional), each with its cohort, period and source.${bench.missing.length ? ` No relevant benchmark for ${bench.missing.map((m) => m.label).join(", ")}.` : ""}`
+    : "No sufficiently relevant published benchmark matches this company's figures yet, so this assessment uses the company's own figures, answers and target.";
 
   // Tables computed from their files, newest first, and the rule-based diagnosis over them.
   const files = await db
@@ -203,13 +173,19 @@ export async function assembleAssessmentInputs(company: Company, useCase: UseCas
       sample_size: f.point.calc?.sampleSize ?? null,
     })),
     data_supplied: supplied,
-    reference: refRows.map(({ metric, row: r }) => ({
-      id: r.metric.id,
-      metric,
-      label: METRICS[metric].label,
-      median: r.metric.median != null ? fmt(metric, r.metric.median) : null,
-      top_quartile: fmt(metric, r.metric.p75!),
-      source: r.source ? [r.source.name, r.source.year].filter(Boolean).join(", ") : null,
+    reference: bench.comparisons.map((c) => ({
+      id: c.benchmark.stats[0]!.recordId,
+      metric: c.metric,
+      label: c.label,
+      quality: c.quality,
+      company_value: c.observed.formatted,
+      benchmark_values: c.benchmark.stats.map((s) => `${s.statistic} ${s.formatted}`),
+      difference: c.derived?.formatted ? `${c.derived.formatted} the ${c.derived.versus}` : null,
+      position: c.derived?.position ?? null,
+      cohort: c.benchmark.cohort,
+      period: c.benchmark.period,
+      source: [c.benchmark.source.name, c.benchmark.source.publisher].filter(Boolean).join(", "),
+      limitations: c.limitations,
     })),
     reference_note: referenceNote,
     diagnosis: dx,
@@ -224,16 +200,21 @@ export async function assembleAssessmentInputs(company: Company, useCase: UseCas
   };
   input.completeness = completeness(input);
 
-  const byMetric = new Map(figures.map((f) => [f.metric, f.value]));
-  const comparison = refRows.map(({ metric, row: r }) => ({ company: byMetric.get(metric)!, median: r.metric.median, topQuartile: r.metric.p75, p25: r.metric.p25 }));
   const answerNumbers = answers.flatMap((a) => numbersIn(a.answer).map((n) => n.value));
   const targetNumber = objective.target_value && Number.isFinite(Number(objective.target_value)) ? [Number(objective.target_value)] : [];
-  const allowed = allowedNumbers(comparison, [
+  // Benchmark values and the differences derived from them in code are inputs too.
+  const benchNumbers = bench.comparisons.flatMap((c) => [
+    ...c.benchmark.stats.flatMap((s) => [s.value, s.low, s.high, s.percentile].filter((v): v is number => v !== null)),
+    ...(c.benchmark.sampleSize !== null ? [c.benchmark.sampleSize] : []),
+    ...(c.derived ? [Math.abs(c.derived.difference), ...(c.derived.relativePct !== null ? [Math.abs(c.derived.relativePct)] : [])] : []),
+    ...[c.benchmark.period, c.benchmark.cohort, ...c.limitations, c.interpretation].flatMap((t) => numbersIn(t).map((n) => n.value)),
+  ]);
+  const allowed = allowedNumbers([], [
+    ...benchNumbers,
     ...figures.map((f) => f.value),
     ...answerNumbers,
     ...targetNumber,
     ...HORIZON_DAYS,
-    ...(reference?.companyCount ? [reference.companyCount] : []),
     // Numbers in code-side evidence and tables are inputs too (they were computed, not written by the model).
     ...dx.evidence.flatMap((e) => numbersIn(e.text).map((n) => n.value)),
     ...dx.candidates.flatMap((c) => (c.arr_at_stake ? numbersIn(c.arr_at_stake).map((n) => n.value) : [])),
@@ -241,7 +222,7 @@ export async function assembleAssessmentInputs(company: Company, useCase: UseCas
   ]);
 
   const dataPointIds = new Set(figures.map((f) => f.dataPointId));
-  const benchmarkIds = new Set(refRows.map((r) => r.row.metric.id));
+  const benchmarkIds = new Set(bench.comparisons.flatMap((c) => c.benchmark.stats.map((s) => s.recordId)));
   const answerNotes = new Map(answers.map((a) => [a.id, `Your answer to “${a.question}”: ${a.answer}`]));
   const itemNotes = new Map(supplied.map((s) => [s.id, `${s.item}: ${s.status.replace("_", " ")}${s.files ? `, ${s.files} ${s.files === 1 ? "file" : "files"}` : ""}${s.coverage ? `, ${s.coverage}` : ""}`]));
   const analysisNotes = new Map<string, string>([
@@ -265,7 +246,9 @@ export async function assembleAssessmentInputs(company: Company, useCase: UseCas
     })),
     analyses: tables.map(({ title, rows }) => ({ title, rows })),
     unknowns: dx.unknowns,
-    reference,
+    reference: null,
+    benchmarks: bench.comparisons,
+    benchmarkGaps: bench.missing,
     methodology: `${referenceNote} Figures marked "calculated" were computed in code from your files; others come from your company profile or were read from your documents (unconfirmed ones are marked). The diagnosis is ranked by fixed rules over that evidence; the written brief was checked in code against every input.`,
     validIds: new Set([...dataPointIds, ...benchmarkIds, ...answerNotes.keys(), ...itemNotes.keys(), ...analysisNotes.keys()]),
     dataPointIds,
@@ -279,7 +262,7 @@ export async function assembleAssessmentInputs(company: Company, useCase: UseCas
 
 export function contentFromAssessment(
   useCase: UseCaseId,
-  inputs: Pick<AssessmentInputs, "figures" | "reference" | "methodology" | "input" | "baseline" | "analyses" | "unknowns">,
+  inputs: Pick<AssessmentInputs, "figures" | "reference" | "methodology" | "input" | "baseline" | "analyses" | "unknowns" | "benchmarks" | "benchmarkGaps">,
   out: AssessmentOutput,
   degraded = false,
 ): BriefContent {
@@ -289,6 +272,8 @@ export function contentFromAssessment(
     useCase,
     figures: inputs.figures.map(({ metric, dataPointId }) => ({ metric, dataPointId })),
     reference: inputs.reference,
+    benchmarks: inputs.benchmarks,
+    benchmarkGaps: inputs.benchmarkGaps,
     baseline: inputs.baseline,
     certainty: inputs.input.diagnosis?.certainty ?? null,
     executiveDecision: { decision: out.executive_decision.decision, conclusion: out.executive_decision.conclusion, claimKey: "decision" },
@@ -338,7 +323,7 @@ async function saveClaims(deliverableId: string, claims: ClaimForCheck[], inputs
     const sources: (typeof schema.claimSources.$inferInsert)[] = [];
     for (const id of new Set(c.sources)) {
       if (inputs.dataPointIds.has(id)) sources.push({ claimId: row!.id, kind: "data_point", refId: id });
-      else if (inputs.benchmarkIds.has(id)) sources.push({ claimId: row!.id, kind: "benchmark_metric", refId: id });
+      else if (inputs.benchmarkIds.has(id)) sources.push({ claimId: row!.id, kind: "benchmark_record", refId: id });
       else if (inputs.answerNotes.has(id)) sources.push({ claimId: row!.id, kind: "founder_answer", note: inputs.answerNotes.get(id)! });
       else if (inputs.itemNotes.has(id)) sources.push({ claimId: row!.id, kind: "document", note: inputs.itemNotes.get(id)! });
       else if (inputs.analysisNotes.has(id)) sources.push({ claimId: row!.id, kind: "analysis", note: inputs.analysisNotes.get(id)! });
@@ -468,6 +453,8 @@ export async function runAssessmentPipeline(deliverableId: string, deps: Assessm
   }
 
   await saveClaims(deliverableId, claimsFromAssessment(out), inputs);
+  // Links the report to the exact records it used (usage counts, audit, protection from deletion).
+  await recordUsage(deliverableId, company.id, inputs.benchmarks);
   await db
     .update(schema.agentRuns)
     .set({
@@ -551,6 +538,9 @@ export type ResultsView = {
   executiveDecision: BriefContent["executiveDecision"];
   baseline: BaselineRow[];
   reference: { name: string; companyCount: number | null; matched: string[]; unmatched: string[]; sources: string[] } | null;
+  /** Benchmark comparisons as saved with this version (never re-matched on display). */
+  benchmarks: BriefContent["benchmarks"];
+  benchmarkGaps: BriefContent["benchmarkGaps"];
   diagnosis: BriefContent["diagnosis"];
   evidence: BriefContent["evidence"];
   analyses: BriefContent["analyses"];
@@ -661,6 +651,7 @@ export async function assessmentView(d: Deliverable): Promise<ResultsView | null
     };
   });
 
+  const c_benchmarks = c.benchmarks;
   const describe = (s: typeof schema.claimSources.$inferSelect): SourceView | null => {
     if (s.kind === "data_point") {
       const p = s.refId ? dp.get(s.refId) : undefined;
@@ -681,6 +672,16 @@ export async function assessmentView(d: Deliverable): Promise<ResultsView | null
         kind: "benchmark_metric",
         title: `Peer reference, ${METRICS[m].label}: median ${f(r.metric.median)}, top quartile ${f(r.metric.p75)}`,
         detail: [c.reference?.name, r.source ? [r.source.name, r.source.year].filter(Boolean).join(", ") : null].filter(Boolean).join(" · ") || null,
+      };
+    }
+    if (s.kind === "benchmark_record") {
+      const c = c_benchmarks.find((b) => b.benchmark.stats.some((x) => x.recordId === s.refId));
+      if (!c) return null;
+      const src = c.benchmark.source;
+      return {
+        kind: "benchmark_record",
+        title: `Benchmark, ${c.label}: ${c.benchmark.stats.map((x) => `${x.statistic} ${x.formatted}`).join(", ")}`,
+        detail: [c.benchmark.cohort, c.benchmark.period, [src.name, src.publisher].filter(Boolean).join(", "), `${c.benchmark.dataset.name} v${c.benchmark.dataset.version}`].join(" · "),
       };
     }
     if (s.kind === "founder_answer") return { kind: "founder_answer", title: s.note ?? "Your answer", detail: null };
@@ -719,6 +720,8 @@ export async function assessmentView(d: Deliverable): Promise<ResultsView | null
             sources: [...new Set(usedRefs.flatMap((r) => (r.source ? [[r.source.name, r.source.year].filter(Boolean).join(", ")] : [])))],
           }
         : null,
+    benchmarks: c.benchmarks,
+    benchmarkGaps: c.benchmarkGaps,
     diagnosis: c.diagnosis,
     evidence: c.evidence,
     analyses: c.analyses,

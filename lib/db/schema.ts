@@ -74,6 +74,15 @@ export const registerStatus = pgEnum("register_status", ["open", "resolved", "un
 export const registerOwner = pgEnum("register_owner", ["founder", "advisor"]);
 export const benchmarkSourceType = pgEnum("benchmark_source_type", ["public", "advisory"]);
 export const benchmarkMetricStatus = pgEnum("benchmark_metric_status", ["proposed", "approved", "retired"]);
+// Benchmark Library (dataset versions and records)
+export const benchmarkSourceKind = pgEnum("benchmark_source_kind", ["published_report", "licensed_dataset", "internal_research", "aggregated_customer"]);
+export const benchmarkReliability = pgEnum("benchmark_reliability", ["unverified", "reliable", "use_with_caution", "unreliable"]);
+export const benchmarkVersionStatus = pgEnum("benchmark_version_status", ["draft", "validated", "published", "archived"]);
+export const benchmarkStatistic = pgEnum("benchmark_statistic", ["median", "mean", "percentile", "min", "max", "range"]);
+export const benchmarkValueType = pgEnum("benchmark_value_type", ["percentage", "currency", "ratio", "duration", "count", "other"]);
+export const benchmarkUnit = pgEnum("benchmark_unit", ["percent", "usd", "ratio", "days", "months", "count", "other"]);
+export const benchmarkPeriodBasis = pgEnum("benchmark_period_basis", ["annual", "trailing_12_months", "quarterly", "monthly", "point_in_time", "other"]);
+export const benchmarkImportStatus = pgEnum("benchmark_import_status", ["committed", "failed"]);
 export const deliverableType = pgEnum("deliverable_type", ["benchmark", "baseline", "icp", "channels", "hiring"]);
 export const deliverableStatus = pgEnum("deliverable_status", [
   "drafting",
@@ -84,7 +93,7 @@ export const deliverableStatus = pgEnum("deliverable_status", [
   "published",
   "failed",
 ]);
-export const claimSourceKind = pgEnum("claim_source_kind", ["data_point", "benchmark_metric", "document", "methodology", "founder_answer", "analysis"]);
+export const claimSourceKind = pgEnum("claim_source_kind", ["data_point", "benchmark_metric", "document", "methodology", "founder_answer", "analysis", "benchmark_record"]);
 export const agentKind = pgEnum("agent_kind", ["draft", "qa", "extract", "research", "sort"]);
 export const agentRunStatus = pgEnum("agent_run_status", ["running", "succeeded", "failed"]);
 export const reviewDecision = pgEnum("review_decision", ["approve", "request_changes", "send_back"]);
@@ -373,6 +382,23 @@ export const benchmarkSources = pgTable("benchmark_sources", {
   licenceNote: text("licence_note"),
   importedBy: uuid("imported_by").references(() => users.id, { onDelete: "set null" }),
   notes: text("notes"),
+  // Benchmark Library provenance and licensing (legacy cohort rows use `type` above)
+  kind: benchmarkSourceKind("kind").notNull().default("published_report"),
+  documentRef: text("document_ref"),
+  publishedOn: date("published_on"),
+  collectionPeriod: text("collection_period"),
+  attribution: text("attribution"),
+  // Licence terms: off until an admin confirms the licence allows it
+  allowCustomerDisplay: boolean("allow_customer_display").notNull().default(false),
+  allowDerived: boolean("allow_derived").notNull().default(false),
+  reliability: benchmarkReliability("reliability").notNull().default("unverified"),
+  lastVerifiedAt: timestamp("last_verified_at", { withTimezone: true }),
+  // How often the publisher updates it, and when datasets from it are due for review
+  updateFrequency: text("update_frequency"),
+  reviewIntervalDays: integer("review_interval_days"),
+  // Required for aggregated customer data before any dataset from it can be published
+  consentReference: text("consent_reference"),
+  minAggregationSize: integer("min_aggregation_size"),
   ...timestamps,
 });
 
@@ -416,6 +442,166 @@ export const benchmarkMetrics = pgTable(
     ...timestamps,
   },
   (t) => [index("benchmark_metrics_cohort_status_idx").on(t.cohortId, t.status)],
+);
+
+// Benchmark Library: source → dataset → immutable published versions → records
+
+export const benchmarkDatasets = pgTable(
+  "benchmark_datasets",
+  {
+    id: id(),
+    name: text("name").notNull(),
+    description: text("description"),
+    sourceId: uuid("source_id")
+      .notNull()
+      .references(() => benchmarkSources.id, { onDelete: "restrict" }),
+    companyTypes: text("company_types").array().notNull().default(sql`'{}'::text[]`),
+    businessModels: text("business_models").array().notNull().default(sql`'{}'::text[]`),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("benchmark_datasets_name_idx").on(sql`lower(${t.name})`)],
+);
+
+export type BenchmarkVersionEvent = { at: string; by: string | null; action: string; note?: string };
+
+export const benchmarkDatasetVersions = pgTable(
+  "benchmark_dataset_versions",
+  {
+    id: id(),
+    datasetId: uuid("dataset_id")
+      .notNull()
+      .references(() => benchmarkDatasets.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    status: benchmarkVersionStatus("status").notNull().default("draft"),
+    effectiveDate: date("effective_date"),
+    publishedOn: date("published_on"),
+    changeNote: text("change_note"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    publishedBy: uuid("published_by").references(() => users.id, { onDelete: "set null" }),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    lastReviewedAt: timestamp("last_reviewed_at", { withTimezone: true }),
+    reviewedBy: uuid("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+    history: jsonb("history").$type<BenchmarkVersionEvent[]>().notNull().default([]),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("benchmark_versions_dataset_version_idx").on(t.datasetId, t.version), index("benchmark_versions_status_idx").on(t.status)],
+);
+
+export const benchmarkRecords = pgTable(
+  "benchmark_records",
+  {
+    id: id(),
+    versionId: uuid("version_id")
+      .notNull()
+      .references(() => benchmarkDatasetVersions.id, { onDelete: "cascade" }),
+    // A Growth Goaled metric key when it maps to one; otherwise the source's own identifier
+    metric: text("metric").notNull(),
+    displayName: text("display_name").notNull(),
+    definition: text("definition").notNull(),
+    // The admin confirmed the source's definition matches Growth Goaled's for this metric
+    definitionMatches: boolean("definition_matches").notNull().default(false),
+    unit: benchmarkUnit("unit").notNull(),
+    valueType: benchmarkValueType("value_type").notNull(),
+    statistic: benchmarkStatistic("statistic").notNull(),
+    percentile: integer("percentile"),
+    value: numeric("value", { mode: "number" }),
+    valueLow: numeric("value_low", { mode: "number" }),
+    valueHigh: numeric("value_high", { mode: "number" }),
+    stages: text("stages").array().notNull().default(sql`'{}'::text[]`),
+    arrMin: numeric("arr_min", { mode: "number" }),
+    arrMax: numeric("arr_max", { mode: "number" }),
+    industry: text("industry"),
+    businessModel: text("business_model"),
+    pricingModel: text("pricing_model"),
+    customerSegment: text("customer_segment"),
+    acvMin: numeric("acv_min", { mode: "number" }),
+    acvMax: numeric("acv_max", { mode: "number" }),
+    geography: text("geography"),
+    period: text("period").notNull(),
+    periodBasis: benchmarkPeriodBasis("period_basis").notNull(),
+    cohortDefinition: text("cohort_definition"),
+    sampleSize: integer("sample_size"),
+    methodology: text("methodology"),
+    limitations: text("limitations"),
+    // Same metric, statistic, cohort and period in one version
+    dedupeKey: text("dedupe_key").notNull(),
+    importId: uuid("import_id"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("benchmark_records_dedupe_idx").on(t.versionId, t.dedupeKey), index("benchmark_records_metric_idx").on(t.metric)],
+);
+
+export type BenchmarkImportError = { line: number; field?: string; message: string };
+
+export const benchmarkImports = pgTable(
+  "benchmark_imports",
+  {
+    id: id(),
+    datasetId: uuid("dataset_id")
+      .notNull()
+      .references(() => benchmarkDatasets.id, { onDelete: "cascade" }),
+    versionId: uuid("version_id").references(() => benchmarkDatasetVersions.id, { onDelete: "set null" }),
+    filename: text("filename").notNull(),
+    // Private Blob copy of the uploaded file, when storage is configured
+    blobUrl: text("blob_url"),
+    contentHash: text("content_hash").notNull(),
+    columnMap: jsonb("column_map").$type<Record<string, string>>().notNull().default({}),
+    status: benchmarkImportStatus("status").notNull(),
+    rowsTotal: integer("rows_total").notNull().default(0),
+    rowsAccepted: integer("rows_accepted").notNull().default(0),
+    rowsRejected: integer("rows_rejected").notNull().default(0),
+    rowsSkipped: integer("rows_skipped").notNull().default(0),
+    errors: jsonb("errors").$type<BenchmarkImportError[]>().notNull().default([]),
+    importedBy: uuid("imported_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("benchmark_imports_dataset_idx").on(t.datasetId)],
+);
+
+/** Which records a report used: makes usage visible and keeps reports auditable. */
+export const benchmarkUsages = pgTable(
+  "benchmark_usages",
+  {
+    id: id(),
+    deliverableId: uuid("deliverable_id")
+      .notNull()
+      .references(() => deliverables.id, { onDelete: "cascade" }),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    recordId: uuid("record_id")
+      .notNull()
+      .references(() => benchmarkRecords.id, { onDelete: "restrict" }),
+    versionId: uuid("version_id")
+      .notNull()
+      .references(() => benchmarkDatasetVersions.id, { onDelete: "restrict" }),
+    metric: text("metric").notNull(),
+    selection: text("selection").notNull(),
+    quality: text("quality").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("benchmark_usages_version_idx").on(t.versionId), uniqueIndex("benchmark_usages_deliverable_record_idx").on(t.deliverableId, t.recordId)],
+);
+
+/** An advisor's explicit choice for one company and metric: a record to use, or none (null). */
+export const benchmarkOverrides = pgTable(
+  "benchmark_overrides",
+  {
+    id: id(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    metric: text("metric").notNull(),
+    recordId: uuid("record_id").references(() => benchmarkRecords.id, { onDelete: "cascade" }),
+    reason: text("reason").notNull(),
+    setBy: uuid("set_by").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("benchmark_overrides_company_metric_idx").on(t.companyId, t.metric)],
 );
 
 export type RubricCriterion = {

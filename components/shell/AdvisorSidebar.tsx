@@ -8,7 +8,7 @@ const ADVISOR_NAV = [
   { href: "/advisor/portfolio", label: "Portfolio" },
   { href: "/advisor/unassigned", label: "Unassigned", badgeKey: "unassigned" },
   { href: "/advisor/review", label: "Review Queue", badgeKey: "review" },
-  { href: "/advisor/benchmarks", label: "Benchmarks" },
+  { href: "/advisor/benchmark-library", label: "Benchmark Library" },
   { href: "/advisor/rubrics", label: "Score Rubrics" },
   { href: "/advisor/registers", label: "Registers" },
   { href: "/advisor/settings", label: "Settings" },

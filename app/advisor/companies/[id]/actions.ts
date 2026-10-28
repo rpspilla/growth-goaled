@@ -10,6 +10,7 @@ import { activateWithoutPayment } from "@/lib/data/use-cases";
 import { approveAssessment } from "@/lib/data/assessments";
 import { getDeliverable } from "@/lib/data/deliverables";
 import { isUseCaseId } from "@/lib/use-cases";
+import { clearOverride, setOverride } from "@/lib/data/benchmark-library";
 
 async function managed(companyId: string) {
   const user = await requireRole(["advisor", "admin"]);
@@ -73,4 +74,19 @@ export async function approveAssessmentAction(companyId: string, deliverableId: 
   refresh(companyId);
   revalidatePath("/", "layout");
   return { ok: true };
+}
+
+/**
+ * An advisor's benchmark choice for one metric of one of their companies: "auto" (the matching
+ * service decides), "none" (don't benchmark it), or a published record id. Used from the next brief on.
+ */
+export async function setBenchmarkChoice(companyId: string, metric: string, choice: string, reason: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const ctx = await managed(companyId);
+  if (!ctx) return { ok: false, error: "Not allowed." };
+  const r =
+    choice === "auto"
+      ? await clearOverride(ctx.user, ctx.company, metric)
+      : await setOverride(ctx.user, ctx.company, metric, choice === "none" ? null : z.uuid().parse(choice), z.string().max(1000).parse(reason));
+  if (r.ok) refresh(companyId);
+  return r;
 }

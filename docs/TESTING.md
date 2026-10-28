@@ -97,7 +97,23 @@ Use two browsers (or a private window): one signed in as **admin** (ryan@growthg
 - [ ] "Enter the correct value", "Answer", "Use uploaded data", "Mark as unknown" each close an item and show in Answered
 - [ ] Admin `/advisor/registers`: filters work; add an item "Ask the founder" → founder sees it immediately; reopen a closed item
 
-## Benchmark library (M7)
+## Benchmark Library
+- [ ] Sidebar shows **Benchmark Library**; as an advisor it's read only (no New dataset, no import); `/advisor/benchmark-library/new` sends advisors back to Portfolio; founders can't open it
+- [ ] Sources → Add a source: publisher, URL, dates, type, reliability, attribution; customer display and derived figures start unticked. Choosing "Aggregated customer data" asks for consent reference and minimum cohort size, and saving without them fails
+- [ ] New dataset → choose the source → lands on the dataset as draft version 1
+- [ ] Download the CSV template; importing it unchanged rejects both PLACEHOLDER rows
+- [ ] Import a real CSV: column mapping is filled in; rename a header and map it by hand; preview lists every row (Will import / Rejected with the reason / Skipped); "Import N to draft version 1"; import the same file again → nothing added, the import log shows it as failed with skipped rows
+- [ ] Bad data is caught with readable errors: unit "dollars", percentile 150, NRR 1200, 0.95 for a percentage (warning), value_low above value_high, stage "Series Z", a 75th percentile below the median (on Validate)
+- [ ] Add a record by hand; edit it; remove it (drafts only)
+- [ ] Validate → Publish (optional effective date). Published records can't be edited; "New version" makes draft v2 with the same records; change a value, validate, publish → v1 shows Archived, v2 Published
+- [ ] Customer preview: pick a cohort, type a value → the same card founders see (Observed / Benchmark / Derived / Interpretation, source, limitations)
+- [ ] Untick "customer display" on the source → a new brief says no benchmark is available because of the licence; untick "derived figures" → the card shows values side by side without a gap
+- [ ] Founder with matching stage/ARR runs an assessment → Results section 2 shows the comparison with the dataset name and version; a Seed company doesn't get a Series A cohort; a metric with no benchmark is listed with the reason
+- [ ] The dataset's "Used in reports" lists the company, brief version and dataset version; publish v2 and the founder's existing brief still shows v1's values
+- [ ] Admin → company → Results: "Benchmarks for this company" shows the automatic match per metric; set "Don't benchmark this metric" with a reason → the next brief lists it as an advisor choice
+- [ ] Overview: counts, metrics missing cohorts, records awaiting review, drafts with errors; set a source's review interval to 7 days and backdate nothing → after 7 days the dataset shows "Due for review" and "Mark reviewed" clears it
+
+## Legacy cohort benchmarks (M7)
 - [ ] Create a cohort (stages, ARR 2M / 10M style input, model, GTM motion); edit it
 - [ ] Download the CSV template, fill a few rows, import → rows appear as Proposed; bad rows listed by line
 - [ ] Approve a row, approve a second row for the same metric/period → first is retired automatically

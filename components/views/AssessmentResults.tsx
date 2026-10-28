@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { SourceTrailPanel } from "@/components/SourceTrailPanel";
+import { BenchmarkComparisons } from "@/components/benchmarks/BenchmarkComparisonCard";
 import type { ResultsView } from "@/lib/data/assessments";
 
 const card = { background: "var(--card)", borderColor: "var(--border)" };
@@ -205,10 +206,11 @@ export function AssessmentResults({
               {data.reference.sources.length ? `; source: ${data.reference.sources.join("; ")}` : ""}. Approved, cited reference data only.
               {data.reference.unmatched.length > 0 && ` An imperfect match: it doesn't match your company on ${data.reference.unmatched.join("; ")}, so treat the comparison as indicative.`}
             </>
-          ) : (
-            "No approved peer reference data matches your company yet, so this brief judges your figures against your own trend and target, not peers."
+          ) : data.benchmarks.length ? null : (
+            "No sufficiently relevant published benchmark matches your company yet, so this brief judges your figures against your own trend and target, not peers."
           )}
         </p>
+        <BenchmarkComparisons comparisons={data.benchmarks} gaps={data.benchmarkGaps} />
       </Section>
 
       <Section n={3} title="Diagnosis">

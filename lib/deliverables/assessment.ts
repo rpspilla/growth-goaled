@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { METRICS, type MetricKey } from "@/lib/metrics";
 import { USE_CASE_IDS } from "@/lib/use-cases/types";
+import type { BenchmarkComparison } from "@/lib/benchmark-library/compare";
 
 const metricKey = z.enum(Object.keys(METRICS) as [MetricKey, ...MetricKey[]]);
 const claimKey = z.string().min(1);
@@ -29,6 +30,13 @@ const shared = {
   completeness: z.enum(["complete", "partial", "minimal"]).default("partial"),
   /** True when the model couldn't produce a brief and a plain one was built from the inputs. */
   degraded: z.boolean().default(false),
+  /**
+   * Benchmark comparisons as calculated when the brief was built, with the dataset version and
+   * record ids used. Rendered from this copy, so a later dataset version never changes the report.
+   */
+  benchmarks: z.array(z.custom<BenchmarkComparison>((v) => typeof v === "object" && v !== null && "metric" in v && "benchmark" in v)).default([]),
+  /** Metrics the brief compared none for, and why (no relevant benchmark, advisor choice…). */
+  benchmarkGaps: z.array(z.object({ metric: z.string(), label: z.string(), reason: z.string() })).default([]),
 };
 
 /**
@@ -118,6 +126,8 @@ export function parseBrief(content: unknown): BriefContent | null {
     systemGaps: c.systemGaps,
     completeness: c.completeness,
     degraded: c.degraded,
+    benchmarks: c.benchmarks,
+    benchmarkGaps: c.benchmarkGaps,
     baseline: [],
     certainty: null,
     executiveDecision: { decision: c.summary.headline, conclusion: c.summary.body, claimKey: c.summary.claimKey },

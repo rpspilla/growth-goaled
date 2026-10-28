@@ -42,7 +42,7 @@ export function fakeAssessment(input: AssessmentInput): AssessmentOutput {
   const item = input.data_supplied[0];
   const cite = [fig?.id, ref?.id, answer?.id, item?.id].filter((x): x is string => Boolean(x));
   const top = input.diagnosis?.candidates[0];
-  const figText = fig ? `${fig.label} is ${fig.value}${ref ? ` against a peer top quartile of ${ref.top_quartile}` : ""}.` : "We worked from your answers and the data you shared.";
+  const figText = fig ? `${fig.label} is ${fig.value}${ref ? ` against a benchmark ${ref.benchmark_values[0]}` : ""}.` : "We worked from your answers and the data you shared.";
   const tracked = input.figures.find((f) => input.trackable_metrics?.includes(f.metric));
   return {
     executive_decision: { decision: `Test mode brief: ${input.use_case.question}`, conclusion: `${figText} ${input.reference_note}`, sources: cite },

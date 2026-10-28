@@ -32,7 +32,7 @@ beforeAll(async () => {
 }, 60_000);
 
 beforeEach(async () => {
-  for (const t of [schema.dataItems, schema.claimSources, schema.claims, schema.reviews, schema.agentRuns, schema.deliverables, schema.companyUseCases, schema.dataPoints, schema.benchmarkMetrics, schema.benchmarkSources, schema.benchmarkCohorts, schema.events, schema.companies, schema.users]) await db().delete(t);
+  for (const t of [schema.benchmarkUsages, schema.benchmarkOverrides, schema.benchmarkImports, schema.benchmarkRecords, schema.benchmarkDatasetVersions, schema.benchmarkDatasets, schema.dataItems, schema.claimSources, schema.claims, schema.reviews, schema.agentRuns, schema.deliverables, schema.companyUseCases, schema.dataPoints, schema.benchmarkMetrics, schema.benchmarkSources, schema.benchmarkCohorts, schema.events, schema.companies, schema.users]) await db().delete(t);
   [founder, advisor] = (await db()
     .insert(schema.users)
     .values([
@@ -98,7 +98,7 @@ describe("assessment engine", () => {
     );
     expect(inputs.input.data_supplied[0]).toMatchObject({ id: "item:roster", priority: "required" });
     expect(inputs.input.reference).toEqual([]);
-    expect(inputs.input.reference_note).toMatch(/No approved peer reference data/);
+    expect(inputs.input.reference_note).toMatch(/No sufficiently relevant published benchmark/);
     expect(inputs.allowed).toEqual(expect.arrayContaining([18, 3, 300000, 90]));
   });
 
@@ -214,21 +214,36 @@ describe("assessment engine", () => {
     expect(state.view.advisor).toBe("monthly");
   });
 
-  it("uses approved reference rows when a cohort matches", async () => {
+  it("compares with published Benchmark Library records that fit, and keeps the version and record ids", async () => {
     await activateUseCase(co.id, "hire_or_fix", { activation: "paid", by: founder.id });
-    const [src] = await db().insert(schema.benchmarkSources).values({ name: "Survey", type: "public" }).returning();
-    const [cohort] = await db().insert(schema.benchmarkCohorts).values({ name: "Seed founder-led", criteria: { stage: ["Seed"] }, companyCount: 30 }).returning();
-    const [row] = await db().insert(schema.benchmarkMetrics).values({ cohortId: cohort!.id, metric: "win_rate", median: 21, p75: 27, sourceId: src!.id, status: "approved" }).returning();
-    const inputs = await assembleAssessmentInputs(co, hire);
-    expect(inputs.input.reference).toEqual([expect.objectContaining({ id: row!.id, metric: "win_rate", median: "21%", top_quartile: "27%" })]);
-    expect(inputs.allowed).toEqual(expect.arrayContaining([21, 27, 30]));
+    const [admin] = (await db().insert(schema.users).values({ email: "admin@gg.test", authUserId: "adm", role: "admin" }).returning()) as [User];
+    const lib = await import("@/lib/data/benchmark-library");
+    const src = await lib.saveSource(admin, { name: "Survey", publisher: "Test Publisher", url: null, documentRef: null, publishedOn: "2026-01-01", collectionPeriod: null, kind: "published_report", attribution: null, licenceNote: null, allowCustomerDisplay: true, allowDerived: true, reliability: "reliable", updateFrequency: null, reviewIntervalDays: null, consentReference: null, minAggregationSize: null, notes: null });
+    if (!src.ok) throw new Error(src.error);
+    const ds = await lib.createDataset(admin, { name: "Seed win rates", description: null, sourceId: src.id, companyTypes: [], businessModels: [] });
+    if (!ds.ok) throw new Error(ds.error);
+    // Test fixture values, not real benchmarks.
+    const csv = "metric,definition,definition_matches,unit,statistic,percentile,value,stages,period,period_basis,cohort_definition,sample_size\nwin_rate,Won ÷ closed,yes,percent,median,,21,Seed,FY2025,annual,Seed companies,30\nwin_rate,Won ÷ closed,yes,percent,percentile,75,27,Seed,FY2025,annual,Seed companies,30\n";
+    expect(await lib.commitImport(admin, ds.id, { filename: "w.csv", text: csv }, undefined)).toMatchObject({ ok: true, accepted: 2 });
+    await lib.validateVersion(admin, ds.versionId);
+    expect(await lib.publishVersion(admin, ds.versionId, null)).toEqual({ ok: true });
 
+    const inputs = await assembleAssessmentInputs(co, hire);
+    expect(inputs.input.reference).toEqual([expect.objectContaining({ metric: "win_rate", quality: "strong", benchmark_values: ["median 21%", "75th percentile 27%"], difference: "3 pts below the median" })]);
+    expect(inputs.input.reference_note).toMatch(/1 comparison from the Benchmark Library/);
+    expect(inputs.allowed).toEqual(expect.arrayContaining([21, 27, 30, 3]));
+
+    const cites = async (i: AssessmentInput) => {
+      const d = await goodDraft(i);
+      d.output.evidence.push({ text: `Win rate is 3 pts below the cohort median of 21%.`, status: "calculated", bearing: "supports", sources: [i.reference[0]!.id] });
+      return d;
+    };
     const v = (await createAssessmentVersion(co, "hire_or_fix"))!;
-    await runAssessmentPipeline(v.id, { draft: goodDraft, qa });
+    await runAssessmentPipeline(v.id, { draft: cites, qa });
     const state = await founderAssessment(co.id, "hire_or_fix");
     if (state.state !== "ready") throw new Error("expected ready");
-    expect(state.view.reference).toMatchObject({ name: "Seed founder-led", companyCount: 30 });
-    expect(state.view.baseline.find((e) => e.label === "Win Rate")).toMatchObject({ median: "21%", topQuartile: "27%" });
-    expect(state.view.reference).toMatchObject({ sources: ["Survey"] });
+    expect(state.view.benchmarks).toEqual([expect.objectContaining({ metric: "win_rate", benchmark: expect.objectContaining({ dataset: expect.objectContaining({ name: "Seed win rates", version: 1, versionId: ds.versionId }) }) })]);
+    expect(state.view.claims["evidence.2"]!.sources.map((s) => s.kind)).toContain("benchmark_record");
+    expect((await lib.getDataset(ds.id))!.usage).toEqual([expect.objectContaining({ company: "Hire Co", useCase: "hire_or_fix", metrics: ["win_rate"] })]);
   });
 });

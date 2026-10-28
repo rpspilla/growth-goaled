@@ -2,6 +2,7 @@
 
 const KIND_LABEL: Record<string, string> = {
   data_point: "Company data",
+  benchmark_record: "Benchmark",
   benchmark_metric: "Benchmark",
   document: "Data you shared",
   founder_answer: "Your answer",

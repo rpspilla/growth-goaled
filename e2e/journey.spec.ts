@@ -63,28 +63,53 @@ async function fillSection(page: Page) {
 }
 
 test("founder: free snapshot, $149 assessment, results, optional advisory", async ({ browser }) => {
-  // --- Advisor: a cohort with approved benchmark rows ---
+  // The longest journey: it also builds a Benchmark Library dataset, and dev mode compiles each page on first visit.
+  test.setTimeout(480_000);
+  // --- Admin: a Benchmark Library dataset (source → dataset → CSV preview → import → validate → publish) ---
+  // Test fixture values, not real benchmarks.
   const admin = await as(browser, ADMIN);
-  await admin.page.goto("/advisor/benchmarks");
-  await admin.page.locator("form", { hasText: "New cohort" }).getByLabel("Name").fill("E2E Series A founder-led");
-  await admin.page.getByLabel("Stages (comma separated)").fill("Series A");
-  await admin.page.getByLabel("ARR min").fill("2M");
-  await admin.page.getByLabel("ARR max").fill("10M");
-  await admin.page.getByLabel("GTM motion").fill("Founder-led");
-  await admin.page.getByRole("button", { name: "Create cohort" }).click();
-  await expect(admin.page).toHaveURL(/cohort=/);
-  await admin.page.locator('input[type=file][name=file]').setInputFiles({
+  await admin.page.goto("/advisor/benchmark-library");
+  await expect(admin.page.getByRole("heading", { name: "Benchmark Library" })).toBeVisible();
+  await admin.page.getByRole("link", { name: /^Sources/ }).click();
+  await admin.page.getByRole("link", { name: "Add a source" }).click();
+  await admin.page.getByLabel("Source name").fill("E2E advisory survey");
+  await admin.page.getByLabel("Publisher").fill("E2E Research");
+  await admin.page.getByLabel("Publication date").fill("2026-01-15");
+  await admin.page.getByLabel("Reliability").selectOption("reliable");
+  await admin.page.getByLabel(/allows showing these values in customer reports/).check();
+  await admin.page.getByLabel(/allows derived figures/).check();
+  await admin.page.getByRole("button", { name: "Add source" }).click();
+  await expect(admin.page.getByRole("article").filter({ hasText: "E2E advisory survey" })).toContainText("Customer display: allowed");
+
+  await admin.page.goto("/advisor/benchmark-library/new");
+  await admin.page.getByLabel("Dataset name").fill("E2E Series A retention");
+  await admin.page.locator('select[name="sourceId"]').selectOption({ label: "E2E advisory survey · E2E Research" });
+  await admin.page.getByRole("button", { name: "Create dataset" }).click();
+  await expect(admin.page.getByRole("heading", { name: "E2E Series A retention" })).toBeVisible();
+  await admin.page.getByRole("link", { name: "Import CSV" }).click();
+  await admin.page.getByLabel("CSV file").setInputFiles({
     name: "bench.csv",
     mimeType: "text/csv",
-    buffer: Buffer.from("metric,p25,median,top_quartile,sample_size,period\narr_growth,35,58,89,40,2026\nnrr,95,104,119,40,2026\nacv,20000,35000,60000,40,2026\n"),
+    buffer: Buffer.from(
+      "metric,definition,definition_matches,unit,statistic,percentile,value,stages,arr_min,arr_max,period,period_basis,cohort_definition,sample_size\n" +
+        "nrr,ARR from customers a year ago ÷ their ARR then,yes,percent,median,,104,Series A,2M,10M,FY2025,annual,E2E Series A cohort,40\n" +
+        "nrr,ARR from customers a year ago ÷ their ARR then,yes,percent,percentile,75,119,Series A,2M,10M,FY2025,annual,E2E Series A cohort,40\n" +
+        "nrr,ARR from customers a year ago ÷ their ARR then,yes,dollars,median,,90,Series A,2M,10M,FY2024,annual,E2E Series A cohort,40\n",
+    ),
   });
-  await admin.page.getByPlaceholder("Source name, e.g. Portfolio survey Q3 2026").fill("E2E advisory survey");
-  await admin.page.getByRole("button", { name: "Import as proposed" }).click();
-  await expect(admin.page.getByText("Imported 3 rows as proposed")).toBeVisible();
-  for (let i = 0; i < 3; i++) {
-    await admin.page.getByRole("button", { name: "Approve", exact: true }).first().click();
-    await expect(admin.page.getByRole("heading", { name: /Approved \(used by agents\) · /i })).toContainText(String(i + 1));
-  }
+  await admin.page.getByRole("button", { name: "Preview" }).click();
+  await expect(admin.page.getByText("3 rows: 2 will be imported, 1 rejected")).toBeVisible();
+  await expect(admin.page.getByText(/Unknown unit "dollars"/)).toBeVisible();
+  await admin.page.getByRole("button", { name: /^Import 2 to draft version 1/ }).click();
+  await admin.page.getByRole("link", { name: "Review the draft →" }).click();
+  await expect(admin.page.getByText("No validation errors.")).toBeVisible();
+  await admin.page.getByRole("button", { name: "Validate" }).click();
+  await expect(admin.page.getByText("Validated: ready to publish.")).toBeVisible();
+  await admin.page.getByRole("button", { name: "Publish", exact: true }).click();
+  await expect(admin.page.getByText("Version 1 published")).toBeVisible();
+  // The customer preview uses the same card as reports.
+  await admin.page.getByPlaceholder("e.g. 94").fill("94");
+  await expect(admin.page.getByRole("article", { name: "NRR benchmark comparison" })).toContainText("10 pts below");
 
   // --- Founder: sign up and company profile ---
   const founder = await as(browser, FOUNDER);
@@ -202,7 +227,13 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   }
   await expect(founder.page.getByText(/every statement was checked against your inputs/)).toBeVisible();
   await expect(founder.page.getByText("Test mode brief: Where is our growth leaking?")).toBeVisible();
-  await expect(founder.page.getByText(/^Peer reference: E2E Series A founder-led.*Approved, cited reference data only\./)).toBeVisible();
+  // Benchmark comparison from the library: observed, benchmark, derived and interpretation, with the source.
+  const nrrCard = founder.page.getByRole("article", { name: "NRR benchmark comparison" });
+  await expect(nrrCard).toContainText("Observed");
+  await expect(nrrCard).toContainText("median 104%");
+  await expect(nrrCard).toContainText("10 pts below");
+  await expect(nrrCard).toContainText("E2E advisory survey");
+  await expect(nrrCard).toContainText("E2E Series A retention, version 1");
   await expect(founder.page.getByText(/Should we hire more salespeople/)).toBeVisible();
   await founder.page.getByRole("button", { name: "Evidence →" }).first().click();
   await expect(founder.page.getByRole("dialog", { name: "Sources" })).toContainText("Checked in code against your inputs.");
