@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
-import { PeerComparisonCard } from "@/components/use-cases/PeerComparisonCard";
+import { PeerComparisons } from "@/components/use-cases/PeerComparisons";
 import { PurchaseButton } from "@/components/use-cases/PurchaseButton";
 import { founderContext } from "@/lib/data/founder-context";
 import { getIntakeAnswers } from "@/lib/data/intake";
@@ -92,15 +92,7 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
             </ul>
           </section>
 
-          <section aria-labelledby="peers">
-            <h2 id="peers" className="text-xl sm:text-2xl font-semibold" style={{ color: "var(--foreground)" }}>How you compare with peers</h2>
-            <p className="text-base mt-1 mb-4" style={{ color: "var(--muted-foreground)" }}>
-              Growth, retention and revenue against companies in your industry founded around the same time, from the same sources for every Snapshot. Where no data fits yet, we say so and show Growth Goaled's standard reference instead, labelled as an assumption. The band shows the bottom to top quartile; the line is the median.
-            </p>
-            <div className="space-y-4">
-              {peers.map((c) => <PeerComparisonCard key={c.key} c={c} />)}
-            </div>
-          </section>
+          <PeerComparisons peers={peers} />
 
           <section className="surface surface-pad" style={{ borderColor: snapshot.fit.good ? undefined : "var(--blue)" }} aria-labelledby="fit">
             <h2 id="fit" className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>Is this the right question?</h2>

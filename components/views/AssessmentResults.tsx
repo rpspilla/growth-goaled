@@ -66,6 +66,7 @@ export function AssessmentResults({
   reviewHref,
   figures,
   commit,
+  peers,
   onSourceTrail,
 }: {
   title: string;
@@ -81,6 +82,8 @@ export function AssessmentResults({
   figures?: ReactNode;
   /** "Commit to this plan" (or where it's tracked), shown with the plan. */
   commit?: ReactNode;
+  /** Growth, retention and revenue against peers (or the standard reference), shown with the evidence. */
+  peers?: ReactNode;
   onSourceTrail?: (claimKey: string) => void;
 }) {
   const [openClaim, setOpenClaimState] = useState<string | null>(null);
@@ -237,6 +240,7 @@ export function AssessmentResults({
         ) : (
           <p className="text-sm" style={muted}>No sufficiently relevant published benchmark matches your company yet, so this judges your figures against your own trend and target, not peers.</p>
         )}
+        {peers}
         {figures}
       </Block>
 

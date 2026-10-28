@@ -11,6 +11,9 @@ import { BenchmarkChoices, type ChoiceRow } from "@/components/benchmark-library
 import { benchmarkOptions, companyFigures } from "@/lib/data/benchmark-library";
 import { KEY_METRICS } from "@/lib/diagnostics";
 import { companyContext } from "../context";
+import { getIntakeAnswers } from "@/lib/data/intake";
+import { snapshotPeers } from "@/lib/data/peers";
+import { PeerComparisons } from "@/components/use-cases/PeerComparisons";
 
 const card = { background: "var(--card)", borderColor: "var(--border)" };
 const STATE: Record<string, string> = {
@@ -92,7 +95,15 @@ export default async function CompanyResultsPage({ params }: { params: Promise<{
           <div className="border-t pt-4 label" style={{ borderColor: "var(--border)" }}>What the founder sees</div>
         </div>
       )}
-      {view && active && <AssessmentResults title={active.def.question} data={view} nextUseCase={null} advisory={null} />}
+      {view && active && (
+        <AssessmentResults
+          title={active.def.question}
+          data={view}
+          nextUseCase={null}
+          advisory={null}
+          peers={<PeerComparisons key="peers" level={3} peers={await snapshotPeers(company, await getIntakeAnswers(company))} />}
+        />
+      )}
     </div>
   );
 }

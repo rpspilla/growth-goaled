@@ -38,6 +38,7 @@ import {
 } from "@/lib/data/benchmark-library";
 import type { RawRecord } from "@/lib/benchmark-library/records";
 import { ensureStandardReference } from "@/lib/benchmark-library/ensure-reference";
+import { snapshotPeers } from "@/lib/data/peers";
 
 type DB = typeof import("@/lib/db").db;
 const db = () => h.db as unknown as DB;
@@ -252,6 +253,15 @@ describe("assessment retrieval", () => {
     // An advisor's "don't benchmark this" also rules out the reference.
     await setOverride(advisor, co, "arr_growth", null, "Not comparable");
     expect((await benchmarkCompany(co, growth)).comparisons).toEqual([]);
+  });
+
+  it("gives every Snapshot growth, churn and revenue comparisons from the standard reference when no peer data fits", async () => {
+    await ensureStandardReference(db() as never);
+    const answers = { "company.stage": "Seed", "company.founded_year": "2024", "company.industry": "HealthTech", "company.growth_range": "50–100%", "customers.gross_retention_range": "5–10%" };
+    const [growth, retention, revenue] = await snapshotPeers({ industry: null, revenueBand: "1m_3m", isSample: false, stage: null }, answers);
+    expect(growth).toMatchObject({ status: "reference", reference: { top: { formatted: "80–120%" } }, position: "Between the median and the top quartile" });
+    expect(retention).toMatchObject({ status: "reference", metric: "grr", reference: { median: { formatted: "10–12%" } }, company: { text: "5–10%" } });
+    expect(revenue).toMatchObject({ status: "trajectory", target: "reach $3M–$9M ARR next year" });
   });
 
   it("reproduces an old report's comparison from the version it used after a new version is published", async () => {

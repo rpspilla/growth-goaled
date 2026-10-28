@@ -273,6 +273,9 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
     await expect(founder.page.locator("summary", { hasText: detail })).toBeVisible();
   }
   await expect(founder.page.getByText(/every statement was checked against your inputs/)).toBeVisible();
+  // The paid assessment shows the same peer comparisons as the Snapshot.
+  await expect(founder.page.getByRole("heading", { name: "How you compare with peers" })).toBeVisible();
+  await expect(founder.page.getByRole("article", { name: "Retention compared with peers" })).toContainText("Fintech · founded 2017–2021");
   await expect(founder.page.getByText("Test mode brief: How do I fix churn?")).toBeVisible();
   // Benchmark comparison from the library: observed, benchmark, derived and interpretation, with the source.
   const nrrCard = founder.page.getByRole("article", { name: "NRR benchmark comparison" });

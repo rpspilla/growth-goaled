@@ -31,7 +31,9 @@ function figureFor(key: PeerKey | "grossRetention", answers: IntakeAnswers, reve
 /** The Snapshot's three peer comparisons, from the fixed Snapshot sources only. */
 export async function snapshotPeers(company: Pick<Company, "industry" | "revenueBand" | "isSample" | "stage">, answers: IntakeAnswers): Promise<PeerComparison[]> {
   const industry = typeof answers["company.industry"] === "string" ? (answers["company.industry"] as string) : company.industry;
-  const candidates = company.isSample ? [] : (await loadCandidates(PEER_METRICS.map((m) => m.metric))).filter((r) => r.source.snapshotSource);
+  // Peer metrics, plus gross retention: the standard reference's churn figures are stored as it.
+  // Snapshot sources for peers; the standard reference for the fallback.
+  const candidates = company.isSample ? [] : (await loadCandidates([...PEER_METRICS.map((m) => m.metric), "grr"])).filter((r) => r.source.snapshotSource || r.source.standardReference);
   return peerComparisons(
     {
       industry: industry ?? null,

@@ -10,6 +10,9 @@ import { founderAssessment } from "@/lib/data/assessments";
 import { figureChoices } from "@/lib/data/figures";
 import { FigureChecker } from "@/components/use-cases/FigureChecker";
 import { founderContext } from "@/lib/data/founder-context";
+import { getIntakeAnswers } from "@/lib/data/intake";
+import { snapshotPeers } from "@/lib/data/peers";
+import { PeerComparisons } from "@/components/use-cases/PeerComparisons";
 import { track } from "@/lib/events";
 import { advisoryHref, formatPrice, pricing } from "@/lib/pricing";
 import { assessmentMetrics, getUseCase, targetSummary } from "@/lib/use-cases";
@@ -49,6 +52,7 @@ export default async function ResultsPage() {
         advisory={<AdvisoryOffer key="advisory" kind={state.view.advisor} price={formatPrice(pricing().advisoryFromCents)} href={advisoryHref(def.id, state.view.advisor)} target={targetSummary(active.objective)} />}
         reviewHref={advisoryHref(def.id, "review")}
         figures={figures}
+        peers={<PeerComparisons key="peers" level={3} peers={await snapshotPeers(company, await getIntakeAnswers(company))} />}
         commit={<CommitPlanButton key="commit" committedAt={state.view.committedAt} commit={commitPlanAction.bind(null, state.view.deliverableId)} />}
         actions={
           <div key="actions" className="mt-3">
