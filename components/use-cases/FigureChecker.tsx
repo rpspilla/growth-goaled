@@ -37,6 +37,7 @@ function Row({ f, choose, enter, onChanged }: { f: FigureChoice; choose: (m: str
         <span className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>{f.label}</span>
         <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: badge.bg, color: badge.color }}>{badge.label}</span>
       </div>
+      <p id={`${inputId}-def`} className="text-sm -mt-1 mb-2" style={{ color: "var(--muted-foreground)" }}>{f.definition}</p>
 
       {f.candidates.length > 0 && (
         <fieldset disabled={pending}>
@@ -85,6 +86,7 @@ function Row({ f, choose, enter, onChanged }: { f: FigureChoice; choose: (m: str
           </label>
           <input
             id={inputId}
+            aria-describedby={`${inputId}-def`}
             value={raw}
             onChange={(e) => setRaw(e.target.value)}
             placeholder={`${f.label}, ${f.unitHint}`}

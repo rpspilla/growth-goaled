@@ -40,6 +40,7 @@ export function questionnaire(useCase: UseCaseDef, answers: IntakeAnswers, reven
         label: range.label,
         kind: "select",
         options: range.options.map((o) => ({ value: o.label, label: o.label })),
+        help: field.help,
         group: "company",
       });
       continue;
@@ -51,6 +52,7 @@ export function questionnaire(useCase: UseCaseDef, answers: IntakeAnswers, reven
       required: REQUIRED_PROFILE.some((r) => r.section === q.section && r.field === q.field),
       options: field.options?.map((o) => ({ value: o, label: o })),
       placeholder: field.placeholder,
+      help: field.help,
       group: "company",
     });
   }

@@ -20,7 +20,7 @@ export const hireOrFix: UseCaseDef = {
   snapshotProfile: [{ section: "gtm", field: "sales_reps" }, { section: "customers", field: "sales_cycle" }, { section: "customers", field: "acv" }, { section: "company", field: "arr" }],
   nextUseCase: "winning_icp",
   objectiveQuestions: [
-    { id: "hiring_budget", label: "Hiring budget for the next 12 months", kind: "currency", placeholder: "e.g. 600000" },
+    { id: "hiring_budget", label: "Hiring budget for the next 12 months", kind: "currency", placeholder: "e.g. 600000", help: "What you can spend on new sales hires over the next year: salaries, commission and recruiting." },
     { id: "roles_considering", label: "Which roles are you considering?", kind: "textarea", placeholder: "e.g. 2 AEs and an SDR, or a VP Sales" },
   ],
   requiredItems: ["roster", "sales_capacity", "opportunities", "win_loss"],

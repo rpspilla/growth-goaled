@@ -164,6 +164,7 @@ export function IntakeForm({
                         onBlur={(e) => save(f.id, e.target.value)}
                       />
                     )}
+                    {f.help && <div className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>{f.help}</div>}
                     {range && <div className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>You told us {values[range.id]}. Add the exact figure if you know it.</div>}
                     {errors[f.id] && <div className="text-xs mt-1" style={{ color: "var(--red)" }}>{errors[f.id]}</div>}
                   </div>

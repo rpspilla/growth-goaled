@@ -1,7 +1,7 @@
 import type { ObjectiveField, UseCaseDef } from "./types";
 
 const raiseQuestions = (round: string): ObjectiveField[] => [
-  { id: "raise_amount", label: `How much are you looking to raise in your ${round}?`, kind: "currency", placeholder: "e.g. 12000000" },
+  { id: "raise_amount", label: `How much are you looking to raise in your ${round}?`, kind: "currency", placeholder: "e.g. 12000000", help: "The total new money you plan to raise in this round, in dollars." },
   { id: "raise_close_date", label: "When do you want the round closed?", kind: "date" },
   { id: "investor_conversations", label: "Investor conversations so far", kind: "textarea", placeholder: "Who you've spoken to and what they said" },
 ];

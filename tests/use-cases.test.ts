@@ -69,7 +69,10 @@ describe("objective form", () => {
       "profile.customers.gross_retention_range",
       "profile.company.employees_range",
     ]);
-    for (const f of empty.fields.filter((f) => f.id.endsWith("_range"))) expect(f.kind).toBe("select");
+    for (const f of empty.fields.filter((f) => f.id.endsWith("_range"))) {
+      expect(f.kind).toBe("select");
+      expect(f.help, f.id).toMatch(/\w{3,}.*\./); // every figure we ask for has a simple definition
+    }
     expect(empty.fields.find((f) => f.id === "profile.company.employees_range")!.options!.map((o) => o.label)).toEqual(["1–5", "6–10", "11–25", "26–50", "50+"]);
     expect(empty.fields.filter((f) => f.required).map((f) => f.id)).toEqual(["profile.company.stage", "profile.gtm.model"]);
     for (const u of USE_CASES) expect(questionnaire(u, {}).fields.map((f) => f.id)).toContain("profile.company.employees_range");
@@ -344,5 +347,15 @@ describe("how we work with companies like yours", () => {
     expect(howWeWork({ useCase: "series_a_ready", profile: { "gtm.model": "Founder-led" }, revenueBand: null }).example.trigger).toMatch(/founder-led sales/);
     expect(howWeWork({ useCase: "hire_or_fix", profile: { "gtm.sales_reps": 0 }, revenueBand: null }).example.trigger).toMatch(/first sales hire/);
     expect(howWeWork({ useCase: "growth_leak", profile: {}, revenueBand: null }).audience).toBe("Early-stage B2B software companies");
+  });
+});
+
+describe("metric definitions", () => {
+  it("defines every metric, and every figure the profile or a questionnaire asks for", async () => {
+    const { METRICS } = await import("@/lib/metrics");
+    const { INTAKE_SECTIONS } = await import("@/lib/intake");
+    for (const [k, m] of Object.entries(METRICS)) expect(m.definition.length, k).toBeGreaterThan(20);
+    for (const s of INTAKE_SECTIONS) for (const f of s.fields) if (f.metric || f.rangeOf || f.kind === "currency") expect(f.help, `${s.id}.${f.id}`).toBeTruthy();
+    for (const u of USE_CASES) for (const q of u.objectiveQuestions) if (q.kind === "currency" || q.kind === "number" || /share|%/.test(q.placeholder ?? "")) expect(q.help, `${u.id}.${q.id}`).toBeTruthy();
   });
 });

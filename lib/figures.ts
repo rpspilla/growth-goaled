@@ -23,6 +23,8 @@ export type FigureChoice = {
   label: string;
   /** Unit hint for typing a value in. */
   unitHint: string;
+  /** What the figure means, in a sentence. */
+  definition: string;
   state: FigureState;
   /** The value the assessment will use (latest confirmed, else latest), or null when missing. */
   inUseId: string | null;
@@ -42,6 +44,7 @@ export function figureChoice(metric: MetricKey, candidates: readonly FigureCandi
     metric,
     label: METRICS[metric].label,
     unitHint: UNIT_HINT[METRICS[metric].unit] ?? "",
+    definition: METRICS[metric].definition,
     state,
     inUseId: sorted[0]?.id ?? null,
     candidates: sorted.map((c) => ({ ...c, formatted: formatMetric(metric, c.value) })),

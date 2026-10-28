@@ -1,4 +1,4 @@
-import type { MetricKey } from "@/lib/metrics";
+import { METRICS, type MetricKey } from "@/lib/metrics";
 import { RANGES, rangeFieldId } from "@/lib/ranges";
 
 /**
@@ -38,6 +38,8 @@ export type IntakeField = {
   /** Numeric answers are also stored as an accepted, company-provided data point for this metric. */
   metric?: MetricKey;
   column?: CompanyColumn;
+  /** A simple definition shown under the question; defaults to the metric's definition. */
+  help?: string;
   /** Set on range fields: the exact field this range stands in for. Never a figure. */
   rangeOf?: string;
 };
@@ -62,7 +64,7 @@ const BASE_SECTIONS: IntakeSection[] = [
       { id: "stage", label: "Stage", kind: "select", required: true, options: ["Pre-seed", "Seed", "Series A", "Series B+"], column: "stage" },
       { id: "arr", label: "ARR ($)", kind: "currency", required: true, placeholder: "4,200,000", metric: "arr", column: "arr" },
       { id: "growth", label: "YoY Growth (%)", kind: "percent", required: true, placeholder: "72", metric: "arr_growth", column: "growthPct" },
-      { id: "funding", label: "Total Funding ($)", kind: "currency", required: false, placeholder: "8,500,000", column: "funding" },
+      { id: "funding", label: "Total Funding ($)", kind: "currency", required: false, placeholder: "8,500,000", column: "funding", help: "All the equity and convertible money you've raised to date (SAFEs, notes and priced rounds), not loans." },
       { id: "employees", label: "Employees", kind: "integer", required: true, placeholder: "38", metric: "employees", column: "employees" },
     ],
   },
@@ -122,19 +124,23 @@ const BASE_SECTIONS: IntakeSection[] = [
 ];
 
 /**
- * Each section plus a range field for every exact figure that has ranges (lib/ranges.ts): optional
- * selects the questionnaire asks instead of the exact number, and the profile form doesn't show.
+ * Each section, every figure with its definition, plus a range field for every exact figure that has
+ * ranges (lib/ranges.ts): optional selects the questionnaire asks instead of the exact number, and the
+ * profile form doesn't show.
  */
-export const INTAKE_SECTIONS: IntakeSection[] = BASE_SECTIONS.map((s) => ({
-  ...s,
-  fields: [
-    ...s.fields,
-    ...s.fields.flatMap((f): IntakeField[] => {
-      const range = RANGES[`${s.id}.${f.id}`];
-      return range ? [{ id: rangeFieldId(f.id), label: range.label, kind: "select", required: false, options: range.options.map((o) => o.label), rangeOf: f.id }] : [];
-    }),
-  ],
-}));
+export const INTAKE_SECTIONS: IntakeSection[] = BASE_SECTIONS.map((s) => {
+  const fields = s.fields.map((f) => ({ ...f, help: f.help ?? (f.metric ? METRICS[f.metric].definition : undefined) }));
+  return {
+    ...s,
+    fields: [
+      ...fields,
+      ...fields.flatMap((f): IntakeField[] => {
+        const range = RANGES[`${s.id}.${f.id}`];
+        return range ? [{ id: rangeFieldId(f.id), label: range.label, kind: "select", required: false, options: range.options.map((o) => o.label), rangeOf: f.id, help: f.help }] : [];
+      }),
+    ],
+  };
+});
 
 export const INTAKE_SECTION_IDS = INTAKE_SECTIONS.map((s) => s.id);
 

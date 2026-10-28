@@ -20,7 +20,7 @@ export const founderHandoff: UseCaseDef = {
   snapshotProfile: [{ section: "gtm", field: "sales_reps" }, { section: "customers", field: "sales_cycle" }, { section: "customers", field: "count" }],
   nextUseCase: "hire_or_fix",
   objectiveQuestions: [
-    { id: "founder_deal_share", label: "Roughly what share of deals are you personally involved in?", kind: "text", placeholder: "e.g. 80%" },
+    { id: "founder_deal_share", label: "Roughly what share of deals are you personally involved in?", kind: "text", placeholder: "e.g. 80%", help: "Of the deals you closed recently, how many needed you on a call or in the negotiation." },
     { id: "step_back_date", label: "When do you want to step back from day-to-day selling?", kind: "date" },
   ],
   requiredItems: ["opportunities", "win_loss", "founder_dependencies"],
