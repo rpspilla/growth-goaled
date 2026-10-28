@@ -40,9 +40,9 @@ describe("use case registry", () => {
 });
 
 describe("recommendation", () => {
-  it("recommends Series A readiness and Growth Leak to early companies, Growth Leak otherwise", () => {
-    expect(recommendedUseCases({ stage: "Seed", revenueBand: null })).toEqual(["series_a_ready", "growth_leak"]);
-    expect(recommendedUseCases({ stage: "Series B+", revenueBand: "1m_3m" })).toEqual(["series_a_ready", "growth_leak"]);
+  it("recommends Fix Churn, and never a coming-soon question", () => {
+    expect(recommendedUseCases({ stage: "Seed", revenueBand: null })).toEqual(["growth_leak"]);
+    expect(recommendedUseCases({ stage: "Series B+", revenueBand: "1m_3m" })).toEqual(["growth_leak"]);
     expect(recommendedUseCases({ stage: "Series A", revenueBand: "3m_10m" })).toEqual(["growth_leak"]);
     expect(recommendedUseCases({ stage: null, revenueBand: null })).toEqual(["growth_leak"]);
   });
@@ -152,7 +152,7 @@ describe("Growth Snapshot", () => {
     expect(snap("growth_leak", { "customers.gross_retention_range": "Under 2%" }).signals[0]!.title).toBe("Up to 2% of starting revenue is lost each year");
     expect(snap("growth_leak", { "company.growth_range": "Shrinking" }).signals[0]!.title).toBe("Revenue isn't growing year over year");
     expect(snap("growth_leak", { "company.growth_range": "25–50%", "customers.nrr_range": "100–110%" }).signals.map((s) => s.title)).toContain("If there's a leak, it's more likely in new business");
-    expect(snap("hire_or_fix", { "gtm.sales_reps_range": "None yet" }).fit.suggested).toBe("founder_handoff");
+    expect(snap("hire_or_fix", { "gtm.sales_reps_range": "None yet" }).fit).toMatchObject({ good: true, suggested: null, note: expect.stringMatching(/who to hire first/) });
     expect(snap("hire_or_fix", { "customers.acv_range": "$15K–$30K" }, { hiring_budget: "300000" }).signals.map((s) => s.title)).toContain("Your hiring budget equals about 10–20 deals at your ACV");
     expect(snap("winning_icp", { "customers.count_range": "10–19" }).signals[0]!.title).toBe("Segment comparisons will be directional");
     expect(snap("winning_icp", { "customers.count_range": "20–49" }).signals.map((s) => s.title)).not.toContain("Segment comparisons will be directional");
@@ -173,7 +173,7 @@ describe("Growth Snapshot", () => {
   it("suggests a better-fitting assessment when the answers point elsewhere", () => {
     expect(snap("series_a_ready", { "company.stage": "Series A" }).fit).toMatchObject({ good: false, suggested: "series_b_ready" });
     expect(snap("series_b_ready", { "company.stage": "Seed" }).fit).toMatchObject({ good: false, suggested: "series_a_ready" });
-    expect(snap("hire_or_fix", { "gtm.sales_reps": 0 }).fit).toMatchObject({ good: false, suggested: "founder_handoff" });
+    expect(snap("hire_or_fix", { "gtm.sales_reps": 0 }).fit).toMatchObject({ good: true, suggested: null });
     expect(snap("growth_leak", {}).fit.good).toBe(true);
   });
 
@@ -190,8 +190,9 @@ describe("Growth Snapshot", () => {
 });
 
 describe("pricing", () => {
-  it("defaults to $149 assessments for all six use cases, $750 advisory and a reserved, unavailable $299 subscription", () => {
-    expect(sellableUseCases()).toEqual([...USE_CASE_IDS]);
+  it("defaults to $149 assessments for every available use case, $750 advisory and a reserved, unavailable $299 subscription", () => {
+    expect(sellableUseCases()).toEqual(["growth_leak", "hire_or_fix", "winning_icp"]);
+    expect(USE_CASES.filter((u) => u.comingSoon).map((u) => u.id)).toEqual(["series_a_ready", "series_b_ready", "founder_handoff"]);
     expect(pricing()).toEqual({ assessmentCents: 14_900, advisoryFromCents: 75_000, subscriptionMonthlyCents: 29_900, subscriptionAvailable: false });
     expect(formatPrice(14_900)).toBe("$149");
     expect(formatPrice(75_000)).toBe("$750");
@@ -201,7 +202,7 @@ describe("pricing", () => {
   it("reads prices, the booking link and sellable assessments from configuration", () => {
     const env = { ...process.env };
     try {
-      Object.assign(process.env, { ASSESSMENT_PRICE_CENTS: "59900", ADVISORY_PRICE_CENTS: "nonsense", ADVISORY_BOOKING_URL: "http://insecure.test", SELLABLE_USE_CASES: "growth_leak, winning_icp, made_up" });
+      Object.assign(process.env, { ASSESSMENT_PRICE_CENTS: "59900", ADVISORY_PRICE_CENTS: "nonsense", ADVISORY_BOOKING_URL: "http://insecure.test", SELLABLE_USE_CASES: "growth_leak, winning_icp, made_up, series_a_ready" });
       expect(pricing().assessmentCents).toBe(59_900);
       expect(pricing().advisoryFromCents).toBe(75_000);
       expect(advisoryBookingUrl()).toBeNull();
@@ -216,7 +217,7 @@ describe("pricing", () => {
       delete process.env.ADVISORY_MONTHLY_BOOKING_URL;
       expect(advisoryHref("growth_leak", "monthly")).toBe("/advisory?use_case=growth_leak&kind=monthly");
       delete process.env.SELLABLE_USE_CASES;
-      expect(sellableUseCases()).toEqual([...USE_CASE_IDS]);
+      expect(sellableUseCases()).toEqual(USE_CASE_IDS.filter((id) => !getUseCase(id)!.comingSoon));
     } finally {
       process.env = env;
     }

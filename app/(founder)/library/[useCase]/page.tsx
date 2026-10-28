@@ -22,7 +22,28 @@ export default async function UseCasePage({ params }: { params: Promise<{ useCas
   const { fields, known } = questionnaire(def, answers, company?.revenueBand ?? null);
   const price = formatPrice(pricing().assessmentCents);
   const sellable = sellableUseCases().includes(def.id);
-  if (company) await track("use_case_viewed", { userId: user.id, companyId: company.id, props: { use_case: def.id } });
+  if (company) await track("use_case_viewed", { userId: user.id, companyId: company.id, props: { use_case: def.id, coming_soon: Boolean(def.comingSoon) } });
+
+  if (def.comingSoon) {
+    return (
+      <div className="px-4 sm:px-8 py-8 max-w-3xl">
+        <Link href="/library" className="text-sm link">← All growth questions</Link>
+        <div className="mt-4">
+          <PageHeader eyebrow={`${def.shortTitle} · Coming soon`} title={def.question} subtitle={def.description} />
+        </div>
+        <section className="surface surface-pad" aria-labelledby="soon">
+          <h2 id="soon" className="text-xl font-semibold" style={{ color: "var(--foreground)" }}>Coming soon</h2>
+          <p className="text-base mt-1" style={{ color: "var(--muted-foreground)" }}>This isn&apos;t available to start or buy yet. When it launches, it will give you:</p>
+          <ul className="text-base space-y-2 mt-4" style={{ color: "var(--foreground)" }}>
+            {def.youGet.map((g) => (
+              <li key={g} className="flex gap-2.5"><span aria-hidden style={{ color: "var(--muted-foreground)" }}>•</span><span>{g}</span></li>
+            ))}
+          </ul>
+          <Link href="/library" className="btn btn-primary mt-6">See the questions available now →</Link>
+        </section>
+      </div>
+    );
+  }
 
   const journey = ["Answer a few questions", "See your free Snapshot", `Full assessment from your data${sellable ? ` · ${price}` : ""}`];
   return (

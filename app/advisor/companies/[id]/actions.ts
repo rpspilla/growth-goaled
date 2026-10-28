@@ -9,7 +9,7 @@ import { updateDataItem, type UpdateResult } from "@/lib/data/readiness";
 import { activateWithoutPayment } from "@/lib/data/use-cases";
 import { approveAssessment } from "@/lib/data/assessments";
 import { getDeliverable } from "@/lib/data/deliverables";
-import { isUseCaseId } from "@/lib/use-cases";
+import { isComingSoon, isUseCaseId } from "@/lib/use-cases";
 import { clearOverride, setOverride } from "@/lib/data/benchmark-library";
 
 async function managed(companyId: string) {
@@ -54,6 +54,7 @@ export async function activateForCompany(companyId: string, useCase: string, not
   const ctx = await managed(companyId);
   if (!ctx) return { ok: false, error: "Not found." };
   if (!isUseCaseId(useCase)) return { ok: false, error: "Unknown use case." };
+  if (isComingSoon(useCase)) return { ok: false, error: "This question is coming soon and can't be granted yet." };
   const reason = z.string().trim().max(500).safeParse(note);
   if (!reason.success || !reason.data) return { ok: false, error: "Add a short note saying why (e.g. pilot, partner deal)." };
   await activateWithoutPayment(ctx.user, ctx.company, useCase, reason.data);

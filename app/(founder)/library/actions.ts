@@ -11,7 +11,7 @@ import { displayValue, getField } from "@/lib/intake";
 import { rangeFieldId } from "@/lib/ranges";
 import { sellableUseCases } from "@/lib/pricing";
 import { stripeConfigured } from "@/lib/stripe";
-import { getUseCase, isUseCaseId, missingRequired, parseProfileFieldId, profileQuestions } from "@/lib/use-cases";
+import { getUseCase, isComingSoon, isUseCaseId, missingRequired, parseProfileFieldId, profileQuestions } from "@/lib/use-cases";
 
 async function founderCompany() {
   const { user, company } = await founderContext();
@@ -26,6 +26,7 @@ async function founderCompany() {
 export async function saveAnswer(useCaseId: string, fieldId: string, value: string): Promise<SaveAnswerResult> {
   const { user, company } = await founderCompany();
   if (!isUseCaseId(useCaseId) || typeof fieldId !== "string" || typeof value !== "string") return { ok: false, error: "Unknown question." };
+  if (isComingSoon(useCaseId)) return { ok: false, error: "This question isn't available yet." };
   const profile = parseProfileFieldId(fieldId);
   if (profile) {
     const useCase = getUseCase(useCaseId)!;
@@ -48,6 +49,7 @@ export async function submitQuestionnaire(useCaseId: string): Promise<{ ok: true
   const { user, company } = await founderCompany();
   const def = getUseCase(useCaseId);
   if (!def) return { ok: false, error: "Unknown use case." };
+  if (def.comingSoon) return { ok: false, error: "This question isn't available yet." };
   const [row, answers] = await Promise.all([getCompanyUseCase(company.id, def.id), getIntakeAnswers(company)]);
   if (missingRequired(def, row?.objective, answers).length) return { ok: false, error: "Please answer the required questions first." };
   if (!row) await startUseCase(company, def.id);

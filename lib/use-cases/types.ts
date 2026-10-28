@@ -53,4 +53,6 @@ export type UseCaseDef = {
   itemWhy: Readonly<Record<string, string>>;
   figures: readonly MetricKey[];
   trackableMetrics: readonly MetricKey[];
+  /** Shown in the library as "Coming soon": no questionnaire, Snapshot, purchase or grant yet. */
+  comingSoon?: boolean;
 };

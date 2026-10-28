@@ -2,12 +2,12 @@ import type { UseCaseDef } from "./types";
 
 export const winningIcp: UseCaseDef = {
   id: "winning_icp",
-  title: "Who are we actually winning with?",
-  shortTitle: "Winning ICP",
-  question: "Who are we actually winning with?",
-  description: "Ranks your customer segments by how well you win, keep and grow them, so you know where to focus.",
+  title: "Build a repeatable sales motion",
+  shortTitle: "Repeatable Sales Motion",
+  question: "Build a repeatable sales motion",
+  description: "Finds the customers you win, keep and grow best, so your sales team can focus on a motion that repeats.",
   forWho: "Companies with a scattered customer base, long sales cycles or an unclear ideal customer profile.",
-  decision: "Which customers to focus on, and which to stop chasing.",
+  decision: "Which customers to build the motion around, and which to stop chasing.",
   whenUseful: "You sell to several kinds of customer and want to focus sales and marketing on the segments that win, stay and grow.",
   youGet: [
     "Customer segments ranked by commercial attractiveness",

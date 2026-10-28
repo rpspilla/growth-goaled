@@ -107,6 +107,7 @@ export async function activateUseCase(
 /** Advisor/admin pilot activation: no payment, recorded with who and why. Access is checked by the caller. */
 export async function activateWithoutPayment(advisor: User, company: Pick<Company, "id">, useCaseId: UseCaseId, note: string) {
   if (advisor.role !== "advisor" && advisor.role !== "admin") throw new Error("Only advisors can activate without payment.");
+  if (getUseCase(useCaseId)?.comingSoon) throw new Error("This question is coming soon and can't be granted yet.");
   return activateUseCase(company.id, useCaseId, { activation: "advisor", by: advisor.id, note });
 }
 

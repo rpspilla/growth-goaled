@@ -144,10 +144,20 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await expect(steps.getByRole("link", { name: /Data/ })).toHaveCount(0);
   await founder.page.getByRole("link", { name: "Pick a question to answer →" }).click();
   await expect(founder.page).toHaveURL(/\/library$/);
-  const leakCard = founder.page.locator("article", { has: founder.page.getByRole("heading", { name: "Where is our growth leaking?" }) });
+  const leakCard = founder.page.locator("article", { has: founder.page.getByRole("heading", { name: "How do I fix churn?" }) });
   await expect(leakCard).toContainText("Recommended for you");
   await expect(leakCard).toContainText("Snapshot free · Assessment $149");
-  await expect(founder.page.locator("article", { hasText: "Are we ready to raise a Series A?" })).toContainText("Snapshot free · Assessment $149");
+  // Coming-soon questions are listed but can't be started or bought.
+  for (const soon of ["Are we ready to raise a Series A?", "Are we ready to raise a Series B?", "Build me an investor update"]) {
+    const card = founder.page.getByRole("article", { name: `${soon} (coming soon)` });
+    await expect(card).toContainText("Coming soon");
+    await expect(card.getByRole("link")).toHaveCount(0);
+  }
+  await founder.page.goto("/library/series_a_ready/snapshot");
+  await expect(founder.page).toHaveURL(/\/library\/series_a_ready$/);
+  await expect(founder.page.getByRole("heading", { name: "Coming soon", exact: true })).toBeVisible();
+  await expect(founder.page.getByRole("button")).not.toContainText([/Snapshot|\$149/]);
+  await founder.page.goto("/library");
   await leakCard.getByRole("link", { name: /^Start with a free Snapshot/ }).click();
   await expect(founder.page).toHaveURL(/\/library\/growth_leak$/);
   await expect(founder.page.getByLabel("Pricing")).toContainText("$149");
@@ -209,7 +219,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await expect(steps.getByRole("link", { name: /Data/ })).toHaveCount(0);
   await founder.page.getByRole("button", { name: "Get the full assessment · $149" }).click();
   await expect(founder.page).toHaveURL(/\/data\?checkout=success/);
-  await expect(founder.page.getByRole("heading", { name: "Data for Growth Leak" })).toBeVisible();
+  await expect(founder.page.getByRole("heading", { name: "Data for Fix Churn" })).toBeVisible();
   await expect(steps.getByRole("link", { name: /Data/ })).toBeVisible();
   {
     const db = new Client({ connectionString: E2E_DATABASE_URL });
@@ -231,9 +241,9 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   }
   await expect(founder.page.getByRole("link", { name: "Go to Data →" })).toBeVisible();
 
-  // --- Founder: Data shows only Growth Leak's items, in priority order ---
+  // --- Founder: Data shows only Fix Churn's items, in priority order ---
   await founder.page.goto("/data");
-  await expect(founder.page.getByRole("heading", { name: "Data for Growth Leak" })).toBeVisible();
+  await expect(founder.page.getByRole("heading", { name: "Data for Fix Churn" })).toBeVisible();
   await expect(founder.page.getByText(/benchmark/i)).toHaveCount(0);
   await expect(founder.page.getByRole("heading", { name: "Needed for the assessment (3)" })).toBeVisible();
   await expect(founder.page.getByText("Why it matters:").first()).toBeVisible();
@@ -254,7 +264,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
 
   // --- Founder: self-service results, built from their answers and data ---
   await expect(founder.page.getByRole("heading", { name: "The answer", exact: true })).toBeVisible({ timeout: 90_000 });
-  await expect(founder.page.getByRole("heading", { name: "Where is our growth leaking?" })).toBeVisible();
+  await expect(founder.page.getByRole("heading", { name: "How do I fix churn?" })).toBeVisible();
   // The Decision Brief, in reading order: the answer first, the depth on demand.
   for (const section of ["The answer", "Why it matters", "What the evidence shows", "What to do next", "Explore the details"]) {
     await expect(founder.page.getByRole("heading", { name: section, exact: true })).toBeVisible();
@@ -263,7 +273,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
     await expect(founder.page.locator("summary", { hasText: detail })).toBeVisible();
   }
   await expect(founder.page.getByText(/every statement was checked against your inputs/)).toBeVisible();
-  await expect(founder.page.getByText("Test mode brief: Where is our growth leaking?")).toBeVisible();
+  await expect(founder.page.getByText("Test mode brief: How do I fix churn?")).toBeVisible();
   // Benchmark comparison from the library: observed, benchmark, derived and interpretation, with the source.
   const nrrCard = founder.page.getByRole("article", { name: "NRR benchmark comparison" });
   await expect(nrrCard).toContainText("Observed");
@@ -271,7 +281,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await expect(nrrCard).toContainText("10 pts below");
   await expect(nrrCard).toContainText("E2E advisory survey");
   await expect(nrrCard).toContainText("E2E Series A retention, version 1");
-  await expect(founder.page.getByText(/Should we hire more salespeople/)).toBeVisible();
+  await expect(founder.page.getByText(/Build a growth hiring plan/)).toBeVisible();
   await founder.page.getByRole("button", { name: "Evidence →" }).first().click();
   await expect(founder.page.getByRole("dialog", { name: "Sources" })).toContainText("Checked in code against your inputs.");
   await founder.page.getByRole("button", { name: "Close" }).click();
@@ -346,17 +356,17 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await expect(admin.page.getByText("Reviewed", { exact: true })).toBeVisible();
   await mirrored.getByRole("link", { name: "Growth questions" }).click();
   // Pilot: grant an assessment without payment, recorded with a note.
-  await admin.page.locator("section", { hasText: "Winning ICP" }).getByPlaceholder("Why (e.g. pilot customer)").fill("E2E pilot");
-  await admin.page.locator("section", { hasText: "Winning ICP" }).getByRole("button", { name: "Grant without payment" }).click();
+  await admin.page.locator("section", { hasText: "Repeatable Sales Motion" }).getByPlaceholder("Why (e.g. pilot customer)").fill("E2E pilot");
+  await admin.page.locator("section", { hasText: "Repeatable Sales Motion" }).getByRole("button", { name: "Grant without payment" }).click();
   await expect(admin.page.getByText(/Granted without payment by E2E Admin .* · E2E pilot/)).toBeVisible();
 
   // --- Founder: the switcher follows the granted assessment; results now show as reviewed ---
   await founder.page.goto("/data");
   const switcher = founder.page.getByRole("combobox", { name: "Active question" });
   await switcher.selectOption("winning_icp");
-  await expect(founder.page.getByRole("heading", { name: "Data for Winning ICP" })).toBeVisible();
+  await expect(founder.page.getByRole("heading", { name: "Data for Repeatable Sales Motion" })).toBeVisible();
   await switcher.selectOption("growth_leak");
-  await expect(founder.page.getByRole("heading", { name: "Data for Growth Leak" })).toBeVisible();
+  await expect(founder.page.getByRole("heading", { name: "Data for Fix Churn" })).toBeVisible();
   await expect(founder.page.getByRole("link", { name: "View your results →" })).toBeVisible();
   await founder.page.goto("/baseline");
   await expect(founder.page.getByText(/Reviewed by E2E Admin/)).toBeVisible();
@@ -383,8 +393,8 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   // --- Assessment history ---
   await founder.page.goto("/assessments");
   const history = founder.page.getByRole("table");
-  await expect(history.getByRole("row", { name: /growth leaking.*Purchased.*Complete/ })).toBeVisible();
-  await expect(history.getByRole("row", { name: /winning with.*Granted by your advisor.*Collecting data/ })).toBeVisible();
+  await expect(history.getByRole("row", { name: /fix churn.*Purchased.*Complete/ })).toBeVisible();
+  await expect(history.getByRole("row", { name: /repeatable sales motion.*Granted by your advisor.*Collecting data/ })).toBeVisible();
 
   // --- Advisor sees the advisory request on the company ---
   await admin.page.goto("/advisor/portfolio");

@@ -144,7 +144,7 @@ export function growthSnapshot(input: SnapshotInput, now = new Date()): Snapshot
     }
     case "hire_or_fix": {
       if (noneOf(reps))
-        fit = { good: false, note: "You don't have salespeople yet, so the question is who to hire first. Founder Handoff is built for that.", suggested: "founder_handoff" };
+        fit = { good: true, note: "You don't have salespeople yet, so the plan starts with who to hire first: an account executive or a sales leader.", suggested: null };
       if (reps && atLeast(reps, 1))
         signals.push({ kind: "info", title: `${reps.text} ${reps.exact === 1 ? "rep" : "reps"} today`, detail: "The assessment measures what each one produces and how long new reps take to ramp, before recommending more.", basis: `Your answer: ${reps.text} AEs` });
       const budget = num(objective.hiring_budget);

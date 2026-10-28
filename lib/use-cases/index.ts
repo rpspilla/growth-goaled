@@ -16,10 +16,13 @@ const BY_ID = new Map(USE_CASES.map((u) => [u.id, u]));
 
 export const getUseCase = (id: string): UseCaseDef | undefined => (isUseCaseId(id) ? BY_ID.get(id) : undefined);
 
+/** Listed as "Coming soon": nothing can be started, bought or granted for it yet. */
+export const isComingSoon = (id: string): boolean => Boolean(getUseCase(id)?.comingSoon);
+
 /** Library recommendation (HANDOFF §13.3): early companies see fundraise readiness first. */
 export function recommendedUseCases(company: { stage: string | null; revenueBand: string | null }): UseCaseId[] {
   const early = company.stage === "Pre-seed" || company.stage === "Seed" || company.revenueBand === "lt_1m" || company.revenueBand === "1m_3m";
-  return early ? ["series_a_ready", "growth_leak"] : ["growth_leak"];
+  return (early ? (["series_a_ready", "growth_leak"] as UseCaseId[]) : (["growth_leak"] as UseCaseId[])).filter((id) => !isComingSoon(id));
 }
 
 /**

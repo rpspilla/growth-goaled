@@ -24,12 +24,26 @@ export function UseCaseCards({
   price?: string | null;
   sellable?: readonly string[];
 }) {
-  const ordered = [...useCases].sort((a, b) => Number(recommended.includes(b.id)) - Number(recommended.includes(a.id)));
+  // Recommended first, "Coming soon" last.
+  const rank = (u: UseCaseDef) => (u.comingSoon ? 2 : recommended.includes(u.id) ? 0 : 1);
+  const ordered = [...useCases].sort((a, b) => rank(a) - rank(b));
   return (
     <div className="grid md:grid-cols-2 gap-5">
       {ordered.map((u) => {
         const state = states[u.id];
         const isRecommended = recommended.includes(u.id);
+        if (u.comingSoon) {
+          return (
+            <article key={u.id} className="surface p-6 flex flex-col" style={{ background: "var(--muted)" }} aria-label={`${u.question} (coming soon)`}>
+              <div className="flex items-center gap-2 mb-3">
+                <Pill tone="neutral">Coming soon</Pill>
+              </div>
+              <h2 className="font-display text-2xl leading-tight" style={{ color: "var(--foreground)" }}>{u.question}</h2>
+              <p className="mt-3 text-base" style={{ color: "var(--muted-foreground)" }}>{u.description}</p>
+              <p className="mt-auto pt-6 text-sm" style={{ color: "var(--muted-foreground)" }}>Not available to start yet.</p>
+            </article>
+          );
+        }
         const cta = state === "active" ? "Open your assessment" : state === "started" ? "Continue" : "Start with a free Snapshot";
         return (
           <article

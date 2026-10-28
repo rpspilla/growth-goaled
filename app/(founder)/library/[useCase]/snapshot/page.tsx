@@ -33,6 +33,7 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
   const [{ useCase: id }, { checkout }] = await Promise.all([params, searchParams]);
   const def = getUseCase(id);
   if (!def) notFound();
+  if (def.comingSoon) redirect(`/library/${def.id}`);
   const { user, company, useCases } = await founderContext();
   if (!company) redirect(`/library/${def.id}`);
   const row = useCases.find((u) => u.useCase === def.id);
@@ -47,7 +48,9 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
   });
   const peers = await snapshotPeers(company, answers);
   const approach = howWeWork({ useCase: def.id, profile: answers, revenueBand: company.revenueBand });
-  const suggested = snapshot.fit.suggested ? getUseCase(snapshot.fit.suggested) : undefined;
+  const suggestedDef = snapshot.fit.suggested ? getUseCase(snapshot.fit.suggested) : undefined;
+  // Never point founders at a question they can't start yet.
+  const suggested = suggestedDef?.comingSoon ? undefined : suggestedDef;
   const price = formatPrice(pricing().assessmentCents);
   const sellable = sellableUseCases().includes(def.id) && stripeConfigured();
   const message = checkout ? CHECKOUT_MESSAGE[checkout] : undefined;

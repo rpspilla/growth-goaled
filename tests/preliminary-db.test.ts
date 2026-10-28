@@ -247,8 +247,10 @@ describe("assessment purchase", () => {
     expect((await db().select().from(schema.payments).where(eq(schema.payments.stripeSessionId, "cs_test_1")))[0]!.status).toBe("paid");
   });
 
-  it("sells all six assessments by default, and only those listed when SELLABLE_USE_CASES narrows it", async () => {
-    expect(await createAssessmentCheckout(founder, acme, "series_a_ready", "https://dev.test", fakeStripe({}) as never)).toContain("checkout.stripe.com");
+  it("sells every available assessment by default, never a coming-soon one, and only those listed when SELLABLE_USE_CASES narrows it", async () => {
+    expect(await createAssessmentCheckout(founder, acme, "hire_or_fix", "https://dev.test", fakeStripe({}) as never)).toContain("checkout.stripe.com");
+    for (const soon of ["series_a_ready", "series_b_ready", "founder_handoff"] as const)
+      await expect(createAssessmentCheckout(founder, acme, soon, "https://dev.test", fakeStripe({}) as never)).rejects.toThrow("isn't available to buy yet");
     process.env.SELLABLE_USE_CASES = "growth_leak";
     try {
       await expect(createAssessmentCheckout(founder, acme, "winning_icp", "https://dev.test", fakeStripe({}) as never)).rejects.toThrow("isn't available to buy yet");
@@ -290,25 +292,26 @@ describe("assessment purchase", () => {
   });
 
   it("saves objective answers one at a time, keeps them through activation, and validates them", async () => {
-    expect(await saveObjectiveAnswer(acme, "series_a_ready", "raise_amount", "  $5,000,000 ")).toEqual({ ok: true, value: "5000000" });
-    expect(await saveObjectiveAnswer(acme, "series_a_ready", "raise_close_date", "2027-06-30")).toEqual({ ok: true, value: "2027-06-30" });
-    expect(await saveObjectiveAnswer(acme, "series_a_ready", "raise_amount", "lots")).toMatchObject({ ok: false });
-    expect(await saveObjectiveAnswer(acme, "series_a_ready", "raise_close_date", "2027-13-45")).toMatchObject({ ok: false });
-    expect(await saveObjectiveAnswer(acme, "series_a_ready", "goal", "Raise")).toMatchObject({ ok: false }); // retired question
-    expect(await saveObjectiveAnswer(acme, "series_a_ready", "not_a_question", "x")).toMatchObject({ ok: false });
-    expect(await saveObjectiveAnswer(acme, "growth_leak", "raise_amount", "1")).toMatchObject({ ok: false }); // another use case's question
-    let row = await getCompanyUseCase(acme.id, "series_a_ready");
-    expect(row).toMatchObject({ status: "objective", activatedAt: null, objective: { raise_amount: "5000000", raise_close_date: "2027-06-30" } });
-    expect(await saveObjectiveAnswer(acme, "series_a_ready", "raise_close_date", "")).toMatchObject({ ok: true });
-    row = await getCompanyUseCase(acme.id, "series_a_ready");
-    expect(row!.objective).toEqual({ raise_amount: "5000000" });
+    expect(await saveObjectiveAnswer(acme, "hire_or_fix", "hiring_budget", "  $500,000 ")).toEqual({ ok: true, value: "500000" });
+    expect(await saveObjectiveAnswer(acme, "hire_or_fix", "roles_considering", "Two AEs")).toEqual({ ok: true, value: "Two AEs" });
+    expect(await saveObjectiveAnswer(acme, "hire_or_fix", "hiring_budget", "lots")).toMatchObject({ ok: false });
+    expect(await saveObjectiveAnswer(acme, "hire_or_fix", "goal", "Hire")).toMatchObject({ ok: false }); // retired question
+    expect(await saveObjectiveAnswer(acme, "hire_or_fix", "not_a_question", "x")).toMatchObject({ ok: false });
+    expect(await saveObjectiveAnswer(acme, "growth_leak", "hiring_budget", "1")).toMatchObject({ ok: false }); // another use case's question
+    let row = await getCompanyUseCase(acme.id, "hire_or_fix");
+    expect(row).toMatchObject({ status: "objective", activatedAt: null, objective: { hiring_budget: "500000", roles_considering: "Two AEs" } });
+    expect(await saveObjectiveAnswer(acme, "hire_or_fix", "roles_considering", "")).toMatchObject({ ok: true });
+    row = await getCompanyUseCase(acme.id, "hire_or_fix");
+    expect(row!.objective).toEqual({ hiring_budget: "500000" });
 
-    await activateWithoutPayment(advisor, acme, "series_a_ready", "Pilot");
-    row = await getCompanyUseCase(acme.id, "series_a_ready");
-    expect(row).toMatchObject({ status: "active", activation: "advisor", activatedBy: advisor.id, activationNote: "Pilot", objective: { raise_amount: "5000000" } });
+    await activateWithoutPayment(advisor, acme, "hire_or_fix", "Pilot");
+    row = await getCompanyUseCase(acme.id, "hire_or_fix");
+    expect(row).toMatchObject({ status: "active", activation: "advisor", activatedBy: advisor.id, activationNote: "Pilot", objective: { hiring_budget: "500000" } });
     // A second activation (e.g. a late payment) keeps the original record.
-    expect(await activateUseCase(acme.id, "series_a_ready", { activation: "paid", by: founder.id })).toEqual({ activated: false });
-    expect((await getCompanyUseCase(acme.id, "series_a_ready"))!.activation).toBe("advisor");
+    expect(await activateUseCase(acme.id, "hire_or_fix", { activation: "paid", by: founder.id })).toEqual({ activated: false });
+    expect((await getCompanyUseCase(acme.id, "hire_or_fix"))!.activation).toBe("advisor");
+    // Coming-soon questions can't be granted either.
+    await expect(activateWithoutPayment(advisor, acme, "series_a_ready", "Pilot")).rejects.toThrow(/coming soon/);
     await expect(activateWithoutPayment(founder, acme, "growth_leak", "me")).rejects.toThrow();
   });
 

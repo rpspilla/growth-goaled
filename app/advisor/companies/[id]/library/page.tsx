@@ -28,7 +28,7 @@ export default async function CompanyLibraryPage({ params }: { params: Promise<{
               <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>{def.question}</span>
               {recommended.includes(def.id) && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "var(--green-muted)", color: "var(--green)" }}>Recommended</span>}
               <span className="ml-auto text-xs font-medium" style={{ color: row?.activatedAt ? "var(--green)" : "var(--muted-foreground)" }}>
-                {row?.activatedAt ? "Purchased" : row ? "Snapshot only" : "Not started"}
+                {row?.activatedAt ? "Purchased" : def.comingSoon ? "Coming soon" : row ? "Snapshot only" : "Not started"}
               </span>
             </div>
             {row?.activatedAt && (
@@ -50,7 +50,12 @@ export default async function CompanyLibraryPage({ params }: { params: Promise<{
             ) : (
               <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>No questionnaire answers yet.</p>
             )}
-            {!row?.activatedAt && <ActivateForm companyId={company.id} useCase={def.id} activate={activateForCompany} />}
+            {!row?.activatedAt &&
+              (def.comingSoon ? (
+                <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Coming soon: can&apos;t be started or granted yet.</p>
+              ) : (
+                <ActivateForm companyId={company.id} useCase={def.id} activate={activateForCompany} />
+              ))}
           </section>
         );
       })}

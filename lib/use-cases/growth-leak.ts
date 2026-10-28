@@ -2,15 +2,15 @@ import type { UseCaseDef } from "./types";
 
 export const growthLeak: UseCaseDef = {
   id: "growth_leak",
-  title: "Where is our growth leaking?",
-  shortTitle: "Growth Leak",
-  question: "Where is our growth leaking?",
-  description: "Finds where revenue growth is being lost (pipeline, conversion, retention or expansion) so you fix the right thing first.",
-  forWho: "Founders whose growth is slowing and who aren't sure why. The best place to start if you're unsure which question to ask.",
-  decision: "Which part of growth to fix first: new business, retention or expansion.",
-  whenUseful: "Growth has slowed or stalled and you're not sure whether the problem is pipeline, conversion, retention or expansion.",
+  title: "How do I fix churn?",
+  shortTitle: "Fix Churn",
+  question: "How do I fix churn?",
+  description: "Finds where you're losing revenue (cancellations, downgrades or stalled expansion), which customers it comes from, and what to fix first. It also checks whether the real leak is in new business.",
+  forWho: "Founders losing customers or revenue they expected to keep. The best place to start if growth has slowed and you're unsure why.",
+  decision: "What's driving churn, and the first fix to make: retention, expansion or new business.",
+  whenUseful: "Customers are cancelling or shrinking, or growth has slowed and you suspect churn.",
   youGet: [
-    "Your key growth and retention metrics, with the evidence behind each figure",
+    "Your churn, retention and growth metrics, with the evidence behind each figure",
     "Comparison with approved peer reference data, where it exists",
     "The main constraint on growth, with supporting evidence",
     "Your recommended next action and first priority",

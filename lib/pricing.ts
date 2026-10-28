@@ -1,3 +1,4 @@
+import { isComingSoon } from "@/lib/use-cases";
 import { isUseCaseId, USE_CASE_IDS, type UseCaseId } from "@/lib/use-cases/types";
 
 /**
@@ -46,7 +47,8 @@ export const advisoryHref = (useCase: string, kind: AdvisoryKind) =>
  */
 export function sellableUseCases(): UseCaseId[] {
   const raw = process.env.SELLABLE_USE_CASES?.trim() || USE_CASE_IDS.join(",");
-  return raw.split(",").map((s) => s.trim()).filter(isUseCaseId);
+  // A "Coming soon" question is never sold, whatever the environment says.
+  return raw.split(",").map((s) => s.trim()).filter(isUseCaseId).filter((id) => !isComingSoon(id));
 }
 
 export const formatPrice = (c: number) => `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: c % 100 ? 2 : 0, maximumFractionDigits: 2 })}`;
