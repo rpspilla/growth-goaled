@@ -53,6 +53,7 @@ export async function saveSourceAction(_prev: Result<{ id?: string }> | null, fd
     allowCustomerDisplay: fd.get("allowCustomerDisplay") === "on",
     allowDerived: fd.get("allowDerived") === "on",
     snapshotSource: fd.get("snapshotSource") === "on",
+    standardReference: fd.get("standardReference") === "on",
     reliability: s("reliability"),
     updateFrequency: s("updateFrequency"),
     reviewIntervalDays: s("reviewIntervalDays").trim() || null,

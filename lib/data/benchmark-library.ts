@@ -4,6 +4,7 @@ import { and, asc, count, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm
 import { z } from "zod";
 import { db, schema } from "@/lib/db";
 import type { BenchmarkImportError, BenchmarkVersionEvent, Company, User } from "@/lib/db/schema";
+import { isReference } from "@/lib/benchmark-library/reference";
 import { compare, type BenchmarkComparison } from "@/lib/benchmark-library/compare";
 import { previewCsv, type CsvField, type CsvPreview } from "@/lib/benchmark-library/csv";
 import { DEFAULT_REVIEW_DAYS, isStale, matchBenchmark, type CandidateRecord, type CompanyProfile } from "@/lib/benchmark-library/match";
@@ -50,6 +51,7 @@ export const sourceSchema = z.object({
   minAggregationSize: z.coerce.number().int().min(5).max(100_000).optional().nullable(),
   notes: opt(4000),
   snapshotSource: z.boolean().optional(),
+  standardReference: z.boolean().optional(),
 });
 export type SourceInput = z.infer<typeof sourceSchema>;
 
@@ -63,7 +65,7 @@ export async function saveSource(actor: User, input: SourceInput, id?: string): 
   if (!isLibraryAdmin(actor)) return denied;
   if (input.kind === "aggregated_customer" && (!input.consentReference || !input.minAggregationSize))
     return { ok: false, error: "Aggregated customer data needs a consent reference and a minimum aggregation size before it can be recorded." };
-  const values = { ...input, reviewIntervalDays: input.reviewIntervalDays ?? null, minAggregationSize: input.minAggregationSize ?? null, snapshotSource: input.snapshotSource ?? false };
+  const values = { ...input, reviewIntervalDays: input.reviewIntervalDays ?? null, minAggregationSize: input.minAggregationSize ?? null, snapshotSource: input.snapshotSource ?? false, standardReference: input.standardReference ?? false };
   if (id) {
     const [row] = await db.update(schema.benchmarkSources).set({ ...values, updatedAt: new Date() }).where(eq(schema.benchmarkSources.id, id)).returning({ id: schema.benchmarkSources.id });
     return row ? { ok: true, id: row.id } : { ok: false, error: "Source not found." };
@@ -606,6 +608,7 @@ function toCandidate(r: RecordRow, v: Version, d: typeof schema.benchmarkDataset
       allowDerived: s.allowDerived,
       reviewIntervalDays: s.reviewIntervalDays,
       snapshotSource: s.snapshotSource,
+      standardReference: s.standardReference,
     },
   };
 }
@@ -631,11 +634,19 @@ export async function benchmarkCompany(company: Pick<Company, "id" | "isSample" 
     db.select().from(schema.benchmarkOverrides).where(eq(schema.benchmarkOverrides.companyId, company.id)),
   ]);
   const profile = companyProfile(company, figures);
+  // Growth Goaled's standard reference is a last resort: matched only when nothing else fits, and labelled an assumption.
+  const real = candidates.filter((r) => !isReference(r));
+  const reference = candidates.filter(isReference);
   const out: BenchmarkResult = { comparisons: [], missing: [] };
   for (const f of comparable) {
     const o = overrides.find((x) => x.metric === f.metric);
-    const m = matchBenchmark(f.metric, profile, candidates, o ? { recordId: o.recordId, reason: o.reason } : undefined);
-    if (m.status === "matched") out.comparisons.push(compare(f, m));
+    const m = matchBenchmark(f.metric, profile, real, o ? { recordId: o.recordId, reason: o.reason } : undefined);
+    if (m.status === "matched") {
+      out.comparisons.push(compare(f, m));
+      continue;
+    }
+    const fallback = o?.recordId === null ? null : matchBenchmark(f.metric, profile, reference, undefined);
+    if (fallback?.status === "matched") out.comparisons.push(compare(f, fallback, { assumption: m.reason }));
     else out.missing.push({ metric: f.metric, label: METRICS[f.metric].label, reason: m.reason });
   }
   return out;

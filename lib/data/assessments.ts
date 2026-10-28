@@ -20,6 +20,7 @@ import { resultConfidence, type Confidence } from "@/lib/use-cases/results";
 import { combineQa, isStalled } from "./deliverables";
 import { figureChoices } from "./figures";
 import { getIntakeAnswers } from "./intake";
+import { foundingYear } from "@/lib/intake";
 import { getReadiness } from "./readiness";
 import { getCompanyUseCase, setUseCaseStatus } from "./use-cases";
 
@@ -121,12 +122,13 @@ export async function assembleAssessmentInputs(company: Company, useCase: UseCas
 
   // Benchmarks from the published Benchmark Library: matched and calculated in code. None is a valid outcome.
   const bench = await benchmarkCompany(
-    company,
+    { ...company, foundedYear: foundingYear(intake["company.founded_year"]) },
     figures.map((f) => ({ metric: f.metric, value: f.value, period: f.point.period, origin: f.point.origin })),
   );
-  const strong = bench.comparisons.filter((c) => c.quality === "strong").length;
+  const strong = bench.comparisons.filter((c) => c.quality === "strong" && !c.assumption).length;
+  const assumed = bench.comparisons.filter((c) => c.assumption);
   const referenceNote = bench.comparisons.length
-    ? `Benchmarks: ${bench.comparisons.length} comparison${bench.comparisons.length === 1 ? "" : "s"} from the Benchmark Library (${strong} strong, ${bench.comparisons.length - strong} directional), each with its cohort, period and source.${bench.missing.length ? ` No relevant benchmark for ${bench.missing.map((m) => m.label).join(", ")}.` : ""}`
+    ? `Benchmarks: ${bench.comparisons.length} comparison${bench.comparisons.length === 1 ? "" : "s"} from the Benchmark Library (${strong} strong, ${bench.comparisons.length - strong - assumed.length} directional${assumed.length ? `, ${assumed.length} from Growth Goaled's standard reference: assumptions, not a measured peer group` : ""}), each with its cohort, period and source.${bench.missing.length ? ` No relevant benchmark for ${bench.missing.map((m) => m.label).join(", ")}.` : ""}`
     : "No sufficiently relevant published benchmark matches this company's figures yet, so this assessment uses the company's own figures, answers and target.";
 
   // Tables computed from their files, newest first, and the rule-based diagnosis over them.
@@ -176,8 +178,8 @@ export async function assembleAssessmentInputs(company: Company, useCase: UseCas
     reference: bench.comparisons.map((c) => ({
       id: c.benchmark.stats[0]!.recordId,
       metric: c.metric,
-      label: c.label,
-      quality: c.quality,
+      label: c.assumption ? `${c.label} (standard reference: an assumption)` : c.label,
+      quality: c.assumption ? "directional" : c.quality,
       company_value: c.observed.formatted,
       benchmark_values: c.benchmark.stats.map((s) => `${s.statistic} ${s.formatted}`),
       difference: c.derived?.formatted ? `${c.derived.formatted} the ${c.derived.versus}` : null,

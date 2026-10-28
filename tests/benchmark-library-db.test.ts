@@ -37,6 +37,7 @@ import {
   type SourceInput,
 } from "@/lib/data/benchmark-library";
 import type { RawRecord } from "@/lib/benchmark-library/records";
+import { ensureStandardReference } from "@/lib/benchmark-library/ensure-reference";
 
 type DB = typeof import("@/lib/db").db;
 const db = () => h.db as unknown as DB;
@@ -231,6 +232,26 @@ describe("assessment retrieval", () => {
     const [third] = (await db().insert(schema.companies).values({ name: "Third", stage: "Series A", arr: 3_000_000 }).returning()) as [Company];
     expect((await benchmarkCompany(third, [{ metric: "nrr", value: 94, period: null, origin: "manual" }])).comparisons).toHaveLength(1);
     expect(await setOverride(advisor, co, "nrr", "00000000-0000-0000-0000-000000000000", "Use this")).toMatchObject({ ok: false });
+  });
+
+  it("loads the standard reference once, and uses it only when no other benchmark fits, labelled an assumption", async () => {
+    expect(await ensureStandardReference(db() as never)).toBe(true);
+    expect(await ensureStandardReference(db() as never)).toBe(false); // admin edits are never overwritten
+    const [ref] = await db().select().from(schema.benchmarkSources).where(eq(schema.benchmarkSources.standardReference, true));
+    expect(ref).toMatchObject({ name: "Growth Goaled standard reference", allowCustomerDisplay: true, snapshotSource: false });
+    const growth = [{ metric: "arr_growth" as const, value: 60, period: null, origin: "manual" }];
+    const fallback = (await benchmarkCompany(co, growth)).comparisons[0]!;
+    expect(fallback).toMatchObject({ metric: "arr_growth", assumption: "No published benchmark exists for this metric yet.", benchmark: { source: { name: "Growth Goaled standard reference" } } });
+    expect(fallback.benchmark.stats.map((x) => x.formatted)).toEqual(["20–25%", "40–45%", "80–120%", "200%+"]);
+    expect(fallback.interpretation).toMatch(/^Standard reference \(an assumption\): /);
+    expect(fallback.limitations[0]).toMatch(/Growth Goaled's standard reference: an assumption/);
+    // A real published benchmark always wins over the reference.
+    await publishedNrr();
+    const nrr = (await benchmarkCompany(co, [{ metric: "nrr", value: 94, period: null, origin: "manual" }])).comparisons[0]!;
+    expect(nrr.assumption).toBeUndefined();
+    // An advisor's "don't benchmark this" also rules out the reference.
+    await setOverride(advisor, co, "arr_growth", null, "Not comparable");
+    expect((await benchmarkCompany(co, growth)).comparisons).toEqual([]);
   });
 
   it("reproduces an old report's comparison from the version it used after a new version is published", async () => {

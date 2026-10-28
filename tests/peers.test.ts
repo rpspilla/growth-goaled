@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { cohortFit, type CandidateRecord, type CompanyProfile } from "@/lib/benchmark-library/match";
-import { t2d3Target } from "@/lib/benchmark-library/reference";
+import { growthPath, pathTarget, pathYears } from "@/lib/benchmark-library/reference";
+import { STANDARD_REFERENCE_RECORDS } from "@/lib/benchmark-library/standard-reference";
 import { ADVISOR_CONFIRMS, peerComparisons, position, sameIndustry, topQuartileTarget, type PeerFigure } from "@/lib/benchmark-library/peers";
 import { describeCohort, validateRecord } from "@/lib/benchmark-library/records";
 
@@ -26,6 +27,13 @@ const cohort = (metric: string, [p25, med, p75]: [number, number, number], over:
   rec(metric, { statistic: "median" }, med, over),
   rec(metric, { statistic: "percentile", percentile: 75 }, p75, over),
 ];
+/** The shipped standard reference, as published library records. */
+const referenceRecords = (): CandidateRecord[] =>
+  STANDARD_REFERENCE_RECORDS.map((raw, i) => ({
+    ...validateRecord(raw).record!,
+    id: `ref${i}`, versionId: "vref", version: 1, datasetId: "dref", datasetName: "Growth Goaled standard reference: private B2B SaaS", reviewedAt: new Date(),
+    source: source({ id: "sref", name: "Growth Goaled standard reference", kind: "internal_research", reliability: "use_with_caution", snapshotSource: false, standardReference: true }),
+  }));
 const exact = (v: number, text: string): PeerFigure => ({ lo: v, hi: v, exact: v, text, origin: "your company profile" });
 
 describe("founding-year cohorts in the Benchmark Library", () => {
@@ -62,40 +70,47 @@ describe("Snapshot peer comparisons", () => {
   });
 
   it("is transparent when there's no industry, founding year or published cohort, and never borrows another industry or vintage", () => {
-    for (const c of peerComparisons(company({ industry: null }), records)) expect(c).toMatchObject({ status: expect.stringMatching(/reference|trajectory/), reason: expect.stringContaining(ADVISOR_CONFIRMS) });
+    for (const c of peerComparisons(company({ industry: null }), [...records, ...referenceRecords()])) expect(c).toMatchObject({ status: expect.stringMatching(/reference|trajectory/), reason: expect.stringContaining(ADVISOR_CONFIRMS) });
     for (const c of peerComparisons(company({ foundedYear: null }), records)) expect(c.status).not.toBe("compared");
     for (const c of peerComparisons(company({ industry: "Other" }), records)) expect(c.status).not.toBe("compared");
     const other = peerComparisons(company({ industry: "HealthTech" }), records)[0]!;
-    expect(other).toMatchObject({ status: "reference", reason: `Our comparison sources don't publish growth figures for HealthTech companies founded in 2019 yet. ${ADVISOR_CONFIRMS}` });
-    expect(peerComparisons(company({ foundedYear: 2012 }), records)[0]!.status).toBe("reference");
+    expect(other).toMatchObject({ status: "none", reason: `Our comparison sources don't publish growth figures for HealthTech companies founded in 2019 yet. ${ADVISOR_CONFIRMS}` });
+    expect(peerComparisons(company({ foundedYear: 2012 }), records)[0]!.status).toBe("none");
     // A cohort without founding years isn't a founding-year comparison.
-    expect(peerComparisons(company(), cohort("nrr", [90, 100, 110], { foundedFrom: null, foundedTo: null }))[1]!.status).toBe("reference");
+    expect(peerComparisons(company(), cohort("nrr", [90, 100, 110], { foundedFrom: null, foundedTo: null }))[1]!.status).toBe("none");
   });
 
-  it("falls back to Growth Goaled's standard reference, labelled as an assumption, when no data fits", () => {
+  it("falls back to Growth Goaled's standard reference from the library, labelled as an assumption, when no data fits", () => {
+    const ref = referenceRecords();
+    for (const raw of STANDARD_REFERENCE_RECORDS) expect(validateRecord(raw).record, raw.cohortDefinition).not.toBeNull();
     const [growth, retention, revenue] = peerComparisons(
       { industry: "HealthTech", foundedYear: 2024, stage: "Seed", figures: { growth: exact(60, "60%"), grossRetention: { lo: 90, hi: 95, exact: null, text: "5–10%", origin: "the range you picked" }, revenue: { lo: 1_000_000, hi: 3_000_000, exact: null, text: "$1M–$3M", origin: "" } } },
-      [],
+      ref,
     );
-    expect(growth).toMatchObject({ status: "reference", metric: "arr_growth", position: "Between the median and the top quartile", reference: { bottom: { formatted: "20–25%" }, median: { formatted: "40–45%" }, top: { formatted: "80–120%" } } });
-    expect(growth!.status === "reference" && growth!.basis).toMatch(/assumption/);
-    expect(retention).toMatchObject({ status: "reference", metric: "grr", company: { text: "5–10%" }, position: "Between the median and the top quartile", reference: { metricLabel: "Annual gross revenue churn", bottom: { formatted: "over 20%" }, median: { formatted: "10–12%" }, top: { formatted: "about 5%" } } });
+    expect(growth).toMatchObject({ status: "reference", metric: "arr_growth", position: "Between the median and the top quartile", reference: { bottom: { formatted: "20–25%" }, median: { formatted: "40–45%" }, top: { formatted: "80–120%" }, elite: "Elite companies grow 200%+ a year." } });
+    expect(growth!.status === "reference" && growth!.reference.basis).toMatch(/standard reference \(Growth Goaled standard reference: private B2B SaaS, version 1\).*assumption/);
+    expect(retention).toMatchObject({ status: "reference", metric: "grr", company: { text: "5–10%" }, position: "Between the median and the top quartile", reference: { metricLabel: "Annual gross revenue churn", bottom: { formatted: "over 20%" }, median: { formatted: "10–12%" }, top: { formatted: "about 5%" }, elite: "World-class companies lose under 2% a year." } });
     expect(revenue).toMatchObject({ status: "trajectory", target: "reach $3M–$9M ARR next year" });
-    // A published stage figure beats the assumption.
+    // Without a standard reference in the library, only the transparent message remains.
+    expect(peerComparisons({ industry: "HealthTech", foundedYear: 2024, stage: "Seed", figures: {} }, []).map((c) => c.status)).toEqual(["none", "none", "none"]);
+    // A published stage figure beats the assumption, and the reference never stands in for peers.
     const stageP75 = rec("arr_growth", { statistic: "percentile", percentile: 75 }, 150, { stages: ["Seed"], industry: null, foundedFrom: null, foundedTo: null });
-    expect(peerComparisons({ industry: "HealthTech", foundedYear: 2024, stage: "Seed", figures: {} }, [stageP75])[0]!.status).toBe("unavailable");
+    expect(peerComparisons({ industry: "HealthTech", foundedYear: 2024, stage: "Seed", figures: {} }, [...ref, stageP75])[0]!.status).toBe("unavailable");
   });
 
-  it("sets T2D3 targets: triple below $6M ARR, double from there, and reach $1–2M first", () => {
-    expect(t2d3Target({ lo: 2_000_000, hi: 2_000_000, exact: 2_000_000 })).toBe("reach $6M ARR next year (triple today's)");
-    expect(t2d3Target({ lo: 12_000_000, hi: 12_000_000, exact: 12_000_000 })).toBe("reach $24M ARR next year (double today's)");
-    expect(t2d3Target({ lo: 0, hi: 1_000_000, exact: null })).toMatch(/^reach \$1–2M ARR/);
-    expect(t2d3Target({ lo: 20_000_000, hi: null, exact: null })).toBe("reach at least $40M ARR next year");
+  it("reads the T2D3 path from the library: triple below $6M ARR, double from there, reach $1–2M first", () => {
+    const path = growthPath(referenceRecords())!;
+    expect(pathYears(path, 1_000_000).map((y) => y.arr)).toEqual([1e6, 3e6, 9e6, 18e6, 36e6]);
+    expect(pathYears(path, 2_000_000).map((y) => y.arr)).toEqual([2e6, 6e6, 12e6, 24e6, 48e6]);
+    expect(pathTarget(path, { lo: 2_000_000, hi: 2_000_000, exact: 2_000_000 })).toBe("reach $6M ARR next year (triple today's)");
+    expect(pathTarget(path, { lo: 12_000_000, hi: 12_000_000, exact: 12_000_000 })).toBe("reach $24M ARR next year (double today's)");
+    expect(pathTarget(path, { lo: 0, hi: 1_000_000, exact: null })).toMatch(/^reach \$1M–\$2M ARR/);
+    expect(pathTarget(path, { lo: 20_000_000, hi: null, exact: null })).toBe("reach at least $40M ARR next year");
   });
 
   it("uses only the fixed Snapshot sources whose licence allows customer display", () => {
-    expect(peerComparisons(company(), cohort("nrr", [90, 100, 110], { source: source({ snapshotSource: false }) }))[1]!.status).toBe("reference");
-    expect(peerComparisons(company(), cohort("nrr", [90, 100, 110], { source: source({ allowCustomerDisplay: false }) }))[1]!.status).toBe("reference");
+    expect(peerComparisons(company(), cohort("nrr", [90, 100, 110], { source: source({ snapshotSource: false }) }))[1]!.status).toBe("none");
+    expect(peerComparisons(company(), cohort("nrr", [90, 100, 110], { source: source({ allowCustomerDisplay: false }) }))[1]!.status).toBe("none");
   });
 
   it("picks the same cohort every time, whatever order the records arrive in", () => {
@@ -109,7 +124,7 @@ describe("Snapshot peer comparisons", () => {
   it("still shows the peers when the company's figure is missing, and needs both a bottom and a top", () => {
     const c = peerComparisons(company({ figures: {} }), records)[0]!;
     expect(c).toMatchObject({ status: "compared", company: null, position: null });
-    expect(peerComparisons(company(), [rec("nrr", { statistic: "median" }, 100)])[1]!.status).toBe("reference");
+    expect(peerComparisons(company(), [rec("nrr", { statistic: "median" }, 100)])[1]!.status).toBe("none");
   });
 
   it("places a range only when it falls in one band", () => {

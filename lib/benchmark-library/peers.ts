@@ -1,7 +1,7 @@
 import { formatMetric, METRICS, type MetricKey } from "@/lib/metrics";
 import { incompatible, stagesFor, type CandidateRecord } from "./match";
 import { cohortKey, describeCohort, foundedLabel } from "./records";
-import { GROSS_CHURN_REFERENCE, GROWTH_REFERENCE, REFERENCE_BASIS, t2d3Target, type ReferenceSpread } from "./reference";
+import { growthPath, isReference, pathTarget, referenceSpread, type GrowthPath, type ReferenceSpread } from "./reference";
 
 /**
  * The free Snapshot's peer comparisons: growth, retention and revenue against companies in the
@@ -46,8 +46,10 @@ export type PeerComparison =
     }
   | { status: "unavailable"; key: PeerKey; title: string; metric: MetricKey; company: PeerFigure | null; reason: string; target: TopQuartileTarget }
   /** No data fits at all: Growth Goaled's standard reference (an assumption), shown as such. */
-  | { status: "reference"; key: PeerKey; title: string; metric: MetricKey; company: PeerFigure | null; reason: string; reference: ReferenceSpread; position: string | null; basis: string }
-  | { status: "trajectory"; key: PeerKey; title: string; metric: MetricKey; company: PeerFigure | null; reason: string; target: string; basis: string };
+  | { status: "reference"; key: PeerKey; title: string; metric: MetricKey; company: PeerFigure | null; reason: string; reference: ReferenceSpread; position: string | null }
+  | { status: "trajectory"; key: PeerKey; title: string; metric: MetricKey; company: PeerFigure | null; reason: string; target: string; path: GrowthPath }
+  /** Nothing fits and the standard reference doesn't cover it either: the transparent message alone. */
+  | { status: "none"; key: PeerKey; title: string; metric: MetricKey; company: PeerFigure | null; reason: string };
 
 /**
  * The fallback when no industry-and-founding-year cohort exists: the top-quartile figure the fixed
@@ -86,9 +88,10 @@ const pct = (r: CandidateRecord) => (r.statistic === "median" ? 50 : r.statistic
 /** Bottom, median and top of one cohort's published statistics, if it has a bottom and a top. */
 function spread(rows: CandidateRecord[], metric: MetricKey): { bottom: PeerPoint; median: PeerPoint | null; top: PeerPoint } | null {
   const ranked = rows.map((r) => ({ r, p: pct(r) })).filter((x): x is { r: CandidateRecord; p: number } => x.p !== null && x.r.value !== null).sort((a, b) => a.p - b.p);
-  const low = ranked[0];
-  const high = ranked.at(-1);
-  if (!low || !high || low.p > 30 || high.p < 70) return null;
+  // The quartiles when published (the highest percentile at or below 30, the lowest at or above 70).
+  const low = [...ranked].reverse().find((x) => x.p <= 30);
+  const high = ranked.find((x) => x.p >= 70);
+  if (!low || !high) return null;
   const point = (x: { r: CandidateRecord; p: number }, edge: "bottom" | "top" | "median"): PeerPoint => ({
     label: edge === "median" ? "Median" : x.p === 25 ? "Bottom quartile" : x.p === 75 ? "Top quartile" : `${x.p}th percentile`,
     value: x.r.value!,
@@ -147,7 +150,7 @@ export function topQuartileTarget(
   const industryFits = (r: CandidateRecord) => !r.industry || (company.industry ? sameIndustry(company.industry, r.industry) : false);
   const yearFits = (r: CandidateRecord) => (r.foundedFrom == null && r.foundedTo == null) || company.foundedYear === null || inFounded(r, company.foundedYear);
   const rows = candidates
-    .filter((r) => r.metric === metric && r.source.snapshotSource && !incompatible(r, metric, "customer_report"))
+    .filter((r) => r.metric === metric && r.source.snapshotSource && !isReference(r) && !incompatible(r, metric, "customer_report"))
     .filter((r) => r.statistic === "percentile" && r.percentile !== null && r.percentile >= 75 && r.value !== null)
     .filter((r) => r.stages.some((st) => stages.includes(st)) && industryFits(r) && yearFits(r))
     .sort(
@@ -199,15 +202,21 @@ export function peerComparisons(
       const reason = `${why} ${ADVISOR_CONFIRMS}`;
       const target = topQuartileTarget(metric, { stage: company.stage ?? null, industry: company.industry, foundedYear: company.foundedYear }, figure, candidates);
       if (target) return { status: "unavailable", key, title, metric, company: figure, reason, target };
-      if (key === "revenue") return { status: "trajectory", key, title, metric, company: figure, reason, target: figure ? t2d3Target(figure) : "reach $1–2M ARR, where the T2D3 path starts", basis: REFERENCE_BASIS };
-      const [refMetric, reference, own]: [MetricKey, ReferenceSpread, PeerFigure | null] =
-        key === "growth" ? ["arr_growth", GROWTH_REFERENCE, figure] : ["grr", GROSS_CHURN_REFERENCE, company.figures.grossRetention ?? null];
-      return { status: "reference", key, title, metric: refMetric, company: own, reason, reference, position: own ? position(own, reference) : null, basis: REFERENCE_BASIS };
+      if (key === "revenue") {
+        const path = growthPath(candidates);
+        return path ? { status: "trajectory", key, title, metric, company: figure, reason, target: pathTarget(path, figure ?? { lo: null, hi: null, exact: null }), path } : { status: "none", key, title, metric, company: figure, reason };
+      }
+      const [refMetric, reference, own] =
+        key === "growth"
+          ? (["arr_growth", referenceSpread("arr_growth", candidates, { metricLabel: "Year-over-year ARR growth" }), figure] as const)
+          : (["grr", referenceSpread("grr", candidates, { asChurn: true, metricLabel: "Annual gross revenue churn" }), company.figures.grossRetention ?? null] as const);
+      if (!reference) return { status: "none", key, title, metric, company: figure, reason };
+      return { status: "reference", key, title, metric: refMetric, company: own, reason, reference, position: own ? position(own, reference) : null };
     };
     if (!company.industry || norm(company.industry) === "other") return none("We don't have an industry to compare you within yet.");
     if (company.foundedYear === null) return none("We don't have your founding year yet.");
 
-    const fits = candidates.filter((r) => r.metric === metric && r.source.snapshotSource && !incompatible(r, metric, "customer_report") && r.industry && sameIndustry(company.industry!, r.industry) && inFounded(r, company.foundedYear!));
+    const fits = candidates.filter((r) => r.metric === metric && r.source.snapshotSource && !isReference(r) && !incompatible(r, metric, "customer_report") && r.industry && sameIndustry(company.industry!, r.industry) && inFounded(r, company.foundedYear!));
     const groups = new Map<string, CandidateRecord[]>();
     for (const r of fits) {
       const k = [r.versionId, cohortKey(r), r.period.toLowerCase(), r.periodBasis].join("#");

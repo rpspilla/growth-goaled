@@ -1,5 +1,5 @@
 import type { PeerComparison, PeerFigure, PeerPoint } from "@/lib/benchmark-library/peers";
-import { T2D3 } from "@/lib/benchmark-library/reference";
+import { pathYears } from "@/lib/benchmark-library/reference";
 import { formatMetric } from "@/lib/metrics";
 
 const muted = { color: "var(--muted-foreground)" };
@@ -123,13 +123,16 @@ export function PeerComparisonCard({ c }: { c: PeerComparison }) {
         <Header title={c.title} label={r.metricLabel} />
         <p className="text-base mt-2" style={muted}>{c.reason}</p>
         <Assumption>
-          <Spread c={{ title: c.title, bottom: r.bottom, median: r.median, top: r.top, company: c.company, position: c.company ? c.position : `Add your ${r.metricLabel.toLowerCase()} to see where you sit.` }} note={r.elite} />
-          <p className="text-sm mt-2" style={muted}>{c.basis}</p>
+          <Spread c={{ title: c.title, bottom: r.bottom, median: r.median, top: r.top, company: c.company, position: c.company ? c.position : `Add your ${r.metricLabel.toLowerCase()} to see where you sit.` }} note={r.elite ?? undefined} />
+          <p className="text-sm mt-2" style={muted}>{r.basis}</p>
         </Assumption>
       </article>
     );
   }
   if (c.status === "trajectory") {
+    const from1 = pathYears(c.path, 1_000_000);
+    const from2 = pathYears(c.path, 2_000_000);
+    const phase = (m: number) => (m === 3 ? "Triple" : m === 2 ? "Double" : `${m}×`);
     return (
       <article className="surface p-5" aria-label={label}>
         <Header title={c.title} label="ARR" />
@@ -137,33 +140,40 @@ export function PeerComparisonCard({ c }: { c: PeerComparison }) {
         <p className="text-base mt-2" style={muted}>{c.reason}</p>
         <Assumption>
           <p className="text-base font-medium" style={{ color: "var(--foreground)" }}>
-            Top-quartile venture-backed companies follow the T2D3 path: triple ARR for two years, then double it for three. On that path you&apos;d aim to {c.target}.
+            Top-quartile venture-backed companies follow a path like T2D3: triple ARR for two years, then double it for three. On that path you&apos;d aim to {c.target}.
           </p>
           <div className="overflow-x-auto mt-3">
             <table className="w-full text-sm min-w-[420px]">
-              <caption className="sr-only">The T2D3 path from $1M and from $2M ARR</caption>
+              <caption className="sr-only">The growth path from $1M and from $2M ARR</caption>
               <thead>
                 <tr className="text-left" style={muted}>
                   <th className="py-1.5 pr-2 font-semibold">Year</th>
-                  <th className="py-1.5 pr-2 font-semibold">Phase</th>
                   <th className="py-1.5 pr-2 font-semibold">From $1M</th>
                   <th className="py-1.5 font-semibold">From $2M</th>
                 </tr>
               </thead>
               <tbody>
-                {T2D3.map((y) => (
+                {from1.map((y, i) => (
                   <tr key={y.year} className="border-t" style={{ borderColor: "var(--border)", color: "var(--foreground)" }}>
                     <td className="py-1.5 pr-2">Year {y.year}</td>
-                    <td className="py-1.5 pr-2">{y.phase} · {y.multiplier}×</td>
-                    <td className="py-1.5 pr-2 font-semibold">{formatMetric("arr", y.from1m)}</td>
-                    <td className="py-1.5 font-semibold">{formatMetric("arr", y.from2m)}{y.year === 1 ? " (common Series A entry point)" : ""}</td>
+                    <td className="py-1.5 pr-2"><span className="font-semibold">{formatMetric("arr", y.arr)}</span> <span style={muted}>then {phase(y.multiplier)}</span></td>
+                    <td className="py-1.5"><span className="font-semibold">{formatMetric("arr", from2[i]!.arr)}</span> <span style={muted}>then {phase(from2[i]!.multiplier)}{i === 0 ? " · common Series A entry point" : ""}</span></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <p className="text-sm mt-2" style={muted}>{c.basis}</p>
+          <p className="text-sm mt-2" style={muted}>{c.path.basis}</p>
         </Assumption>
+      </article>
+    );
+  }
+  if (c.status === "none") {
+    return (
+      <article className="surface p-5" aria-label={label}>
+        <Header title={c.title} />
+        <You f={c.company} />
+        <p className="text-base mt-2" style={muted}>{c.reason}</p>
       </article>
     );
   }

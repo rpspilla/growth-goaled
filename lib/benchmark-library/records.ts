@@ -202,7 +202,10 @@ export function validateRecord(raw: RawRecord): { record: RecordInput | null; is
     if (value !== null) err("value", "A range uses value_low and value_high, not value.");
   } else if (statistic) {
     if (value === null) err("value", "Value is required.");
-    if (valueLow !== null || valueHigh !== null) err("valueLow", "Only range statistics take value_low and value_high.");
+    // A median or percentile may also keep the band the source published it as (e.g. 20–25%); the value is where it's plotted.
+    if (statistic !== "median" && statistic !== "percentile" && (valueLow !== null || valueHigh !== null)) err("valueLow", "Only range, median and percentile statistics take value_low and value_high.");
+    else if (value !== null && !Number.isNaN(value) && ((valueLow !== null && !Number.isNaN(valueLow) && valueLow > value) || (valueHigh !== null && !Number.isNaN(valueHigh) && valueHigh < value)))
+      err("valueLow", "A published band must contain the value (value_low ≤ value ≤ value_high).");
   }
   const values = [value, valueLow, valueHigh].filter((v): v is number => v !== null && !Number.isNaN(v));
   if (unit === "percent") {
@@ -269,8 +272,8 @@ export function validateRecord(raw: RawRecord): { record: RecordInput | null; is
       statistic: statistic!,
       percentile: statistic === "percentile" ? percentile : null,
       value: statistic === "range" ? null : value,
-      valueLow: statistic === "range" ? valueLow : null,
-      valueHigh: statistic === "range" ? valueHigh : null,
+      valueLow: statistic === "range" || statistic === "median" || statistic === "percentile" ? valueLow : null,
+      valueHigh: statistic === "range" || statistic === "median" || statistic === "percentile" ? valueHigh : null,
       stages,
       arrMin,
       arrMax,

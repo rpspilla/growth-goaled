@@ -120,6 +120,13 @@
       "when": 1793209831005,
       "tag": "0016_snapshot_peers",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793215400790,
+      "tag": "0017_standard_reference",
+      "breakpoints": true
     }
   ]
 }

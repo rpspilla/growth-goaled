@@ -19,6 +19,7 @@ type Source = {
   allowCustomerDisplay: boolean;
   allowDerived: boolean;
   snapshotSource: boolean;
+  standardReference: boolean;
   reliability: string;
   updateFrequency: string | null;
   reviewIntervalDays: number | null;
@@ -105,6 +106,13 @@ export function SourceForm({ source, action }: { source?: Source; action: typeof
           Use for Snapshot peer comparisons (growth, retention and revenue by industry and founding year)
         </label>
         <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Every Snapshot draws its peer comparisons from these sources only, so founders are always compared on the same basis. The licence must also allow customer display.</p>
+        <label className="flex items-center gap-2 text-sm" style={{ color: "var(--foreground)" }}>
+          <input type="checkbox" name="standardReference" defaultChecked={source?.standardReference ?? false} />
+          Growth Goaled standard reference (assumptions used only when no other data fits)
+        </label>
+        <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+          Snapshots and assessments fall back to its published figures only when no other benchmark fits, and always label them as an assumption. Quartiles by metric with no cohort filters; growth by ARR band sets the growth path (T2D3).
+        </p>
       </fieldset>
       {kind === "aggregated_customer" && (
         <fieldset className="rounded-lg border p-3 space-y-2" style={{ borderColor: "var(--amber)" }}>

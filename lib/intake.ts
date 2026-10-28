@@ -40,6 +40,11 @@ export type IntakeField = {
   column?: CompanyColumn;
   /** A simple definition shown under the question; defaults to the metric's definition. */
   help?: string;
+  /**
+   * Asked as its complement: the founder enters annual gross churn, and the gross retention it
+   * implies (100 minus it) is what's stored and becomes the figure. Shown back as churn.
+   */
+  asChurn?: boolean;
   /** Set on range fields: the exact field this range stands in for. Never a figure. */
   rangeOf?: string;
 };
@@ -91,7 +96,17 @@ const BASE_SECTIONS: IntakeSection[] = [
       { id: "count", label: "Customer count", kind: "integer", required: true, placeholder: "87", metric: "customers", column: "customers" },
       { id: "acv", label: "ACV ($)", kind: "currency", required: true, placeholder: "42,000", metric: "acv", column: "acv" },
       { id: "nrr", label: "NRR (%)", kind: "percent", required: true, placeholder: "108", metric: "nrr", column: "nrr" },
-      { id: "gross_retention", label: "Gross retention (%)", kind: "percent", required: false, placeholder: "91", metric: "grr", column: "grr" },
+      {
+        id: "gross_retention",
+        label: "Annual gross revenue churn (%)",
+        kind: "percent",
+        required: false,
+        placeholder: "9",
+        metric: "grr",
+        column: "grr",
+        asChurn: true,
+        help: "The share of last year's recurring revenue you lost to cancellations and downgrades, before any upsells. We store 100% minus this as your gross revenue retention.",
+      },
       {
         id: "sales_cycle",
         label: "Avg. sales cycle (days)",
@@ -220,6 +235,7 @@ export function parseFieldValue(
   if (field.kind === "percent") {
     if (m[2]) return { ok: false, error: "Enter a percentage, e.g. 72." };
     if (value > 1000) return { ok: false, error: "That percentage looks too high." };
+    if (field.asChurn) return value > 100 ? { ok: false, error: "Churn can't be more than 100%." } : { ok: true, value: +(100 - value).toFixed(2) };
     return { ok: true, value };
   }
   if (field.kind === "integer") {
@@ -233,5 +249,6 @@ export function parseFieldValue(
 export function displayValue(field: IntakeField, value: IntakeValue | null | undefined): string {
   if (value === null || value === undefined) return "";
   if (typeof value === "number" && field.kind === "currency") return value.toLocaleString("en-US");
+  if (typeof value === "number" && field.asChurn) return String(+(100 - value).toFixed(2));
   return String(value);
 }

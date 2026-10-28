@@ -1,0 +1,1 @@
+ALTER TABLE "benchmark_sources" ADD COLUMN "standard_reference" boolean DEFAULT false NOT NULL;

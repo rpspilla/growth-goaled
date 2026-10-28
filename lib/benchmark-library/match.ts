@@ -26,6 +26,8 @@ export type SourceInfo = {
   reviewIntervalDays: number | null;
   /** One of the fixed sources the free Snapshot's peer comparisons use. */
   snapshotSource?: boolean;
+  /** Growth Goaled's standard reference: used only when nothing else fits, and labelled an assumption. */
+  standardReference?: boolean;
 };
 
 export type CandidateRecord = RecordInput & {

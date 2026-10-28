@@ -401,6 +401,8 @@ export const benchmarkSources = pgTable("benchmark_sources", {
   minAggregationSize: integer("min_aggregation_size"),
   // One of the fixed sources every free Snapshot's peer comparisons are drawn from
   snapshotSource: boolean("snapshot_source").notNull().default(false),
+  // Growth Goaled's own standard reference: assumptions used only when no other data fits, always labelled as such
+  standardReference: boolean("standard_reference").notNull().default(false),
   ...timestamps,
 });
 

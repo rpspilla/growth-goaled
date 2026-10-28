@@ -1,6 +1,7 @@
 import { formatMetric, METRICS, type MetricKey } from "@/lib/metrics";
 import type { BenchmarkMatch, CandidateRecord } from "./match";
 import { describeCohort, PERIOD_BASIS_LABEL, statisticLabel } from "./records";
+import { bandText } from "./reference";
 
 /**
  * Deterministic benchmark comparisons. Every number shown in a comparison is either the
@@ -15,6 +16,8 @@ export type BenchmarkComparison = {
   label: string;
   quality: "strong" | "directional";
   selection: "auto" | "override";
+  /** Set when this is Growth Goaled's standard reference (an assumption), with why no published benchmark fit. */
+  assumption?: string;
   observed: { value: number; formatted: string; period: string | null; origin: string };
   benchmark: {
     stats: ComparisonStat[];
@@ -81,7 +84,11 @@ export function difference(metric: MetricKey, value: number, ref: number): { dif
 }
 
 /** Builds the comparison for one matched figure. */
-export function compare(figure: { metric: MetricKey; value: number; period: string | null; origin: string }, match: Extract<BenchmarkMatch, { status: "matched" }>): BenchmarkComparison {
+export function compare(
+  figure: { metric: MetricKey; value: number; period: string | null; origin: string },
+  match: Extract<BenchmarkMatch, { status: "matched" }>,
+  { assumption }: { assumption?: string } = {},
+): BenchmarkComparison {
   const { metric } = figure;
   const label = METRICS[metric].label;
   const head = match.records[0]!;
@@ -95,7 +102,8 @@ export function compare(figure: { metric: MetricKey; value: number; period: stri
       low: r.valueLow,
       high: r.valueHigh,
       percentile: r.percentile,
-      formatted: r.statistic === "range" ? `${fmt(r.valueLow!)}–${fmt(r.valueHigh!)}` : fmt(r.value!),
+      // A median or percentile published as a band (e.g. 20–25%) shows the band.
+      formatted: r.statistic === "range" ? `${fmt(r.valueLow!)}–${fmt(r.valueHigh!)}` : bandText(metric, r),
     }));
 
   const ref = centre(match.records);
@@ -120,13 +128,15 @@ export function compare(figure: { metric: MetricKey; value: number; period: stri
   const where = derived?.position ? `, ${derived.position}` : "";
   const gap = derived && derived.formatted ? `${derived.formatted} the cohort ${derived.versus}${where}` : derived?.position ? derived.position : `compared side by side with the cohort's ${stats.map((s) => s.statistic).join(", ")}`;
   const verdict = derived?.better === true ? " (better)" : derived?.better === false ? " (worse)" : "";
-  const interpretation = `${match.quality === "directional" ? "Directional only: " : ""}${label} of ${fmt(figure.value)} is ${gap}${verdict}. This shows where the company sits against this cohort, not why; the diagnosis rests on the company's own data.`;
+  if (assumption) limitations.unshift(`No published benchmark fits (${assumption.replace(/\.$/, "")}), so this uses Growth Goaled's standard reference: an assumption, not a measured peer group.`);
+  const interpretation = `${assumption ? "Standard reference (an assumption): " : match.quality === "directional" ? "Directional only: " : ""}${label} of ${fmt(figure.value)} is ${gap}${verdict}. This shows where the company sits against this cohort, not why; the diagnosis rests on the company's own data.`;
 
   return {
     metric,
     label,
     quality: match.quality,
     selection: match.selection,
+    ...(assumption ? { assumption } : {}),
     observed: { value: figure.value, formatted: fmt(figure.value), period: figure.period, origin: figure.origin },
     benchmark: {
       stats,

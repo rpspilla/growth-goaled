@@ -1,59 +1,115 @@
-import { formatMetric } from "@/lib/metrics";
+import { formatMetric, type MetricKey } from "@/lib/metrics";
+import { incompatible, type CandidateRecord } from "./match";
 
 /**
- * Growth Goaled's standard reference: the assumptions the free Snapshot falls back on when no
- * published data or Growth Goaled customer data fits the company. Set by Growth Goaled (owner
- * decision, Oct 2026) from common private B2B SaaS rules of thumb; always shown labelled as an
- * assumption with its basis, never as a peer measurement.
+ * Growth Goaled's standard reference: assumptions used only when no published data or Growth
+ * Goaled customer data fits a company. They live in the Benchmark Library like any other dataset
+ * (a source flagged "standard reference"), so admins edit and version them; everything here reads
+ * the published version. Always shown labelled as an assumption with its basis.
  */
-
-export const REFERENCE_BASIS =
-  "Growth Goaled's standard reference for private B2B SaaS, compiled from widely cited industry rules of thumb (SaaS Mag; Ryan Allis on LinkedIn) and the T2D3 growth framework. It's an assumption, used only because no published or Growth Goaled data fits your company yet.";
 
 export type ReferencePoint = { label: string; value: number; formatted: string };
-export type ReferenceSpread = { bottom: ReferencePoint; median: ReferencePoint; top: ReferencePoint; elite: string; metricLabel: string };
+export type ReferenceSpread = { bottom: ReferencePoint; median: ReferencePoint; top: ReferencePoint; elite: string | null; metricLabel: string; basis: string };
+export type GrowthPath = { rules: { from: number; to: number | null; multiplier: number }[]; basis: string };
 
-/** Year-over-year ARR growth. Plotted at each band's midpoint; shown as the band. */
-export const GROWTH_REFERENCE: ReferenceSpread = {
-  bottom: { label: "Bottom quartile", value: 22.5, formatted: "20–25%" },
-  median: { label: "Median", value: 42.5, formatted: "40–45%" },
-  top: { label: "Top quartile", value: 100, formatted: "80–120%" },
-  elite: "Elite companies grow 200% or more a year.",
-  metricLabel: "Year-over-year ARR growth",
-};
+export const isReference = (r: CandidateRecord) => Boolean(r.source.standardReference);
 
-/**
- * Annual gross revenue churn: over 20% (bottom quartile), ~10–12% (median), ~5% (top quartile),
- * under 2% (world class). Shown as churn; plotted on the gross retention scale (100% minus churn)
- * so further right is better, like every other strip.
- */
-export const GROSS_CHURN_REFERENCE: ReferenceSpread = {
-  bottom: { label: "Bottom quartile", value: 80, formatted: "over 20%" },
-  median: { label: "Median", value: 89, formatted: "10–12%" },
-  top: { label: "Top quartile", value: 95, formatted: "about 5%" },
-  elite: "World-class companies lose less than 2% a year.",
-  metricLabel: "Annual gross revenue churn",
-};
+/** A published band as text: "20–25%", "200%+", "under 80%", or the value. */
+export function bandText(metric: MetricKey, r: Pick<CandidateRecord, "value" | "valueLow" | "valueHigh">): string {
+  const f = (v: number) => formatMetric(metric, v);
+  if (r.valueLow !== null && r.valueHigh !== null) return `${f(r.valueLow).replace(/%$/, "")}–${f(r.valueHigh)}`;
+  if (r.valueLow !== null) return `${f(r.valueLow)}+`;
+  if (r.valueHigh !== null) return `under ${f(r.valueHigh)}`;
+  return r.value !== null ? f(r.value) : "";
+}
 
-/** The T2D3 path: triple ARR twice, then double three times, from $1M or from $2M (a common Series A entry point). */
-export const T2D3 = [
-  { year: 1, phase: "Triple (1st)", multiplier: 3, from1m: 1_000_000, from2m: 2_000_000 },
-  { year: 2, phase: "Triple (2nd)", multiplier: 3, from1m: 3_000_000, from2m: 6_000_000 },
-  { year: 3, phase: "Double (1st)", multiplier: 2, from1m: 9_000_000, from2m: 12_000_000 },
-  { year: 4, phase: "Double (2nd)", multiplier: 2, from1m: 18_000_000, from2m: 24_000_000 },
-  { year: 5, phase: "Double (3rd)", multiplier: 2, from1m: 36_000_000, from2m: 48_000_000 },
-] as const;
+/** The same band as annual gross churn (100% minus gross retention): 88–90% retention is "10–12%" churn. */
+export function churnText(r: Pick<CandidateRecord, "value" | "valueLow" | "valueHigh">): string {
+  const c = (v: number) => +(100 - v).toFixed(1);
+  if (r.valueLow !== null && r.valueHigh !== null) return `${c(r.valueHigh)}–${c(r.valueLow)}%`;
+  if (r.valueLow !== null) return `under ${c(r.valueLow)}%`;
+  if (r.valueHigh !== null) return `over ${c(r.valueHigh)}%`;
+  return r.value !== null ? `about ${c(r.value)}%` : "";
+}
+
+const basisOf = (r: CandidateRecord) =>
+  `Growth Goaled's standard reference (${r.datasetName}, version ${r.version}).${r.methodology ? ` ${r.methodology}` : ""} It's an assumption, used only because no published or Growth Goaled data fits your company yet.`;
+
+const pct = (r: CandidateRecord) => (r.statistic === "median" ? 50 : r.statistic === "percentile" ? r.percentile : null);
+const eligible = (rows: readonly CandidateRecord[], metric: MetricKey) =>
+  rows.filter((r) => isReference(r) && r.metric === metric && !incompatible(r, metric, "customer_report") && r.value !== null && pct(r) !== null);
+const cohortWide = (r: CandidateRecord) => r.arrMin === null && r.arrMax === null && !r.stages.length && !r.industry;
 
 /**
- * Next year's ARR on the T2D3 path. Both paths triple below $6M ARR and double from there.
- * Below $1M the path hasn't started: the target is reaching $1–2M.
+ * Bottom quartile, median and top quartile (and the elite tier above it, if published) for a
+ * metric. `asChurn` shows gross retention as churn. Null when the reference doesn't cover it.
  */
-export function t2d3Target(arr: { lo: number | null; hi: number | null; exact: number | null }): string {
-  const next = (v: number) => (v < 6_000_000 ? v * 3 : v * 2);
+export function referenceSpread(metric: MetricKey, rows: readonly CandidateRecord[], { asChurn = false, metricLabel }: { asChurn?: boolean; metricLabel: string }): ReferenceSpread | null {
+  const own = eligible(rows, metric).filter(cohortWide);
+  const latest = Math.max(...own.map((r) => r.version));
+  const ranked = own.filter((r) => r.version === latest).sort((a, b) => pct(a)! - pct(b)!);
+  const bottom = [...ranked].reverse().find((r) => pct(r)! <= 30);
+  const median = ranked.find((r) => pct(r) === 50);
+  const top = ranked.find((r) => pct(r)! >= 70);
+  if (!bottom || !median || !top) return null;
+  const elite = ranked.filter((r) => pct(r)! > pct(top)!).at(-1);
+  const text = (r: CandidateRecord) => (asChurn ? churnText(r) : bandText(metric, r));
+  const point = (r: CandidateRecord, label: string): ReferencePoint => ({ label, value: r.value!, formatted: text(r) });
+  return {
+    bottom: point(bottom, "Bottom quartile"),
+    median: point(median, "Median"),
+    top: point(top, "Top quartile"),
+    elite: elite ? (asChurn ? `World-class companies lose ${text(elite)} a year.` : `Elite companies grow ${text(elite)} a year.`) : null,
+    metricLabel,
+    basis: basisOf(top),
+  };
+}
+
+/**
+ * The growth path (T2D3 in the default reference): growth by ARR band, e.g. 200% (triple) from
+ * $1M to $6M and 100% (double) from $6M. Read from the reference's ARR-banded growth records.
+ */
+export function growthPath(rows: readonly CandidateRecord[]): GrowthPath | null {
+  const own = eligible(rows, "arr_growth").filter((r) => r.arrMin !== null);
+  if (!own.length) return null;
+  const latest = Math.max(...own.map((r) => r.version));
+  const rules = own
+    .filter((r) => r.version === latest)
+    .sort((a, b) => a.arrMin! - b.arrMin!)
+    .map((r) => ({ from: r.arrMin!, to: r.arrMax, multiplier: 1 + r.value! / 100 }));
+  return { rules, basis: basisOf(own.find((r) => r.version === latest)!) };
+}
+
+const step = (path: GrowthPath, v: number) => {
+  const rule = path.rules.find((r) => v >= r.from && (r.to === null || v < r.to)) ?? path.rules.at(-1)!;
+  return v * rule.multiplier;
+};
+
+/** The path's first five years from a starting ARR, e.g. $1M → $3M → $9M → $18M → $36M. */
+export function pathYears(path: GrowthPath, start: number): { year: number; arr: number; multiplier: number }[] {
+  const out: { year: number; arr: number; multiplier: number }[] = [];
+  let v = start;
+  for (let year = 1; year <= 5; year++) {
+    const next = step(path, v);
+    out.push({ year, arr: v, multiplier: +(next / v).toFixed(2) });
+    v = next;
+  }
+  return out;
+}
+
+/** Next year's ARR on the path, for an exact ARR or a range. Below the path's start, reaching it is the target. */
+export function pathTarget(path: GrowthPath, arr: { lo: number | null; hi: number | null; exact: number | null }): string {
+  const start = path.rules[0]!.from;
+  const f = (v: number) => formatMetric("arr", v);
   const lo = arr.exact ?? arr.lo;
   const hi = arr.exact ?? arr.hi;
-  if (hi !== null && hi <= 1_000_000) return "reach $1–2M ARR, where the T2D3 path (and a typical Series A) starts";
-  if (lo === null || lo < 1_000_000) return hi !== null ? `reach up to ${formatMetric("arr", next(hi))} ARR next year` : "reach $1–2M ARR, where the T2D3 path starts";
-  if (hi === null) return `reach at least ${formatMetric("arr", next(lo))} ARR next year`;
-  return lo === hi ? `reach ${formatMetric("arr", next(lo))} ARR next year (${lo < 6_000_000 ? "triple" : "double"} today's)` : `reach ${formatMetric("arr", next(lo))}–${formatMetric("arr", next(hi))} ARR next year`;
+  const begin = `reach ${f(start)}–${f(start * 2)} ARR, where the path (and a typical Series A) starts`;
+  if (hi !== null && hi <= start) return begin;
+  if (lo === null || lo < start) return hi !== null ? `reach up to ${f(step(path, hi))} ARR next year` : begin;
+  if (hi === null) return `reach at least ${f(step(path, lo))} ARR next year`;
+  if (lo === hi) {
+    const m = step(path, lo) / lo;
+    return `reach ${f(step(path, lo))} ARR next year (${m === 3 ? "triple" : m === 2 ? "double" : `${+m.toFixed(1)}×`} today's)`;
+  }
+  return `reach ${f(step(path, lo))}–${f(step(path, hi))} ARR next year`;
 }

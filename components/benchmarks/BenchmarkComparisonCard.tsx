@@ -24,7 +24,11 @@ export function BenchmarkComparisonCard({ c, preview = false }: { c: BenchmarkCo
     <article className="rounded-lg border p-4 text-sm space-y-2.5" style={{ borderColor: c.quality === "directional" ? "var(--amber)" : "var(--border)" }} aria-label={`${c.label} benchmark comparison`}>
       <div className="flex items-center gap-2 flex-wrap">
         <h3 className="font-semibold" style={fg}>{c.label}</h3>
-        {c.quality === "directional" && <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: "var(--amber-muted)", color: "var(--amber)" }}>Directional</span>}
+        {c.assumption ? (
+          <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: "var(--amber-muted)", color: "#92400E" }}>Standard reference · an assumption</span>
+        ) : (
+          c.quality === "directional" && <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: "var(--amber-muted)", color: "var(--amber)" }}>Directional</span>
+        )}
         {c.selection === "override" && <span className="text-xs" style={muted}>Chosen by your advisor</span>}
         {preview && <span className="text-xs ml-auto" style={muted}>Preview</span>}
       </div>

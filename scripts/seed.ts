@@ -11,6 +11,7 @@ import { drizzle } from "drizzle-orm/neon-serverless";
 import { inArray } from "drizzle-orm";
 import * as schema from "../lib/db/schema";
 import { acme, ACME_ID, benchmark, portfolio, PORTFOLIO_IDS, rubric, SAMPLE_IDS, SEED_USERS, users } from "../lib/seed/data";
+import { ensureStandardReference } from "../lib/benchmark-library/ensure-reference";
 
 const args = new Set(process.argv.slice(2));
 const isProduction = process.env.VERCEL_ENV === "production" || process.env.APP_URL?.includes("app.growthgoaled.com");
@@ -75,6 +76,8 @@ try {
     }
   });
   console.log(`[seed] Seeded Acme AI sample${withPortfolio ? " and fake portfolio" : ""}.`);
+  // Every environment, production included: the owner's standard reference, once (admins edit it after).
+  if (await ensureStandardReference(db)) console.log("[seed] Loaded the Growth Goaled standard reference into the Benchmark Library.");
 } catch (err) {
   console.error("[seed] Failed:", err);
   process.exitCode = 1;

@@ -76,7 +76,8 @@ export function growthSnapshot(input: SnapshotInput, now = new Date()): Snapshot
   const model = typeof profile["gtm.model"] === "string" ? (profile["gtm.model"] as string) : null;
   const growth = figure(profile, "company.growth", pct);
   const nrr = figure(profile, "customers.nrr", pct);
-  const grr = figure(profile, "customers.gross_retention", pct);
+  // Stored as gross retention, asked and quoted as annual gross churn (100% minus it).
+  const grr = figure(profile, "customers.gross_retention", (n) => `${+(100 - n).toFixed(1)}%`);
   const arr = figure(profile, "company.arr", usd);
   const reps = figure(profile, "gtm.sales_reps", String);
   const cycle = figure(profile, "customers.sales_cycle", (n) => `${n} days`);
@@ -101,7 +102,7 @@ export function growthSnapshot(input: SnapshotInput, now = new Date()): Snapshot
       : grr.hi !== null && grr.hi >= 100 ? `Up to ${100 - grr.lo}%`
       : `About ${100 - grr.hi!}–${100 - grr.lo}%`;
     if (grr && lost)
-      signals.push({ kind: "info", title: `${lost} of starting revenue is lost each year`, detail: "That's churn plus downgrades, before expansion. The assessment shows which customers it comes from.", basis: grr.exact !== null ? `Your answer: gross retention ${grr.text}` : `Your answer: annual gross churn ${grr.text}` });
+      signals.push({ kind: "info", title: `${lost} of starting revenue is lost each year`, detail: "That's churn plus downgrades, before expansion. The assessment shows which customers it comes from.", basis: `Your answer: annual gross churn ${grr.text}` });
   };
   const growthSignal = () => {
     if (growth && (growth.exact !== null ? growth.exact <= 0 : growth.hi !== null && growth.hi <= 0))
