@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { z } from "zod";
 import { authClient } from "@/lib/auth/client";
 import { trackSignupEvent } from "./actions";
@@ -27,6 +27,14 @@ export function MagicLinkForm({ mode, next, lockedEmail, cta }: { mode: "sign-in
   const [fieldError, setFieldError] = useState<string | null>(null);
   const started = useRef(false);
   const signup = mode === "sign-up" && !lockedEmail;
+  // Counted here, not on the server: the sign-up page is prerendered, so a server-side event would
+  // only fire at build time. The ref keeps React's dev double-mount from counting twice.
+  const viewed = useRef(false);
+  useEffect(() => {
+    if (!signup || viewed.current) return;
+    viewed.current = true;
+    void trackSignupEvent("signup_viewed");
+  }, [signup]);
 
   async function send(email: string) {
     setState({ status: "sending" });

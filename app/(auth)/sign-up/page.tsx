@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { track } from "@/lib/events";
 import { formatPrice, pricing } from "@/lib/pricing";
 import { AuthShell, Positioning } from "../AuthShell";
 import { MagicLinkForm } from "../MagicLinkForm";
@@ -17,8 +16,7 @@ const NEXT = [
 ];
 
 /** The main conversion page: what this is, why it matters at your stage, and exactly what happens next. */
-export default async function SignUpPage() {
-  await track("signup_viewed");
+export default function SignUpPage() {
   const price = formatPrice(pricing().assessmentCents);
   return (
     <AuthShell

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/session";
 import { track } from "@/lib/events";
 
-const SIGNUP_EVENTS = ["signup_started", "signup_submitted", "signup_link_sent", "signup_failed"] as const;
+const SIGNUP_EVENTS = ["signup_viewed", "signup_started", "signup_submitted", "signup_link_sent", "signup_failed"] as const;
 const REASONS = ["invalid_email", "rate_limited", "auth_error", "network"] as const;
 
 /**

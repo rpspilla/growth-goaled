@@ -367,6 +367,25 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await admin.page.goto("/advisor/analytics");
   await expect(admin.page.locator("div", { hasText: /^deliverable_published2$/ }).first()).toBeVisible();
   await expect(admin.page.getByText("Sign-up to first Benchmark")).toBeVisible();
+  // The sign-up page is prerendered, so its view is counted from the browser.
+  {
+    const visitor = await browser.newContext();
+    const page = await visitor.newPage();
+    await page.goto("/sign-up");
+    await expect(page.getByRole("button", { name: "Get my free Growth Snapshot" })).toBeVisible();
+    await expect
+      .poll(async () => {
+        const db = new Client({ connectionString: E2E_DATABASE_URL });
+        await db.connect();
+        const { rows } = await db.query("select count(*)::int as n from events where name = 'signup_viewed'");
+        await db.end();
+        return rows[0].n;
+      }, { timeout: 30_000 })
+      .toBeGreaterThan(0);
+    await visitor.close();
+  }
+  await admin.page.reload();
+  await expect(admin.page.getByLabel("Sign-up and activation funnel")).toContainText("Viewed the sign-up page");
 
   await founder.ctx.close();
   await admin.ctx.close();
