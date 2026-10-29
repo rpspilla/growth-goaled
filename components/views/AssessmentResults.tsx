@@ -361,6 +361,12 @@ export function AssessmentResults({
               </p>
               {evidence(data.executiveDecision.claimKey)}
             </div>
+            <p className="flex items-center gap-2 text-sm flex-wrap" style={fg}>
+              <span data-label className="text-[11px] font-bold px-1.5 py-0.5 rounded" style={{ background: "var(--amber-muted)", color: "#92400E" }}>
+                PROBLEM
+              </span>
+              <span className="font-medium">{data.diagnosis.primary.title}</span>
+            </p>
             {first && (
               <p className="flex items-center gap-2 text-sm flex-wrap" style={fg}>
                 <span data-label className="text-[11px] font-bold px-1.5 py-0.5 rounded" style={{ background: "var(--green)", color: "#fff" }}>
