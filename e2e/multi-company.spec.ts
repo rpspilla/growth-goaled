@@ -36,6 +36,22 @@ test("an allowed founder can run several company profiles, each with its own dat
   await expect(page.getByLabel(/^Company: First Co/)).toBeVisible();
   await page.goto("/profile/company");
   await expect(page.locator("#intake-name")).toHaveValue("First Co");
+
+  // Listed in SELF_ADVISOR_EMAILS: switches to the advisor view, advises their own companies, and switches back.
+  await page.getByRole("button", { name: "Switch to advisor view" }).click();
+  await expect(page).toHaveURL(/\/advisor\/portfolio/);
+  await expect(page.getByText("First Co", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Second Co", { exact: true }).first()).toBeVisible();
+  {
+    const check = new Client({ connectionString: E2E_DATABASE_URL });
+    await check.connect();
+    const { rows } = await check.query("select c.name from companies c join users u on u.id = c.advisor_id where u.email = 'multi@e2e.test' order by 1");
+    expect(rows.map((r) => r.name)).toEqual(["First Co", "Second Co"]);
+    await check.end();
+  }
+  await page.getByRole("button", { name: "Switch to founder view" }).click();
+  await expect(page).toHaveURL(/\/overview/);
+  await expect(page.getByLabel(/^Company: First Co/)).toBeVisible();
   await ctx.close();
 
   // A founder not on the list has one company and no way to add another.
@@ -46,6 +62,7 @@ test("an allowed founder can run several company profiles, each with its own dat
   await expect(p2.getByRole("banner").getByText("Only Co", { exact: true })).toBeVisible();
   await expect(p2.getByLabel(/^Company: /)).toHaveCount(0);
   await expect(p2.getByRole("link", { name: "+ Add a company" })).toHaveCount(0);
+  await expect(p2.getByRole("button", { name: "Switch to advisor view" })).toHaveCount(0);
   await p2.goto("/companies/new");
   await expect(p2).toHaveURL(/\/overview/);
   await single.close();

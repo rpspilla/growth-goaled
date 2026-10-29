@@ -27,6 +27,7 @@ export default defineConfig({
       NEON_AUTH_COOKIE_SECRET: "e2e-cookie-secret-not-used-xxxxxxxxxxxxxxxxxxxxxxxx",
       APP_URL: `http://localhost:${PORT}`,
       MULTI_COMPANY_FOUNDERS: "multi@e2e.test",
+      SELF_ADVISOR_EMAILS: "multi@e2e.test",
     },
   },
 });

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { isStaging } from "@/lib/env";
-import { signOut } from "./actions";
+import { signOut, switchView } from "./actions";
 import { initials } from "./initials";
 import { MobileNav } from "./MobileNav";
 
@@ -55,9 +55,17 @@ export function StagingBadge() {
   );
 }
 
-export function UserMenu({ name, email, color, profileHref }: { name: string | null; email: string; color: "navy" | "green"; profileHref?: string }) {
+export function UserMenu({ name, email, color, profileHref, switchTo }: { name: string | null; email: string; color: "navy" | "green"; profileHref?: string; switchTo?: "founder" | "advisor" }) {
   return (
     <div className="flex items-center gap-3">
+      {switchTo && (
+        <form action={switchView}>
+          <input type="hidden" name="to" value={switchTo} />
+          <button type="submit" className="text-sm whitespace-nowrap link">
+            Switch to {switchTo} view
+          </button>
+        </form>
+      )}
       {profileHref && (
         <Link href={profileHref} className="text-sm whitespace-nowrap hover:underline" style={{ color: "var(--muted-foreground)" }}>
           <span className="hidden sm:inline">Company </span>profile

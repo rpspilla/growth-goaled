@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { and, count, eq, isNull, or } from "drizzle-orm";
 import { requireRole } from "@/lib/auth/session";
+import { canSwitchToAdvisor } from "@/lib/multi-company";
 import { db, schema } from "@/lib/db";
 import type { User } from "@/lib/db/schema";
 import { Shell, StagingBadge, UserMenu } from "@/components/shell/Shell";
@@ -58,7 +59,7 @@ export default async function AdvisorLayout({ children }: { children: ReactNode 
                 {badges.review} pending {badges.review === 1 ? "review" : "reviews"}
               </span>
             )}
-            <UserMenu name={user.name} email={user.email} color="green" />
+            <UserMenu name={user.name} email={user.email} color="green" switchTo={user.role === "advisor" && canSwitchToAdvisor(user.email) ? "founder" : undefined} />
           </div>
         </>
       }

@@ -5,8 +5,21 @@
  */
 export const COMPANY_COOKIE = "gg_company";
 
-export function canAddCompanies(email: string | null | undefined, env: string | undefined = process.env.MULTI_COMPANY_FOUNDERS): boolean {
+function listed(email: string | null | undefined, env: string | undefined): boolean {
   if (!email || !env) return false;
   const allowed = env.split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
   return allowed.includes(email.trim().toLowerCase());
+}
+
+export function canAddCompanies(email: string | null | undefined, env: string | undefined = process.env.MULTI_COMPANY_FOUNDERS): boolean {
+  return listed(email, env);
+}
+
+/**
+ * Founders who may switch themselves between the founder and advisor views (e.g. a fractional CRO
+ * who runs their own company profiles and advises them). Set by email in SELF_ADVISOR_EMAILS
+ * (comma-separated). Never applies to admins, whose role is left alone.
+ */
+export function canSwitchToAdvisor(email: string | null | undefined, env: string | undefined = process.env.SELF_ADVISOR_EMAILS): boolean {
+  return listed(email, env);
 }

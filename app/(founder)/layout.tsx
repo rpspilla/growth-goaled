@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { founderContext } from "@/lib/data/founder-context";
 import { listFounderCompanies } from "@/lib/data/companies";
-import { canAddCompanies } from "@/lib/multi-company";
+import { canAddCompanies, canSwitchToAdvisor } from "@/lib/multi-company";
 import { CompanySwitcher } from "@/components/shell/CompanySwitcher";
 import { Shell, StagingBadge, UserMenu } from "@/components/shell/Shell";
 import { UseCaseSidebar } from "@/components/shell/UseCaseSidebar";
@@ -48,7 +48,7 @@ export default async function FounderLayout({ children }: { children: ReactNode 
             <StagingBadge />
           </div>
           <div className="ml-auto flex items-center gap-3">
-            <UserMenu name={user.name} email={user.email} color="navy" />
+            <UserMenu name={user.name} email={user.email} color="navy" switchTo={canSwitchToAdvisor(user.email) ? "advisor" : undefined} />
           </div>
         </>
       }
