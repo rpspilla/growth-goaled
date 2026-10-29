@@ -2,6 +2,7 @@ import { z } from "zod";
 import { METRICS, type MetricKey } from "@/lib/metrics";
 import { USE_CASE_IDS } from "@/lib/use-cases/types";
 import type { BenchmarkComparison } from "@/lib/benchmark-library/compare";
+import { briefChartsSchema, EMPTY_CHARTS } from "./charts";
 
 const metricKey = z.enum(Object.keys(METRICS) as [MetricKey, ...MetricKey[]]);
 const claimKey = z.string().min(1);
@@ -37,6 +38,8 @@ const shared = {
   benchmarks: z.array(z.custom<BenchmarkComparison>((v) => typeof v === "object" && v !== null && "metric" in v && "benchmark" in v)).default([]),
   /** Metrics the brief compared none for, and why (no relevant benchmark, advisor choice…). */
   benchmarkGaps: z.array(z.object({ metric: z.string(), label: z.string(), reason: z.string() })).default([]),
+  /** Tables computed in code from the founder's files, for the Results charts. Absent on older briefs. */
+  charts: briefChartsSchema.default(EMPTY_CHARTS),
 };
 
 /**
@@ -138,6 +141,7 @@ export function parseBrief(content: unknown): BriefContent | null {
     degraded: c.degraded,
     benchmarks: c.benchmarks,
     benchmarkGaps: c.benchmarkGaps,
+    charts: c.charts,
     baseline: [],
     certainty: null,
     executiveDecision: { decision: c.summary.headline, conclusion: c.summary.body, claimKey: c.summary.claimKey },

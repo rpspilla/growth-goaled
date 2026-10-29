@@ -104,6 +104,7 @@ export default async function CompanyResultsPage({ params }: { params: Promise<{
           nextUseCase={null}
           advisory={null}
           dimensions={await dimensionViews(company, active.def, `/advisor/companies/${company.id}/data`)}
+          dataPath={`/advisor/companies/${company.id}/data`}
         />
       )}
     </div>

@@ -34,6 +34,19 @@ export const money = (n: number) => {
   return n < 0 ? `−${s}` : s;
 };
 
+/** One-line chart labels: "Food & Beverage Producers" → "Food & Beverage…". */
+const short = (s: string, n = 16) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
+
+/** A category tick that never wraps (Recharts wraps long ticks onto several lines). */
+function OneLineTick({ x, y, payload, width = 140 }: { x?: number; y?: number; payload?: { value: string }; width?: number }) {
+  return (
+    <text x={x} y={y} dy={4} textAnchor="end" style={{ ...AXIS, fill: C.navy }}>
+      <title>{payload?.value}</title>
+      {short(String(payload?.value ?? ""), Math.floor(width / 7.2))}
+    </text>
+  );
+}
+
 const tooltipStyle = { contentStyle: { borderRadius: 8, border: "1px solid #E2E8F0", fontSize: 12 }, labelStyle: { fontWeight: 600, color: C.navy } };
 
 /* ------------------------------------------------------------------ Fix Churn */
@@ -115,7 +128,7 @@ export function RepCapacityChart({ reps, target, targetLabel }: { reps: { name: 
     <figure aria-label={summary} className="w-full h-56">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={reps} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
-          <XAxis dataKey="name" tickLine={false} axisLine={false} tick={AXIS} interval={0} />
+          <XAxis dataKey="name" tickLine={false} axisLine={false} tick={AXIS} interval={0} tickFormatter={(v) => short(String(v), 12)} />
           <YAxis hide domain={[0, max]} />
           {target !== null && <ReferenceLine y={target} stroke={C.navy} strokeDasharray="4 4" ifOverflow="extendDomain" />}
           <Bar dataKey="value" radius={[6, 6, 0, 0]} isAnimationActive={false}>
@@ -143,7 +156,7 @@ export function PeerBars({ label, you, median, top, format }: { label: string; y
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={rows} layout="vertical" margin={{ top: 4, right: 64, left: 0, bottom: 4 }}>
           <XAxis type="number" hide domain={[0, "dataMax"]} />
-          <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} tick={{ ...AXIS, fill: C.navy }} width={96} />
+          <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} tick={<OneLineTick width={96} />} width={100} interval={0} />
           <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={22} isAnimationActive={false}>
             {rows.map((r) => (
               <Cell key={r.name} fill={r.fill} />
@@ -222,23 +235,37 @@ export type SegmentPoint = { name: string; winRate: number; avgWon: number; won:
 
 /** Segments: win rate (x) × average won deal (y), bubble = won deals. Top-right is the motion to build on. */
 export function SegmentScatter({ points, dimension }: { points: SegmentPoint[]; dimension: string }) {
-  const data = points.map((p) => ({ ...p, x: p.winRate, y: p.avgWon, z: Math.max(1, p.won) }));
+  // Alternate labels above and below in order of win rate, so neighbouring bubbles don't collide.
+  const order = [...points].sort((a, b) => a.winRate - b.winRate).map((p) => p.name);
+  const data = points.map((p) => ({ ...p, x: p.winRate, y: p.avgWon, z: Math.max(1, p.won), below: order.indexOf(p.name) % 2 === 1 }));
   const best = [...data].sort((a, b) => b.x * b.y * b.z - a.x * a.y * a.z)[0];
   const summary = `${dimension}: ${data.map((d) => `${d.name} win rate ${d.x}%, average won ${money(d.y)}, ${d.won} won`).join("; ")}.`;
   return (
     <figure aria-label={summary} className="w-full h-64">
       <ResponsiveContainer width="100%" height="100%">
-        <ScatterChart margin={{ top: 16, right: 16, left: 0, bottom: 8 }}>
+        <ScatterChart margin={{ top: 28, right: 24, left: 0, bottom: 8 }}>
           <CartesianGrid stroke="#EEF1F4" />
           <XAxis type="number" dataKey="x" name="Win rate" unit="%" tick={AXIS} tickLine={false} axisLine={false} domain={[0, 100]} label={{ value: "Win rate", position: "insideBottomRight", offset: -4, style: { ...AXIS } }} />
-          <YAxis type="number" dataKey="y" name="Avg won deal" tick={AXIS} tickLine={false} axisLine={false} tickFormatter={money} width={52} />
+          <YAxis type="number" dataKey="y" name="Avg won deal" tick={AXIS} tickLine={false} axisLine={false} tickFormatter={money} width={52} domain={[0, (max: number) => Math.ceil((max * 1.3) / 10_000) * 10_000]} />
           <ZAxis type="number" dataKey="z" range={[80, 900]} name="Won deals" />
           <Tooltip {...tooltipStyle} formatter={(v, n) => (n === "Avg won deal" ? money(Number(v)) : n === "Win rate" ? `${v}%` : String(v))} labelFormatter={() => ""} />
           <Scatter data={data} isAnimationActive={false}>
             {data.map((d) => (
               <Cell key={d.name} fill={d === best ? C.green : d.smallSample ? C.grey : C.greenLight} fillOpacity={d === best ? 0.95 : 0.55} stroke={d === best ? C.navy : "none"} />
             ))}
-            <LabelList dataKey="name" position="top" style={{ ...LABEL, fontSize: 11 }} />
+            <LabelList
+              dataKey="name"
+              content={(p) => {
+                const { x, y, width, height, value, index } = p as { x?: number; y?: number; width?: number; height?: number; value?: string; index?: number };
+                if (x === undefined || y === undefined) return null;
+                const below = data[index ?? 0]?.below;
+                return (
+                  <text x={Number(x) + Number(width ?? 0) / 2} y={below ? Number(y) + Number(height ?? 0) + 14 : Number(y) - 6} textAnchor="middle" style={{ ...LABEL, fontSize: 11 }}>
+                    {short(String(value ?? ""), 20)}
+                  </text>
+                );
+              }}
+            />
           </Scatter>
         </ScatterChart>
       </ResponsiveContainer>
@@ -255,7 +282,7 @@ export function ChannelBars({ rows }: { rows: { name: string; winRate: number; w
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} layout="vertical" margin={{ top: 4, right: 48, left: 0, bottom: 4 }}>
           <XAxis type="number" hide domain={[0, 100]} />
-          <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} tick={{ ...AXIS, fill: C.navy }} width={104} />
+          <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} tick={<OneLineTick width={184} />} width={190} interval={0} />
           <Bar dataKey="winRate" radius={[0, 6, 6, 0]} barSize={18} isAnimationActive={false}>
             {data.map((d) => (
               <Cell key={d.name} fill={d.winRate === top ? C.green : C.greenLight} fillOpacity={d.winRate === top ? 1 : 0.55} />

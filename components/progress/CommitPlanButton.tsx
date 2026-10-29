@@ -13,20 +13,18 @@ export function CommitPlanButton({ committedAt, commit }: { committedAt: string 
   const router = useRouter();
   if (committedAt) {
     return (
-      <div className="rounded-xl px-5 py-4 text-base flex items-center gap-3 flex-wrap" style={{ background: "var(--green-muted)", color: "var(--foreground)" }}>
-        <span className="flex-1">
-          <span style={{ color: "var(--green)" }}>✓</span> You committed to this plan on {new Date(committedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}.
+      <div className="inline-flex items-center gap-3 flex-wrap">
+        <span className="text-sm font-semibold rounded-full px-3 py-1" style={{ background: "var(--green-muted)", color: "var(--green)" }}>
+          ✓ You committed to this plan on {new Date(committedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}.
         </span>
         <Link href="/progress" className="btn btn-primary btn-sm">Track progress →</Link>
       </div>
     );
   }
   return (
-    <div className="surface px-5 py-4 text-base flex items-center gap-4 flex-wrap">
-      <span className="flex-1" style={{ color: "var(--muted-foreground)" }}>
-        Commit to this plan to track each action and its metric against today&apos;s baseline, and get a reminder of when to reassess.
-      </span>
+    <div className="inline-flex items-center gap-3 flex-wrap">
       <button
+        title="Track each action and its metric against today's baseline, and get a reminder of when to reassess."
         type="button"
         disabled={pending}
         onClick={() =>

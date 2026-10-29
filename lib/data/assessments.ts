@@ -6,6 +6,7 @@ import type { Company, QaResults, User } from "@/lib/db/schema";
 import { AI_MODEL, aiProblemForStaff, isAiConfigError } from "@/lib/ai/config";
 import { AssessmentDraftError, AssessmentQaError, ASSESSMENT_BRIEFS, draftAssessment, qaAssessment, type AssessmentInput, type AssessmentOutput } from "@/lib/ai/assessment";
 import { parseBrief, type BriefContent } from "@/lib/deliverables/assessment";
+import { chartsFromAnalyses, EMPTY_CHARTS, type BriefCharts } from "@/lib/deliverables/charts";
 import { allowedNumbers, checkDraft, numbersIn, type ClaimForCheck, type CodeCheckResult } from "@/lib/deliverables/checks";
 export { claimsFromAssessment };
 import { claimsFromAssessment, completeness, fallbackAssessment, sanitizeAssessment, systemGaps } from "@/lib/deliverables/assessment-safety";
@@ -44,6 +45,8 @@ export type AssessmentInputs = {
   /** Snapshot of the figures the brief rests on, saved with it for later comparison. */
   baseline: BriefContent["baseline"];
   analyses: { title: string; rows: string[] }[];
+  /** Structured tables for the Results charts (lib/deliverables/charts.ts). */
+  charts: BriefCharts;
   unknowns: string[];
   reference: BriefContent["reference"];
   benchmarks: BriefContent["benchmarks"];
@@ -248,6 +251,7 @@ export async function assembleAssessmentInputs(company: Company, useCase: UseCas
       recordedAt: p.updatedAt.toISOString(),
     })),
     analyses: tables.map(({ title, rows }) => ({ title, rows })),
+    charts: chartsFromAnalyses(fileAnalyses),
     unknowns: dx.unknowns,
     reference: null,
     benchmarks: bench.comparisons,
@@ -265,7 +269,7 @@ export async function assembleAssessmentInputs(company: Company, useCase: UseCas
 
 export function contentFromAssessment(
   useCase: UseCaseId,
-  inputs: Pick<AssessmentInputs, "figures" | "reference" | "methodology" | "input" | "baseline" | "analyses" | "unknowns" | "benchmarks" | "benchmarkGaps">,
+  inputs: Pick<AssessmentInputs, "figures" | "reference" | "methodology" | "input" | "baseline" | "analyses" | "unknowns" | "benchmarks" | "benchmarkGaps"> & { charts?: BriefCharts },
   out: AssessmentOutput,
   degraded = false,
 ): BriefContent {
@@ -280,6 +284,7 @@ export function contentFromAssessment(
     reference: inputs.reference,
     benchmarks: inputs.benchmarks,
     benchmarkGaps: inputs.benchmarkGaps,
+    charts: inputs.charts ?? EMPTY_CHARTS,
     baseline: inputs.baseline,
     certainty: inputs.input.diagnosis?.certainty ?? null,
     executiveDecision: { decision: out.executive_decision.decision, conclusion: out.executive_decision.conclusion, claimKey: "decision" },
@@ -559,10 +564,17 @@ export type BaselineRow = {
   previous: { value: string; version: number; direction: "better" | "worse" | "same" } | null;
   median: string | null;
   topQuartile: string | null;
+  /** The same figures as numbers, for charts and tiles. */
+  raw: number;
+  medianRaw: number | null;
+  topQuartileRaw: number | null;
 };
 
 export type ResultsView = {
   deliverableId: string;
+  useCase: BriefContent["useCase"];
+  /** Tables computed from the founder's files when this version was built (signature charts). */
+  charts: BriefCharts;
   version: number;
   builtAt: string;
   reviewed: { by: string | null; at: string; comment: string | null } | null;
@@ -680,6 +692,9 @@ export async function assessmentView(d: Deliverable): Promise<ResultsView | null
           : { value: formatMetric(b.metric, before), version: previous.version, direction: before === b.value ? "same" : before < b.value !== lower ? "better" : "worse" },
       median: r?.median != null ? formatMetric(b.metric, r.median) : null,
       topQuartile: r?.p75 != null ? formatMetric(b.metric, r.p75) : null,
+      raw: b.value,
+      medianRaw: r?.median != null ? Number(r.median) : null,
+      topQuartileRaw: r?.p75 != null ? Number(r.p75) : null,
     };
   });
 
@@ -736,6 +751,8 @@ export async function assessmentView(d: Deliverable): Promise<ResultsView | null
   const usedRefs = refs.filter((r) => baseline.some((b) => b.metric === r.metric.metric));
   return {
     deliverableId: d.id,
+    useCase: c.useCase,
+    charts: c.charts,
     version: d.version,
     builtAt: d.createdAt.toISOString(),
     reviewed,
