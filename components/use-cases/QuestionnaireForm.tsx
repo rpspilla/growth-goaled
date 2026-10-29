@@ -18,7 +18,7 @@ const isSegmented = (f: ObjectiveField) => f.kind === "select" && (f.options?.le
  */
 export function QuestionnaireForm({
   useCaseId,
-  fields,
+  fields: initialFields,
   initial,
   save,
   submit,
@@ -32,6 +32,9 @@ export function QuestionnaireForm({
   snapshotHref: string;
 }) {
   const router = useRouter();
+  // Saving a profile answer refreshes the page, which moves that question into "From your profile".
+  // Keep the list the founder started with, so the step they're on never shifts under them.
+  const [fields] = useState(initialFields);
   const [values, setValues] = useState<Record<string, string>>(initial);
   const [saved, setSaved] = useState<Record<string, string>>(initial);
   const [errors, setErrors] = useState<Record<string, string>>({});

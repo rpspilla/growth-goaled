@@ -34,14 +34,14 @@ export default async function DataPage() {
   const rows = new Map(readiness.items.map((i) => [i.itemKey, i]));
 
   const groups = [
-    { title: "Needed for the assessment", caption: "We can't complete the assessment without these.", keys: useCase.requiredItems, required: true },
-    { title: "Sharpens it", caption: "Not required, but each one makes the answer more precise.", keys: useCase.helpfulItems, required: false },
-    { title: "Optional extras", caption: "Useful if you have them to hand.", keys: useCase.optionalItems, required: false },
+    { title: "Needed for the assessment", caption: "Required", keys: useCase.requiredItems, required: true },
+    { title: "Sharpens it", caption: "Optional · makes the answer more precise", keys: useCase.helpfulItems, required: false },
+    { title: "Optional extras", caption: "If you have them to hand", keys: useCase.optionalItems, required: false },
   ].filter((g) => g.keys.length);
 
   return (
     <div className="px-4 sm:px-8 py-8 max-w-5xl">
-      <PageHeader eyebrow="Step 3 of 5" title={`Data for ${useCase.shortTitle}`} subtitle={`Only what we need to answer “${useCase.question}”`} />
+      <PageHeader eyebrow="Step 3 of 5" title={`Data for ${useCase.shortTitle}`} subtitle="Only what this question needs." />
       <DataTopPanel />
       <ReadinessTabs questions={questions.length} />
 
@@ -57,9 +57,11 @@ export default async function DataPage() {
 
       {groups.map((g) => (
         <section key={g.title} className="mb-8">
-          <h2 className="text-xl font-semibold" style={{ color: "var(--foreground)" }}>{g.title} ({g.keys.length})</h2>
-          <p className="text-base mt-0.5 mb-3" style={{ color: "var(--muted-foreground)" }}>{g.caption}</p>
-          <div className="space-y-3">
+          <div className="flex items-baseline gap-2 flex-wrap mb-3">
+            <h2 className="text-lg font-semibold" style={{ color: "var(--foreground)" }} title={g.caption}>{g.title} ({g.keys.length})</h2>
+            <span data-label className="text-xs" style={{ color: "var(--muted-foreground)" }}>{g.caption}</span>
+          </div>
+          <div className="grid md:grid-cols-2 gap-3 items-start">
             {g.keys.flatMap((key) => {
               const def = getItem(key);
               const category = def && getCategory(def.category);

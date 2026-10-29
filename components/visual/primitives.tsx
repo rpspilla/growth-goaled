@@ -39,7 +39,7 @@ export function MetricTile({
         {Icon && <Icon size={14} aria-hidden />}
         <span className="truncate">{label}</span>
       </div>
-      <div className="font-mono text-2xl sm:text-3xl font-semibold tracking-tight" style={{ color: "var(--foreground)" }}>
+      <div className={`font-mono font-semibold tracking-tight ${value.length > 7 ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl"}`} style={{ color: "var(--foreground)" }}>
         {value}
       </div>
       {compare && (

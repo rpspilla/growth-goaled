@@ -7,7 +7,7 @@ import type { FigureChoice } from "@/lib/figures";
 type Result = { ok: true } | { ok: false; error: string };
 
 const BADGE: Record<FigureChoice["state"], { label: string; color: string; bg: string }> = {
-  conflict: { label: "Values disagree", color: "var(--red)", bg: "var(--red-muted, #FDECEC)" },
+  conflict: { label: "Values disagree", color: "#92400E", bg: "var(--amber-muted)" },
   unconfirmed: { label: "Not confirmed", color: "var(--amber)", bg: "var(--amber-muted)" },
   missing: { label: "Missing", color: "var(--muted-foreground)", bg: "var(--muted)" },
   agreed: { label: "Confirmed", color: "var(--green)", bg: "var(--green-muted)" },
@@ -32,12 +32,12 @@ function Row({ f, choose, enter, onChanged }: { f: FigureChoice; choose: (m: str
   const inputId = `figure-${f.metric}`;
 
   return (
-    <li className="py-4 border-t first:border-t-0" style={{ borderColor: "var(--border)" }}>
+    <li className="py-3 px-3 -mx-3 rounded-lg border-t first:border-t-0" style={{ borderColor: "var(--border)", background: f.state === "conflict" ? "var(--amber-muted)" : undefined }}>
       <div className="flex items-center gap-2 flex-wrap mb-2">
-        <span className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>{f.label}</span>
+        <span className="text-sm font-semibold" style={{ color: "var(--foreground)" }} title={f.definition}>{f.label}</span>
         <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: badge.bg, color: badge.color }}>{badge.label}</span>
       </div>
-      <p id={`${inputId}-def`} className="text-sm -mt-1 mb-2" style={{ color: "var(--muted-foreground)" }}>{f.definition}</p>
+      <p id={`${inputId}-def`} className="sr-only">{f.definition}</p>
 
       {f.candidates.length > 0 && (
         <fieldset disabled={pending}>
@@ -48,7 +48,7 @@ function Row({ f, choose, enter, onChanged }: { f: FigureChoice; choose: (m: str
               return (
                 <li key={c.id} className="flex items-center gap-3 flex-wrap text-sm">
                   <span className="font-mono font-semibold w-24" style={{ color: "var(--foreground)" }}>{c.formatted}</span>
-                  <span className="flex-1 min-w-40" style={{ color: "var(--muted-foreground)" }}>
+                  <span data-label className="flex-1 min-w-40 text-xs font-mono" style={{ color: "var(--muted-foreground)" }}>
                     {c.source}
                     {c.period && c.period !== "Current" ? ` · ${c.period}` : ""}
                     {c.status === "proposed" ? " · not confirmed" : ""}
@@ -138,7 +138,7 @@ export function FigureChecker({
   const sorted = [...choices].sort((a, b) => order[a.state] - order[b.state]);
 
   return (
-    <details open={issues.length > 0} className="rounded-xl border p-5" style={{ background: "var(--card)", borderColor: conflicts ? "var(--red)" : issues.length ? "var(--amber)" : "var(--border)" }}>
+    <details open={issues.length > 0} className="rounded-xl border p-5" style={{ background: "var(--card)", borderColor: issues.length ? "var(--amber)" : "var(--border)" }}>
       <summary className="cursor-pointer text-sm font-semibold" style={{ color: "var(--foreground)" }}>
         Check your figures
         <span className="font-normal" style={{ color: "var(--muted-foreground)" }}>
@@ -149,8 +149,8 @@ export function FigureChecker({
             : "all confirmed"}
         </span>
       </summary>
-      <p className="text-xs mt-2 mb-1" style={{ color: "var(--muted-foreground)" }}>
-        These are the figures this assessment uses. Where your company profile and your files disagree, choose the right one; add any that are missing. Your choice updates your profile too.
+      <p className="text-xs mt-2 mb-1" style={{ color: "var(--muted-foreground)" }} title="These are the figures this assessment uses. Where your company profile and your files disagree, choose the right one; add any that are missing. Your choice updates your profile too.">
+        Pick the right value where sources disagree. Updates your profile too.
       </p>
       {changed && (
         <div className="rounded-lg p-3 my-2 text-sm flex items-center gap-3 flex-wrap" role="status" style={{ background: "var(--green-muted)", color: "var(--foreground)" }}>

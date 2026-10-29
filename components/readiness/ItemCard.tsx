@@ -13,6 +13,9 @@ import {
   type ItemStatus,
 } from "@/lib/readiness";
 import { updateItem } from "@/app/(founder)/data/actions";
+import { Paperclip } from "lucide-react";
+import { dataItemIcon } from "@/components/visual/icons";
+import { StatusChip } from "@/components/visual/primitives";
 import { UploadButton } from "./UploadButton";
 import { RemoveFileButton } from "./RemoveFileButton";
 
@@ -38,6 +41,14 @@ export const STATUS_COLOR: Record<ItemStatus, string> = {
   partial: "var(--amber)",
   missing: "var(--red)",
   not_applicable: "var(--muted-foreground)",
+};
+
+const CHIP: Record<ItemStatus, { status: "in" | "partial" | "missing" | "soon"; word: string }> = {
+  available: { status: "in", word: "Available" },
+  partial: { status: "partial", word: "Partial" },
+  missing: { status: "missing", word: "Missing" },
+  not_reviewed: { status: "missing", word: "Not reviewed" },
+  not_applicable: { status: "soon", word: "Not applicable" },
 };
 
 const month = (d: string | null) => (d ? d.slice(0, 7) : "");
@@ -105,6 +116,7 @@ export function ItemCard({
   }
 
   const needsAttention = record.status === "partial" || record.status === "missing";
+  const Icon = dataItemIcon(def.key, category);
   const listId = `sources-${def.key}`;
 
   return (
@@ -112,34 +124,37 @@ export function ItemCard({
     <div id={`item-${def.key}`} className="rounded-xl border scroll-mt-24" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
       <div className="p-4">
         <div className="flex items-start gap-3">
+          <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: record.status === "available" ? "var(--green-muted)" : "var(--muted)", color: record.status === "available" ? "var(--green)" : "var(--muted-foreground)" }} aria-hidden>
+            <Icon size={20} />
+          </span>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>{def.name}</span>
-              <span
-                className="text-xs font-semibold px-1.5 py-0.5 rounded"
-                style={{ background: "var(--muted)", color: def.required ? "var(--foreground)" : "var(--muted-foreground)" }}
-              >
-                {def.required ? "Required" : "Optional"}
-              </span>
-              <span className="text-xs font-medium" style={{ color: STATUS_COLOR[record.status] }}>● {ITEM_STATUS_LABEL[record.status]}</span>
-              {record.status !== "not_reviewed" && record.status !== "missing" && record.status !== "not_applicable" && (
-                <span className="text-xs" style={{ color: record.quality === "validated" ? "var(--green)" : "var(--muted-foreground)" }}>
-                  · {QUALITY_LABEL[record.quality]}
+            <div className="text-sm font-semibold leading-snug" style={{ color: "var(--foreground)" }} title={def.description}>
+              {def.name}
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap mt-1">
+              <StatusChip status={CHIP[record.status].status} word={CHIP[record.status].word} />
+              {def.required && (
+                <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded" style={{ background: "var(--muted)", color: "var(--foreground)" }}>
+                  Required
+                </span>
+              )}
+              {record.status !== "not_reviewed" && record.status !== "missing" && record.status !== "not_applicable" && record.quality === "validated" && (
+                <span className="text-[11px] font-semibold" style={{ color: "var(--green)" }}>
+                  ✓ {QUALITY_LABEL.validated}
                 </span>
               )}
               {files.length > 0 && (
-                <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-                  · {files.length} {files.length === 1 ? "file" : "files"}
+                <span className="inline-flex items-center gap-1 text-[11px] font-mono" style={{ color: "var(--muted-foreground)" }}>
+                  <Paperclip size={11} aria-hidden />
+                  {files.length}
                 </span>
               )}
             </div>
-            <p className="text-sm mt-1" style={{ color: "var(--muted-foreground)" }}>{def.description}</p>
-            {why && <p className="text-xs mt-1" style={{ color: "var(--foreground)" }}><span className="font-semibold">Why it matters:</span> {why}</p>}
           </div>
           <button
             type="button"
             onClick={() => setOpen(!open)}
-            className="text-xs px-3 py-1.5 rounded-md font-medium shrink-0"
+            className="text-xs px-2.5 py-1.5 rounded-md font-medium shrink-0"
             style={{ background: "var(--muted)", color: "var(--foreground)" }}
             aria-expanded={open}
           >
@@ -189,6 +204,17 @@ export function ItemCard({
 
       {open && (
         <div className="border-t p-4 space-y-4" style={{ borderColor: "var(--border)" }}>
+          <div className="text-sm space-y-1">
+            <p style={{ color: "var(--muted-foreground)" }}>{def.description}</p>
+            {why && (
+              <p className="text-xs" style={{ color: "var(--foreground)" }}>
+                <span className="font-semibold">Why it matters:</span> {why}
+              </p>
+            )}
+            {record.status !== "not_reviewed" && record.status !== "missing" && record.status !== "not_applicable" && record.quality !== "validated" && (
+              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Quality: {QUALITY_LABEL[record.quality]}</p>
+            )}
+          </div>
           <div className="grid md:grid-cols-2 gap-4 text-sm">
             <div>
               <div className="text-xs font-semibold mb-1" style={{ color: "var(--foreground)" }}>Why we ask</div>

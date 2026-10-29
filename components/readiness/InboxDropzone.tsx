@@ -1,5 +1,7 @@
 "use client";
 
+import { UploadCloud } from "lucide-react";
+
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
@@ -110,14 +112,21 @@ export function InboxDropzone({ blobPrefix }: { blobPrefix: string }) {
             void send(files);
           }}
         />
-        <div className="text-2xl mb-2" aria-hidden>📥</div>
-        <div className="font-display text-xl mb-1" style={{ color: "var(--foreground)" }}>Upload whatever you have and we&apos;ll help you get organized</div>
-        <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-          One messy spreadsheet, a board deck, CRM exports, screenshots: any format, several at once. Drag files here or click to choose.
+        <span className="mx-auto mb-2 w-12 h-12 rounded-full flex items-center justify-center" style={{ background: "var(--green-muted)", color: "var(--green)" }} aria-hidden>
+          <UploadCloud size={24} />
+        </span>
+        <div className="font-display text-xl mb-1" style={{ color: "var(--foreground)" }}>Drop anything here</div>
+        <p className="text-sm" style={{ color: "var(--muted-foreground)" }} title="We read spreadsheets, CSV, PDF and images, and suggest where each piece fits in the checklist. You confirm before anything is marked. Other formats are kept for your advisor.">
+          Any format, several at once. We sort it.
         </p>
-        <p className="text-xs mt-2" style={{ color: "var(--muted-foreground)" }}>
-          We read spreadsheets, CSV, PDF and images, and suggest where each piece fits in the checklist. You confirm before anything is marked. Other formats are kept for your advisor. Up to 25 MB per file.
-        </p>
+        <div data-label className="flex items-center justify-center gap-1.5 mt-2 flex-wrap" aria-hidden>
+          {["XLSX", "CSV", "PDF", "PNG", "≤ 25 MB"].map((t) => (
+            <span key={t} className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ background: "var(--muted)", color: "var(--subtle-foreground)" }}>
+              {t}
+            </span>
+          ))}
+        </div>
+        <p className="sr-only">We read spreadsheets, CSV, PDF and images, and suggest where each piece fits in the checklist. You confirm before anything is marked. Other formats are kept for your advisor. Up to 25 MB per file.</p>
       </div>
       <form
         className="mt-3 flex gap-2 flex-wrap items-center"
@@ -127,7 +136,7 @@ export function InboxDropzone({ blobPrefix }: { blobPrefix: string }) {
         }}
       >
         <label htmlFor="google-link" className="text-xs font-medium" style={{ color: "var(--muted-foreground)" }}>
-          Or paste a Google link:
+          Or a Google link:
         </label>
         <input
           id="google-link"
@@ -143,9 +152,10 @@ export function InboxDropzone({ blobPrefix }: { blobPrefix: string }) {
           {linkBusy ? "Importing..." : "Import"}
         </button>
       </form>
-      <p className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>
-        Google Sheets, Docs, Slides or Drive files. Set sharing to “Anyone with the link can view”. We save a copy now; later edits in Google aren&apos;t synced.
-      </p>
+      <details className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>
+        <summary className="cursor-pointer" style={{ color: "var(--green)" }}>About Google links</summary>
+        <p className="mt-1">Google Sheets, Docs, Slides or Drive files. Set sharing to “Anyone with the link can view”. We save a copy now; later edits in Google aren&apos;t synced.</p>
+      </details>
       {linkMsg && (
         <p role="status" className="text-xs mt-1" style={{ color: linkMsg.kind === "ok" ? "var(--green)" : "var(--red)" }}>
           {linkMsg.text}
