@@ -5,7 +5,7 @@ import { STATUS_LABEL } from "@/components/deliverables/status";
 import { requireRole } from "@/lib/auth/session";
 import { listManagedCompanies } from "@/lib/data/companies";
 import { listQueue, type QueueItem } from "@/lib/data/deliverables";
-import { heldAssessments } from "@/lib/data/assessments";
+import { salesCallsToCollect } from "@/lib/data/assessments";
 import { getUseCase } from "@/lib/use-cases";
 import { generateBenchmark } from "./actions";
 
@@ -34,7 +34,7 @@ function Row({ item }: { item: QueueItem }) {
 export default async function ReviewQueuePage() {
   const user = await requireRole(["advisor", "admin"]);
   const companies = await listManagedCompanies(user);
-  const [items, held] = await Promise.all([listQueue(companies.map((c) => c.id)), heldAssessments(companies.map((c) => c.id))]);
+  const [items, calls] = await Promise.all([listQueue(companies.map((c) => c.id)), salesCallsToCollect(companies.map((c) => c.id))]);
   // Latest version per company decides what needs attention.
   const latest = new Map<string, QueueItem>();
   for (const i of items) if (!latest.has(i.companyId) || latest.get(i.companyId)!.version < i.version) latest.set(i.companyId, i);
@@ -45,21 +45,32 @@ export default async function ReviewQueuePage() {
   return (
     <div className="px-4 sm:px-8 py-8 max-w-6xl">
       <PageHeader title="Review Queue" subtitle="AI-generated deliverables awaiting advisor review before release to founders." />
-      {held.length > 0 && (
-        <section className="surface mb-6 overflow-hidden" aria-labelledby="held" style={{ borderColor: "var(--amber)" }}>
+      {calls.length > 0 && (
+        <section className="surface mb-6 overflow-hidden" aria-labelledby="calls" style={{ borderColor: "var(--amber)" }}>
           <div className="px-5 py-3 border-b" style={{ borderColor: "var(--border)", background: "var(--amber-muted)" }}>
-            <h2 id="held" className="text-base font-semibold" style={{ color: "var(--foreground)" }}>Reports held for your review ({held.length})</h2>
-            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Built with fewer than the required recorded sales calls. The founder sees them once you mark them reviewed.</p>
+            <h2 id="calls" className="text-base font-semibold" style={{ color: "var(--foreground)" }}>
+              Sales calls to collect ({calls.length})
+            </h2>
+            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+              These founders&apos; reports published without the recorded sales calls their question expects. Ask them for recordings or transcripts, then re-run the report so the sales call review is complete.
+            </p>
           </div>
-          {held.map((h) => (
-            <Link key={h.id} href={`/advisor/companies/${h.companyId}/baseline`} className="flex items-center gap-4 px-5 py-4 border-b hover:opacity-80" style={{ borderColor: "var(--border)" }}>
+          {calls.map((c) => (
+            <Link key={c.companyId} href={`/advisor/companies/${c.companyId}/data#item-sales_calls`} className="flex items-center gap-4 px-5 py-4 border-b hover:opacity-80" style={{ borderColor: "var(--border)" }}>
               <div className="flex-1 min-w-0">
-                <div className="text-base font-semibold" style={{ color: "var(--foreground)" }}>{h.companyName}</div>
+                <div className="text-base font-semibold" style={{ color: "var(--foreground)" }}>
+                  {c.companyName}
+                </div>
                 <div className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-                  {(h.useCase && getUseCase(h.useCase)?.question) ?? "Assessment"} · version {h.version} · {when(h.updatedAt.toISOString())}
+                  {getUseCase(c.useCase)?.question ?? "Assessment"}
                 </div>
               </div>
-              <span className="text-sm font-semibold" style={{ color: "var(--amber)" }}>Review →</span>
+              <span className="text-sm font-semibold font-mono" style={{ color: "#92400E" }}>
+                {c.count} of {c.expected} calls
+              </span>
+              <span className="text-sm font-semibold" style={{ color: "var(--amber)" }}>
+                Collect →
+              </span>
             </Link>
           ))}
         </section>

@@ -14,7 +14,7 @@ import { loadReadiness } from "@/app/(founder)/data/load";
 export async function DataTopPanel() {
   const [data, { active }] = await Promise.all([loadReadiness(), founderContext()]);
   if (!data || !active) return null;
-  const needed = active.def.salesCallsToPublish;
+  const needed = active.def.salesCallsExpected;
   const [documents, assessment, callCount] = await Promise.all([listDocuments(data.company), founderAssessment(data.company.id, active.def.id), needed ? salesCallCount(data.company) : 0]);
   const meter = baselineReadiness(active.def, Object.fromEntries(data.readiness.items.map((i) => [i.itemKey, i.status])));
   const inbox = documents.filter((d) => d.inbox || d.suggestions.some((x) => x.status === "suggested"));

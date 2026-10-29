@@ -20,7 +20,7 @@ export const hireOrFix: UseCaseDef = {
   snapshotProfile: [{ section: "gtm", field: "sales_reps" }, { section: "customers", field: "sales_cycle" }, { section: "customers", field: "acv" }, { section: "company", field: "arr" }],
   nextUseCase: "winning_icp",
   objectiveQuestions: [],
-  salesCallsToPublish: 3,
+  salesCallsExpected: 3,
   dimensions: [
     { id: "capacity", title: "Team capacity", summary: "What your current sellers produce, and how much more they could carry.", items: ["roster", "sales_capacity", "targets"] },
     { id: "pipeline", title: "Pipeline and conversion", summary: "Whether there's enough pipeline, converting well enough, for new hires to work.", items: ["opportunities", "stage_conversion", "win_loss", "sales_cycle"] },
@@ -35,7 +35,7 @@ export const hireOrFix: UseCaseDef = {
   helpfulItems: ["sales_calls", "targets", "opp_value_dates", "sales_cycle", "compensation"],
   optionalItems: ["hiring_dates_comp", "open_roles", "stage_conversion"],
   itemWhy: {
-    sales_calls: "With 3 or more recorded calls your report publishes straight away; with fewer, an advisor reviews it before you see it.",
+    sales_calls: "Shows how your sales process runs on real calls. Optional for your report; your advisor will ask for 3 if they aren't here.",
     roster: "Who sells today, so we can measure each rep's output and ramp.",
     sales_capacity: "Quota and attainment: is the current team at capacity?",
     opportunities: "Pipeline coverage: is there enough pipeline for more reps?",

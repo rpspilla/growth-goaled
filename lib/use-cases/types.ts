@@ -62,10 +62,10 @@ export type UseCaseDef = {
   figures: readonly MetricKey[];
   trackableMetrics: readonly MetricKey[];
   /**
-   * Recorded sales calls needed for the report to publish straight to the founder. With fewer,
-   * it's held until an advisor reviews it. Unset: always published once it passes the checks.
+   * Recorded sales calls the advisor should collect for this question. Reports never wait for
+   * them: with fewer, the report still publishes and the advisor is flagged to ask for them.
    */
-  salesCallsToPublish?: number;
+  salesCallsExpected?: number;
   /** The dimensions the plan is organised around, in order. Without them, results use the general layout. */
   dimensions?: readonly PlanDimension[];
   /** Shown in the library as "Coming soon": no questionnaire, Snapshot, purchase or grant yet. */

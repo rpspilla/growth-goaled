@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlertTriangle, Database, Loader2, Mic, UserCheck } from "lucide-react";
+import { AlertTriangle, Database, Loader2 } from "lucide-react";
 import { TONE } from "@/components/visual/primitives";
 import { BuildingRefresh } from "@/components/deliverables/BuildingRefresh";
 import { AnalyzingDots } from "@/components/readiness/DocumentCard";
 import { AdvisoryOffer } from "@/components/use-cases/AdvisoryOffer";
 import { RunAssessmentButton } from "@/components/use-cases/RunAssessmentButton";
 import { AssessmentResults } from "@/components/views/AssessmentResults";
-import { founderAssessment, salesCallCount } from "@/lib/data/assessments";
+import { founderAssessment } from "@/lib/data/assessments";
 import { figureChoices } from "@/lib/data/figures";
 import { FigureChecker } from "@/components/use-cases/FigureChecker";
 import { founderContext } from "@/lib/data/founder-context";
@@ -55,11 +55,6 @@ export default async function ResultsPage() {
         commit={<CommitPlanButton key="commit" committedAt={state.view.committedAt} commit={commitPlanAction.bind(null, state.view.deliverableId)} />}
         actions={
           <div key="actions" className="pt-1 space-y-3">
-            {state.newerInReview && (
-              <p className="rounded-lg px-4 py-3 text-base" role="status" style={{ background: "var(--blue-muted)", color: "var(--foreground)" }}>
-                A newer version of this report is with an advisor for review. This is your latest reviewed report; you&apos;ll see the new one as soon as it&apos;s reviewed.
-              </p>
-            )}
             <RunAssessmentButton label="Re-run my report" />
           </div>
         }
@@ -69,11 +64,9 @@ export default async function ResultsPage() {
   }
 
   const target = targetSummary(active.objective);
-  const calls = state.state === "in_review" && def.salesCallsToPublish ? await salesCallCount(company) : 0;
   const STATUS = {
     building: { icon: Loader2, tone: "green" as const, title: "Analyzing your data", spin: true },
     failed: { icon: AlertTriangle, tone: "amber" as const, title: "The report didn't finish", spin: false },
-    in_review: { icon: UserCheck, tone: "blue" as const, title: "Your report is with an advisor for review", spin: false },
     not_started: { icon: Database, tone: "neutral" as const, title: "Share your data, then run your report", spin: false },
   }[state.state];
   const Icon = STATUS.icon;
@@ -113,40 +106,6 @@ export default async function ResultsPage() {
                   Book time with an executive advisor →
                 </a>
               </div>
-            </>
-          )}
-          {state.state === "in_review" && (
-            <>
-              {def.salesCallsToPublish ? (
-                <div>
-                  <div className="flex items-center gap-1" aria-hidden>
-                    {Array.from({ length: def.salesCallsToPublish }, (_, i) => (
-                      <span key={i} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: i < calls ? "var(--green)" : "var(--muted)", color: i < calls ? "#fff" : "var(--subtle-foreground)" }}>
-                        <Mic size={15} />
-                      </span>
-                    ))}
-                  </div>
-                  <p className="text-sm mt-2" style={{ color: "var(--foreground)" }}>
-                    <span className="font-semibold">
-                      {calls} of {def.salesCallsToPublish} recorded sales calls.
-                    </span>{" "}
-                    Share {def.salesCallsToPublish} to skip the review.
-                  </p>
-                </div>
-              ) : null}
-              <details className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-                <summary className="cursor-pointer font-semibold" style={{ color: "var(--green)" }}>
-                  Why the review?
-                </summary>
-                <p className="mt-1">
-                  {def.salesCallsToPublish
-                    ? `Reports for this question publish straight away when at least ${def.salesCallsToPublish} recorded sales calls are shared. With fewer, an advisor checks the report first. You'll see it as soon as they've reviewed it. Rather not wait? Upload ${def.salesCallsToPublish} recorded sales calls (recordings or transcripts) on the Data step, then re-run your report.`
-                    : "An advisor is checking it before it's shared. You'll see it as soon as they've reviewed it."}
-                </p>
-              </details>
-              <Link href="/data" className="btn btn-primary">
-                Go to Data →
-              </Link>
             </>
           )}
           {state.state === "not_started" && (

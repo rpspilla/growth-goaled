@@ -20,7 +20,7 @@ export const winningIcp: UseCaseDef = {
   snapshotProfile: [{ section: "customers", field: "count" }, { section: "customers", field: "segment" }, { section: "customers", field: "acv" }],
   nextUseCase: "growth_leak",
   objectiveQuestions: [],
-  salesCallsToPublish: 3,
+  salesCallsExpected: 3,
   dimensions: [
     { id: "icp", title: "Ideal customer profile", summary: "Which customers you win, keep and grow best, and which to stop chasing.", items: ["customer_list", "revenue_by_customer", "industry", "company_size", "contract_metrics", "status_renewal", "win_loss"] },
     { id: "sales_calls", title: "Sales call reviews", summary: "What happens on your calls: qualification, messaging and objections, and what your best calls have in common.", items: ["sales_calls", "stage_history"] },
@@ -34,7 +34,7 @@ export const winningIcp: UseCaseDef = {
   helpfulItems: ["sales_calls", "contract_metrics", "use_case", "start_term", "status_renewal", "win_loss"],
   optionalItems: ["opp_value_dates", "stage_history", "lead_source", "leads_by_source", "marketing_spend", "roster", "sales_capacity", "open_roles", "compensation"],
   itemWhy: {
-    sales_calls: "With 3 or more recorded calls your report publishes straight away; with fewer, an advisor reviews it before you see it.",
+    sales_calls: "Shows how your sales process runs on real calls. Optional for your report; your advisor will ask for 3 if they aren't here.",
     customer_list: "The customers we segment.",
     revenue_by_customer: "Value per segment: ACV and expansion.",
     industry: "One of the main ways to segment customers.",

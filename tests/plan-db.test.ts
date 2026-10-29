@@ -64,7 +64,7 @@ beforeEach(async () => {
     })),
   );
   await activateUseCase(co.id, "growth_leak", { activation: "paid", by: founder.id });
-  // Three recorded sales calls, so briefs publish without waiting for an advisor.
+  // Three recorded sales calls, so the sales call review is complete.
   for (let i = 0; i < 3; i++)
     await db().insert(schema.documents).values({ companyId: co.id, docType: "other", blobUrl: `e2e://call-${i}`, filename: `call-${i}.mp3`, mime: "audio/mpeg", size: 1, status: "done", dataItemKeys: ["sales_calls"] });
 });

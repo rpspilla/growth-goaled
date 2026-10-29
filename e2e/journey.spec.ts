@@ -283,7 +283,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
     await expect(button).toHaveAttribute("aria-pressed", "true");
   }
   await expect(founder.page.getByText("Ready: everything the assessment needs is in.")).toBeVisible();
-  // Fewer than 3 recorded sales calls would hold the report for an advisor; this founder shares three.
+  // Recorded sales calls are optional for the report (fewer flags the advisor to collect them); this founder shares three.
   await expect(founder.page.getByText("Recorded sales calls: 0 of 3.")).toBeVisible();
   {
     const db = new Client({ connectionString: E2E_DATABASE_URL });

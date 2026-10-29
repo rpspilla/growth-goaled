@@ -504,23 +504,46 @@ export async function runAssessmentPipeline(deliverableId: string, deps: Assessm
     await db.update(schema.agentRuns).set({ status: "failed", error: why, output: { code, notes }, durationMs: Date.now() - started }).where(eq(schema.agentRuns.id, qaRun));
   }
   await db.insert(schema.reviews).values({ deliverableId, version: d.version, qaResults });
-  // Too few recorded sales calls for this question: hold it for an advisor before the founder sees it.
-  const reviewRequired = useCase.salesCallsToPublish !== undefined && (await salesCallCount(company)) < useCase.salesCallsToPublish;
-  await db.update(schema.deliverables).set({ status: "in_review", codeChecksPassed: true, reviewRequired }).where(and(eq(schema.deliverables.id, deliverableId), eq(schema.deliverables.status, "qa")));
-  await track(reviewRequired ? "deliverable_held_for_review" : "deliverable_published", { companyId: company.id, props: { type: "assessment", use_case: useCase.id, automated: true, degraded, completeness: inputs.input.completeness } });
+  // Reports never wait for recorded sales calls. With fewer than the question expects, the report
+  // still publishes and the advisor is flagged to collect them (salesCallsToCollect).
+  const calls = useCase.salesCallsExpected !== undefined ? await salesCallCount(company) : null;
+  await db.update(schema.deliverables).set({ status: "in_review", codeChecksPassed: true, reviewRequired: false }).where(and(eq(schema.deliverables.id, deliverableId), eq(schema.deliverables.status, "qa")));
+  await track("deliverable_published", { companyId: company.id, props: { type: "assessment", use_case: useCase.id, automated: true, degraded, completeness: inputs.input.completeness, ...(calls !== null ? { sales_calls: calls, sales_calls_expected: useCase.salesCallsExpected } : {}) } });
 }
 
 /** An advisor or admin marks a version reviewed (founders then see "Reviewed by …"). Access is checked by the caller. */
-/** Assessments held for an advisor's review before the founder sees them, for these companies. */
-export async function heldAssessments(companyIds: string[]) {
+/**
+ * Companies whose purchased question expects recorded sales calls and has fewer than that shared.
+ * Reports publish regardless; this is the advisor's list of calls to collect.
+ */
+export async function salesCallsToCollect(companyIds: string[]): Promise<{ companyId: string; companyName: string; useCase: UseCaseId; count: number; expected: number }[]> {
   if (!companyIds.length) return [];
-  const rows = await db
-    .select({ d: schema.deliverables, name: schema.companies.name })
-    .from(schema.deliverables)
-    .innerJoin(schema.companies, eq(schema.companies.id, schema.deliverables.companyId))
-    .where(and(inArray(schema.deliverables.companyId, companyIds), eq(schema.deliverables.type, TYPE), eq(schema.deliverables.status, "in_review"), eq(schema.deliverables.reviewRequired, true)))
-    .orderBy(desc(schema.deliverables.updatedAt));
-  return rows.map(({ d, name }) => ({ id: d.id, companyId: d.companyId, companyName: name, useCase: d.useCase, version: d.version, updatedAt: d.updatedAt }));
+  const [active, docs] = await Promise.all([
+    db
+      .select({ companyId: schema.companyUseCases.companyId, useCase: schema.companyUseCases.useCase, name: schema.companies.name })
+      .from(schema.companyUseCases)
+      .innerJoin(schema.companies, eq(schema.companies.id, schema.companyUseCases.companyId))
+      .where(and(inArray(schema.companyUseCases.companyId, companyIds), isNotNull(schema.companyUseCases.activatedAt))),
+    db
+      .select({ companyId: schema.documents.companyId, keys: schema.documents.dataItemKeys })
+      .from(schema.documents)
+      .where(inArray(schema.documents.companyId, companyIds)),
+  ]);
+  const counts = new Map<string, number>();
+  for (const d of docs) if (d.keys.includes("sales_calls")) counts.set(d.companyId, (counts.get(d.companyId) ?? 0) + 1);
+  const out: { companyId: string; companyName: string; useCase: UseCaseId; count: number; expected: number }[] = [];
+  for (const r of active) {
+    const def = getUseCase(r.useCase);
+    const expected = def?.salesCallsExpected;
+    const count = counts.get(r.companyId) ?? 0;
+    // One row per company: the question that expects the most calls.
+    if (!def || expected === undefined || count >= expected) continue;
+    const existing = out.find((o) => o.companyId === r.companyId);
+    if (existing && existing.expected >= expected) continue;
+    if (existing) Object.assign(existing, { useCase: def.id, expected });
+    else out.push({ companyId: r.companyId, companyName: r.name, useCase: def.id, count, expected });
+  }
+  return out.sort((a, b) => a.count - b.count || a.companyName.localeCompare(b.companyName));
 }
 
 /** Recorded sales calls the company has shared: files filed under "Recorded sales calls". */
@@ -529,10 +552,11 @@ export async function salesCallCount(company: Pick<Company, "id">): Promise<numb
   return readiness.files.filter((f) => f.itemKeys.includes("sales_calls")).length;
 }
 
-/** Shown to the founder: passed the checks, and either needs no review or an advisor has reviewed it. */
-const founderCanSee = (d: Pick<Deliverable, "codeChecksPassed" | "status" | "reviewRequired">) =>
-  d.codeChecksPassed === true && (d.status === "approved" || d.status === "published" || (d.status === "in_review" && !d.reviewRequired));
-const heldForReview = (d: Pick<Deliverable, "codeChecksPassed" | "status" | "reviewRequired">) => d.codeChecksPassed === true && d.status === "in_review" && d.reviewRequired;
+/**
+ * Shown to the founder: any version that passed the checks. Reports used to be held for an advisor
+ * when recorded sales calls were missing; they no longer are, and versions held before are released.
+ */
+const founderCanSee = (d: Pick<Deliverable, "codeChecksPassed" | "status">) => d.codeChecksPassed === true && (d.status === "in_review" || d.status === "approved" || d.status === "published");
 
 export async function approveAssessment(actor: User, deliverableId: string, comment: string | null): Promise<boolean> {
   const [d] = await db.select().from(schema.deliverables).where(eq(schema.deliverables.id, deliverableId)).limit(1);
@@ -795,10 +819,7 @@ export type FounderAssessment =
   | { state: "not_started" }
   | { state: "building" }
   | { state: "failed"; reason: string }
-  /** Built, but held for an advisor's review before the founder sees it. */
-  | { state: "in_review" }
-  /** `newerInReview`: a newer version is with an advisor; this is the last one they reviewed or published. */
-  | { state: "ready"; view: ResultsView; completedAt: Date; newerInReview?: boolean };
+  | { state: "ready"; view: ResultsView; completedAt: Date };
 
 /** What the founder's Results step shows for one purchased assessment. */
 export async function founderAssessment(companyId: string, useCase: UseCaseId): Promise<FounderAssessment> {
@@ -809,13 +830,6 @@ export async function founderAssessment(companyId: string, useCase: UseCaseId): 
     .orderBy(desc(schema.deliverables.version));
   const visible = rows.find(founderCanSee);
   const latest = rows[0];
-  const held = rows.find(heldForReview);
-  // The newest finished version is with an advisor: show the last one they can see, or say it's in review.
-  if (held && (!visible || held.version > visible.version) && (!latest || latest.id === held.id || latest.status !== "drafting")) {
-    const view = visible ? await assessmentView(visible) : null;
-    if (view) return { state: "ready", view, completedAt: visible!.updatedAt, newerInReview: true };
-    return { state: "in_review" };
-  }
   // A newer version being built doesn't hide the one they already have.
   if (visible && (!latest || latest.id === visible.id || latest.status !== "drafting")) {
     const view = await assessmentView(visible);
@@ -842,7 +856,7 @@ export async function founderAssessment(companyId: string, useCase: UseCaseId): 
 /** When each purchased assessment's results first became visible (for history). */
 export async function assessmentCompletions(companyId: string): Promise<Partial<Record<string, Date>>> {
   const rows = await db
-    .select({ useCase: schema.deliverables.useCase, at: schema.deliverables.updatedAt, codeChecksPassed: schema.deliverables.codeChecksPassed, status: schema.deliverables.status, reviewRequired: schema.deliverables.reviewRequired })
+    .select({ useCase: schema.deliverables.useCase, at: schema.deliverables.updatedAt, codeChecksPassed: schema.deliverables.codeChecksPassed, status: schema.deliverables.status })
     .from(schema.deliverables)
     .where(and(eq(schema.deliverables.companyId, companyId), eq(schema.deliverables.type, TYPE)));
   const out: Partial<Record<string, Date>> = {};

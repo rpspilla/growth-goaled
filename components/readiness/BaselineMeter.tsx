@@ -7,7 +7,7 @@ import { Mic, Play, RefreshCw } from "lucide-react";
 import { ExpandableDetail, ProgressRing } from "@/components/visual/primitives";
 import { requestAssessment } from "@/app/(founder)/data/actions";
 
-export type AssessmentState = "not_started" | "building" | "ready" | "failed" | "in_review";
+export type AssessmentState = "not_started" | "building" | "ready" | "failed";
 
 /**
  * The run / re-run control at the top of every Data page: a readiness ring, a sales-call meter
@@ -25,13 +25,13 @@ export function BaselineMeter({
   total: number;
   ready: boolean;
   assessment: AssessmentState;
-  /** Recorded sales calls shared, and how many publish the report without an advisor's review. */
+  /** Recorded sales calls shared, and how many the question expects (optional: reports never wait for them). */
   calls?: { count: number; needed: number };
 }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const label = assessment === "ready" || assessment === "in_review" ? "Re-run my report" : assessment === "failed" ? "Run my report again" : "Run my report";
+  const label = assessment === "ready" ? "Re-run my report" : assessment === "failed" ? "Run my report again" : "Run my report";
   const enoughCalls = !calls || calls.count >= calls.needed;
   const run = () =>
     start(async () => {
@@ -63,19 +63,14 @@ export function BaselineMeter({
                   </span>
                 ))}
               </div>
-              <p className="text-xs mt-1" style={{ color: enoughCalls ? "var(--green)" : "#92400E" }}>
-                <span className="font-semibold">Recorded sales calls: {calls.count} of {calls.needed}.</span> {enoughCalls ? "Publishes straight away." : "Fewer means advisor review first."}
+              <p className="text-xs mt-1" style={{ color: enoughCalls ? "var(--green)" : "var(--muted-foreground)" }}>
+                <span className="font-semibold">Recorded sales calls: {calls.count} of {calls.needed}.</span> {enoughCalls ? "Sales call review included." : "Optional · your advisor may ask for them."}
               </p>
             </div>
           )}
         </div>
       </div>
 
-      {assessment === "in_review" && (
-        <p className="mt-3 text-xs font-semibold rounded-md px-2.5 py-1.5" style={{ background: "var(--blue-muted)", color: "var(--blue)" }}>
-          Latest report: with an advisor for review
-        </p>
-      )}
 
       <div className="mt-4">
         {assessment === "building" ? (
@@ -84,7 +79,7 @@ export function BaselineMeter({
           </Link>
         ) : (
           <button type="button" disabled={pending} onClick={run} className="btn btn-primary btn-lg w-full text-lg" style={{ minHeight: "3.5rem" }}>
-            {assessment === "ready" || assessment === "in_review" ? <RefreshCw size={18} aria-hidden /> : <Play size={18} aria-hidden />}
+            {assessment === "ready" ? <RefreshCw size={18} aria-hidden /> : <Play size={18} aria-hidden />}
             {pending ? "Starting your report…" : label}
           </button>
         )}
@@ -108,8 +103,7 @@ export function BaselineMeter({
                 ? "Takes a few minutes. You'll see your results as soon as they're ready."
                 : "You can run it now: the report goes as far as your data allows and lists what's missing. Adding the required items makes it sharper."}
           </p>
-          {calls && !enoughCalls && <p>With fewer than {calls.needed} recorded calls, an advisor reviews your report before you see it. Upload call recordings or transcripts to skip the wait.</p>}
-          {assessment === "in_review" && <p>Your latest report is with an advisor for review. You&apos;ll see it as soon as they&apos;ve reviewed it.</p>}
+          {calls && !enoughCalls && <p>Your report doesn&apos;t wait for recorded sales calls. With {calls.needed} or more, it also reviews how your sales process runs on real calls; your advisor will ask for them if they aren&apos;t here.</p>}
         </ExpandableDetail>
       </div>
     </section>

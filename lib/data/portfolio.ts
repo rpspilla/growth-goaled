@@ -4,6 +4,7 @@ import { db, schema } from "@/lib/db";
 import type { Company, User } from "@/lib/db/schema";
 import { assessReadiness } from "@/lib/readiness-assessment";
 import { isMetricKey, type MetricKey } from "@/lib/metrics";
+import { salesCallsToCollect } from "./assessments";
 import { isStalled } from "./deliverables";
 
 export type PortfolioRow = {
@@ -45,7 +46,7 @@ export async function latestMetrics(companyIds: string[]): Promise<Map<string, M
 export async function portfolioRows(companies: Company[], now = new Date()): Promise<PortfolioRow[]> {
   const ids = companies.map((c) => c.id);
   if (!ids.length) return [];
-  const [metrics, registers, items, deliverables, scores] = await Promise.all([
+  const [metrics, registers, items, deliverables, scores, calls] = await Promise.all([
     latestMetrics(ids),
     db
       .select({ companyId: schema.registerItems.companyId, type: schema.registerItems.type, owner: schema.registerItems.owner })
@@ -58,6 +59,7 @@ export async function portfolioRows(companies: Company[], now = new Date()): Pro
       .where(and(inArray(schema.deliverables.companyId, ids), eq(schema.deliverables.type, "benchmark")))
       .orderBy(desc(schema.deliverables.version)),
     db.select().from(schema.companyScores).where(inArray(schema.companyScores.companyId, ids)).orderBy(desc(schema.companyScores.updatedAt)),
+    salesCallsToCollect(ids),
   ]);
 
   return companies.map((c) => {
@@ -81,6 +83,8 @@ export async function portfolioRows(companies: Company[], now = new Date()): Pro
     if (benchmarkStatus === "failed" || benchmarkStatus === "stalled") attention.push("Benchmark run failed");
     if (conflicts) attention.push(`${conflicts} data ${conflicts === 1 ? "conflict" : "conflicts"}`);
     if (c.health === "critical") attention.push("Health: at risk");
+    const missingCalls = calls.find((x) => x.companyId === c.id);
+    if (missingCalls) attention.push(`Sales calls to collect (${missingCalls.count} of ${missingCalls.expected})`);
 
     return {
       id: c.id,

@@ -12,7 +12,7 @@ vi.mock("@/lib/db", async () => {
 import { schema } from "@/lib/db";
 import type { Company, User } from "@/lib/db/schema";
 import type { AssessmentInput, AssessmentOutput } from "@/lib/ai/assessment";
-import { assembleAssessmentInputs, createAssessmentVersion, founderAssessment, runAssessmentPipeline, approveAssessment, assessmentCompletions } from "@/lib/data/assessments";
+import { assembleAssessmentInputs, createAssessmentVersion, founderAssessment, runAssessmentPipeline, approveAssessment, assessmentCompletions, salesCallsToCollect } from "@/lib/data/assessments";
 import { activateUseCase } from "@/lib/data/use-cases";
 import { getUseCase } from "@/lib/use-cases";
 
@@ -195,9 +195,7 @@ describe("assessment engine", () => {
     await activateUseCase(empty.id, "winning_icp", { activation: "advisor", by: advisor.id, note: "test" });
     const v = (await createAssessmentVersion(empty, "winning_icp"))!;
     await runAssessmentPipeline(v.id, { draft: async () => { throw new Error("nothing to go on"); }, qa });
-    // No recorded sales calls: held for an advisor first.
-    expect(await founderAssessment(empty.id, "winning_icp")).toEqual({ state: "in_review" });
-    await approveAssessment(advisor, v.id, null);
+    // No recorded sales calls: published anyway (the advisor is flagged to collect them).
     const state = await founderAssessment(empty.id, "winning_icp");
     if (state.state !== "ready") throw new Error(`expected ready, got ${state.state}`);
     expect(state.view.completeness).toBe("minimal");
@@ -261,40 +259,31 @@ describe("assessment engine", () => {
   });
 });
 
-describe("advisor review when sales calls are missing", () => {
-  it("holds the report from the founder until an advisor reviews it, unless 3 recorded calls were shared", async () => {
+describe("sales calls are collected, never a gate", () => {
+  it("publishes without recorded calls and flags the company for its advisor until 3 are shared", async () => {
     const [low] = (await db().insert(schema.companies).values({ name: "Few Calls Co", stage: "Seed" }).returning()) as [Company];
     await activateUseCase(low.id, "hire_or_fix", { activation: "paid", by: founder.id });
     await addCalls(low, 2);
     const v = (await createAssessmentVersion(low, "hire_or_fix"))!;
     await runAssessmentPipeline(v.id, { draft: goodDraft, qa });
     const [d] = await db().select().from(schema.deliverables).where(eq(schema.deliverables.id, v.id));
-    expect(d).toMatchObject({ status: "in_review", codeChecksPassed: true, reviewRequired: true });
-    expect(await founderAssessment(low.id, "hire_or_fix")).toEqual({ state: "in_review" });
-    expect(await assessmentCompletions(low.id)).toEqual({});
-    // The advisor marks it reviewed: now the founder sees it.
-    expect(await approveAssessment(advisor, v.id, "Checked")).toBe(true);
-    expect((await founderAssessment(low.id, "hire_or_fix")).state).toBe("ready");
-    // With a third call, the next version publishes straight away.
+    expect(d).toMatchObject({ status: "in_review", codeChecksPassed: true, reviewRequired: false });
+    const state = await founderAssessment(low.id, "hire_or_fix");
+    expect(state.state === "ready" && state.view.version).toBe(1);
+    expect(Object.keys(await assessmentCompletions(low.id))).toEqual(["hire_or_fix"]);
+    expect(await salesCallsToCollect([low.id])).toEqual([{ companyId: low.id, companyName: "Few Calls Co", useCase: "hire_or_fix", count: 2, expected: 3 }]);
+    // A third call clears the flag.
     await addCalls(low, 1);
-    const v2 = (await createAssessmentVersion(low, "hire_or_fix"))!;
-    await runAssessmentPipeline(v2.id, { draft: goodDraft, qa });
-    const [d2] = await db().select().from(schema.deliverables).where(eq(schema.deliverables.id, v2.id));
-    expect(d2!.reviewRequired).toBe(false);
-    const after = await founderAssessment(low.id, "hire_or_fix");
-    expect(after.state === "ready" && after.view.version).toBe(2);
+    expect(await salesCallsToCollect([low.id])).toEqual([]);
   });
 
-  it("keeps showing the last reviewed version while a newer one waits for review", async () => {
-    const [mid] = (await db().insert(schema.companies).values({ name: "Mid Co", stage: "Seed" }).returning()) as [Company];
-    await activateUseCase(mid.id, "hire_or_fix", { activation: "paid", by: founder.id });
-    const v1 = (await createAssessmentVersion(mid, "hire_or_fix"))!;
-    await runAssessmentPipeline(v1.id, { draft: goodDraft, qa });
-    await approveAssessment(advisor, v1.id, null);
-    const v2 = (await createAssessmentVersion(mid, "hire_or_fix"))!;
-    await runAssessmentPipeline(v2.id, { draft: goodDraft, qa });
-    const state = await founderAssessment(mid.id, "hire_or_fix");
-    expect(state).toMatchObject({ state: "ready", newerInReview: true });
+  it("shows founders versions that were held for review under the old rule", async () => {
+    const [old] = (await db().insert(schema.companies).values({ name: "Held Co", stage: "Seed" }).returning()) as [Company];
+    await activateUseCase(old.id, "hire_or_fix", { activation: "paid", by: founder.id });
+    const v = (await createAssessmentVersion(old, "hire_or_fix"))!;
+    await runAssessmentPipeline(v.id, { draft: goodDraft, qa });
+    await db().update(schema.deliverables).set({ reviewRequired: true }).where(eq(schema.deliverables.id, v.id));
+    const state = await founderAssessment(old.id, "hire_or_fix");
     expect(state.state === "ready" && state.view.version).toBe(1);
   });
 });

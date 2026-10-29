@@ -2,7 +2,8 @@ import { QA_CHECKS } from "@/lib/ai/qa";
 import { ApproveAssessment } from "@/components/use-cases/ApproveAssessment";
 import { AssessmentResults } from "@/components/views/AssessmentResults";
 import { db, schema } from "@/lib/db";
-import { assessmentView, latestAssessment } from "@/lib/data/assessments";
+import { assessmentView, latestAssessment, salesCallCount } from "@/lib/data/assessments";
+import Link from "next/link";
 import { isStalled } from "@/lib/data/deliverables";
 import { and, desc, eq, isNotNull } from "drizzle-orm";
 import { targetSummary } from "@/lib/use-cases";
@@ -50,6 +51,9 @@ export default async function CompanyResultsPage({ params }: { params: Promise<{
     options: o.options,
   }));
   const target = targetSummary(active?.objective);
+  // Reports publish without recorded sales calls; the advisor is flagged to collect them.
+  const expectedCalls = active?.def.salesCallsExpected;
+  const calls = expectedCalls !== undefined ? await salesCallCount(company) : null;
 
   return (
     <div className="space-y-2">
@@ -59,6 +63,17 @@ export default async function CompanyResultsPage({ params }: { params: Promise<{
           <h1 className="font-display text-3xl font-normal" style={{ color: "var(--foreground)" }}>{company.name}: results</h1>
           {target && <p className="text-base mt-1" style={{ color: "var(--muted-foreground)" }}>Founder&apos;s target: {target}</p>}
         </div>
+        {calls !== null && expectedCalls !== undefined && calls < expectedCalls && (
+          <div className="rounded-lg px-4 py-3 text-sm flex items-center gap-3 flex-wrap" role="note" style={{ background: "var(--amber-muted)", color: "#78350F" }}>
+            <span className="font-semibold">
+              Sales calls to collect: {calls} of {expectedCalls} recorded calls shared.
+            </span>
+            <span>Reports publish without them. Ask the founder for recordings or transcripts{d ? ", then re-run the report" : ""}.</span>
+            <Link href={`/advisor/companies/${company.id}/data#item-sales_calls`} className="font-semibold underline">
+              Go to their data →
+            </Link>
+          </div>
+        )}
         {!active && <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>No purchased assessment yet.</p>}
         {active && !d && <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>The founder hasn&apos;t run this assessment yet.</p>}
         {d && (
@@ -69,9 +84,7 @@ export default async function CompanyResultsPage({ params }: { params: Promise<{
               <span style={{ color: status === "failed" || d.codeChecksPassed === false ? "var(--red)" : "var(--green)" }}>
                 {d.codeChecksPassed === false
                   ? "Failed the code checks (hidden from the founder)"
-                  : d.reviewRequired && d.status === "in_review"
-                    ? "Waiting for your review: hidden from the founder until you mark it reviewed (fewer than the required recorded sales calls)"
-                    : STATE[status ?? ""] ?? status}
+                  : STATE[status ?? ""] ?? status}
               </span>
             </div>
             {qa && (

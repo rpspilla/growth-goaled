@@ -20,7 +20,7 @@ export const growthLeak: UseCaseDef = {
   snapshotProfile: [{ section: "company", field: "arr" }, { section: "company", field: "growth" }, { section: "customers", field: "nrr" }, { section: "customers", field: "gross_retention" }],
   nextUseCase: "hire_or_fix",
   objectiveQuestions: [],
-  salesCallsToPublish: 3,
+  salesCallsExpected: 3,
   dimensions: [
     { id: "retention", title: "Churn and at-risk accounts", summary: "Which customers you lose or shrink, what they have in common, and who's at risk next.", items: ["churned_revenue", "revenue_by_customer", "grr_nrr", "churn"] },
     { id: "onboarding", title: "Onboarding and adoption", summary: "Whether new customers get to value quickly enough to stay.", items: ["onboarding", "activation", "active_usage"] },
@@ -31,7 +31,7 @@ export const growthLeak: UseCaseDef = {
   helpfulItems: ["sales_calls", "renewals_expansions", "grr_nrr", "opportunities", "stage_conversion", "win_loss"],
   optionalItems: ["leads_by_source", "churn", "onboarding", "activation", "active_usage", "contract_metrics"],
   itemWhy: {
-    sales_calls: "With 3 or more recorded calls your report publishes straight away; with fewer, an advisor reviews it before you see it.",
+    sales_calls: "Shows how your sales process runs on real calls. Optional for your report; your advisor will ask for 3 if they aren't here.",
     monthly_revenue: "Builds your ARR and growth trend, the line we're explaining.",
     revenue_by_customer: "Splits growth into new, expansion and churned revenue (the ARR bridge).",
     churned_revenue: "Shows how much growth leaks out through lost and shrinking customers.",

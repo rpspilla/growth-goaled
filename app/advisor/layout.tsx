@@ -19,7 +19,7 @@ async function getBadges(user: User): Promise<AdvisorBadges> {
     .select({ n: count() })
     .from(deliverables)
     .innerJoin(companies, eq(companies.id, deliverables.companyId))
-    // Benchmarks always wait for review; assessments only when held (e.g. too few recorded sales calls).
+    // Benchmarks wait for review. Assessments publish straight away (reviewRequired is no longer set).
     .where(and(eq(deliverables.status, "in_review"), or(eq(deliverables.type, "benchmark"), eq(deliverables.reviewRequired, true)), scope));
 
   return { unassigned: unassigned?.n ?? 0, review: review?.n ?? 0 };
