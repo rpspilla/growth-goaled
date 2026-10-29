@@ -191,8 +191,10 @@ export function QuestionnaireForm({
                       className="sr-only"
                       onChange={() => {
                         onChange(o.value);
+                        const here = step;
                         void persist(f, o.value).then((ok) => {
-                          if (ok && step < last) setTimeout(() => setStep((s) => Math.min(last, s + 1)), 220);
+                          // Move on only if the founder is still on this question (they may have jumped elsewhere).
+                          if (ok && here < last) setTimeout(() => setStep((s) => (s === here ? Math.min(last, s + 1) : s)), 220);
                         });
                       }}
                     />

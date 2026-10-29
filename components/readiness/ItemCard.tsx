@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { createElement, useState, useTransition } from "react";
 import type { ReadinessFile } from "@/lib/data/readiness";
 import {
   ITEM_STATUS_LABEL,
@@ -116,7 +116,7 @@ export function ItemCard({
   }
 
   const needsAttention = record.status === "partial" || record.status === "missing";
-  const Icon = dataItemIcon(def.key, category);
+  const icon = createElement(dataItemIcon(def.key, category), { size: 20 });
   const listId = `sources-${def.key}`;
 
   return (
@@ -125,7 +125,7 @@ export function ItemCard({
       <div className="p-4">
         <div className="flex items-start gap-3">
           <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: record.status === "available" ? "var(--green-muted)" : "var(--muted)", color: record.status === "available" ? "var(--green)" : "var(--muted-foreground)" }} aria-hidden>
-            <Icon size={20} />
+            {icon}
           </span>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-semibold leading-snug" style={{ color: "var(--foreground)" }} title={def.description}>

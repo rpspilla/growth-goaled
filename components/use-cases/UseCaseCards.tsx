@@ -108,7 +108,7 @@ export function UseCaseCards({
               </Link>
               {price !== null && price !== undefined && (
                 <span data-label className="text-[11px] font-mono px-2 py-1 rounded" style={{ background: "var(--muted)", color: "var(--muted-foreground)" }}>
-                  {sellable?.includes(u.id) ? `Free · then ${price}` : "Free · soon"}
+                  {sellable?.includes(u.id) ? `Snapshot free · Assessment ${price}` : "Snapshot free · Assessment soon"}
                 </span>
               )}
             </div>

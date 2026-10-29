@@ -24,7 +24,7 @@ import {
  * alternative for screen readers and stays legible at 390px.
  */
 
-const C = { green: "#155A3C", greenLight: "#1A7049", amber: "#D97706", red: "#B91C1C", navy: "#0D1B2A", grey: "#94A3B8", subtle: "#6B7889" };
+const C = { green: "#155A3C", greenLight: "#1A7049", amber: "#D97706", red: "#B91C1C", navy: "#0D1B2A", grey: "#94A3B8", subtle: "#5F6B7C" };
 const AXIS = { fontSize: 12, fill: C.subtle, fontFamily: "var(--font-mono)" };
 const LABEL = { fontSize: 12, fontFamily: "var(--font-mono)", fill: C.navy, fontWeight: 600 } as const;
 

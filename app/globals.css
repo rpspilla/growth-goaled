@@ -12,7 +12,7 @@
   --muted: #F1F5F9;
   /* Darker than slate-500 so secondary text stays readable (≈6:1 on the page background). */
   --muted-foreground: #4F5D6E;
-  --subtle-foreground: #6B7889;
+  --subtle-foreground: #5F6B7C; /* AA (≥ 4.5:1) for small text on white and muted backgrounds */
   --accent: #155A3C;
   --accent-foreground: #FFFFFF;
   --border: #E2E8F0;

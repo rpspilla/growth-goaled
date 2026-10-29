@@ -3,6 +3,9 @@ import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { PlanTracker } from "@/components/progress/PlanTracker";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Sparkline } from "@/components/ui/Sparkline";
+import { ExpandableDetail, ProgressRing, TONE } from "@/components/visual/primitives";
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, CalendarClock, RefreshCw } from "lucide-react";
 import { RunAssessmentButton } from "@/components/use-cases/RunAssessmentButton";
 import { founderContext } from "@/lib/data/founder-context";
 import { progressView } from "@/lib/data/plan";
@@ -34,87 +37,141 @@ export default async function ProgressPage() {
   const live = view.actions.filter((a) => a.status !== "dropped").length;
   const attention = view.revisitDue || view.newSince.length > 0;
   return (
-    <div className="px-4 sm:px-8 py-8 max-w-4xl space-y-10">
-      <PageHeader eyebrow={active.def.shortTitle} title="Action plan" subtitle={view.decision} />
+    <div className="px-4 sm:px-8 py-8 max-w-6xl space-y-8">
+      <header>
+        <div className="label">{active.def.shortTitle}</div>
+        <h1 className="font-display text-3xl sm:text-4xl mt-1" style={{ color: "var(--foreground)" }}>
+          Action plan
+        </h1>
+        <p className="text-base mt-1" style={muted} title={view.decision}>
+          {view.decision}
+        </p>
+      </header>
 
-      <div className="grid sm:grid-cols-[1fr_auto] gap-4 items-stretch -mt-4">
-        <div className="surface p-5">
-          <div className="text-sm font-semibold" style={muted}>Progress</div>
-          <div className="text-2xl font-semibold mt-0.5" style={{ color: "var(--foreground)" }}>{done} of {live} actions done</div>
-          <div className="h-2 rounded-full mt-3 overflow-hidden" style={{ background: "var(--muted)" }} role="progressbar" aria-valuemin={0} aria-valuemax={live} aria-valuenow={done} aria-label="Actions done">
-            <div className="h-full rounded-full" style={{ width: `${live ? (done / live) * 100 : 0}%`, background: "var(--green)" }} />
-          </div>
-          <p className="text-sm mt-3" style={muted}>Plan from brief version {view.version}, committed {date(view.committedAt)}.</p>
+      <div className="grid md:grid-cols-[auto_minmax(0,1fr)_minmax(0,1.2fr)] gap-4 items-stretch">
+        <div className="surface p-5 flex items-center justify-center">
+          <ProgressRing value={live ? done / live : 0} label={`${done} of ${live} done`} size={104} />
         </div>
-        <div className="surface p-5 sm:w-80" style={attention ? { borderColor: "var(--amber)", boxShadow: "0 0 0 1px var(--amber)" } : undefined}>
-          <div className="text-base font-semibold" style={{ color: "var(--foreground)" }}>
-            {view.revisitDue ? "Time to reassess" : `Reassess by ${date(view.revisitBy)}`}
+        <div className="surface p-5 flex flex-col gap-3" style={attention ? { borderColor: "var(--amber)", boxShadow: "0 0 0 1px var(--amber)" } : undefined}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <CalendarClock size={18} style={{ color: attention ? "var(--amber)" : "var(--green)" }} aria-hidden />
+            <span className="text-base font-semibold" style={{ color: "var(--foreground)" }}>
+              {view.revisitDue ? "Time to reassess" : "Next reassessment"}
+            </span>
+            <span data-label className="font-mono text-xs px-2 py-0.5 rounded-full" style={{ background: attention ? "var(--amber-muted)" : "var(--green-muted)", color: attention ? "#92400E" : "var(--green)" }}>
+              {date(view.revisitBy)}
+            </span>
           </div>
-          <p className="text-sm mt-1" style={muted}>
-            {view.newSince.length
-              ? `${view.newSince.length} ${view.newSince.length === 1 ? "figure has" : "figures have"} changed since your brief (${view.newSince.map((n) => `${n.label} ${n.value}`).join(", ")}). Reassess to see whether the diagnosis still holds.`
-              : view.revisitTrigger
-                ? `Or sooner if: ${view.revisitTrigger.replace(/\.$/, "")}.`
-                : "Add new data on the Data step, then reassess."}
-          </p>
-          <div className="flex items-center gap-3 mt-3 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap mt-auto">
             <RunAssessmentButton label="Reassess now" primary />
-            <Link href="/data" className="link text-sm">Add data</Link>
+            <Link href="/data" className="link text-sm">
+              Add data
+            </Link>
           </div>
+          {view.revisitTrigger && (
+            <ExpandableDetail summary="When to reassess sooner">
+              <p>Or sooner if: {view.revisitTrigger.replace(/\.$/, "")}.</p>
+              <p>Plan from brief version {view.version}, committed {date(view.committedAt)}.</p>
+            </ExpandableDetail>
+          )}
+        </div>
+        <div className="surface p-5">
+          <div className="text-sm font-semibold mb-2" style={{ color: "var(--foreground)" }}>
+            Figures that changed since the brief
+          </div>
+          {view.newSince.length ? (
+            <ul className="space-y-1.5">
+              {view.newSince.slice(0, 5).map((n) => {
+                const m = view.metrics.find((x) => x.label === n.label);
+                const Icon = m?.direction === "better" ? ArrowUpRight : m?.direction === "worse" ? ArrowDownRight : RefreshCw;
+                const color = m?.direction === "better" ? "var(--green)" : m?.direction === "worse" ? "var(--red)" : "var(--muted-foreground)";
+                return (
+                  <li key={n.label} data-label className="flex items-center gap-2 text-sm">
+                    <Icon size={15} style={{ color }} aria-hidden />
+                    <span className="flex-1 min-w-0 truncate" style={{ color: "var(--foreground)" }}>
+                      {n.label}
+                    </span>
+                    <span className="font-mono font-semibold" style={{ color: "var(--foreground)" }}>
+                      {n.value}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p data-label className="text-sm" style={muted}>
+              None yet · upload fresh exports on Data
+            </p>
+          )}
+          {view.newSince.length > 5 && (
+            <p data-label className="text-xs mt-1" style={muted}>
+              +{view.newSince.length - 5} more
+            </p>
+          )}
         </div>
       </div>
 
       {view.newerBrief && (
-        <div className="rounded-xl px-5 py-4 text-base" role="note" style={{ background: "var(--amber-muted)", color: "#78350F" }}>
-          A newer brief (version {view.newerBrief}) is ready. <Link href="/baseline" className="font-semibold underline">Review it and commit to its plan →</Link>
+        <div className="rounded-xl px-4 py-3 text-sm flex items-center gap-2 flex-wrap" role="note" style={{ background: "var(--amber-muted)", color: "#78350F" }}>
+          <AlertTriangle size={16} aria-hidden />
+          <span className="font-semibold">Newer brief ready (version {view.newerBrief}).</span>
+          <Link href="/baseline" className="font-semibold underline">
+            Review it and commit to its plan →
+          </Link>
         </div>
       )}
 
       <section aria-labelledby="progress-plan" className="space-y-3">
-        <div>
-          <h2 id="progress-plan" className="text-xl sm:text-2xl font-semibold" style={{ color: "var(--foreground)" }}>
-            Plan · {done} of {live} done
-          </h2>
-          <p className="text-base mt-1" style={muted}>Update each action as you go. Owners are yours to decide; the brief doesn&apos;t assign them.</p>
-        </div>
+        <h2 id="progress-plan" className="text-xl font-semibold" style={{ color: "var(--foreground)" }}>
+          Plan · {done} of {live} done
+        </h2>
         <PlanTracker actions={view.actions} update={updatePlanActionAction} />
       </section>
 
       {view.metrics.length > 0 && (
         <section aria-labelledby="progress-metrics" className="space-y-3">
-          <h2 id="progress-metrics" className="text-xl sm:text-2xl font-semibold" style={{ color: "var(--foreground)" }}>Metrics against your baseline</h2>
-          <div className="surface p-5">
-            <div className="overflow-x-auto -mx-1">
-              <table className="w-full text-base min-w-[480px]">
-                <thead>
-                  <tr className="text-left text-sm" style={muted}>
-                    <th className="py-2 px-1 font-semibold">Metric</th>
-                    <th className="py-2 px-1 font-semibold">Baseline</th>
-                    <th className="py-2 px-1 font-semibold">Latest</th>
-                    <th className="py-2 px-1 font-semibold">Change</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {view.metrics.map((m) => (
-                    <tr key={m.metric} className="border-t align-top" style={{ borderColor: "var(--border)" }}>
-                      <td className="py-3 px-1" style={{ color: "var(--foreground)" }}>{m.label}</td>
-                      <td className="py-3 px-1 font-semibold" style={{ color: "var(--foreground)" }}>
-                        {m.baseline ?? "—"}
-                        {m.baselinePeriod && m.baselinePeriod !== "Current" && <div className="text-sm font-normal" style={muted}>{m.baselinePeriod}</div>}
-                      </td>
-                      <td className="py-3 px-1 font-semibold" style={{ color: "var(--foreground)" }}>
-                        {m.latest ?? "—"}
-                        {m.latestAt && <div className="text-sm font-normal" style={muted}>updated {date(m.latestAt)}</div>}
-                      </td>
-                      <td className="py-3 px-1 text-sm font-semibold" style={{ color: m.direction === "better" ? "var(--green)" : m.direction === "worse" ? "var(--red)" : "var(--muted-foreground)" }}>
-                        {m.direction === "better" ? "▲ Improving" : m.direction === "worse" ? "▼ Worse" : m.direction === "same" ? "No change" : "No new figure yet"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="text-sm mt-3" style={muted}>Latest values are confirmed or calculated figures recorded since your brief. Upload fresh exports on the Data step to update them.</p>
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <h2 id="progress-metrics" className="text-xl font-semibold" style={{ color: "var(--foreground)" }}>
+              Metrics against your baseline
+            </h2>
+            <span data-label className="text-xs" style={muted} title="Latest values are confirmed or calculated figures recorded since your brief. Upload fresh exports on the Data step to update them.">
+              Confirmed or calculated figures since your brief
+            </span>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {view.metrics.map((m) => {
+              const tone = m.direction === "better" ? "green" : m.direction === "worse" ? "red" : "neutral";
+              const word = m.direction === "better" ? "Improving" : m.direction === "worse" ? "Worse" : m.direction === "same" ? "No change" : "No new figure yet";
+              return (
+                <div key={m.metric} className="surface p-4 flex flex-col gap-1.5 min-w-0">
+                  <div className="text-xs font-semibold truncate" style={muted}>
+                    {m.label}
+                  </div>
+                  <div className="flex items-baseline gap-1.5 font-mono">
+                    <span className="text-sm" style={muted}>
+                      {m.baseline ?? "—"}
+                    </span>
+                    <span aria-hidden style={muted}>
+                      →
+                    </span>
+                    <span className="text-2xl font-semibold" style={{ color: "var(--foreground)" }}>
+                      {m.latest ?? "—"}
+                    </span>
+                  </div>
+                  {m.series.length >= 2 ? <Sparkline values={m.series} lowerIsBetter={m.lowerIsBetter} label={`${m.label}: baseline ${m.baseline ?? "—"}, latest ${m.latest ?? "—"}`} height={36} /> : <div className="h-9" aria-hidden />}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span data-label className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: TONE[tone].bg, color: TONE[tone].fg }}>
+                      {m.direction === "better" ? "▲" : m.direction === "worse" ? "▼" : ""} {word}
+                    </span>
+                    {m.latestAt && (
+                      <span data-label className="text-[11px] font-mono" style={{ color: "var(--subtle-foreground)" }}>
+                        {date(m.latestAt)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </section>
       )}

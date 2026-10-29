@@ -84,6 +84,9 @@ export type MetricProgress = {
   latestPeriod: string | null;
   latestAt: string | null;
   direction: "better" | "worse" | "same" | null;
+  /** Baseline, then each figure recorded since the brief, oldest first (for a sparkline). */
+  series: number[];
+  lowerIsBetter: boolean;
 };
 
 export type ProgressView = {
@@ -164,6 +167,14 @@ export async function progressView(company: Pick<Company, "id">, useCase: UseCas
       latestPeriod: p?.period ?? null,
       latestAt: p ? p.updatedAt.toISOString() : null,
       direction: p && baseline !== null ? (p.value === baseline ? "same" : p.value < baseline === lower ? "better" : "worse") : null,
+      series: [
+        ...(baseline === null ? [] : [baseline]),
+        ...points
+          .filter((x) => x.metric === metric && (x.status === "accepted" || x.origin === "calculated"))
+          .sort((a, b) => a.updatedAt.getTime() - b.updatedAt.getTime())
+          .map((x) => Number(x.value)),
+      ],
+      lowerIsBetter: Boolean(lower),
     };
   };
   const metrics = tracked.map((m) => {

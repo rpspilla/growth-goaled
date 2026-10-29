@@ -168,24 +168,41 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await expect(founder.page.getByLabel(/challenge you're trying to solve|Where do you think the leak is|Your target value|Why now/)).toHaveCount(0);
   // Revenue was given at onboarding, so it isn't asked again.
   await expect(founder.page.getByLabel("Annual recurring revenue (ARR)")).toHaveCount(0);
-  await expect(founder.page.getByText(/Already known from your profile: Annual revenue \$3M–\$10M/)).toBeVisible();
-  await expect(founder.page.locator("#q-profile-company-growth_range option")).toContainText(["Choose…", "Shrinking", "0–25%", "25–50%", "50–100%", "100–200%", "200%+"]);
-  await expect(founder.page.locator("#q-profile-company-employees_range option")).toContainText(["Choose…", "1–5", "6–10", "11–25", "26–50", "50+"]);
-  await founder.page.getByLabel(/^Stage/).selectOption("Series A");
-  await founder.page.getByLabel(/^Sales model/).selectOption("Founder-led");
+  const known = founder.page.getByLabel("Already known from your profile");
+  await expect(known).toContainText("Annual revenue");
+  await expect(known).toContainText("$3M–$10M");
+  // One question per step: jump to a question by its dot, then answer it (ranges are big tap targets).
+  const goTo = async (label: string) => {
+    const dot = founder.page.getByRole("button", { name: new RegExp(`^Question \\d+: ${label.replace(/[()]/g, "\\$&")}`) });
+    await dot.click();
+    await expect(dot).toHaveAttribute("aria-current", "step");
+  };
+  const answer = async (label: string, value: string) => {
+    await goTo(label);
+    const radio = founder.page.getByRole("radio", { name: value, exact: true });
+    if (await radio.count()) await radio.check({ force: true });
+    else await founder.page.getByLabel(new RegExp(`^${label}`)).selectOption(value);
+  };
+  await goTo("Year-over-year revenue growth");
+  await expect(founder.page.locator("form fieldset label")).toHaveText(["Shrinking", "0–25%", "25–50%", "50–100%", "100–200%", "200%+"]);
+  await goTo("Number of employees");
+  await expect(founder.page.locator("form fieldset label")).toHaveText(["1–5", "6–10", "11–25", "26–50", "50+"]);
+  await answer("Stage", "Series A");
+  await answer("Sales model", "Founder-led");
   await expect(founder.page.getByRole("button", { name: "See my free Snapshot" })).toBeDisabled(); // founding year is required
-  await founder.page.getByLabel(/^Founding year/).selectOption("2019");
-  await founder.page.getByLabel(/^Industry/).selectOption("Fintech");
-  await founder.page.getByLabel("Year-over-year revenue growth").selectOption("50–100%");
-  await founder.page.getByLabel("Net revenue retention (NRR)").selectOption("90–100%");
-  await founder.page.getByLabel("Number of employees").selectOption("26–50");
+  await answer("Founding year", "2019");
+  await answer("Industry", "Fintech");
+  await answer("Year-over-year revenue growth", "50–100%");
+  await answer("Net revenue retention (NRR)", "90–100%");
+  await answer("Number of employees", "26–50");
   await expect(founder.page.getByText("Your answers are saved.")).toBeVisible();
   // Answers survive a reload (autosave), and show as known instead of being asked again.
   await founder.page.reload();
-  await expect(founder.page.getByText(/Already known from your profile: .*Stage Series A/)).toBeVisible();
-  await expect(founder.page.getByText(/Already known from your profile: .*Net revenue retention \(NRR\) 90–100%/)).toBeVisible();
-  await expect(founder.page.getByLabel(/^Stage/)).toHaveCount(0);
-  await expect(founder.page.getByLabel("Number of employees")).toHaveCount(0);
+  await expect(known).toContainText("Series A");
+  await expect(known).toContainText("Net revenue retention (NRR)");
+  await expect(known).toContainText("90–100%");
+  await expect(founder.page.getByRole("button", { name: /^Question \d+: Stage/ })).toHaveCount(0);
+  await expect(founder.page.getByRole("button", { name: /^Question \d+: Number of employees/ })).toHaveCount(0);
   await snapshotButton.click();
   await expect(founder.page).toHaveURL(/\/library\/growth_leak\/snapshot$/);
   await expect(founder.page.getByText("Hypotheses", { exact: true })).toBeVisible();
@@ -207,6 +224,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await expect(growth).toContainText("At 50–100%, you're below it.");
   // How we work with companies like this one, and what we'd do after the assessment.
   await expect(founder.page.getByRole("heading", { name: "How we work with companies like yours" })).toBeVisible();
+  await founder.page.getByRole("heading", { name: "How we work with companies like yours" }).click(); // collapsed by default
   await expect(founder.page.getByText(/^Series A .*companies.*with founder-led sales/)).toBeVisible();
   await expect(founder.page.getByText("If the assessment confirms that existing customers are where growth is leaking, we'd:")).toBeVisible();
   // Nothing has been charged or unlocked so far.
@@ -246,6 +264,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await expect(founder.page.getByRole("heading", { name: "Data for Fix Churn" })).toBeVisible();
   await expect(founder.page.getByText(/benchmark/i)).toHaveCount(0);
   await expect(founder.page.getByRole("heading", { name: "Needed for the assessment (3)" })).toBeVisible();
+  await founder.page.getByRole("button", { name: "Details" }).first().click(); // description and why sit behind Details
   await expect(founder.page.getByText("Why it matters:").first()).toBeVisible();
   await expect(founder.page.getByText("0 of 3 required items in")).toBeVisible();
   // Analysis is never blocked: with data missing it runs on what's shared and lists the gaps.
@@ -280,23 +299,24 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await expect(founder.page).toHaveURL(/\/baseline/);
 
   // --- Founder: self-service results, built from their answers and data ---
-  await expect(founder.page.getByRole("heading", { name: "Based on your data, this is the problem" })).toBeVisible({ timeout: 90_000 });
+  await expect(founder.page.getByRole("region", { name: "The answer" })).toBeVisible({ timeout: 90_000 });
   await expect(founder.page.getByRole("heading", { name: "How do I fix churn?" })).toBeVisible();
-  // The problem, then the plan staged across the use case's dimensions, each with the data behind it.
-  await expect(founder.page.getByText(/The solution lives across 4 dimensions: churn and at-risk accounts, onboarding and adoption, expansion and sales call reviews\. Below you.ll find an initial staging of a plan/)).toBeVisible();
+  // The answer, the signature charts (or Needs data tiles), each plan area with the data behind it, then the plan.
+  await expect(founder.page.getByRole("region", { name: /ARR bridge/ })).toBeVisible();
   for (const dim of ["Churn and at-risk accounts", "Onboarding and adoption", "Expansion", "Sales call reviews"]) {
     const section = founder.page.getByRole("region", { name: dim, exact: true });
     await expect(section).toBeVisible();
-    await expect(section.getByRole("heading", { name: "Staged plan" })).toBeVisible();
-    await expect(section.getByRole("heading", { name: /^Data behind this/ })).toBeVisible();
+    await expect(section.locator("summary", { hasText: /^›?\s*Data behind this/ })).toBeVisible();
   }
+  for (const stage of ["Now", "Next", "Later"]) await expect(founder.page.getByRole("heading", { name: stage, exact: true })).toBeVisible();
   const calls = founder.page.getByRole("region", { name: "Sales call reviews", exact: true });
+  await calls.locator("summary", { hasText: "Data behind this" }).click();
   await expect(calls.getByRole("link", { name: "Update Recorded sales calls" })).toHaveAttribute("href", "/data#item-sales_calls");
   await expect(founder.page.getByRole("heading", { name: "Explore the details", exact: true })).toBeVisible();
   for (const detail of ["Options considered", "What would change this recommendation", "Follow-up and when to reassess", "Assumptions, gaps and method"]) {
     await expect(founder.page.locator("summary", { hasText: detail })).toBeVisible();
   }
-  await expect(founder.page.getByText(/every statement was checked against your inputs/)).toBeVisible();
+  await expect(founder.page.getByText(/Every statement checked against your inputs/)).toBeVisible();
   // Peer comparisons live on the Overview; the assessment links to them.
   await expect(founder.page.getByRole("heading", { name: "How you compare with peers" })).toHaveCount(0);
   await expect(founder.page.getByRole("link", { name: /See how you compare with peers/ })).toHaveAttribute("href", "/overview#peers");
@@ -307,6 +327,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await founder.page.goto("/baseline");
   await expect(founder.page.getByText("Test mode brief: How do I fix churn?")).toBeVisible();
   // Benchmark comparison from the library: observed, benchmark, derived and interpretation, with the source.
+  await founder.page.locator("summary", { hasText: "Against published benchmarks" }).click();
   const nrrCard = founder.page.getByRole("article", { name: "NRR benchmark comparison" });
   await expect(nrrCard).toContainText("Observed");
   await expect(nrrCard).toContainText("median 104%");
@@ -425,7 +446,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await founder.page.getByRole("button", { name: "Request a session" }).click();
   await expect(founder.page.getByText(/We'll email you/)).toBeVisible();
   await founder.page.goto("/baseline");
-  await expect(founder.page.getByRole("heading", { name: "Based on your data, this is the problem" })).toBeVisible();
+  await expect(founder.page.getByRole("region", { name: "The answer" })).toBeVisible();
 
   // --- Assessment history ---
   await founder.page.goto("/assessments");

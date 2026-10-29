@@ -56,7 +56,7 @@ function Strip({ c }: { c: StripData }) {
   const you = f ? x(f.exact ?? ((fLo ?? lo) + (fHi ?? hi)) / 2) : null;
   return (
     <div role="img" aria-label={summary} className="mx-2">
-      <div className="relative h-5">{f && you !== null && label(you, `You ${f.text}`, true)}</div>
+      <div className="relative h-5">{f && you !== null && label(you, `You: ${f.text}`, true)}</div>
       <div className="relative h-6">
         <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full" style={{ background: "var(--muted)" }} />
         <div
@@ -158,7 +158,7 @@ export function PeerComparisonCard({ c }: { c: PeerComparison }) {
         </div>
         <div className="flex items-center gap-2 flex-wrap mt-1">
           <span data-label className="text-[11px] font-mono px-2 py-0.5 rounded" style={{ background: "var(--amber-muted)", color: "#92400E" }}>
-            Assumption · Growth Goaled standard reference
+            Standard reference · an assumption
           </span>
         </div>
         <div className="mt-2">
@@ -187,7 +187,7 @@ export function PeerComparisonCard({ c }: { c: PeerComparison }) {
         <div className="mt-2">
           <ExpandableDetail summary="The growth path and source">
             <p>{c.reason}</p>
-            <p>Top-quartile venture-backed companies follow a path like T2D3: triple ARR for two years, then double it for three. Standard reference · an assumption.</p>
+            <p>Top-quartile venture-backed companies follow a path like T2D3: triple ARR for two years, then double it for three. On that path you&apos;d aim to {c.target}. Standard reference · an assumption.</p>
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[360px]">
                 <caption className="sr-only">The growth path from $1M and from $2M ARR</caption>

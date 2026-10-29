@@ -140,12 +140,3 @@ export function SourceChip({ children }: { children: ReactNode }) {
     </span>
   );
 }
-
-/** Mockup-only banner. */
-export function MockupBanner() {
-  return (
-    <div className="text-xs font-mono px-3 py-1.5 rounded-md inline-flex items-center gap-2" style={{ background: "var(--amber-muted)", color: "#92400E" }}>
-      MOCKUP · Acme AI sample company · per-rep, funnel and pipeline figures are illustrative
-    </div>
-  );
-}
