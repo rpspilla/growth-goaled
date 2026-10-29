@@ -15,7 +15,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Prom
   const first = getUseCase(recommended[0] ?? "growth_leak");
 
   return (
-    <div className="px-4 sm:px-8 py-8 max-w-5xl">
+    <div className="px-4 sm:px-8 py-8 max-w-6xl">
       {welcome !== undefined && !useCases.length && (
         <div className="surface p-5 mb-8 flex gap-4 items-start" style={{ background: "var(--green-muted)", borderColor: "transparent" }} role="status">
           <span className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0" style={{ background: "var(--green)", color: "#fff" }}>3</span>
@@ -27,10 +27,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Prom
           </div>
         </div>
       )}
-      <PageHeader
-        title="What do you need to decide?"
-        subtitle={`Pick the question you're facing. A few answers get you a free Growth Snapshot; a full assessment from your own data is ${price}, only if you want it.`}
-      />
+      <PageHeader title="What do you need to decide?" subtitle={`Free Snapshot first. Assessment ${price}, optional.`} />
       <UseCaseCards useCases={USE_CASES} recommended={recommended} states={states} hrefFor={(id) => `/library/${id}`} price={price} sellable={sellableUseCases()} />
     </div>
   );

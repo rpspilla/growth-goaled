@@ -1,0 +1,130 @@
+import {
+  AlertTriangle,
+  BarChart3,
+  Briefcase,
+  Clock,
+  Globe,
+  Repeat,
+  Shapes,
+  Trophy,
+  TrendingDown,
+  Building2,
+  CheckCircle2,
+  Compass,
+  Droplet,
+  FileText,
+  Filter,
+  Flag,
+  Gauge,
+  Layers,
+  LineChart,
+  Megaphone,
+  MousePointerClick,
+  Mic,
+  Target,
+  Users,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react";
+import type { CategoryId } from "@/lib/readiness";
+import type { OutcomeIcon } from "@/lib/use-cases/visual";
+
+/** Outcome chips on library cards and question pages. */
+export const OUTCOME_ICONS: Record<OutcomeIcon, LucideIcon> = {
+  drop: Droplet,
+  alert: AlertTriangle,
+  flag: Flag,
+  users: Users,
+  gauge: Gauge,
+  funnel: Filter,
+  target: Target,
+  layers: Layers,
+  compass: Compass,
+  file: FileText,
+  chart: LineChart,
+  check: CheckCircle2,
+};
+
+/** One icon per kind of data (readiness category), with a few item-level overrides. */
+export const CATEGORY_ICONS: Record<CategoryId, LucideIcon> = {
+  financial: Wallet,
+  customers: Users,
+  pipeline: Filter,
+  marketing: Megaphone,
+  product: MousePointerClick,
+  team: Briefcase,
+};
+
+const ITEM_ICONS: Record<string, LucideIcon> = {
+  sales_calls: Mic,
+  monthly_revenue: BarChart3,
+  targets: Target,
+  win_loss: Trophy,
+  sales_cycle: Clock,
+  opp_value_dates: Clock,
+  sales_capacity: Gauge,
+  roster: Users,
+  compensation: Wallet,
+  churned_revenue: TrendingDown,
+  churn: TrendingDown,
+  renewals_expansions: Repeat,
+  grr_nrr: Repeat,
+  industry: Building2,
+  company_size: Building2,
+  use_case: Shapes,
+  lead_source: Compass,
+  leads_by_source: Compass,
+  web_traffic: Globe,
+};
+
+/** One or two words per data item for icon tiles; the full name stays in the tooltip and details. */
+const ITEM_SHORT: Record<string, string> = {
+  monthly_revenue: "Monthly revenue",
+  monthly_expenses: "Expenses",
+  cash_balances: "Cash balances",
+  monthly_burn: "Burn",
+  current_cash: "Cash",
+  runway: "Runway",
+  gross_margin: "Gross margin",
+  forecast_vs_actual: "Forecast vs actual",
+  customer_list: "Customer list",
+  revenue_by_customer: "Revenue by customer",
+  contract_metrics: "Contract value",
+  industry: "Industry",
+  company_size: "Company size",
+  use_case: "Use case",
+  start_term: "Contract term",
+  status_renewal: "Renewals",
+  opportunities: "Pipeline",
+  opp_value_dates: "Deal dates",
+  stage_history: "Stage history",
+  lead_source: "Lead source",
+  win_loss: "Win / loss",
+  sales_calls: "Sales calls",
+  sales_cycle: "Sales cycle",
+  stage_conversion: "Conversion",
+  deal_terms: "Deal terms",
+  sales_activity: "Sales activity",
+  web_traffic: "Web traffic",
+  leads_by_source: "Leads by source",
+  marketing_spend: "Marketing spend",
+  activation: "Activation",
+  active_usage: "Active usage",
+  onboarding: "Onboarding",
+  churn: "Churn",
+  churned_revenue: "Lost revenue",
+  grr_nrr: "Retention",
+  renewals_expansions: "Expansion",
+  roster: "Team roster",
+  compensation: "Compensation",
+  open_roles: "Open roles",
+  hiring_dates_comp: "Hiring plan",
+  targets: "Targets",
+  sales_capacity: "Rep capacity",
+};
+
+export const dataItemShort = (key: string, name: string): string => ITEM_SHORT[key] ?? name.split(/[,(]| and /)[0]!.trim();
+
+export function dataItemIcon(key: string, category: CategoryId | undefined): LucideIcon {
+  return ITEM_ICONS[key] ?? (category ? CATEGORY_ICONS[category] : FileText);
+}
