@@ -271,7 +271,7 @@ describe("assessment history", () => {
   });
 });
 
-describe("five steps", () => {
+describe("founder steps", () => {
   it("locks Data and Baseline until a use case is active, and Progress until the baseline is approved", () => {
     const none = stepStates(null);
     expect(none.map((s) => s.label)).toEqual(["Overview", "Growth questions", "Data", "Results", "Action plan"]);
@@ -282,13 +282,17 @@ describe("five steps", () => {
 
     const active = stepStates({ useCase: "growth_leak", status: "active" });
     expect(active.filter((s) => s.locked).map((s) => s.key)).toEqual(["progress"]);
-    expect(active.find((s) => s.key === "progress")!.lockedReason).toBe("Unlocks when you commit to your plan");
+    expect(active.find((s) => s.key === "progress")!.lockedReason).toBe("Unlocks when your results are ready");
     expect(active.find((s) => s.current)!.key).toBe("data");
     expect(active.find((s) => s.key === "library")!.done).toBe(true);
 
     const tracking = stepStates({ useCase: "growth_leak", status: "tracking" });
     expect(tracking.some((s) => s.locked)).toBe(false);
     expect(tracking.find((s) => s.current)!.key).toBe("progress");
+
+    // Founders see four steps (Overview is a company page); numbering follows.
+    const founder = stepStates({ useCase: "growth_leak", status: "active" }, { overview: false });
+    expect(founder.map((s) => [s.number, s.label])).toEqual([[1, "Growth questions"], [2, "Data"], [3, "Results"], [4, "Action plan"]]);
   });
 
   it("points Overview's button at the next action", () => {

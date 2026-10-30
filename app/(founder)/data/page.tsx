@@ -44,7 +44,7 @@ export default async function DataPage() {
 
   return (
     <div className="px-4 sm:px-8 py-8 max-w-5xl">
-      <PageHeader eyebrow="Step 3 of 5" title={`Data for ${useCase.shortTitle}`} subtitle="Only what this question needs." />
+      <PageHeader eyebrow="Step 2 of 4" title={`Data for ${useCase.shortTitle}`} subtitle="Only what this question needs." />
       <DataTopPanel />
       <ReadinessTabs questions={questions.length} />
 

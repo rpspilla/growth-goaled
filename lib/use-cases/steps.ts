@@ -1,6 +1,6 @@
 import type { UseCaseId } from "./types";
 
-/** The five founder steps (HANDOFF §13.2). Steps 3–5 follow the active use case. */
+/** The founder steps (HANDOFF §13.2); Data, Results and Action plan follow the active use case. */
 export const STEPS = [
   { key: "overview", label: "Overview", path: "/overview" },
   { key: "library", label: "Growth questions", path: "/library" },
@@ -30,13 +30,18 @@ const STAGE: Record<UseCaseStatus, number> = { objective: 0, active: 1, baseline
 /** Where the company is on the four-stage journey shown on Overview (0 = pick a use case … 3 = track progress). */
 export const journeyStage = (active: ActiveUseCase) => (active ? Math.max(1, STAGE[active.status]) : 0);
 
-export function stepStates(active: ActiveUseCase): StepState[] {
+/**
+ * The steps with their state. Founders see four (Overview is a company page, not a step, so the
+ * first session goes straight from question to data to answer); the advisor's company view keeps
+ * Overview as its first step.
+ */
+export function stepStates(active: ActiveUseCase, { overview = true }: { overview?: boolean } = {}): StepState[] {
   const stage = journeyStage(active);
   const currentKey: StepKey = ["library", "data", "baseline", "progress"][stage] as StepKey;
-  return STEPS.map((s, i) => {
+  return STEPS.filter((s) => overview || s.key !== "overview").map((s, i) => {
     let lockedReason: string | null = null;
     if ((s.key === "data" || s.key === "baseline") && !active) lockedReason = "Unlocks when you buy an assessment";
-    if (s.key === "progress" && stage < 3) lockedReason = active ? "Unlocks when you commit to your plan" : "Unlocks after you commit to a plan";
+    if (s.key === "progress" && stage < 3) lockedReason = active ? "Unlocks when your results are ready" : "Unlocks with your first results";
     const doneAt: Partial<Record<StepKey, number>> = { library: 1, data: 2, baseline: 3 };
     return {
       key: s.key,

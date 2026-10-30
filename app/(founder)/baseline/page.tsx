@@ -15,6 +15,10 @@ import { advisoryHref, formatPrice, pricing } from "@/lib/pricing";
 import { getUseCase, targetSummary } from "@/lib/use-cases";
 import { CommitPlanButton } from "@/components/progress/CommitPlanButton";
 import { commitPlanAction } from "../progress/actions";
+import { autoCommitFirstPlan } from "@/lib/data/plan";
+import { HowWeWorkDetails } from "@/components/use-cases/HowWeWorkDetails";
+import { howWeWork } from "@/lib/use-cases/how-we-work";
+import { getIntakeAnswers } from "@/lib/data/intake";
 import { sourceTrailOpened } from "./actions";
 
 // The assessment is drafted after the action responds (next/server after()), within this budget.
@@ -31,17 +35,25 @@ export default async function ResultsPage() {
 
   if (state.state === "ready") {
     const next = def.nextUseCase ? getUseCase(def.nextUseCase) : undefined;
+    // First results for this question: the plan starts tracking without a button press.
+    const autoCommitted = state.view.committedAt ? null : await autoCommitFirstPlan(user, company, def.id, state.view.deliverableId);
+    const committedAt = state.view.committedAt ?? autoCommitted;
     await track("deliverable_viewed", { userId: user.id, companyId: company.id, props: { type: "assessment", use_case: def.id, version: state.view.version } });
     return (
       <AssessmentResults
         title={def.question}
         data={state.view}
         nextUseCase={next ? { href: `/library/${next.id}`, question: next.question } : null}
-        advisory={<AdvisoryOffer key="advisory" kind={state.view.advisor} price={formatPrice(pricing().advisoryFromCents)} href={advisoryHref(def.id, state.view.advisor)} target={targetSummary(active.objective)} />}
+        advisory={
+          <div key="advisory" className="space-y-4">
+            <HowWeWorkDetails approach={howWeWork({ useCase: def.id, profile: await getIntakeAnswers(company), revenueBand: company.revenueBand })} />
+            <AdvisoryOffer kind={state.view.advisor} price={formatPrice(pricing().advisoryFromCents)} href={advisoryHref(def.id, state.view.advisor)} target={targetSummary(active.objective)} />
+          </div>
+        }
         reviewHref={advisoryHref(def.id, "review")}
         dimensions={await dimensionViews(company, def, "/data")}
         compareHref="/overview#peers"
-        commit={<CommitPlanButton key="commit" committedAt={state.view.committedAt} commit={commitPlanAction.bind(null, state.view.deliverableId)} />}
+        commit={<CommitPlanButton key="commit" committedAt={committedAt} auto={Boolean(autoCommitted)} commit={commitPlanAction.bind(null, state.view.deliverableId)} />}
         actions={
           <div key="actions" className="pt-1 space-y-3">
             <RunAssessmentButton label="Re-run my report" />

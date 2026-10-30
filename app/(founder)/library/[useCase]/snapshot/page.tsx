@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { AlertTriangle, ArrowLeft, BarChart3, Check, CheckCircle2, Clock, FlaskConical, Repeat, Target, TrendingDown, TrendingUp, Users, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BarChart3, CheckCircle2, Clock, FlaskConical, Repeat, Target, TrendingDown, TrendingUp, Users, Wallet } from "lucide-react";
 import { displayValue, getField } from "@/lib/intake";
 import { positionTone, shortPosition } from "@/components/use-cases/PeerComparisonCard";
 import { dataItemIcon, dataItemShort, OUTCOME_ICONS } from "@/components/visual/icons";
@@ -17,7 +17,6 @@ import { formatPrice, pricing, sellableUseCases } from "@/lib/pricing";
 import { getItem } from "@/lib/readiness";
 import { stripeConfigured } from "@/lib/stripe";
 import { getUseCase, missingRequired } from "@/lib/use-cases";
-import { howWeWork } from "@/lib/use-cases/how-we-work";
 import { growthSnapshot } from "@/lib/use-cases/snapshot";
 import { startAssessmentCheckout } from "../../actions";
 
@@ -64,8 +63,8 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
     profile: answers,
     dataStatus: Object.fromEntries(readiness.items.map((i) => [i.itemKey, i.status])),
   });
-  const peers = await snapshotPeers(company, answers);
-  const approach = howWeWork({ useCase: def.id, profile: answers, revenueBand: company.revenueBand });
+  // Only comparisons against a real cohort; stage-wide standard references wait for the full answer.
+  const peers = (await snapshotPeers(company, answers)).filter((c) => c.status === "compared");
   const suggestedDef = snapshot.fit.suggested ? getUseCase(snapshot.fit.suggested) : undefined;
   // Never point founders at a question they can't start yet.
   const suggested = suggestedDef?.comingSoon ? undefined : suggestedDef;
@@ -160,7 +159,7 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
             </ul>
           </section>
 
-          <PeerComparisons peers={peers} columns={3} />
+          {peers.length > 0 && <PeerComparisons peers={peers} columns={3} />}
 
           <div className="grid md:grid-cols-[1fr_1.6fr] gap-3">
             <section className="surface p-4 flex gap-3 items-start" aria-labelledby="fit">
@@ -207,39 +206,6 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
             </section>
           </div>
 
-          <section className="surface p-4" aria-labelledby="how-we-work">
-            <details className="group">
-              <summary className="cursor-pointer list-none flex items-center gap-2">
-                <span className="transition-transform group-open:rotate-90" style={{ color: "var(--green)" }} aria-hidden>
-                  ›
-                </span>
-                <h2 id="how-we-work" className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
-                  How we work with companies like yours
-                </h2>
-              </summary>
-              <div className="mt-3 space-y-3 text-sm" style={{ color: "var(--muted-foreground)" }}>
-                <p>{approach.audience}</p>
-                <ul className="space-y-1.5" style={{ color: "var(--foreground)" }}>
-                  {approach.approach.map((a) => (
-                    <li key={a} className="flex gap-2">
-                      <Check size={16} className="shrink-0 mt-0.5" style={{ color: "var(--green)" }} aria-hidden />
-                      <span>{a}</span>
-                    </li>
-                  ))}
-                </ul>
-                <div className="rounded-xl p-3" style={{ background: "var(--muted)" }}>
-                  <p className="font-medium" style={{ color: "var(--foreground)" }}>
-                    {approach.example.trigger}
-                  </p>
-                  <ol className="space-y-1 list-decimal pl-5 mt-1.5" style={{ color: "var(--foreground)" }}>
-                    {approach.example.steps.map((x) => (
-                      <li key={x}>{x}</li>
-                    ))}
-                  </ol>
-                </div>
-              </div>
-            </details>
-          </section>
         </div>
 
         <aside className="surface p-5 lg:sticky lg:top-6 space-y-3" style={{ borderColor: "var(--green)", borderWidth: 2 }} aria-label="Full assessment">

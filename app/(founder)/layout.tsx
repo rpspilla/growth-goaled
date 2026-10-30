@@ -21,12 +21,13 @@ export default async function FounderLayout({ children }: { children: ReactNode 
     <Shell
       sidebar={
         <UseCaseSidebar
-          steps={stepStates(active && { useCase: active.def.id, status: active.status })}
+          steps={stepStates(active && { useCase: active.def.id, status: active.status }, { overview: false })}
           options={options}
           activeUseCase={active?.useCase ?? null}
           select={selectUseCase}
           libraryHint="Pick a growth question"
           extra={[
+            { href: "/overview", label: "Overview" },
             { href: "/performance", label: "Performance" },
             { href: "/assessments", label: "All assessments" },
             { href: "/profile", label: "Company profile" },

@@ -63,6 +63,27 @@ export async function commitPlan(user: User, company: Company, deliverableId: st
 }
 
 /** Status and note on one of the company's plan actions. */
+/**
+ * Seeing results commits their plan the first time (first-session simplification): the founder
+ * doesn't have to press anything for the Action plan to start. Only when no plan has been
+ * committed for this question yet, so a re-run never silently replaces a plan being tracked.
+ * Returns when the plan was committed, or null when it wasn't (already tracking, or no plan).
+ */
+export async function autoCommitFirstPlan(user: User, company: Company, useCase: UseCaseId, deliverableId: string): Promise<string | null> {
+  const row = await getCompanyUseCase(company.id, useCase);
+  if (!row) return null;
+  const [existing] = await db
+    .select({ id: schema.planActions.id })
+    .from(schema.planActions)
+    .where(and(eq(schema.planActions.companyId, company.id), eq(schema.planActions.companyUseCaseId, row.id)))
+    .limit(1);
+  if (existing) return null;
+  const result = await commitPlan(user, company, deliverableId);
+  if (!result.ok) return null;
+  await track("plan_auto_committed", { userId: user.id, companyId: company.id, props: { use_case: useCase } });
+  return new Date().toISOString();
+}
+
 export async function updatePlanAction(user: User, company: Company, actionId: string, status: PlanStatus, note: string | null): Promise<PlanResult> {
   if (!PLAN_STATUSES.includes(status)) return { ok: false, error: "Unknown status." };
   const updated = await db

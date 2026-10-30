@@ -12,7 +12,8 @@ export const isStaff = (actor: Actor) => actor.role === "advisor" || actor.role 
 
 /** Where a signed-in user lands. */
 export function homePathFor(role: Role): string {
-  return role === "founder" ? "/overview" : "/advisor/portfolio";
+  // Founders land on their next step (app/(founder)/start), not a dashboard.
+  return role === "founder" ? "/start" : "/advisor/portfolio";
 }
 
 /**
