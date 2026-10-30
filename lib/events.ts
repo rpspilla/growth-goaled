@@ -25,6 +25,8 @@ export type EventName =
   | "analysis_requested"
   | "plan_committed"
   | "plan_auto_committed"
+  | "monthly_reminder_sent"
+  | "monthly_reminder_unsubscribed"
   | "plan_action_updated"
   // Sign-up funnel (anonymous until the account exists; no email or name is stored)
   | "signup_viewed"

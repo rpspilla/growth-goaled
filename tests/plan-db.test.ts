@@ -4,6 +4,8 @@ import { eq } from "drizzle-orm";
 
 const h = vi.hoisted(() => ({ db: null as unknown as Record<string | symbol, unknown> }));
 vi.mock("server-only", () => ({}));
+const sent = vi.hoisted(() => [] as { to: string; subject: string; text: string }[]);
+vi.mock("@/lib/email", () => ({ sendEmail: async (m: { to: string; subject: string; text: string }) => (sent.push(m), { sent: true }) }));
 vi.mock("@/lib/db", async () => {
   const schema = await import("@/lib/db/schema");
   return { db: new Proxy({}, { get: (_t, p) => Reflect.get(h.db, p) }), schema };
@@ -14,6 +16,7 @@ import type { Company, User } from "@/lib/db/schema";
 import type { AssessmentInput, AssessmentOutput } from "@/lib/ai/assessment";
 import { assembleAssessmentInputs, createAssessmentVersion, founderAssessment, runAssessmentPipeline } from "@/lib/data/assessments";
 import { commitPlan, progressView, updatePlanAction } from "@/lib/data/plan";
+import { dueReminders, sendMonthlyReminders, unsubscribeToken, validUnsubscribe } from "@/lib/data/reminders";
 import { activateUseCase, getCompanyUseCase } from "@/lib/data/use-cases";
 import { analyzeSheets } from "@/lib/metrics-engine";
 import { getUseCase } from "@/lib/use-cases";
@@ -183,5 +186,33 @@ describe("decision briefs from calculated evidence", () => {
     expect(state.view.executiveDecision.decision).toBe("Old headline");
     expect(state.view.plan[0]).toMatchObject({ action: "Old action", timing: "days_61_90" });
     expect(state.view.certainty).toBeNull();
+  });
+});
+
+describe("monthly reminder", () => {
+  const DAY = 86_400_000;
+  it("emails each founder 30 days after committing, then every 30 days, and respects unsubscribe", async () => {
+    process.env.CRON_SECRET = "test-secret";
+    sent.length = 0;
+    await db().insert(schema.companyMembers).values({ companyId: co.id, userId: founder.id });
+    const view = await brief();
+    await commitPlan(founder, co, view.deliverableId);
+    const now = Date.now();
+    expect(await dueReminders(new Date(now + 29 * DAY))).toEqual([]);
+    const result = await sendMonthlyReminders(new Date(now + 31 * DAY));
+    expect(result).toMatchObject({ due: 1, sent: 1, failed: [] });
+    expect(sent[0]!.to).toBe("f@co.test");
+    expect(sent[0]!.subject).toMatch(/Leak Co/);
+    expect(sent[0]!.text).toMatch(/0 of 1 actions done/);
+    expect(sent[0]!.text).toMatch(/Next action: Interview churned customers\./);
+    expect(sent[0]!.text).toMatch(/\/data/);
+    // Already sent this month: not due again until 30 days after the send.
+    expect(await dueReminders(new Date(now + 40 * DAY))).toEqual([]);
+    expect(await dueReminders(new Date(now + 62 * DAY))).toHaveLength(1);
+    // Signed unsubscribe link.
+    expect(validUnsubscribe(founder.id, unsubscribeToken(founder.id))).toBe(true);
+    expect(validUnsubscribe(founder.id, "0".repeat(32))).toBe(false);
+    await db().insert(schema.events).values({ name: "monthly_reminder_unsubscribed", userId: founder.id });
+    expect(await dueReminders(new Date(now + 62 * DAY))).toEqual([]);
   });
 });
