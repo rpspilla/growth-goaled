@@ -45,7 +45,7 @@ test("founders can't open advisor pages", async ({ browser }) => {
   const { ctx, page } = await as(browser, "access-founder@e2e.test");
   for (const path of ["/advisor/portfolio", "/advisor/benchmarks", "/advisor/benchmark-library", "/advisor/benchmark-library/sources", "/advisor/analytics", `/advisor/companies/${companyId}`]) {
     await page.goto(path);
-    await expect(page, path).toHaveURL(/\/overview$/);
+    await expect(page, path).toHaveURL(/\/library$/); // their next step: no question chosen yet;
   }
   await ctx.close();
 });

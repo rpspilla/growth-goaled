@@ -6,10 +6,11 @@ import { ensureStandardReference } from "../lib/benchmark-library/ensure-referen
 import { E2E_DATABASE_URL } from "../playwright.config";
 
 /**
- * A company no published peer data fits: the Snapshot still compares growth, churn and revenue,
+ * A company no published peer data fits: the Overview still compares growth, churn and revenue,
  * using Growth Goaled's standard reference from the Benchmark Library, labelled an assumption.
+ * The free Snapshot keeps only real peer comparisons, so it shows none here.
  */
-test("the Snapshot falls back to the standard reference for growth, churn and revenue", async ({ browser }) => {
+test("the Overview falls back to the standard reference for growth, churn and revenue", async ({ browser }) => {
   const db = new Client({ connectionString: E2E_DATABASE_URL });
   await db.connect();
   await ensureStandardReference(drizzle(db, { schema }) as never);
@@ -31,6 +32,9 @@ test("the Snapshot falls back to the standard reference for growth, churn and re
   await ctx.addCookies([{ name: "gg_e2e_user", value: "peers@e2e.test", domain: "localhost", path: "/" }]);
   const page = await ctx.newPage();
   await page.goto("/library/growth_leak/snapshot");
+  await expect(page.getByTestId("teaser")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "How you compare with peers" })).toHaveCount(0);
+  await page.goto("/overview");
   await expect(page.getByRole("heading", { name: "How you compare with peers" })).toBeVisible();
 
   const growth = page.getByRole("article", { name: "Growth compared with peers" });

@@ -32,7 +32,7 @@ test("an allowed founder can run several company profiles, each with its own dat
   await expect(page.locator("#intake-name")).toHaveValue("Second Co");
   await page.getByLabel(/^Company: Second Co/).click();
   await page.getByRole("button", { name: "First Co" }).click();
-  await expect(page).toHaveURL(/\/overview/);
+  await expect(page).toHaveURL(/\/overview/); // switching company opens that company's page
   await expect(page.getByLabel(/^Company: First Co/)).toBeVisible();
   await page.goto("/profile/company");
   await expect(page.locator("#intake-name")).toHaveValue("First Co");
@@ -50,7 +50,7 @@ test("an allowed founder can run several company profiles, each with its own dat
     await check.end();
   }
   await page.getByRole("button", { name: "Switch to founder view" }).click();
-  await expect(page).toHaveURL(/\/overview/);
+  await expect(page).toHaveURL(/\/library$/);
   await expect(page.getByLabel(/^Company: First Co/)).toBeVisible();
   await ctx.close();
 

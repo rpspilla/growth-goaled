@@ -15,7 +15,7 @@ export function CommitPlanButton({ committedAt, commit, auto = false }: { commit
     return (
       <div className="inline-flex items-center gap-3 flex-wrap">
         <span className="text-sm font-semibold rounded-full px-3 py-1" style={{ background: "var(--green-muted)", color: "var(--green)" }}>
-          {auto ? "✓ Saved to your Action plan" : `✓ You committed to this plan on ${new Date(committedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}.`}
+          {auto ? "✓ Saved to your Action plan" : `✓ Saved to your Action plan on ${new Date(committedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
         </span>
         <Link href="/progress" className="btn btn-primary btn-sm">Track progress →</Link>
       </div>
