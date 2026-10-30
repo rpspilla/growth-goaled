@@ -70,6 +70,8 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
   const peers = (await snapshotPeers(company, answers)).filter((c) => c.status === "compared");
   // The free teaser: upload the key file, see the verdict from your own numbers (before paying).
   const teaser = !row?.activatedAt && def.keyFile ? await teaserVerdict(company, def) : null;
+  // Once the file gives an early answer, the guesses from questionnaire answers are superseded.
+  const fromFile = teaser?.state === "ready";
   const suggestedDef = snapshot.fit.suggested ? getUseCase(snapshot.fit.suggested) : undefined;
   // Never point founders at a question they can't start yet.
   const suggested = suggestedDef?.comingSoon ? undefined : suggestedDef;
@@ -112,6 +114,7 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
             <h1 className="font-display text-3xl sm:text-4xl leading-tight mt-1" style={{ color: "var(--foreground)" }}>
               {def.question}
             </h1>
+            {!fromFile && (
             <div className="flex items-center gap-2 flex-wrap mt-2">
               <span data-label className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "var(--amber-muted)", color: "#92400E" }} title={`Early signals from your answers${snapshot.answersOnly ? " (no figures yet)" : ""}, not conclusions. Nothing here has been checked against your own data yet.`}>
                 <FlaskConical size={13} aria-hidden />
@@ -121,8 +124,10 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
                 From your answers{snapshot.answersOnly ? " (no figures yet)" : ""} · not yet checked against your data
               </span>
             </div>
+            )}
           </header>
 
+          {!fromFile && (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {answerTiles.map((t) => (
               <MetricTile key={t.key} icon={t.icon} label={t.label} value={t.value} compare="Your answer" />
@@ -134,6 +139,7 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
             })}
             <MetricTile icon={AlertTriangle} label="Worth investigating" value={String(counts.watch)} compare={counts.positive ? `${counts.positive} looking healthy` : undefined} tone={counts.positive ? "green" : "neutral"} />
           </div>
+          )}
 
           {teaser && (
             <TeaserVerdict
@@ -154,6 +160,7 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
             />
           )}
 
+          {!fromFile && (
           <section aria-labelledby="signals">
             <h2 id="signals" className="text-xl font-semibold mb-3" style={{ color: "var(--foreground)" }}>
               What your answers suggest
@@ -182,10 +189,11 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
               })}
             </ul>
           </section>
+          )}
 
           {peers.length > 0 && <PeerComparisons peers={peers} columns={3} />}
 
-          <div className="grid md:grid-cols-[1fr_1.6fr] gap-3">
+          <div className={fromFile ? "grid gap-3" : "grid md:grid-cols-[1fr_1.6fr] gap-3"}>
             <section className="surface p-4 flex gap-3 items-start" aria-labelledby="fit">
               <span className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ background: snapshot.fit.good ? "var(--green-muted)" : "var(--blue-muted)", color: snapshot.fit.good ? "var(--green)" : "var(--blue)" }}>
                 <Target size={20} aria-hidden />
@@ -208,6 +216,7 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
               </div>
             </section>
 
+            {!fromFile && (
             <section className="surface p-4" aria-labelledby="confirm">
               <h2 id="confirm" className="text-sm font-semibold mb-3" style={{ color: "var(--foreground)" }}>
                 What it would take to confirm
@@ -228,6 +237,7 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
                 })}
               </ul>
             </section>
+            )}
           </div>
 
         </div>
