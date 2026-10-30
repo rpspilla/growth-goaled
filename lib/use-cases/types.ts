@@ -24,6 +24,19 @@ export type ObjectiveField = {
  */
 export type PlanDimension = { id: string; title: string; summary: string; items: readonly string[] };
 
+/**
+ * The one file the answer depends on (first-session simplification): uploading it supplies every
+ * item listed, and having it in is what "ready to run" means. Everything else sharpens the answer.
+ */
+export type KeyFile = {
+  /** "Monthly revenue by customer" */
+  label: string;
+  /** Where it comes from and what it should contain, in one line. */
+  hint: string;
+  /** Readiness items one such file supplies, most important first. */
+  items: readonly string[];
+};
+
 /** A company-profile question reused from the intake (lib/intake.ts); answers save to the profile. */
 export type ProfileQuestion = { section: string; field: string };
 
@@ -54,6 +67,8 @@ export type UseCaseDef = {
   objectiveQuestions: readonly ObjectiveField[];
   /** Questions this use case used to ask: no longer asked or saved, but earlier answers are still read. */
   retiredQuestions?: readonly ObjectiveField[];
+  /** The one file the first answer needs (see KeyFile). Without it, every required item counts. */
+  keyFile?: KeyFile;
   requiredItems: readonly string[];
   helpfulItems: readonly string[];
   optionalItems: readonly string[];

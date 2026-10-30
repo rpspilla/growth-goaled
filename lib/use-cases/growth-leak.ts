@@ -27,6 +27,11 @@ export const growthLeak: UseCaseDef = {
     { id: "expansion", title: "Expansion", summary: "Whether customers who stay also grow, and what drives it.", items: ["renewals_expansions", "contract_metrics"] },
     { id: "sales_calls", title: "Sales call reviews", summary: "Whether what's promised on sales calls matches what customers get, a common cause of early churn.", items: ["sales_calls"] },
   ],
+  keyFile: {
+    label: "Monthly revenue by customer",
+    hint: "From billing or accounting: each customer's recurring revenue by month, for the last 12–24 months.",
+    items: ["revenue_by_customer", "monthly_revenue", "churned_revenue"],
+  },
   requiredItems: ["monthly_revenue", "revenue_by_customer", "churned_revenue"],
   helpfulItems: ["sales_calls", "renewals_expansions", "grr_nrr", "opportunities", "stage_conversion", "win_loss"],
   optionalItems: ["leads_by_source", "churn", "onboarding", "activation", "active_usage", "contract_metrics"],

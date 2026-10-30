@@ -58,7 +58,8 @@ export type AssessmentInput = {
   /** Files the founder shared that couldn't be read. */
   unreadable_files: string[];
   /** Metrics where the profile and files disagree and the founder hasn't chosen yet. */
-  conflicts: { metric: string; label: string; values: string }[];
+  /** Values that disagree; `used` is the one the brief rests on (picked by rule, advisor to confirm). */
+  conflicts: { metric: string; label: string; values: string; used?: string }[];
   /** "complete" when all required data is in and confirmed; changes what the plan should look like. */
   completeness: "complete" | "partial" | "minimal";
   /** Metric keys the plan can name as success metrics (tracked on Progress). */
@@ -143,7 +144,7 @@ Rules:
 - change_triggers: 2–4 pieces of new evidence or circumstances that would change the recommendation.
 - follow_up: the metrics to monitor, when to revisit (days), and what should trigger an earlier revisit.
 - Benchmarks (reference) were matched and calculated in code: quote their values, differences and positions exactly as written, with the cohort, period and source. Call a "directional" comparison directional. A gap to a benchmark is not by itself a root cause: tie any recommendation to the company's own evidence. If reference is empty, say plainly that no relevant benchmark is available; don't imply peer comparisons.
-- Never refuse or stop because data is missing: be explicit about what you couldn't determine and list every gap in data_gaps. For metrics in conflicts, don't conclude on either value.
+- Never refuse or stop because data is missing: be explicit about what you couldn't determine and list every gap in data_gaps. For metrics in conflicts, rely on the "used" value (picked by rule: calculated from the founder's file first), and say once that the advisor will confirm it.
 - When completeness is "complete", the plan must be a clear, sequenced plan against the diagnosed constraint (for example retention, if that is what the evidence shows). When "partial" or "minimal", keep conclusions proportionate and make the first actions about closing the most important gaps.
 - If revision_notes is present, fix exactly what it lists.
 - Write plainly and concisely for a founder. Lead with the conclusion. No hype or consulting jargon.`;

@@ -44,6 +44,7 @@ export async function figureChoices(company: Pick<Company, "id">, metrics: reado
           period: point.period,
           rawText: point.rawText,
           updatedAt: point.updatedAt,
+          fromProfile: fromProfile.has(point.id),
         })),
     ),
   );

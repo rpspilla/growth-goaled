@@ -162,28 +162,6 @@ export function ItemCard({
           </button>
         </div>
 
-        <div className="flex flex-wrap gap-1.5 mt-3" role="group" aria-label={`Status of ${def.name}`}>
-          {STATUSES.map((s) => {
-            const active = record.status === s;
-            return (
-              <button
-                key={s}
-                type="button"
-                disabled={pending}
-                aria-pressed={active}
-                onClick={() => save({ status: s })}
-                className="text-xs px-2.5 py-1 rounded-md border font-medium disabled:opacity-60"
-                style={{
-                  borderColor: active ? STATUS_COLOR[s] : "var(--border)",
-                  background: active ? "var(--muted)" : "transparent",
-                  color: active ? STATUS_COLOR[s] : "var(--muted-foreground)",
-                }}
-              >
-                {ITEM_STATUS_LABEL[s]}
-              </button>
-            );
-          })}
-        </div>
 
         {(missingFields.length > 0 || (needsAttention && record.followUp)) && (
           <div className="mt-3 space-y-1">
@@ -204,6 +182,31 @@ export function ItemCard({
 
       {open && (
         <div className="border-t p-4 space-y-4" style={{ borderColor: "var(--border)" }}>
+        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={`Status of ${def.name}`}>
+            <span className="text-xs font-semibold mr-1" style={{ color: "var(--foreground)" }}>
+              Mark as
+            </span>
+            {STATUSES.map((s) => {
+              const active = record.status === s;
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  disabled={pending}
+                  aria-pressed={active}
+                  onClick={() => save({ status: s })}
+                  className="text-xs px-2.5 py-1 rounded-md border font-medium disabled:opacity-60"
+                  style={{
+                    borderColor: active ? STATUS_COLOR[s] : "var(--border)",
+                    background: active ? "var(--muted)" : "transparent",
+                    color: active ? STATUS_COLOR[s] : "var(--muted-foreground)",
+                  }}
+                >
+                  {ITEM_STATUS_LABEL[s]}
+                </button>
+              );
+            })}
+          </div>
           <div className="text-sm space-y-1">
             <p style={{ color: "var(--muted-foreground)" }}>{def.description}</p>
             {why && (

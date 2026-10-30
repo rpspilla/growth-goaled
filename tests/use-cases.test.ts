@@ -1,3 +1,4 @@
+import { getItem } from "@/lib/readiness";
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -329,14 +330,27 @@ describe("Data step", () => {
     expect(Object.values(u.itemWhy).join(" ")).not.toMatch(/benchmark/i);
   });
 
-  it("baseline readiness counts required items in and is ready only when all are", () => {
+  it("is ready to run once the key file's items are in, whatever else is missing", () => {
     const leak = getUseCase("growth_leak")!;
-    expect(baselineReadiness(leak, {})).toMatchObject({ done: 0, total: 3, percent: 0, ready: false, outstanding: ["monthly_revenue", "revenue_by_customer", "churned_revenue"] });
+    expect(leak.keyFile?.items).toEqual(["revenue_by_customer", "monthly_revenue", "churned_revenue"]);
+    expect(baselineReadiness(leak, {})).toMatchObject({ done: 0, total: 3, percent: 0, ready: false, outstanding: ["revenue_by_customer", "monthly_revenue", "churned_revenue"] });
     const some = baselineReadiness(leak, { monthly_revenue: "available", revenue_by_customer: "missing", grr_nrr: "available" });
     expect(some).toMatchObject({ done: 1, percent: 33, ready: false, outstanding: ["revenue_by_customer", "churned_revenue"] });
     expect(baselineReadiness(leak, { monthly_revenue: "available", revenue_by_customer: "partial", churned_revenue: "not_applicable" })).toMatchObject({ done: 3, ready: true });
     // Everything "not applicable" isn't something we can build from.
     expect(baselineReadiness(leak, { monthly_revenue: "not_applicable", revenue_by_customer: "not_applicable", churned_revenue: "not_applicable" }).ready).toBe(false);
+    // The hiring plan's key file is the CRM export; the roster only sharpens it.
+    const hire = getUseCase("hire_or_fix")!;
+    expect(baselineReadiness(hire, { opportunities: "available", win_loss: "available", opp_value_dates: "available", sales_cycle: "available" }).ready).toBe(true);
+    expect(hire.requiredItems).toContain("roster");
+  });
+
+  it("gives each live question one key file, and none to coming-soon questions", () => {
+    for (const u of USE_CASES) {
+      if (u.comingSoon) continue;
+      expect(u.keyFile, u.id).toBeDefined();
+      for (const k of u.keyFile!.items) expect(getItem(k), k).toBeDefined();
+    }
   });
 });
 

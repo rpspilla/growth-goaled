@@ -7,6 +7,7 @@ import { AI_MODEL, aiProblemForStaff, isAiConfigError } from "@/lib/ai/config";
 import { AssessmentDraftError, AssessmentQaError, ASSESSMENT_BRIEFS, draftAssessment, qaAssessment, type AssessmentInput, type AssessmentOutput } from "@/lib/ai/assessment";
 import { parseBrief, type BriefContent } from "@/lib/deliverables/assessment";
 import { chartsFromAnalyses, EMPTY_CHARTS, type BriefCharts } from "@/lib/deliverables/charts";
+import { figureRank } from "@/lib/figures";
 import { allowedNumbers, checkDraft, numbersIn, type ClaimForCheck, type CodeCheckResult } from "@/lib/deliverables/checks";
 export { claimsFromAssessment };
 import { claimsFromAssessment, completeness, fallbackAssessment, sanitizeAssessment, systemGaps } from "@/lib/deliverables/assessment-safety";
@@ -84,8 +85,12 @@ export async function assembleAssessmentInputs(company: Company, useCase: UseCas
       .where(and(eq(schema.registerItems.companyId, company.id), eq(schema.registerItems.status, "open"))),
   ]);
 
-  // Latest figure per metric, confirmed figures first.
-  points.sort((a, b) => Number(b.status === "accepted") - Number(a.status === "accepted"));
+  // One figure per metric, picked without asking the founder (figureRank): profile answers give way
+  // to figures from files or entered later, then confirmed first, then newest.
+  const profileIds = new Set(
+    (await db.select({ id: schema.intakeResponses.dataPointId }).from(schema.intakeResponses).where(eq(schema.intakeResponses.companyId, company.id))).map((r) => r.id).filter(Boolean),
+  );
+  points.sort((a, b) => figureRank({ ...a, fromProfile: profileIds.has(a.id) }, { ...b, fromProfile: profileIds.has(b.id) }));
   const latest = new Map<MetricKey, (typeof points)[number]>();
   for (const p of points) if (isMetricKey(p.metric) && !latest.has(p.metric)) latest.set(p.metric, p);
   const wanted = new Set<MetricKey>([...useCase.figures, ...KEY_METRICS[useCase.id], "arr", "arr_growth", "customers"]);
@@ -199,7 +204,11 @@ export async function assembleAssessmentInputs(company: Company, useCase: UseCas
     unreadable_files: readiness.files.filter((f) => f.status === "failed").map((f) => f.filename).slice(0, 10),
     conflicts: (await figureChoices(company, assessmentMetrics(useCase, objective)))
       .filter((c) => c.state === "conflict")
-      .map((c) => ({ metric: c.metric, label: c.label, values: c.candidates.map((x) => `${x.formatted} in ${x.source === "Your company profile" ? "your company profile" : x.source}`).join(" vs ") })),
+      .map((c) => {
+        const where = (x: (typeof c.candidates)[number]) => `${x.formatted} in ${x.source === "Your company profile" ? "your company profile" : x.source}`;
+        const used = c.candidates.find((x) => x.id === c.inUseId);
+        return { metric: c.metric, label: c.label, values: c.candidates.map(where).join(" vs "), ...(used ? { used: where(used) } : {}) };
+      }),
     completeness: "partial",
     trackable_metrics: [...wanted],
     ...(useCase.dimensions ? { plan_dimensions: useCase.dimensions.map((d) => ({ id: d.id, title: d.title, summary: d.summary, items: d.items.map((k) => `item:${k}`) })) } : {}),

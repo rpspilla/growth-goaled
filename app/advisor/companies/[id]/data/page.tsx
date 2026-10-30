@@ -4,7 +4,10 @@ import { getReadiness } from "@/lib/data/readiness";
 import { listRegisterItems } from "@/lib/data/registers";
 import { CATEGORIES, getItem } from "@/lib/readiness";
 import { registerTypeMeta } from "@/lib/registers";
-import { reviewItem } from "../actions";
+import { chooseFigureForCompany, enterFigureForCompany, reviewItem } from "../actions";
+import { FigureChecker } from "@/components/use-cases/FigureChecker";
+import { figureChoices } from "@/lib/data/figures";
+import { assessmentMetrics } from "@/lib/use-cases";
 import { companyContext } from "../context";
 
 const card = { background: "var(--card)", borderColor: "var(--border)" };
@@ -12,7 +15,13 @@ const card = { background: "var(--card)", borderColor: "var(--border)" };
 /** Step 3 mirrored: everything the founder shared, with validation and follow-ups. */
 export default async function CompanyDataPage({ params }: { params: Promise<{ id: string }> }) {
   const { company, active } = await companyContext((await params).id);
-  const [readiness, questions] = await Promise.all([getReadiness(company), listRegisterItems([company.id], { status: "open" })]);
+  const [readiness, questions, choices] = await Promise.all([
+    getReadiness(company),
+    listRegisterItems([company.id], { status: "open" }),
+    active ? figureChoices(company, assessmentMetrics(active.def, active.objective)) : Promise.resolve([]),
+  ]);
+  const choose = chooseFigureForCompany.bind(null, company.id);
+  const enter = enterFigureForCompany.bind(null, company.id);
   const a = readiness.assessment;
 
   const reviewItems: ReviewItem[] = readiness.items.flatMap((i) => {
@@ -45,6 +54,14 @@ export default async function CompanyDataPage({ params }: { params: Promise<{ id
         <div className="label mb-1" style={{ color: "var(--muted-foreground)" }}>Step 3 · Data{active ? ` · ${active.def.shortTitle}` : ""}</div>
         <h1 className="font-display text-3xl font-normal" style={{ color: "var(--foreground)" }}>{company.name}: data</h1>
       </div>
+      {choices.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+            Founders aren&apos;t asked to settle figures: reports use the value calculated from their file first. Confirm or correct any that disagree.
+          </p>
+          <FigureChecker choices={choices} choose={choose} enter={enter} />
+        </div>
+      )}
       <div className="grid md:grid-cols-3 gap-6">
         <div className="rounded-xl border p-5" style={card}>
           <div className="label mb-3" style={{ color: "var(--muted-foreground)" }}>Data readiness</div>

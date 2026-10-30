@@ -30,6 +30,11 @@ export const winningIcp: UseCaseDef = {
   retiredQuestions: [
     { id: "believed_segments", label: "Which segments do you believe are your best?", kind: "textarea", placeholder: "e.g. mid-market fintech, 200–1,000 employees" },
   ],
+  keyFile: {
+    label: "Won and lost deals with segment",
+    hint: "A CRM export of closed deals: outcome, amount, dates, and the customer's segment or industry and source.",
+    items: ["win_loss", "opp_value_dates", "industry", "company_size", "lead_source"],
+  },
   requiredItems: ["customer_list", "revenue_by_customer", "industry", "company_size"],
   helpfulItems: ["sales_calls", "contract_metrics", "use_case", "start_term", "status_renewal", "win_loss"],
   optionalItems: ["opp_value_dates", "stage_history", "lead_source", "leads_by_source", "marketing_spend", "roster", "sales_capacity", "open_roles", "compensation"],

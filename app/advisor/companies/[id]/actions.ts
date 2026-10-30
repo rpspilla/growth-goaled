@@ -11,6 +11,9 @@ import { approveAssessment } from "@/lib/data/assessments";
 import { getDeliverable } from "@/lib/data/deliverables";
 import { isComingSoon, isUseCaseId } from "@/lib/use-cases";
 import { clearOverride, setOverride } from "@/lib/data/benchmark-library";
+import { chooseFigure, enterFigure, type FigureResult } from "@/lib/data/figures";
+import { parseFigure } from "@/lib/figures";
+import { isMetricKey } from "@/lib/metrics";
 
 async function managed(companyId: string) {
   const user = await requireRole(["advisor", "admin"]);
@@ -90,4 +93,24 @@ export async function setBenchmarkChoice(companyId: string, metric: string, choi
       : await setOverride(ctx.user, ctx.company, metric, choice === "none" ? null : z.uuid().parse(choice), z.string().max(1000).parse(reason));
   if (r.ok) refresh(companyId);
   return r;
+}
+
+/** The advisor settles a figure that disagrees across sources (founders aren't asked; see lib/figures.ts figureRank). */
+export async function chooseFigureForCompany(companyId: string, metric: string, dataPointId: string): Promise<FigureResult> {
+  const ctx = await managed(companyId);
+  const id = z.uuid().safeParse(dataPointId);
+  if (!ctx || !id.success || !isMetricKey(metric)) return { ok: false, error: "That figure isn't available." };
+  const result = await chooseFigure(ctx.user, ctx.company, metric, id.data);
+  if (result.ok) refresh(companyId);
+  return result;
+}
+
+export async function enterFigureForCompany(companyId: string, metric: string, raw: string): Promise<FigureResult> {
+  const ctx = await managed(companyId);
+  if (!ctx || !isMetricKey(metric)) return { ok: false, error: "That figure isn't available." };
+  const value = typeof raw === "string" ? parseFigure(raw) : null;
+  if (value === null) return { ok: false, error: "Enter a number, e.g. 4,200,000 or 94." };
+  const result = await enterFigure(ctx.user, ctx.company, metric, value);
+  if (result.ok) refresh(companyId);
+  return result;
 }

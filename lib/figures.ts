@@ -14,7 +14,23 @@ export type FigureCandidate = {
   period: string | null;
   rawText: string | null;
   updatedAt: Date;
+  /** From the company profile (sign-up / questionnaire answers). */
+  fromProfile?: boolean;
 };
+
+/**
+ * Which value the assessment uses when sources disagree, without asking the founder. Answers from
+ * the company profile (often a quick estimate at sign-up) give way to figures from files or entered
+ * later; then confirmed beats unconfirmed; then newest first. A choice made in the figure checker
+ * rejects the other values, so it always wins. Advisors see disagreements and can override.
+ */
+export function figureRank(
+  a: { fromProfile?: boolean; status: string; updatedAt: Date },
+  b: { fromProfile?: boolean; status: string; updatedAt: Date },
+): number {
+  const score = (x: { fromProfile?: boolean; status: string }) => (x.fromProfile ? 0 : 2) + (x.status === "accepted" ? 1 : 0);
+  return score(b) - score(a) || b.updatedAt.getTime() - a.updatedAt.getTime();
+}
 
 export type FigureState = "agreed" | "conflict" | "unconfirmed" | "missing";
 
@@ -26,7 +42,7 @@ export type FigureChoice = {
   /** What the figure means, in a sentence. */
   definition: string;
   state: FigureState;
-  /** The value the assessment will use (latest confirmed, else latest), or null when missing. */
+  /** The value the assessment will use (see figureRank), or null when missing. */
   inUseId: string | null;
   candidates: (FigureCandidate & { formatted: string })[];
 };
@@ -37,7 +53,7 @@ export const sameValue = (a: number, b: number) => Math.abs(a - b) <= Math.max(1
 const UNIT_HINT: Record<string, string> = { usd: "in dollars", percent: "as a percent", days: "in days", months: "in months", count: "a count", ratio: "as a multiple, e.g. 1.5" };
 
 export function figureChoice(metric: MetricKey, candidates: readonly FigureCandidate[]): FigureChoice {
-  const sorted = [...candidates].sort((a, b) => Number(b.status === "accepted") - Number(a.status === "accepted") || b.updatedAt.getTime() - a.updatedAt.getTime());
+  const sorted = [...candidates].sort(figureRank);
   const distinct = sorted.filter((c, i) => sorted.findIndex((d) => sameValue(c.value, d.value)) === i);
   const state: FigureState = !sorted.length ? "missing" : distinct.length > 1 ? "conflict" : sorted.some((c) => c.status === "accepted") ? "agreed" : "unconfirmed";
   return {

@@ -66,7 +66,8 @@ export async function registerDocument(
   // The inbox takes any file (unreadable formats are stored for the advisor); checklist uploads only readable ones.
   if (!inbox && !ACCEPTED_TYPES[blob.contentType]) throw new Error("That file type isn't supported.");
 
-  const itemKeys = [...new Set(input.itemKeys ?? [])].filter((k) => getItem(k)?.category === input.category);
+  // Any known item: a key file (e.g. revenue by customer) supplies items across categories.
+  const itemKeys = [...new Set(input.itemKeys ?? [])].filter((k) => getItem(k));
   const hash = input.contentHash && /^[a-f0-9]{64}$/.test(input.contentHash) ? input.contentHash : null;
 
   const findExisting = async () =>

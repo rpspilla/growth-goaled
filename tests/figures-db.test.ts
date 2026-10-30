@@ -49,15 +49,19 @@ describe("check your figures", () => {
   it("shows every value with its source and flags the disagreement, which the assessment reports as a gap", async () => {
     const [nrr, grr] = await figureChoices(co, ["nrr", "grr"]);
     expect(nrr).toMatchObject({ state: "conflict", label: "NRR" });
+    // The file's value is in use: profile answers give way to figures from files (figureRank).
     expect(nrr!.candidates.map((c) => [c.formatted, c.source, c.status])).toEqual([
-      ["94%", "Your company profile", "accepted"],
       ["101%", "metrics.xlsx", "proposed"],
+      ["94%", "Your company profile", "accepted"],
     ]);
+    expect(nrr!.inUseId).toBe(fileNrr);
     expect(grr).toMatchObject({ state: "missing", candidates: [] });
 
     await saveObjectiveAnswer(co, "growth_leak", "goal", "Find the leak");
     const inputs = await assembleAssessmentInputs(co, getUseCase("growth_leak")!);
-    expect(inputs.input.conflicts).toEqual([{ metric: "nrr", label: "NRR", values: "94% in your company profile vs 101% in metrics.xlsx" }]);
+    expect(inputs.input.conflicts).toEqual([{ metric: "nrr", label: "NRR", values: "101% in metrics.xlsx vs 94% in your company profile", used: "101% in metrics.xlsx" }]);
+    // The founder isn't asked: the file's figure wins over the profile answer, and the gap says so.
+    expect(inputs.figures.find((f) => f.metric === "nrr")?.value).toBe(101);
     expect(inputs.input.completeness).not.toBe("complete");
   });
 

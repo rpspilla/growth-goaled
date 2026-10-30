@@ -180,10 +180,10 @@ describe("uploads", () => {
     }
   });
 
-  it("ignores item links from another category", async () => {
+  it("links a key file to items across categories, ignoring unknown keys", async () => {
     const pathname = put(acme, "c.csv", CSV, customers);
-    const { doc } = await registerDocument(founder, acme, { pathname, filename: "c.csv", docType: "customer_list", category: "customers", itemKeys: ["industry", "monthly_revenue"] });
-    expect(doc.dataItemKeys).toEqual(["industry"]);
+    const { doc } = await registerDocument(founder, acme, { pathname, filename: "c.csv", docType: "customer_list", category: "customers", itemKeys: ["industry", "monthly_revenue", "not_an_item"] });
+    expect(doc.dataItemKeys).toEqual(["industry", "monthly_revenue"]);
   });
 
   it("re-uploading the same file reuses the record instead of duplicating it", async () => {

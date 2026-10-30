@@ -44,7 +44,7 @@ export function systemGaps(input: AssessmentInput): string[] {
   const supplied = input.data_supplied.filter((d) => d.status === "available" || d.status === "partial");
   if (supplied.length && !input.figures.length) gaps.push("We couldn't read figures from the files you shared, so this report rests on your answers and the data you described.");
   for (const f of input.unreadable_files) gaps.push(`We couldn't read ${f}.`);
-  for (const c of input.conflicts) gaps.push(`${c.label} has different values (${c.values}). Choose the right one under "Check your figures".`);
+  for (const c of input.conflicts) gaps.push(`${c.label} has different values (${c.values}). ${c.used ? `We used ${c.used}` : "We used the most reliable one"}; your advisor will confirm it.`);
   const unconfirmed = input.figures.filter((f) => !f.confirmed);
   if (unconfirmed.length) gaps.push(`${unconfirmed.map((f) => f.label).join(", ")} ${unconfirmed.length === 1 ? "was" : "were"} read from your files and not yet confirmed by you.`);
   return gaps;

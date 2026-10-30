@@ -8,16 +8,14 @@ import { AdvisoryOffer } from "@/components/use-cases/AdvisoryOffer";
 import { RunAssessmentButton } from "@/components/use-cases/RunAssessmentButton";
 import { AssessmentResults } from "@/components/views/AssessmentResults";
 import { founderAssessment } from "@/lib/data/assessments";
-import { figureChoices } from "@/lib/data/figures";
-import { FigureChecker } from "@/components/use-cases/FigureChecker";
 import { founderContext } from "@/lib/data/founder-context";
 import { dimensionViews } from "@/lib/data/dimensions";
 import { track } from "@/lib/events";
 import { advisoryHref, formatPrice, pricing } from "@/lib/pricing";
-import { assessmentMetrics, getUseCase, targetSummary } from "@/lib/use-cases";
+import { getUseCase, targetSummary } from "@/lib/use-cases";
 import { CommitPlanButton } from "@/components/progress/CommitPlanButton";
 import { commitPlanAction } from "../progress/actions";
-import { chooseFigureAction, enterFigureAction, sourceTrailOpened } from "./actions";
+import { sourceTrailOpened } from "./actions";
 
 // The assessment is drafted after the action responds (next/server after()), within this budget.
 export const maxDuration = 300;
@@ -28,16 +26,8 @@ export default async function ResultsPage() {
   const { user, company, active } = await founderContext();
   if (!active || !company) redirect("/library");
   const def = active.def;
-  const [state, choices] = await Promise.all([founderAssessment(company.id, def.id), figureChoices(company, assessmentMetrics(def, active.objective))]);
-  const figures = (
-    <FigureChecker
-      key="figures"
-      choices={choices}
-      choose={chooseFigureAction}
-      enter={enterFigureAction}
-      rerun={state.state === "building" ? null : <RunAssessmentButton label={state.state === "ready" ? "Re-run with these figures" : "Run the assessment"} primary />}
-    />
-  );
+  // Figures are picked by rule (lib/figures.ts figureRank); disagreements go to the advisor, not the founder.
+  const state = await founderAssessment(company.id, def.id);
 
   if (state.state === "ready") {
     const next = def.nextUseCase ? getUseCase(def.nextUseCase) : undefined;
@@ -49,7 +39,6 @@ export default async function ResultsPage() {
         nextUseCase={next ? { href: `/library/${next.id}`, question: next.question } : null}
         advisory={<AdvisoryOffer key="advisory" kind={state.view.advisor} price={formatPrice(pricing().advisoryFromCents)} href={advisoryHref(def.id, state.view.advisor)} target={targetSummary(active.objective)} />}
         reviewHref={advisoryHref(def.id, "review")}
-        figures={figures}
         dimensions={await dimensionViews(company, def, "/data")}
         compareHref="/overview#peers"
         commit={<CommitPlanButton key="commit" committedAt={state.view.committedAt} commit={commitPlanAction.bind(null, state.view.deliverableId)} />}
@@ -120,7 +109,6 @@ export default async function ResultsPage() {
           )}
         </div>
       </section>
-      {figures}
       {target && (
         <p data-label className="text-sm" style={{ color: "var(--muted-foreground)" }}>
           Your target: {target}

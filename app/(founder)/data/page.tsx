@@ -4,10 +4,6 @@ import { DataTopPanel } from "@/components/readiness/DataTopPanel";
 import { ItemCard } from "@/components/readiness/ItemCard";
 import { ReadinessTabs } from "@/components/readiness/ReadinessTabs";
 import { founderContext } from "@/lib/data/founder-context";
-import { figureChoices } from "@/lib/data/figures";
-import { FigureChecker } from "@/components/use-cases/FigureChecker";
-import { assessmentMetrics } from "@/lib/use-cases";
-import { chooseFigureAction, enterFigureAction } from "../baseline/actions";
 import { listRegisterItems } from "@/lib/data/registers";
 import { getCategory, getItem, sourcesFor } from "@/lib/readiness";
 import { loadReadiness, toRecord } from "./load";
@@ -27,17 +23,24 @@ export default async function DataPage() {
   }
   const { company, readiness, blobPrefix } = data;
   const useCase = active.def;
-  const [questions, choices] = await Promise.all([
-    listRegisterItems([company.id], { owner: "founder", status: "open" }),
-    figureChoices(company, assessmentMetrics(useCase, active.objective)),
-  ]);
+  const questions = await listRegisterItems([company.id], { owner: "founder", status: "open" });
   const rows = new Map(readiness.items.map((i) => [i.itemKey, i]));
 
-  const groups = [
-    { title: "Needed for the assessment", caption: "Required", keys: useCase.requiredItems, required: true },
-    { title: "Sharpens it", caption: "Optional · makes the answer more precise", keys: useCase.helpfulItems, required: false },
-    { title: "Optional extras", caption: "If you have them to hand", keys: useCase.optionalItems, required: false },
-  ].filter((g) => g.keys.length);
+  // The key file's items are handled by the "Start here" card; everything else only sharpens the answer.
+  const inKeyFile = new Set(useCase.keyFile?.items ?? []);
+  const notKey = (keys: readonly string[]) => keys.filter((k) => !inKeyFile.has(k));
+  const groups = useCase.keyFile
+    ? [
+        { title: "Most useful", caption: "Each one makes the answer more precise", keys: [...notKey(useCase.requiredItems), ...notKey(useCase.helpfulItems)], required: false },
+        { title: "Optional extras", caption: "If you have them to hand", keys: notKey(useCase.optionalItems), required: false },
+      ].filter((g) => g.keys.length)
+    : [
+        { title: "Needed for the assessment", caption: "Required", keys: useCase.requiredItems, required: true },
+        { title: "Sharpens it", caption: "Optional · makes the answer more precise", keys: useCase.helpfulItems, required: false },
+        { title: "Optional extras", caption: "If you have them to hand", keys: useCase.optionalItems, required: false },
+      ].filter((g) => g.keys.length);
+  const sharperCount = groups.reduce((n, g) => n + g.keys.length, 0);
+  const sharperIn = groups.flatMap((g) => g.keys).filter((k) => ["available", "partial"].includes(rows.get(k)?.status ?? "")).length;
 
   return (
     <div className="px-4 sm:px-8 py-8 max-w-5xl">
@@ -45,16 +48,30 @@ export default async function DataPage() {
       <DataTopPanel />
       <ReadinessTabs questions={questions.length} />
 
-      <div className="mb-6">
-        <FigureChecker choices={choices} choose={chooseFigureAction} enter={enterFigureAction} />
-      </div>
-
       {questions.length > 0 && (
         <Link href="/data/questions" className="block rounded-xl border p-4 mb-6 text-base font-semibold" style={{ background: "var(--card)", borderColor: "var(--amber)", color: "var(--foreground)" }}>
           {questions.length} {questions.length === 1 ? "question needs" : "questions need"} your answer →
         </Link>
       )}
 
+      <details className="group mb-8" open={!useCase.keyFile} data-testid="make-it-sharper">
+        <summary className="list-none cursor-pointer surface p-4 flex items-center gap-3">
+          <span className="transition-transform group-open:rotate-90 text-lg" style={{ color: "var(--green)" }} aria-hidden>
+            ›
+          </span>
+          <span className="flex-1">
+            <span className="block text-base font-semibold" style={{ color: "var(--foreground)" }}>
+              {useCase.keyFile ? "Make it sharper" : "What we need"}
+            </span>
+            <span data-label className="block text-xs" style={{ color: "var(--muted-foreground)" }}>
+              {useCase.keyFile ? "Optional · each file adds detail to the answer" : "In priority order"}
+            </span>
+          </span>
+          <span data-label className="font-mono text-xs px-2 py-0.5 rounded-full" style={{ background: "var(--muted)", color: "var(--muted-foreground)" }}>
+            {sharperIn} of {sharperCount} in
+          </span>
+        </summary>
+        <div className="pt-5">
       {groups.map((g) => (
         <section key={g.title} className="mb-8">
           <div className="flex items-baseline gap-2 flex-wrap mb-3">
@@ -84,6 +101,8 @@ export default async function DataPage() {
           </div>
         </section>
       ))}
+        </div>
+      </details>
     </div>
   );
 }

@@ -31,6 +31,11 @@ export const hireOrFix: UseCaseDef = {
     { id: "hiring_budget", label: "Hiring budget for the next 12 months", kind: "currency", placeholder: "e.g. 600000", help: "What you can spend on new sales hires over the next year: salaries, commission and recruiting." },
     { id: "roles_considering", label: "Which roles are you considering?", kind: "textarea", placeholder: "e.g. 2 AEs and an SDR, or a VP Sales" },
   ],
+  keyFile: {
+    label: "Won and lost deals from your CRM",
+    hint: "Deals closed in the last 12 months: outcome, amount, created and close dates, and deal owner.",
+    items: ["opportunities", "win_loss", "opp_value_dates", "sales_cycle"],
+  },
   requiredItems: ["roster", "sales_capacity", "opportunities", "win_loss"],
   helpfulItems: ["sales_calls", "targets", "opp_value_dates", "sales_cycle", "compensation"],
   optionalItems: ["hiring_dates_comp", "open_roles", "stage_conversion"],
