@@ -6,6 +6,9 @@ import { positionTone, shortPosition } from "@/components/use-cases/PeerComparis
 import { dataItemIcon, dataItemShort, OUTCOME_ICONS } from "@/components/visual/icons";
 import { ExpandableDetail, MetricTile, StatusChip, signalIcon, TONE } from "@/components/visual/primitives";
 import { visualFor } from "@/lib/use-cases/visual";
+import { TeaserVerdict } from "@/components/use-cases/TeaserVerdict";
+import { teaserVerdict } from "@/lib/data/teaser";
+import { companyBlobPrefix } from "@/lib/data/documents";
 import { PeerComparisons } from "@/components/use-cases/PeerComparisons";
 import { PurchaseButton } from "@/components/use-cases/PurchaseButton";
 import { founderContext } from "@/lib/data/founder-context";
@@ -65,6 +68,8 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
   });
   // Only comparisons against a real cohort; stage-wide standard references wait for the full answer.
   const peers = (await snapshotPeers(company, answers)).filter((c) => c.status === "compared");
+  // The free teaser: upload the key file, see the verdict from your own numbers (before paying).
+  const teaser = !row?.activatedAt && def.keyFile ? await teaserVerdict(company, def) : null;
   const suggestedDef = snapshot.fit.suggested ? getUseCase(snapshot.fit.suggested) : undefined;
   // Never point founders at a question they can't start yet.
   const suggested = suggestedDef?.comingSoon ? undefined : suggestedDef;
@@ -129,6 +134,25 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
             })}
             <MetricTile icon={AlertTriangle} label="Worth investigating" value={String(counts.watch)} compare={counts.positive ? `${counts.positive} looking healthy` : undefined} tone={counts.positive ? "green" : "neutral"} />
           </div>
+
+          {teaser && (
+            <TeaserVerdict
+              teaser={teaser}
+              useCase={def}
+              files={readiness.files}
+              blobPrefix={companyBlobPrefix(company.id)}
+              price={price}
+              unlock={
+                sellable ? (
+                  <PurchaseButton useCaseId={def.id} label={`Unlock the full answer · ${price}`} checkout={startAssessmentCheckout} />
+                ) : (
+                  <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+                    Payments aren&apos;t set up in this environment yet.
+                  </p>
+                )
+              }
+            />
+          )}
 
           <section aria-labelledby="signals">
             <h2 id="signals" className="text-xl font-semibold mb-3" style={{ color: "var(--foreground)" }}>
