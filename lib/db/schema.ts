@@ -1081,6 +1081,34 @@ export const actionPlans = pgTable(
   ],
 );
 
+// ---------------------------------------------------------------------------
+// Guest conversations: the chat on the sign-in page, before there's an account
+// ---------------------------------------------------------------------------
+
+/** `ai`: part of the conversation with the AI (after the scripted sign-up questions). */
+export type GuestMessage = { role: "user" | "assistant"; content: string; ai?: boolean };
+
+/** One visitor's pre-sign-up chat, keyed by a random cookie token (only its hash is stored). Claimed into an account after sign-in. */
+export const guestSessions = pgTable(
+  "guest_sessions",
+  {
+    id: id(),
+    tokenHash: text("token_hash").notNull(),
+    // What they want help with, then the sign-up answers as they're given (keys as in companyBasicsSchema, plus name and title)
+    profile: jsonb("profile").$type<Record<string, string>>().notNull().default({}),
+    messages: jsonb("messages").$type<GuestMessage[]>().notNull().default([]),
+    card: jsonb("card").$type<RecommendationCard>(),
+    aiTurns: integer("ai_turns").notNull().default(0),
+    email: text("email"),
+    // Hash of the visitor's IP, for a daily cap on new guest chats (never the IP itself)
+    ipHash: text("ip_hash"),
+    claimedBy: uuid("claimed_by").references(() => users.id, { onDelete: "set null" }),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("guest_sessions_token_idx").on(t.tokenHash), index("guest_sessions_ip_idx").on(t.ipHash, t.createdAt)],
+);
+
 export type User = typeof users.$inferSelect;
 export type Role = (typeof userRole.enumValues)[number];
 export type Company = typeof companies.$inferSelect;
@@ -1090,3 +1118,4 @@ export type ConversationMessage = typeof conversationMessages.$inferSelect;
 export type CompanyFact = typeof companyFacts.$inferSelect;
 export type Recommendation = typeof recommendations.$inferSelect;
 export type ActionPlan = typeof actionPlans.$inferSelect;
+export type GuestSession = typeof guestSessions.$inferSelect;

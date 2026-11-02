@@ -21,6 +21,9 @@ const rel = (p: string) => path.relative(root, p);
 const GUARDS = /requireRole\(|requireUser\(|founderCompany\(\)|founderMetric\(|managed\(|managedItemCompany\(|staff\(\)|staffPlan\(/;
 // Actions visitors call before they have an account. Each must accept only fixed values (z.enum).
 const PUBLIC_ACTIONS: Record<string, string> = { trackSignupEvent: "Sign-up funnel events from signed-out visitors; fixed names only, no personal data." };
+// The sign-in page's guest chat: public by design (no account yet), each scoped to the visitor's own
+// guest session through an unguessable httpOnly cookie token.
+const GUEST_ACTIONS = new Set(["guestReplyAction", "guestEmailAction", "guestRestartAction"]);
 // Shared loaders that call requireRole themselves (asserted below).
 const FOUNDER_CONTEXT = path.join(root, "lib/data/founder-context.ts");
 const COMPANY_CONTEXT = path.join(root, "app/advisor/companies/[id]/context.ts");
@@ -35,6 +38,10 @@ describe("server actions", () => {
     const bodies = src.split(/\nexport async function /).slice(1);
     for (const body of bodies) {
       const name = body.slice(0, body.indexOf("("));
+      if (GUEST_ACTIONS.has(name)) {
+        it(`${rel(file)} › ${name} only touches the visitor's own guest chat`, () => expect(body).toMatch(/guestSession\(/));
+        continue;
+      }
       if (PUBLIC_ACTIONS[name]) {
         it(`${rel(file)} › ${name} is public by design and accepts only fixed values`, () => expect(body).toMatch(/z\.enum\(/));
         continue;

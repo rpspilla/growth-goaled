@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { formatPrice, pricing } from "@/lib/pricing";
 import { AuthShell, Positioning } from "../AuthShell";
-import { MagicLinkForm } from "../MagicLinkForm";
+import { GuestEntry } from "../GuestEntry";
 import { Faq } from "@/components/Faq";
 
 export const metadata: Metadata = {
@@ -11,12 +11,15 @@ export const metadata: Metadata = {
 };
 
 const NEXT = [
-  { title: "Confirm your email", body: "We send a secure link. No password." },
-  { title: "Tell us about your company", body: "Revenue, founding year, vertical, stage and team size. About a minute." },
-  { title: "Pick a growth question", body: "Get your free Growth Snapshot straight away." },
+  { title: "Tell us what you're working on", body: "In your own words, above." },
+  { title: "A few quick questions about your company", body: "Revenue, founding year, stage, vertical and team. About a minute." },
+  { title: "See your recommendation", body: "Enter your email to unlock it; we send a link to save it. No password." },
 ];
 
 /** The main conversion page: what this is, why it matters at your stage, and exactly what happens next. */
+// The guest chat's answers can take a little while.
+export const maxDuration = 300;
+
 export default function SignUpPage() {
   const { actionPlanCents, supportedMonthlyCents } = pricing();
   return (
@@ -36,9 +39,7 @@ export default function SignUpPage() {
         </>
       }
     >
-      <h2 className="text-2xl sm:text-3xl font-semibold" style={{ color: "var(--foreground)", letterSpacing: "-0.01em" }}>Create your free account</h2>
-      <p className="text-base mt-2 mb-6" style={{ color: "var(--muted-foreground)" }}>Built for Seed and Series A B2B SaaS founders.</p>
-      <MagicLinkForm mode="sign-up" cta="Get my free Growth Snapshot" />
+      <GuestEntry />
 
       <div className="mt-8 pt-6 border-t" style={{ borderColor: "var(--border)" }}>
         <div className="text-sm font-semibold mb-3" style={{ color: "var(--foreground)" }}>What happens next</div>

@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
 import { AuthShell, Positioning } from "../AuthShell";
-import { MagicLinkForm } from "../MagicLinkForm";
+import { GuestEntry } from "../GuestEntry";
 
-export const metadata: Metadata = { title: "Sign in · Growth Goaled" };
+export const metadata: Metadata = { title: "Growth Goaled · Your Seed & Series A Stage CRO" };
+// The guest chat's answers can take a little while.
+export const maxDuration = 300;
 
+/** The way in: "How can we help you grow?" as a conversation; returning users sign in below it. */
 export default function SignInPage() {
   return (
     <AuthShell brand={<Positioning compact />}>
-      <h2 className="text-2xl sm:text-3xl font-semibold" style={{ color: "var(--foreground)", letterSpacing: "-0.01em" }}>Welcome back</h2>
-      <p className="text-base mt-2 mb-6" style={{ color: "var(--muted-foreground)" }}>Enter your work email and we&apos;ll send you a sign-in link.</p>
-      <MagicLinkForm mode="sign-in" />
+      <GuestEntry />
     </AuthShell>
   );
 }

@@ -43,7 +43,8 @@ export function RecommendationCardView({
   card: RecommendationCard;
   given: string[];
   deeper: { href: string; label: string } | null;
-  feedback: (recommendationId: string, kind: string, note: string | null) => Promise<{ ok: boolean; error?: string }>;
+  /** Omitted for visitors (nothing to rate yet). */
+  feedback?: (recommendationId: string, kind: string, note: string | null) => Promise<{ ok: boolean; error?: string }>;
 }) {
   const c = CONFIDENCE[card.confidence.level];
   return (
@@ -116,14 +117,16 @@ export function RecommendationCardView({
         </p>
       )}
 
+      {(feedback || deeper) && (
       <div className="flex items-center gap-4 flex-wrap pt-1 border-t" style={{ borderColor: "var(--border)" }}>
-        <FeedbackButtons recommendationId={id} given={given} send={feedback} />
+        {feedback && <FeedbackButtons recommendationId={id} given={given} send={feedback} />}
         {deeper && (
           <Link href={deeper.href} className="link text-sm ml-auto">
             {deeper.label}
           </Link>
         )}
       </div>
+      )}
     </article>
   );
 }

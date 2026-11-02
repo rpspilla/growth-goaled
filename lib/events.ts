@@ -3,6 +3,10 @@ import { db, schema } from "@/lib/db";
 
 export type EventName =
   | "conversation_started"
+  | "guest_chat_started"
+  | "guest_recommendation"
+  | "guest_email_given"
+  | "guest_chat_claimed"
   | "action_plan_purchased"
   | "action_plan_submitted"
   | "action_plan_delivered"

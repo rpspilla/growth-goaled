@@ -34,7 +34,8 @@ export type ChatOutput = z.infer<typeof chatOutputSchema>;
 /** Advisor messages are part of the conversation; the model sees them labelled as the advisor's. */
 export type ChatTurn = { role: "user" | "assistant" | "advisor"; content: string; author?: string | null };
 export type PlanMode = { tier: "plan" | "supported"; status: string; needs: string[] };
-export type ChatInput = { topic: ChatTopic; context: ChatContext; history: ChatTurn[]; plan?: PlanMode | null };
+/** guest: a visitor on the sign-in page who hasn't signed up; give the recommendation early. */
+export type ChatInput = { topic: ChatTopic; context: ChatContext; history: ChatTurn[]; plan?: PlanMode | null; guest?: boolean };
 
 const SYSTEM = `You are Growth Goaled: an experienced CRO advising founders of Seed and Series A B2B SaaS companies on commercial decisions. Talk like a strong CRO in a one-to-one conversation: direct, plain English, short paragraphs. Not a survey, not a report.
 
@@ -79,6 +80,9 @@ function contextBlock(input: ChatInput): string {
 export const planLine = (p: PlanMode) =>
   `ACTION PLAN: ${p.tier === "supported" ? "supported plan ($799/month, advisor in the conversation)" : "one-time plan ($499, advisor-approved before delivery)"}; status ${p.status}${p.needs.length ? `; still needed after the last turn: ${p.needs.join("; ")}` : ""}.`;
 
+export const GUEST_LINE =
+  "VISITOR: not signed up yet; COMPANY CONTEXT is what they told us just now. Give your initial recommendation card as soon as you reasonably can: at most one round of questions first, and only if something critical is missing.";
+
 export class ChatError extends Error {}
 
 export type ChatResult = { output: ChatOutput; model: string; tokensIn: number; tokensOut: number };
@@ -94,6 +98,7 @@ export async function chatTurn(input: ChatInput): Promise<ChatResult> {
   // The plan's state changes as the conversation goes, so it rides on the latest message (the cached prefix stays stable).
   const last = messages.at(-1);
   if (input.plan && last && typeof last.content === "string") last.content += `\n\n${planLine(input.plan)}`;
+  if (input.guest && last && typeof last.content === "string") last.content += `\n\n${GUEST_LINE}`;
   const response = await anthropic().beta.messages.parse({
     model: AI_MODEL,
     max_tokens: 8000,

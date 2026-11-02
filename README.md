@@ -43,6 +43,7 @@ Local development points at the Neon `dev` branch.
 | `ASSESSMENT_AI_DRAFT` | Optional. `on` runs the Draft Agent for paid assessments; unset (the default, owner decision Nov 2026) gives every assessment the summary report built from the figures and rule-based diagnosis, shown as "Summary brief" |
 | `ACTION_PLAN_PRICE_CENTS`, `SUPPORTED_PLAN_MONTHLY_CENTS` | Optional. Action plan prices (defaults $499 once, $799 a month) |
 | `ASSESSMENT_SALES` | Optional. `on` keeps selling the $149 assessment to new buyers; off by default since action plans replaced it (past buyers keep theirs) |
+| `GUEST_DAILY_PER_IP` | Optional. New guest chats on the sign-in page per visitor network per day (default 20) |
 | `CHAT_DAILY_LIMIT` | Optional. Founder chat messages per company per rolling 24 hours (default 80); chat is free, so it's capped |
 
 Each Vercel environment points at its own Neon branch: Production → `main`, Preview and Development → `dev`.
@@ -130,6 +131,17 @@ Every resolution records who closed it, how and when, and emits `register_item_r
 4. **Advisor gate** (`/advisor/review/[id]`): draft preview, QA results and run details side by side. *Approve* → `approved`, then *Publish* → visible to the founder (and phase moves to `baseline`). *Request changes* edits the text into a new version that's QA'd again. *Send back to AI* redrafts with the advisor's comment. Older versions become `changes_requested`.
 
 Founders see progress on `/processing` (status only, never draft content) and the latest *published* version on `/benchmark`. Runs that haven't finished in 10 minutes show as stalled and can be restarted. Events: `review_decision`, `deliverable_published`, `deliverable_viewed`, `source_trail_opened`.
+
+### The way in: a conversation on the sign-in page
+
+Owner decision, Nov 2026. `/sign-in` and `/sign-up` open on **"How can we help you grow?"** (`components/chat/GuestChat.tsx`, `lib/guest/steps.ts`, `lib/data/guest.ts`):
+
+1. The visitor says what they need, then answers the sign-up questions one at a time in the chat (name, company, annual revenue, founding year, funding stage, vertical, AEs, BDRs and customer success; the same rules as the sign-up form, `companyBasicsSchema`). Choices are buttons.
+2. The AI takes over with their challenge and those answers (`guest: true` on the turn: recommend early, at most one round of questions).
+3. **No email is asked until there's a recommendation.** The recommendation is shown blurred behind "Your recommendation is ready: enter your work email". Giving it unlocks the card and sends the magic sign-in link (to `/auth/callback?next=/claim`).
+4. `/claim` (after the link): for the same email only, the chat becomes the founder's company (the sign-up basics), their profile (name, onboarded) and a saved conversation with the recommendation, then opens it, ready for "Build my action plan". An existing founder's chat is added to their company.
+
+Guest chats live in `guest_sessions`, keyed by an unguessable httpOnly cookie token (only its hash is stored). Guest actions are public by design and can only touch the visitor's own chat (permissions test: `GUEST_ACTIONS`). Limits: 6 AI answers per guest chat, and `GUEST_DAILY_PER_IP` new chats per network per day (the IP is stored only as a hash). Returning users click "Already have an account? Sign in" for the email link.
 
 ### Conversations (the main entry)
 

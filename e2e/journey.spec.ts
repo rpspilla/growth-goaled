@@ -443,12 +443,12 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await admin.page.goto("/advisor/analytics");
   await expect(admin.page.locator("div", { hasText: /^deliverable_published2$/ }).first()).toBeVisible();
   await expect(admin.page.getByText("Sign-up to first Benchmark")).toBeVisible();
-  // The sign-up page is prerendered, so its view is counted from the browser.
+  // The sign-up page's view is counted from the browser (the guest chat).
   {
     const visitor = await browser.newContext();
     const page = await visitor.newPage();
     await page.goto("/sign-up");
-    await expect(page.getByRole("button", { name: "Get my free Growth Snapshot" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "How can we help you grow?" })).toBeVisible();
     await expect
       .poll(async () => {
         const db = new Client({ connectionString: E2E_DATABASE_URL });
