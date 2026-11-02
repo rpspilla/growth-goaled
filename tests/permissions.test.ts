@@ -113,3 +113,12 @@ describe("end-to-end test mode", () => {
     }
   });
 });
+
+describe("database driver", () => {
+  // Deployed apps use drizzle's neon-http driver, which has no transactions (tests run on PGlite,
+  // which does, so they'd pass anyway). Scripts that bring their own connection are exempt.
+  it("app and library code never opens a transaction", () => {
+    const code = [...appFiles, ...walk(path.join(root, "lib"))].filter((f) => /\.tsx?$/.test(f) && !f.includes(`${path.sep}seed${path.sep}`) && !f.endsWith("ensure-reference.ts"));
+    expect(code.filter((f) => /\.transaction\(/.test(read(f))).map(rel)).toEqual([]);
+  });
+});

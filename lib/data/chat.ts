@@ -128,50 +128,50 @@ export async function sendMessage(user: User, company: Company, conversationId: 
   }
   const { output } = result;
 
-  await db.transaction(async (tx) => {
-    for (const f of output.facts) {
-      const key = f.key.trim().toLowerCase();
-      if (!FACT_KEY.test(key) || !f.value.trim()) continue;
-      // A fact an advisor or the founder marked verified isn't overwritten by conversation.
-      await tx
-        .insert(schema.companyFacts)
-        .values({ companyId: company.id, key, label: f.label.slice(0, 120), value: f.value.slice(0, 500), status: f.status, conversationId, updatedBy: user.id })
-        .onConflictDoUpdate({
-          target: [schema.companyFacts.companyId, schema.companyFacts.key],
-          set: { label: sql`excluded.label`, value: sql`excluded.value`, status: sql`excluded.status`, conversationId, updatedBy: user.id, updatedAt: new Date() },
-          setWhere: sql`${schema.companyFacts.status} <> 'verified'`,
-        });
-    }
-    let recommendationId: string | null = null;
-    if (output.recommendation) {
-      const [rec] = await tx
-        .insert(schema.recommendations)
-        .values({
-          companyId: company.id,
-          conversationId,
-          topic: topic.id,
-          question: view.conversation.title,
-          context: characteristics(company),
-          card: cardFrom(output.recommendation),
-          confidence: output.recommendation.confidence.level,
-          methodologyVersion: CHAT_METHODOLOGY_VERSION,
-          model: result.model,
-        })
-        .returning({ id: schema.recommendations.id });
-      recommendationId = rec!.id;
-    }
-    await tx.insert(schema.conversationMessages).values({
-      conversationId,
-      role: "assistant",
-      content: output.reply,
-      questions: output.questions,
-      recommendationId,
-      model: result.model,
-      tokensIn: result.tokensIn,
-      tokensOut: result.tokensOut,
-    });
-    await tx.update(schema.conversations).set({ updatedAt: new Date() }).where(eq(schema.conversations.id, conversationId));
+  // Sequential writes: the production driver (neon-http) has no transactions. The answer is
+  // written last, so a failure part-way leaves the founder's message unanswered and retryable.
+  let recommendationId: string | null = null;
+  if (output.recommendation) {
+    const [rec] = await db
+      .insert(schema.recommendations)
+      .values({
+        companyId: company.id,
+        conversationId,
+        topic: topic.id,
+        question: view.conversation.title,
+        context: characteristics(company),
+        card: cardFrom(output.recommendation),
+        confidence: output.recommendation.confidence.level,
+        methodologyVersion: CHAT_METHODOLOGY_VERSION,
+        model: result.model,
+      })
+      .returning({ id: schema.recommendations.id });
+    recommendationId = rec!.id;
+  }
+  for (const f of output.facts) {
+    const key = f.key.trim().toLowerCase();
+    if (!FACT_KEY.test(key) || !f.value.trim()) continue;
+    // A fact the founder corrected (verified) isn't overwritten by conversation.
+    await db
+      .insert(schema.companyFacts)
+      .values({ companyId: company.id, key, label: f.label.slice(0, 120), value: f.value.slice(0, 500), status: f.status, conversationId, updatedBy: user.id })
+      .onConflictDoUpdate({
+        target: [schema.companyFacts.companyId, schema.companyFacts.key],
+        set: { label: sql`excluded.label`, value: sql`excluded.value`, status: sql`excluded.status`, conversationId, updatedBy: user.id, updatedAt: new Date() },
+        setWhere: sql`${schema.companyFacts.status} <> 'verified'`,
+      });
+  }
+  await db.insert(schema.conversationMessages).values({
+    conversationId,
+    role: "assistant",
+    content: output.reply,
+    questions: output.questions,
+    recommendationId,
+    model: result.model,
+    tokensIn: result.tokensIn,
+    tokensOut: result.tokensOut,
   });
+  await db.update(schema.conversations).set({ updatedAt: new Date() }).where(eq(schema.conversations.id, conversationId));
   await track("conversation_message", { userId: user.id, companyId: company.id, props: { topic: topic.id, recommendation: Boolean(output.recommendation) } });
   return { ok: true };
 }
