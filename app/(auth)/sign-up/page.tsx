@@ -3,6 +3,7 @@ import Link from "next/link";
 import { formatPrice, pricing } from "@/lib/pricing";
 import { AuthShell, Positioning } from "../AuthShell";
 import { MagicLinkForm } from "../MagicLinkForm";
+import { Faq } from "@/components/Faq";
 
 export const metadata: Metadata = {
   title: "Find out what's holding your growth back · Growth Goaled",
@@ -11,8 +12,8 @@ export const metadata: Metadata = {
 
 const NEXT = [
   { title: "Confirm your email", body: "We send a secure link. No password." },
-  { title: "Tell us about your company", body: "Name and revenue range. About a minute." },
-  { title: "Pick a growth question", body: "Answer a few questions and get your free Growth Snapshot." },
+  { title: "Tell us about your company", body: "Revenue, founding year, vertical, stage and team size. About a minute." },
+  { title: "Pick a growth question", body: "Get your free Growth Snapshot straight away." },
 ];
 
 /** The main conversion page: what this is, why it matters at your stage, and exactly what happens next. */
@@ -56,6 +57,7 @@ export default function SignUpPage() {
           <p><span className="font-semibold" style={{ color: "var(--foreground)" }}>Your data:</span> used only for your own analysis, never shown to other companies.</p>
           <p><Link href="/sample" className="link">See a sample company first →</Link></p>
         </div>
+        <Faq className="mt-6" />
       </div>
     </AuthShell>
   );

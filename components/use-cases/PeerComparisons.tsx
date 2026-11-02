@@ -7,18 +7,36 @@ import { PeerComparisonCard } from "./PeerComparisonCard";
  * where no data fits, Growth Goaled's standard reference (labelled an assumption). Shared by the
  * free Snapshot and the paid assessment, so both compare on the same basis.
  */
-export function PeerComparisons({ peers, level = 2, columns = 1 }: { peers: PeerComparison[]; level?: 2 | 3; columns?: 1 | 3 }) {
+export function PeerComparisons({
+  peers,
+  level = 2,
+  columns = 1,
+  title = "How you compare with peers",
+  lead,
+}: {
+  peers: PeerComparison[];
+  level?: 2 | 3;
+  columns?: 1 | 3;
+  title?: string;
+  /** One line under the heading (the Overview's summary of where the company stands). */
+  lead?: string;
+}) {
   const Heading = level === 2 ? "h2" : "h3";
   return (
     <section id="peers-section" aria-labelledby="peers" className="scroll-mt-24">
       <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
         <Heading id="peers" className={level === 2 ? "scroll-mt-24 text-xl font-semibold" : "text-lg font-semibold"} style={{ color: "var(--foreground)" }}>
-          How you compare with peers
+          {title}
         </Heading>
         <span data-label className="text-[11px] font-mono" style={{ color: "var(--subtle-foreground)" }} aria-hidden>
           ● you · ▬ bottom–top quartile · | median
         </span>
       </div>
+      {lead && (
+        <p className="text-base -mt-1 mb-3" style={{ color: "var(--muted-foreground)" }}>
+          {lead}
+        </p>
+      )}
       <div className={columns === 3 ? "grid md:grid-cols-3 gap-3" : "space-y-3"}>
         {peers.map((c) => (
           <PeerComparisonCard key={c.key} c={c} />

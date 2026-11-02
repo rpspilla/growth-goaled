@@ -299,7 +299,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await expect(founder.page.getByRole("link", { name: /See how you compare with peers/ })).toHaveAttribute("href", "/overview#peers");
   await founder.page.getByRole("link", { name: /See how you compare with peers/ }).click();
   await expect(founder.page).toHaveURL(/\/overview#peers/);
-  await expect(founder.page.getByRole("heading", { name: "How you compare with peers" })).toBeVisible();
+  await expect(founder.page.getByRole("heading", { name: "Company Benchmark Performance" })).toBeVisible();
   await expect(founder.page.getByRole("article", { name: "Retention compared with peers" })).toContainText("Fintech · founded 2017–2021");
   await founder.page.goto("/baseline");
   await expect(founder.page.getByText("Test mode brief: How do I fix churn?")).toBeVisible();

@@ -44,3 +44,21 @@ The link works once and expires in ${p.expiresInDays} days.`;
 </div>`;
   return { subject, text, html };
 }
+
+/** To the owner: a founder didn't find their question in the library ("Don't see what you're looking for?"). */
+export function suggestionEmail(p: { companyName: string; founderName: string; email: string; decision: string }) {
+  const subject = `New growth question request from ${p.companyName}`;
+  const text = `${p.founderName} (${p.email}) at ${p.companyName} didn't find their question in the library.
+
+What they're trying to decide:
+${p.decision}
+
+Reply to this founder at ${p.email}.`;
+  const html = `<div style="font-family:Inter,Arial,sans-serif;color:#0D1B2A;max-width:520px">
+<p style="font-size:15px"><strong>${escape(p.founderName)}</strong> (${escape(p.email)}) at <strong>${escape(p.companyName)}</strong> didn't find their question in the library.</p>
+<p style="font-size:13px;color:#64748B;margin-bottom:4px">What they're trying to decide:</p>
+<blockquote style="margin:0;padding:12px 16px;background:#F1F5F9;border-radius:8px;font-size:15px;white-space:pre-wrap">${escape(p.decision)}</blockquote>
+<p style="font-size:13px;color:#64748B">Reply to them at <a href="mailto:${escape(p.email)}">${escape(p.email)}</a>.</p>
+</div>`;
+  return { subject, text, html };
+}

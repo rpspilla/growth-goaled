@@ -11,6 +11,8 @@ import { displayValue, getField } from "@/lib/intake";
 import { rangeFieldId } from "@/lib/ranges";
 import { sellableUseCases } from "@/lib/pricing";
 import { stripeConfigured } from "@/lib/stripe";
+import { z } from "zod";
+import { sendEmail, suggestionEmail } from "@/lib/email";
 import { getUseCase, isComingSoon, isUseCaseId, missingRequired, parseProfileFieldId, profileQuestions } from "@/lib/use-cases";
 
 async function founderCompany() {
@@ -75,4 +77,27 @@ export async function startAssessmentCheckout(useCaseId: string): Promise<{ ok: 
     console.error("[stripe] Checkout failed", err);
     return { ok: false, error: "We couldn't start the payment. Please try again." };
   }
+}
+
+const suggestionSchema = z.object({
+  decision: z.string().trim().min(3, "Tell us what you're trying to decide.").max(1000, "Please keep it under 1,000 characters."),
+  email: z.email("Enter a valid email."),
+});
+
+/**
+ * "Don't see what you're looking for?": records what the founder wants to decide (event
+ * `use_case_suggested`) and emails the owner (OWNER_NOTIFY_EMAIL) when set. No checkout.
+ */
+export async function suggestUseCase(decision: string, email: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { user, company } = await founderCompany();
+  const parsed = suggestionSchema.safeParse({ decision, email });
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]!.message };
+  await track("use_case_suggested", { userId: user.id, companyId: company.id, props: { decision: parsed.data.decision, email: parsed.data.email } });
+  const to = process.env.OWNER_NOTIFY_EMAIL;
+  if (to) {
+    const msg = suggestionEmail({ companyName: company.name, founderName: user.name ?? user.email, email: parsed.data.email, decision: parsed.data.decision });
+    const sent = await sendEmail({ to, ...msg });
+    if (!sent.sent) console.error("[suggest] Owner email not sent:", sent.reason);
+  }
+  return { ok: true };
 }

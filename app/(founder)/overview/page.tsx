@@ -11,7 +11,8 @@ import { snapshotPeers } from "@/lib/data/peers";
 import { PeerComparisons } from "@/components/use-cases/PeerComparisons";
 import { companyPerformance } from "@/lib/data/performance";
 import { progressView } from "@/lib/data/plan";
-import { formatMetric } from "@/lib/metrics";
+import { formatMetric, METRICS } from "@/lib/metrics";
+import type { PeerComparison } from "@/lib/benchmark-library/peers";
 import { HEADLINE_METRICS } from "@/lib/performance";
 import { formatPrice, pricing } from "@/lib/pricing";
 import { firstUseCase, getUseCase, targetSummary } from "@/lib/use-cases";
@@ -45,6 +46,26 @@ const STAGE_COPY = [
   { title: "Keep your plan moving", body: "Track your actions and the metrics they should move." },
 ];
 
+/**
+ * One line on where the company stands against its benchmarks, from the comparisons already shown
+ * (never a new figure): how many are against real peers, and which sit at or above the median.
+ */
+function benchmarkLead(peers: PeerComparison[]): string {
+  const real = peers.filter((p): p is Extract<PeerComparison, { status: "compared" }> => p.status === "compared");
+  const placed = real.filter((p) => p.company && p.median && p.position);
+  // An exact figure, or a range wholly on one side of the median (a straddling range counts as neither).
+  const ahead = placed.filter((p) => {
+    const f = p.company!;
+    const m = p.median!.value;
+    if (METRICS[p.metric].lowerIsBetter) return f.exact !== null ? f.exact <= m : f.hi !== null && f.hi <= m;
+    return f.exact !== null ? f.exact >= m : f.lo !== null && f.lo >= m;
+  });
+  if (!real.length) return "No published peer data matches your vertical and founding year yet, so these use Growth Goaled's standard reference, labelled as an assumption.";
+  const base = `${real.length} of ${peers.length} compared with published peers in your vertical and founding years.`;
+  if (!placed.length) return `${base} Add your figures on your profile or share data to see where you sit.`;
+  return `${base} ${ahead.length ? `At or above the median on ${ahead.map((p) => p.title.toLowerCase()).join(" and ")}.` : "None is at or above the median yet."}`;
+}
+
 /** Growth Command Center: the main finding, the numbers that matter, the next three actions, and where each question stands. */
 export default async function OverviewPage() {
   const { user, company, useCases, active } = await founderContext();
@@ -59,6 +80,8 @@ export default async function OverviewPage() {
     company ? getIntakeAnswers(company).then((a) => snapshotPeers(company, a)) : null,
   ]);
   const view = brief?.state === "ready" ? brief.view : null;
+  // AE ramp time always has a place on the Overview (James's feedback): the figure, or what would give it.
+  const ramp = perf?.metrics.get("ramp_months") ?? null;
   const headline = HEADLINE_METRICS.filter((m) => perf?.metrics.has(m)).slice(0, 4).map((m) => perf!.metrics.get(m)!);
   const firstName = user.name?.split(" ")[0];
   const stage = journeyStage(state);
@@ -126,9 +149,22 @@ export default async function OverviewPage() {
           </div>
         ) : (
           <div className="surface surface-pad text-base" style={{ color: "var(--muted-foreground)" }}>
-            No figures yet. They appear here once you answer a question&apos;s survey or share data, and they&apos;re calculated from your own files where possible.
+            No figures yet. They appear here once you add them to your profile or share data, and they&apos;re calculated from your own files where possible.
           </div>
         )}
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+          {ramp ? (
+            <MetricCard m={ramp} />
+          ) : (
+            <div className="surface p-5 flex flex-col" aria-label="AE Ramp Time">
+              <div className="text-sm font-semibold" style={{ color: "var(--muted-foreground)" }}>{METRICS.ramp_months.label}</div>
+              <div className="text-lg font-semibold mt-1" style={{ color: "var(--foreground)" }}>Not enough data yet</div>
+              <p className="text-sm mt-2" style={{ color: "var(--muted-foreground)" }}>
+                {METRICS.ramp_months.definition} Share your sales team roster with hire dates and it appears here.
+              </p>
+            </div>
+          )}
+        </div>
         {perf?.monthly && (
           <div className="surface p-5 mt-4">
             <div className="flex items-baseline justify-between gap-3 flex-wrap">
@@ -169,7 +205,7 @@ export default async function OverviewPage() {
         </Section>
       )}
 
-      {peers && peers.length > 0 && <PeerComparisons peers={peers} />}
+      {peers && peers.length > 0 && <PeerComparisons peers={peers} title="Company Benchmark Performance" lead={benchmarkLead(peers)} columns={3} />}
 
       {useCases.length > 0 && (
       <Section id="questions" title="Your growth questions" aside={<Link href="/library" className="link text-sm">Explore other questions →</Link>}>

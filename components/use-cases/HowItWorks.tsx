@@ -1,8 +1,8 @@
 /** The assessment workflow, shown on every use case page. */
 export function HowItWorks({ price, sellable }: { price: string; sellable: boolean }) {
   const steps = [
-    ["Answer a few questions", "Free. About five minutes."],
-    ["Get your Growth Snapshot", "Free. Early hypotheses from your answers, and which assessment fits."],
+    ["Pick a growth question", "Free. Uses what you told us at sign-up."],
+    ["Get your Growth Snapshot", "Free. Early signals and peer comparisons, and which assessment fits."],
     ["Buy the assessment", sellable ? `${price}, one time. No subscription.` : "Launching soon."],
     ["Share your data", "Upload whatever you have; we sort it and show what's missing."],
     ["Receive your results", "Within minutes of sharing your data: findings, evidence, recommendations and an action plan, with confidence and gaps stated plainly."],

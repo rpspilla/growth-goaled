@@ -19,6 +19,7 @@ export function UseCaseCards({
   hrefFor,
   price,
   sellable,
+  extra,
 }: {
   useCases: readonly UseCaseDef[];
   states: Record<string, CardState>;
@@ -26,6 +27,8 @@ export function UseCaseCards({
   /** Formatted assessment price, or null where prices aren't shown (advisor view). */
   price?: string | null;
   sellable?: readonly string[];
+  /** A last card after the questions (the founder library's "Don't see what you're looking for?"). */
+  extra?: React.ReactNode;
 }) {
   // Library order, "Coming soon" last.
   const ordered = [...useCases].sort((a, b) => Number(Boolean(a.comingSoon)) - Number(Boolean(b.comingSoon)));
@@ -91,6 +94,7 @@ export function UseCaseCards({
           </article>
         );
       })}
+      {extra}
     </div>
   );
 }

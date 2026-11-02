@@ -1,4 +1,7 @@
+import { Faq } from "@/components/Faq";
 import { PageHeader } from "@/components/PageHeader";
+import { SuggestUseCaseCard } from "@/components/use-cases/SuggestUseCaseCard";
+import { suggestUseCase } from "./actions";
 import { UseCaseCards, type CardState } from "@/components/use-cases/UseCaseCards";
 import { founderContext } from "@/lib/data/founder-context";
 import { track } from "@/lib/events";
@@ -27,7 +30,15 @@ export default async function LibraryPage({ searchParams }: { searchParams: Prom
         </div>
       )}
       <PageHeader title="What do you need to decide?" subtitle={`Free Snapshot first. Assessment ${price}, optional.`} />
-      <UseCaseCards useCases={USE_CASES} states={states} hrefFor={(id) => `/library/${id}`} price={price} sellable={sellableUseCases()} />
+      <UseCaseCards
+        useCases={USE_CASES}
+        states={states}
+        hrefFor={(id) => `/library/${id}`}
+        price={price}
+        sellable={sellableUseCases()}
+        extra={company ? <SuggestUseCaseCard defaultEmail={user.email} submit={suggestUseCase} /> : null}
+      />
+      <Faq className="mt-10 max-w-3xl" />
     </div>
   );
 }

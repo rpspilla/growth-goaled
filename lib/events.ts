@@ -21,6 +21,7 @@ export type EventName =
   | "use_case_activated"
   | "snapshot_viewed"
   | "advisory_requested"
+  | "use_case_suggested"
   | "advisory_link_opened"
   | "analysis_requested"
   | "plan_committed"

@@ -69,6 +69,12 @@ test("sign-up basics carry through, and every growth question opens its own page
   await page.getByRole("button", { name: "See my free Snapshot" }).click();
   await expect(page).toHaveURL(/\/library\/hire_or_fix\/snapshot$/);
 
+  // --- Overview: AE ramp time has a place even before there's data; benchmarks under their new name ---
+  await page.goto("/overview");
+  const ramp = page.getByLabel("AE Ramp Time");
+  await expect(ramp).toContainText("Not enough data yet");
+  await expect(page.getByRole("heading", { name: "Company Benchmark Performance" })).toBeVisible();
+
   // --- Profile: pre-filled from sign-up, all optional, and nothing re-entered ---
   await page.goto("/profile/company");
   await expect(page.locator("#intake-founded_year")).toHaveValue("2020");
@@ -95,5 +101,35 @@ test("sign-up basics carry through, and every growth question opens its own page
   await page.goto("/profile/hiring");
   const team = page.getByLabel("Current team", { exact: true });
   for (const text of ["10 Account executives", "4 BDRs / SDRs", "1 Customer success", "5 Marketing"]) await expect(team).toContainText(text);
+  await ctx.close();
+});
+
+test("library: FAQ, and a request for a question we don't offer yet", async ({ browser }) => {
+  const { Client } = await import("pg");
+  const { E2E_DATABASE_URL } = await import("../playwright.config");
+  const db = new Client({ connectionString: E2E_DATABASE_URL });
+  await db.connect();
+  const u = await db.query("insert into users (email, auth_user_id, role, name, onboarded_at) values ('ask@e2e.test', 'e2e:ask@e2e.test', 'founder', 'Ask', now()) on conflict (auth_user_id) do update set name = 'Ask' returning id");
+  const c = await db.query("insert into companies (name, revenue_band) values ('Ask Co', '1m_3m') returning id");
+  await db.query("insert into company_members (company_id, user_id) values ($1, $2)", [c.rows[0].id, u.rows[0].id]);
+
+  const ctx = await browser.newContext();
+  await ctx.addCookies([{ name: "gg_e2e_user", value: "ask@e2e.test", domain: "localhost", path: "/" }]);
+  const page = await ctx.newPage();
+  await page.goto("/library");
+  await page.getByText("How is this different from prompting Claude or ChatGPT?").click();
+  await expect(page.getByText(/same answer every time on the same data/)).toBeVisible();
+
+  const card = page.getByRole("article", { name: "Don't see what you're looking for?" });
+  await card.getByRole("button", { name: "Tell us what you need" }).click();
+  await expect(card.getByLabel("Your email")).toHaveValue("ask@e2e.test");
+  await card.getByRole("button", { name: "Send" }).click();
+  await expect(card.getByRole("alert")).toContainText("Tell us what you're trying to decide.");
+  await card.getByLabel("What are you trying to decide?").fill("Should we raise a bridge round?");
+  await card.getByRole("button", { name: "Send" }).click();
+  await expect(card.getByRole("status")).toContainText("We'll be in touch at ask@e2e.test");
+  const { rows } = await db.query("select props from events where name = 'use_case_suggested' and company_id = $1", [c.rows[0].id]);
+  expect(rows).toEqual([{ props: { decision: "Should we raise a bridge round?", email: "ask@e2e.test" } }]);
+  await db.end();
   await ctx.close();
 });

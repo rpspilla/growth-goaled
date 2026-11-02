@@ -35,7 +35,7 @@ test("the Overview falls back to the standard reference for growth, churn and re
   await expect(page.getByTestId("teaser")).toBeVisible();
   await expect(page.getByRole("heading", { name: "How you compare with peers" })).toHaveCount(0);
   await page.goto("/overview");
-  await expect(page.getByRole("heading", { name: "How you compare with peers" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Company Benchmark Performance" })).toBeVisible();
 
   const growth = page.getByRole("article", { name: "Growth compared with peers" });
   await expect(growth).toContainText("Our comparison sources don't publish growth figures for HealthTech companies founded in 2024 yet. An advisor can confirm this comparison for you later.");
