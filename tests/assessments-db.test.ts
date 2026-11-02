@@ -190,6 +190,22 @@ describe("assessment engine", () => {
     expect(state.state === "ready" && state.view.version).toBe(v.version);
   });
 
+  it("uses the summary report without calling the Draft Agent unless ASSESSMENT_AI_DRAFT=on (owner decision, Nov 2026)", async () => {
+    await activateUseCase(co.id, "hire_or_fix", { activation: "paid", by: founder.id });
+    const v = (await createAssessmentVersion(co, "hire_or_fix"))!;
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await runAssessmentPipeline(v.id, { qa });
+    } finally {
+      errors.mockRestore();
+    }
+    expect(errors).not.toHaveBeenCalledWith(expect.stringContaining("draft failed"), expect.anything());
+    const state = await founderAssessment(co.id, "hire_or_fix");
+    if (state.state !== "ready") throw new Error("expected ready");
+    expect(state.view.degraded).toBe(true);
+    expect(state.view.evidence.map((f) => f.text).join(" ")).toMatch(/Win Rate 18%/);
+  });
+
   it("works with no answers and no data at all", async () => {
     const [empty] = (await db().insert(schema.companies).values({ name: "Empty Co" }).returning()) as [Company];
     await activateUseCase(empty.id, "winning_icp", { activation: "advisor", by: advisor.id, note: "test" });

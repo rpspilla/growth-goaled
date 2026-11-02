@@ -443,6 +443,9 @@ export async function runAssessmentPipeline(deliverableId: string, deps: Assessm
   let tokensOut = 0;
   const notes: string[] = [];
   try {
+    // Owner decision, Nov 2026: the summary report built from the inputs, without the Draft Agent,
+    // unless ASSESSMENT_AI_DRAFT=on (or a test passes its own draft).
+    if (!deps.draft && process.env.ASSESSMENT_AI_DRAFT !== "on") throw new AssessmentDraftError("AI draft switched off (ASSESSMENT_AI_DRAFT)");
     const first = await draft(inputs.input);
     tokensIn += first.tokensIn;
     tokensOut += first.tokensOut;
@@ -457,7 +460,7 @@ export async function runAssessmentPipeline(deliverableId: string, deps: Assessm
       out = second.output;
     }
   } catch (err) {
-    console.error(`[assessment] ${deliverableId} draft failed; building a plain report from the inputs`, err);
+    if (process.env.ASSESSMENT_AI_DRAFT === "on" || deps.draft) console.error(`[assessment] ${deliverableId} draft failed; building a plain report from the inputs`, err);
     notes.push(`Draft Agent failed (${err instanceof AssessmentDraftError ? err.message : isAiConfigError(err) ? aiProblemForStaff(err) : "unexpected error"}); plain report built from the inputs.`);
     out = fallbackAssessment(inputs.input);
     degraded = true;

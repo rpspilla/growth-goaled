@@ -28,6 +28,8 @@ export default defineConfig({
       APP_URL: `http://localhost:${PORT}`,
       MULTI_COMPANY_FOUNDERS: "multi@e2e.test",
       SELF_ADVISOR_EMAILS: "multi@e2e.test",
+      // The full pipeline, with the stand-in draft (production uses the summary report for now).
+      ASSESSMENT_AI_DRAFT: "on",
     },
   },
 });

@@ -417,7 +417,7 @@ export function AssessmentResults({
         <div className="-mt-6 flex items-center gap-2 flex-wrap" role="note">
           <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full" style={{ background: "var(--amber-muted)", color: "#92400E" }}>
             <AlertTriangle size={13} aria-hidden />
-            {data.degraded ? "Partial brief" : `${data.dataGaps.length} ${data.dataGaps.length === 1 ? "gap" : "gaps"} limit this`}
+            {data.degraded ? "Summary brief" : `${data.dataGaps.length} ${data.dataGaps.length === 1 ? "gap" : "gaps"} limit this`}
           </span>
           {data.dataGaps.slice(0, 3).map((g) => (
             <Link key={g} href={dataPath} data-label title={g} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full max-w-[16rem] truncate" style={{ background: "var(--muted)", color: "var(--foreground)" }}>
@@ -426,7 +426,7 @@ export function AssessmentResults({
             </Link>
           ))}
           <ExpandableDetail summary={data.dataGaps.length > 3 ? `All ${data.dataGaps.length}` : "Details"}>
-            {data.degraded && <p>A partial brief: the full analysis couldn&apos;t be completed this time.</p>}
+            {data.degraded && <p>A summary brief, built straight from your figures and the rule-based diagnosis. Your advisor can take it deeper.</p>}
             <ul className="space-y-1">
               {data.dataGaps.map((g) => (
                 <li key={g}>• {g}</li>

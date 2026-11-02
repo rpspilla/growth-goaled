@@ -82,12 +82,13 @@ export async function chatTurn(input: ChatInput): Promise<ChatResult> {
   }));
   const response = await anthropic().beta.messages.parse({
     model: AI_MODEL,
-    max_tokens: 16000,
+    max_tokens: 8000,
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     system: SYSTEM,
     cache_control: { type: "ephemeral" },
-    output_config: { effort: "medium", format: betaZodOutputFormat(chatOutputSchema) },
+    // Owner decision, Nov 2026: fast replies over depth.
+    output_config: { effort: "low", format: betaZodOutputFormat(chatOutputSchema) },
     messages,
   });
   if (response.stop_reason === "refusal") throw new ChatError("That message couldn't be answered. Try rephrasing it.");
