@@ -4,7 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { ALL_ITEM_KEYS } from "@/lib/readiness";
 import { isMetricKey } from "@/lib/metrics";
-import { answeredObjectiveFields, getUseCase, isUseCaseId, missingRequired, objectiveFields, parseAnswer, parseProfileFieldId, recommendedUseCases, targetSummary, USE_CASE_IDS, USE_CASES } from "@/lib/use-cases";
+import { answeredObjectiveFields, getUseCase, isUseCaseId, missingRequired, objectiveFields, parseAnswer, parseProfileFieldId, firstUseCase, targetSummary, USE_CASE_IDS, USE_CASES } from "@/lib/use-cases";
 import { advisoryBookingUrl, advisoryHref, formatPrice, pricing, sellableUseCases } from "@/lib/pricing";
 import { assessmentHistory } from "@/lib/use-cases/history";
 import { questionnaire } from "@/lib/use-cases/questionnaire";
@@ -15,8 +15,8 @@ import { journeyStage, nextAction, stepStates } from "@/lib/use-cases/steps";
 import { baselineReadiness } from "@/lib/use-cases/readiness";
 
 describe("use case registry", () => {
-  it("has the six use cases from HANDOFF §13.3, in order, with stable ids", () => {
-    expect(USE_CASES.map((u) => u.id)).toEqual(["growth_leak", "series_a_ready", "series_b_ready", "hire_or_fix", "winning_icp", "founder_handoff"]);
+  it("has the six use cases, in the owner's order (sales motion, hiring plan, churn), with stable ids", () => {
+    expect(USE_CASES.map((u) => u.id)).toEqual(["winning_icp", "hire_or_fix", "growth_leak", "series_a_ready", "series_b_ready", "founder_handoff"]);
     expect(USE_CASE_IDS).toHaveLength(6);
     expect(getUseCase("nope")).toBeUndefined();
     expect(getUseCase("__proto__")).toBeUndefined();
@@ -40,12 +40,10 @@ describe("use case registry", () => {
   });
 });
 
-describe("recommendation", () => {
-  it("recommends Fix Churn, and never a coming-soon question", () => {
-    expect(recommendedUseCases({ stage: "Seed", revenueBand: null })).toEqual(["growth_leak"]);
-    expect(recommendedUseCases({ stage: "Series B+", revenueBand: "1m_3m" })).toEqual(["growth_leak"]);
-    expect(recommendedUseCases({ stage: "Series A", revenueBand: "3m_10m" })).toEqual(["growth_leak"]);
-    expect(recommendedUseCases({ stage: null, revenueBand: null })).toEqual(["growth_leak"]);
+describe("where to start", () => {
+  it("is the first available question in library order, never a coming-soon one", () => {
+    expect(firstUseCase().id).toBe("winning_icp");
+    expect(firstUseCase().comingSoon).toBeFalsy();
   });
 });
 
@@ -59,45 +57,26 @@ describe("objective form", () => {
     }
   });
 
-  it("asks figures as ranges, adds employees everywhere, and skips what's on file", () => {
+  it("asks only the sign-up basics a company is missing, and nothing else before the Snapshot", () => {
     const empty = questionnaire(leak, {});
-    expect(empty.fields.filter((f) => f.group === "company").map((f) => f.id)).toEqual([
-      "profile.company.stage",
-      "profile.company.founded_year",
-      "profile.gtm.model",
-      "profile.company.arr_range",
-      "profile.company.growth_range",
-      "profile.customers.nrr_range",
-      "profile.customers.gross_retention_range",
-      "profile.company.industry",
-      "profile.company.employees_range",
-    ]);
-    expect(empty.fields.find((f) => f.id === "profile.customers.gross_retention_range")).toMatchObject({ label: "Annual gross revenue churn", help: expect.stringMatching(/^The share of last year's recurring revenue you lost/) });
-    expect(empty.fields.find((f) => f.id === "profile.customers.gross_retention_range")!.options!.map((o) => o.label)).toEqual(["Under 2%", "2–5%", "5–10%", "10–20%", "Over 20%"]);
+    expect(empty.fields.map((f) => f.id)).toEqual(["profile.company.stage", "profile.company.founded_year", "profile.company.industry"]);
+    expect(empty.fields.every((f) => f.required && f.kind === "select")).toBe(true);
     const year = empty.fields.find((f) => f.id === "profile.company.founded_year")!;
-    expect(year).toMatchObject({ kind: "select", required: true });
     expect(year.options![0]!.value).toBe(String(new Date().getUTCFullYear()));
     expect(year.options!.at(-1)!.value).toBe("Before 1990");
-    for (const f of empty.fields.filter((f) => f.id.endsWith("_range"))) {
-      expect(f.kind).toBe("select");
-      expect(f.help, f.id).toMatch(/\w{3,}.*\./); // every figure we ask for has a simple definition
-    }
-    expect(empty.fields.find((f) => f.id === "profile.company.employees_range")!.options!.map((o) => o.label)).toEqual(["1–5", "6–10", "11–25", "26–50", "50+"]);
-    expect(empty.fields.filter((f) => f.required).map((f) => f.id)).toEqual(["profile.company.stage", "profile.company.founded_year", "profile.gtm.model"]);
-    for (const u of USE_CASES) expect(questionnaire(u, {}).fields.map((f) => f.id)).toEqual(expect.arrayContaining(["profile.company.founded_year", "profile.company.industry", "profile.company.employees_range"]));
-    // An exact figure or a range already given is listed, not asked again.
-    const known = questionnaire(leak, { "company.stage": "Seed", "gtm.model": "Founder-led", "company.arr": 2_000_000, "company.growth_range": "25–50%" });
-    expect(known.fields.filter((f) => f.group === "company").map((f) => f.id)).toEqual(["profile.company.founded_year", "profile.customers.nrr_range", "profile.customers.gross_retention_range", "profile.company.industry", "profile.company.employees_range"]);
-    expect(known.known).toEqual([
-      { label: "Stage", value: "Seed" },
-      { label: "Sales model", value: "Founder-led" },
-      { label: "ARR ($)", value: "2,000,000" },
-      { label: "Year-over-year revenue growth", value: "25–50%" },
+    expect(empty.fields.find((f) => f.id === "profile.company.stage")!.options!.map((o) => o.value)).toEqual(["Bootstrapped", "Pre-seed", "Seed", "Series A", "Series B+"]);
+    expect(empty.fields.find((f) => f.id === "profile.company.industry")!.options!.map((o) => o.value)).not.toContain("B2B SaaS");
+    // No figures (ARR, growth, retention, employees…) are asked before the Snapshot, for any question.
+    for (const u of USE_CASES) expect(questionnaire(u, {}).fields.filter((f) => f.id.endsWith("_range"))).toEqual([]);
+    // A founder who signed up after Nov 2026 has all three: nothing to ask.
+    const signedUp = questionnaire(leak, { "company.stage": "Seed", "company.founded_year": "2020", "company.industry": "Fintech" }, "3m_10m");
+    expect(signedUp.fields).toEqual([]);
+    expect(signedUp.known).toEqual([
+      { label: "Annual revenue", value: "$3M–$10M" },
+      { label: "Funding stage", value: "Seed" },
+      { label: "Founding year", value: "2020" },
+      { label: "Vertical", value: "Fintech" },
     ]);
-    // Revenue given at onboarding isn't asked again.
-    const banded = questionnaire(leak, {}, "3m_10m");
-    expect(banded.fields.map((f) => f.id)).not.toContain("profile.company.arr_range");
-    expect(banded.known).toEqual([{ label: "Annual revenue", value: "$3M–$10M" }]);
     expect(parseProfileFieldId("profile.company.arr_range")).toEqual({ section: "company", field: "arr_range" });
     expect(parseProfileFieldId("goal")).toBeNull();
   });
@@ -116,9 +95,9 @@ describe("objective form", () => {
   });
 
   it("lists required answers still missing and summarises the founder's target", () => {
-    expect(missingRequired(leak, null)).toEqual(["profile.company.stage", "profile.company.founded_year", "profile.gtm.model"]);
-    expect(missingRequired(leak, {}, { "company.stage": "Seed", "gtm.model": "Hybrid" })).toEqual(["profile.company.founded_year"]);
-    expect(missingRequired(leak, {}, { "company.stage": "Seed", "company.founded_year": "2019", "gtm.model": "Hybrid" })).toEqual([]);
+    expect(missingRequired(leak, null)).toEqual(["profile.company.stage", "profile.company.founded_year", "profile.company.industry"]);
+    expect(missingRequired(leak, {}, { "company.stage": "Seed", "company.industry": "Fintech" })).toEqual(["profile.company.founded_year"]);
+    expect(missingRequired(leak, {}, { "company.stage": "Seed", "company.founded_year": "2019", "company.industry": "Fintech" })).toEqual([]);
     const objective = { goal: "Grow", main_metric: "arr", target_value: "5000000", target_date: "2027-06-30" };
     expect(targetSummary(objective)).toBe("ARR $5M by 2027-06-30");
     expect(targetSummary({ main_metric: "arr" })).toBeNull();

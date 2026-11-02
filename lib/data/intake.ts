@@ -16,6 +16,7 @@ import {
   type IntakeSectionId,
   type IntakeValue,
 } from "@/lib/intake";
+import type { CompanyBasics } from "@/lib/onboarding";
 
 /** Saved answers, falling back to the company row (e.g. name and website from onboarding). */
 export async function getIntakeAnswers(company: Company): Promise<IntakeAnswers> {
@@ -125,4 +126,29 @@ export async function saveIntakeAnswer(user: User, company: Company, sectionId: 
   }
 
   return { ok: true, percent, completeSections: nowComplete, phaseAdvanced };
+}
+
+/**
+ * Saves the sign-up basics (lib/onboarding.ts) through the intake, so the profile, the company row
+ * and the figures stay the single source: founding year, vertical, funding stage and the go-to-market
+ * team. Name and revenue band are on the company row already.
+ */
+export async function saveCompanyBasics(user: User, companyId: string, basics: CompanyBasics): Promise<void> {
+  const answers: [string, string, string | number | null][] = [
+    ["company", "founded_year", basics.foundedYear],
+    ["company", "industry", basics.vertical],
+    ["company", "industry_other", basics.vertical === "Other" ? basics.verticalOther : null],
+    ["company", "stage", basics.stage],
+    ["gtm", "sales_reps", basics.aes],
+    ["gtm", "sdrs", basics.bdrs],
+    ["gtm", "cs", basics.cs],
+  ];
+  for (const [section, field, value] of answers) {
+    if (value === null) continue;
+    // Re-read the row each time: saveIntakeAnswer mirrors answers into its columns.
+    const [company] = await db.select().from(schema.companies).where(eq(schema.companies.id, companyId)).limit(1);
+    if (!company) throw new Error("Company not found.");
+    const result = await saveIntakeAnswer(user, company, section, field, String(value));
+    if (!result.ok) throw new Error(`Couldn't save ${section}.${field}: ${result.error}`);
+  }
 }

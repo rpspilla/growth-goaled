@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Star } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Pill } from "@/components/ui/Pill";
 import { OUTCOME_ICONS } from "@/components/visual/icons";
 import { ExpandableDetail, StatusChip } from "@/components/visual/primitives";
@@ -12,33 +12,29 @@ export type CardState = "active" | "started" | null;
 /**
  * The library: each card is a question the founder is facing, shown as an illustration, the
  * question, one line on when to ask it and three outcome chips. "Use it when" and "You'll decide"
- * stay one tap away under Details. Recommended questions come first, marked with a ribbon.
+ * stay one tap away under Details. Cards keep the library order; coming-soon questions go last.
  */
 export function UseCaseCards({
   useCases,
-  recommended,
   states,
   hrefFor,
   price,
   sellable,
 }: {
   useCases: readonly UseCaseDef[];
-  recommended: readonly string[];
   states: Record<string, CardState>;
   hrefFor: (id: string) => string;
   /** Formatted assessment price, or null where prices aren't shown (advisor view). */
   price?: string | null;
   sellable?: readonly string[];
 }) {
-  // Recommended first, "Coming soon" last.
-  const rank = (u: UseCaseDef) => (u.comingSoon ? 2 : recommended.includes(u.id) ? 0 : 1);
-  const ordered = [...useCases].sort((a, b) => rank(a) - rank(b));
+  // Library order, "Coming soon" last.
+  const ordered = [...useCases].sort((a, b) => Number(Boolean(a.comingSoon)) - Number(Boolean(b.comingSoon)));
   return (
     <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
       {ordered.map((u) => {
         const v = visualFor(u.id);
         const state = states[u.id];
-        const isRecommended = recommended.includes(u.id);
         if (u.comingSoon) {
           return (
             <article key={u.id} className="surface p-4 flex flex-col gap-3" style={{ background: "var(--muted)" }} aria-label={`${u.question} (coming soon)`}>
@@ -57,18 +53,9 @@ export function UseCaseCards({
         }
         const cta = state === "active" ? "Open your assessment" : state === "started" ? "Continue" : "Start with a free Snapshot";
         return (
-          <article
-            key={u.id}
-            className="surface p-4 flex flex-col gap-3 relative hover:shadow-md transition-shadow"
-            style={{ borderColor: isRecommended ? "var(--green)" : undefined, boxShadow: isRecommended ? "0 0 0 1px var(--green)" : undefined }}
-          >
+          <article key={u.id} className="surface p-4 flex flex-col gap-3 relative hover:shadow-md transition-shadow">
             <div className="relative">
               <QuestionIllustration id={u.id} className="h-28" />
-              {isRecommended && (
-                <span className="absolute top-2 left-2 inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-md shadow-sm" style={{ background: "var(--green)", color: "#fff" }}>
-                  <Star size={12} fill="currentColor" aria-hidden /> Recommended for you
-                </span>
-              )}
               {state && (
                 <span className="absolute top-2 right-2">
                   {state === "active" ? <Pill tone="green">Purchased</Pill> : <Pill tone="amber">In progress</Pill>}
@@ -103,7 +90,7 @@ export function UseCaseCards({
               </p>
             </ExpandableDetail>
             <div className="mt-auto pt-2 flex items-center justify-between gap-2 flex-wrap">
-              <Link href={hrefFor(u.id)} className={`btn ${state === "active" || isRecommended ? "btn-primary" : "btn-secondary"}`} aria-label={`${cta}: ${u.question}`}>
+              <Link href={hrefFor(u.id)} className={`btn ${state === "active" ? "btn-primary" : "btn-secondary"}`} aria-label={`${cta}: ${u.question}`}>
                 {cta} <ArrowRight size={16} aria-hidden />
               </Link>
               {price !== null && price !== undefined && (

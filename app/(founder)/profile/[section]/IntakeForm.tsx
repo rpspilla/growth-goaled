@@ -15,12 +15,18 @@ export function IntakeForm({
   initialValues,
   initialPercent,
   initialComplete,
+  hints = {},
+  team = null,
 }: {
   sections: { id: IntakeSectionId; label: string }[];
   section: IntakeSection;
   initialValues: Record<string, string>;
   initialPercent: number;
   initialComplete: IntakeSectionId[];
+  /** A note under a field about what the founder already told us (e.g. their revenue band). */
+  hints?: Record<string, string>;
+  /** Hiring section: the current team, carried over from the GTM answers. */
+  team?: { label: string; value: string }[] | null;
 }) {
   const [values, setValues] = useState(initialValues);
   const [saved, setSaved] = useState(initialValues);
@@ -71,7 +77,7 @@ export function IntakeForm({
           Tell us about your company
         </h1>
         <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-          This data forms the foundation of your Growth Intelligence profile. Answers save automatically.
+          All optional. Anything you add here makes your results sharper. Answers save automatically.
         </p>
       </div>
 
@@ -112,6 +118,27 @@ export function IntakeForm({
                 {anySaving ? "Saving…" : Object.values(status).includes("saved") ? "✓ All changes saved" : ""}
               </div>
             </div>
+            {team && (
+              <div className="rounded-lg p-4 mb-5" style={{ background: "var(--muted)" }} aria-label="Current team">
+                <div className="text-xs font-semibold mb-2" style={{ color: "var(--foreground)" }}>
+                  Current team <span className="font-normal" style={{ color: "var(--muted-foreground)" }}>· from your GTM answers</span>
+                </div>
+                {team.length ? (
+                  <ul className="flex flex-wrap gap-x-5 gap-y-1 text-sm" style={{ color: "var(--foreground)" }}>
+                    {team.map((t) => (
+                      <li key={t.label}>
+                        <span className="font-semibold font-mono">{t.value}</span> <span style={{ color: "var(--muted-foreground)" }}>{t.label}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>No headcount yet.</p>
+                )}
+                <Link href="/profile/gtm" className="text-xs link mt-2 inline-block">
+                  Edit in GTM
+                </Link>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               {section.fields.filter((f) => !f.rangeOf).map((f) => {
                 const id = `intake-${f.id}`;
@@ -129,7 +156,6 @@ export function IntakeForm({
                     <label htmlFor={id} className="text-xs font-medium flex items-center justify-between mb-1.5" style={{ color: "var(--muted-foreground)" }}>
                       <span>
                         {f.label}
-                        {f.required && <span style={{ color: "var(--amber)" }}> *</span>}
                       </span>
                       {status[f.id] === "saved" && <span style={{ color: "var(--green)" }}>✓</span>}
                     </label>
@@ -143,6 +169,10 @@ export function IntakeForm({
                       >
                         <option value="">Select…</option>
                         {f.options?.map((o) => (
+                          <option key={o} value={o}>{o}</option>
+                        ))}
+                        {/* An earlier option no longer offered stays selectable while it's the answer. */}
+                        {f.legacyOptions?.filter((o) => o === values[f.id]).map((o) => (
                           <option key={o} value={o}>{o}</option>
                         ))}
                       </select>
@@ -165,6 +195,7 @@ export function IntakeForm({
                       />
                     )}
                     {f.help && <div className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>{f.help}</div>}
+                    {hints[f.id] && !values[f.id] && <div className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>{hints[f.id]}</div>}
                     {range && <div className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>You told us {values[range.id]}. Add the exact figure if you know it.</div>}
                     {errors[f.id] && <div className="text-xs mt-1" style={{ color: "var(--red)" }}>{errors[f.id]}</div>}
                   </div>

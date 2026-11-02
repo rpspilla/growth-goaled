@@ -129,8 +129,13 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await founder.page.locator("#name").fill("Maya Founder");
   await founder.page.locator("#title").fill("CEO");
   await founder.page.locator("#companyName").fill("E2E Analytics");
-  await founder.page.locator("#website").fill("e2e-analytics.test");
   await founder.page.locator("#revenueBand").selectOption("3m_10m");
+  // The six basics (owner decision, Nov 2026): name, ARR, founding year, vertical, funding stage, GTM team.
+  await founder.page.locator("#foundedYear").selectOption("2019");
+  await founder.page.locator("#stage").selectOption("Series A");
+  await founder.page.locator("#vertical").selectOption("Fintech");
+  await founder.page.locator("#aes").fill("5");
+  await founder.page.locator("#bdrs").fill("2");
   await founder.page.getByRole("button", { name: "Continue to growth questions" }).click();
   // Straight to the first real step, with a progress cue.
   await expect(founder.page).toHaveURL(/\/library\?welcome=1$/);
@@ -145,7 +150,10 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await founder.page.getByRole("link", { name: "Pick a question to answer →" }).click();
   await expect(founder.page).toHaveURL(/\/library$/);
   const leakCard = founder.page.locator("article", { has: founder.page.getByRole("heading", { name: "How do I fix churn?" }) });
-  await expect(leakCard).toContainText("Recommended for you");
+  // No "Recommended" tag for now, and the owner's order: sales motion, hiring plan, churn.
+  await expect(founder.page.getByText("Recommended for you")).toHaveCount(0);
+  const titles = founder.page.locator("article h2");
+  for (const [i, title] of ["Build a repeatable sales motion", "Build a growth hiring plan", "How do I fix churn?"].entries()) await expect(titles.nth(i)).toHaveText(title);
   await expect(leakCard).toContainText("Snapshot free · Assessment $149");
   // Coming-soon questions are listed but can't be started or bought.
   for (const soon of ["Are we ready to raise a Series A?", "Are we ready to raise a Series B?", "Build me an investor update"]) {
@@ -163,58 +171,20 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await expect(founder.page.getByLabel("Pricing")).toContainText("$149");
   await expect(founder.page.getByRole("button", { name: /payment|\$149/ })).toHaveCount(0); // selecting is free
   const snapshotButton = founder.page.getByRole("button", { name: "See my free Snapshot" });
-  await expect(snapshotButton).toBeDisabled();
-  // No free-text challenge, goal or context: just the essentials, with figures as ranges.
+  // Nothing more is asked before the Snapshot: the sign-up basics are listed as known.
   await expect(founder.page.getByLabel(/challenge you're trying to solve|Where do you think the leak is|Your target value|Why now/)).toHaveCount(0);
-  // Revenue was given at onboarding, so it isn't asked again.
-  await expect(founder.page.getByLabel("Annual recurring revenue (ARR)")).toHaveCount(0);
+  await expect(founder.page.getByRole("button", { name: /^Question \d+:/ })).toHaveCount(0);
   const known = founder.page.getByLabel("Already known from your profile");
-  await expect(known).toContainText("Annual revenue");
-  await expect(known).toContainText("$3M–$10M");
-  // One question per step: jump to a question by its dot, then answer it (ranges are big tap targets).
-  const goTo = async (label: string) => {
-    const dot = founder.page.getByRole("button", { name: new RegExp(`^Question \\d+: ${label.replace(/[()]/g, "\\$&")}`) });
-    await dot.click();
-    await expect(dot).toHaveAttribute("aria-current", "step");
-  };
-  const answer = async (label: string, value: string) => {
-    await goTo(label);
-    const radio = founder.page.getByRole("radio", { name: value, exact: true });
-    if (await radio.count()) await radio.check({ force: true });
-    else await founder.page.getByLabel(new RegExp(`^${label}`)).selectOption(value);
-  };
-  await goTo("Year-over-year revenue growth");
-  await expect(founder.page.locator("form fieldset label")).toHaveText(["Shrinking", "0–25%", "25–50%", "50–100%", "100–200%", "200%+"]);
-  await goTo("Number of employees");
-  await expect(founder.page.locator("form fieldset label")).toHaveText(["1–5", "6–10", "11–25", "26–50", "50+"]);
-  await answer("Stage", "Series A");
-  await answer("Sales model", "Founder-led");
-  await expect(founder.page.getByRole("button", { name: "See my free Snapshot" })).toBeDisabled(); // founding year is required
-  await answer("Founding year", "2019");
-  await answer("Industry", "Fintech");
-  await answer("Year-over-year revenue growth", "50–100%");
-  await answer("Net revenue retention (NRR)", "90–100%");
-  await answer("Number of employees", "26–50");
-  await expect(founder.page.getByText("Your answers are saved.")).toBeVisible();
-  // Answers survive a reload (autosave), and show as known instead of being asked again.
-  await founder.page.reload();
-  await expect(known).toContainText("Series A");
-  await expect(known).toContainText("Net revenue retention (NRR)");
-  await expect(known).toContainText("90–100%");
-  await expect(founder.page.getByRole("button", { name: /^Question \d+: Stage/ })).toHaveCount(0);
-  await expect(founder.page.getByRole("button", { name: /^Question \d+: Number of employees/ })).toHaveCount(0);
+  for (const text of ["Annual revenue", "$3M–$10M", "Series A", "2019", "Fintech"]) await expect(known).toContainText(text);
+  await expect(snapshotButton).toBeEnabled();
   await snapshotButton.click();
   await expect(founder.page).toHaveURL(/\/library\/growth_leak\/snapshot$/);
-  await expect(founder.page.getByText("Hypotheses", { exact: true })).toBeVisible();
-  await expect(founder.page.getByText("Your existing customers shrink on net")).toBeVisible();
-  await expect(founder.page.getByText("Based on: Your answer: NRR 90–100%")).toBeVisible();
-  // Peer comparisons: the same fixed sources, the founder's industry and founding year, and plain words when there's nothing to compare.
+  // Peer comparisons: the same fixed sources, the founder's vertical and founding year from sign-up.
+  // Retention isn't asked before the Snapshot any more: peers are shown, without a figure for the founder yet.
   await expect(founder.page.getByRole("heading", { name: "How you compare with peers" })).toBeVisible();
   const retention = founder.page.getByRole("article", { name: "Retention compared with peers" });
-  await expect(retention).toContainText("Between the bottom quartile and the median");
-  await expect(retention).toContainText("You: 90–100%");
   await expect(retention).toContainText("Fintech · founded 2017–2021");
-  await expect(retention).toContainText("E2E advisory survey");
+  await expect(retention).not.toContainText("You:");
   const revenue = founder.page.getByRole("article", { name: "Revenue compared with peers" });
   await expect(revenue).toContainText("$3M");
   await expect(revenue).toContainText("the revenue band you gave at sign-up");

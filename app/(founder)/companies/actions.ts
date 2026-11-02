@@ -10,7 +10,8 @@ import { db, schema } from "@/lib/db";
 import { listFounderCompanies } from "@/lib/data/companies";
 import { track } from "@/lib/events";
 import { COMPANY_COOKIE, canAddCompanies } from "@/lib/multi-company";
-import { founderOnboardingSchema } from "@/lib/onboarding";
+import { companyBasicsSchema } from "@/lib/onboarding";
+import { saveCompanyBasics } from "@/lib/data/intake";
 import { USE_CASE_COOKIE } from "@/lib/use-cases/cookie";
 
 const cookieOptions = { httpOnly: true, sameSite: "lax" as const, secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 365 };
@@ -32,25 +33,27 @@ export async function switchCompany(formData: FormData) {
   redirect("/overview");
 }
 
-export type AddCompanyState = { errors?: Record<string, string> };
+export type AddCompanyState = { errors?: Record<string, string>; values?: Record<string, string> };
 
 /** Another company profile, for founders allowed more than one (MULTI_COMPANY_FOUNDERS). */
 export async function addCompany(_prev: AddCompanyState, formData: FormData): Promise<AddCompanyState> {
   const user = await requireRole(["founder"]);
   if (!canAddCompanies(user.email)) return { errors: { form: "Your account can have one company. Contact us if you need more." } };
-  const parsed = founderOnboardingSchema.pick({ companyName: true, website: true, revenueBand: true }).safeParse(Object.fromEntries(formData));
+  const parsed = companyBasicsSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
     const errors: Record<string, string> = {};
     for (const i of parsed.error.issues) errors[String(i.path[0] ?? "form")] ??= i.message;
-    return { errors };
+    const values = Object.fromEntries([...formData].filter(([k, v]) => typeof v === "string" && !k.startsWith("$")).map(([k, v]) => [k, v as string]));
+    return { errors, values };
   }
-  const { companyName, website, revenueBand } = parsed.data;
+  const { companyName, revenueBand } = parsed.data;
   const companyId = randomUUID();
   // Like onboarding: the new company joins the unassigned queue for an advisor to claim.
   await db.batch([
-    db.insert(schema.companies).values({ id: companyId, name: companyName, website, revenueBand, advisorId: null }),
+    db.insert(schema.companies).values({ id: companyId, name: companyName, revenueBand, advisorId: null }),
     db.insert(schema.companyMembers).values({ companyId, userId: user.id, memberRole: "owner" }),
   ]);
+  await saveCompanyBasics(user, companyId, parsed.data);
   await track("company_added", { userId: user.id, companyId, props: { revenue_band: revenueBand } });
   await workOn(companyId);
   redirect("/library?welcome=1");

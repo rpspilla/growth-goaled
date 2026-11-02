@@ -47,6 +47,8 @@ export type IntakeField = {
   asChurn?: boolean;
   /** Set on range fields: the exact field this range stands in for. Never a figure. */
   rangeOf?: string;
+  /** Earlier options no longer offered: answers already given stay valid and are shown back. */
+  legacyOptions?: readonly string[];
 };
 
 export type IntakeSection = { id: IntakeSectionId; label: string; fields: IntakeField[] };
@@ -54,6 +56,30 @@ export type IntakeSection = { id: IntakeSectionId; label: string; fields: Intake
 /** Founding years offered, newest first; the last option covers anything older. */
 const THIS_YEAR = new Date().getUTCFullYear();
 export const FOUNDING_YEARS = [...Array.from({ length: THIS_YEAR - 1990 + 1 }, (_, i) => String(THIS_YEAR - i)), "Before 1990"];
+
+/**
+ * The company's own vertical (its customers' industry is asked separately, on the ICP section).
+ * "B2B SaaS" was an option until Nov 2026: it's a business model, not a vertical, so it's no
+ * longer offered, but answers already given stay valid.
+ */
+export const VERTICALS = [
+  "AI / Automation",
+  "Fintech",
+  "HealthTech",
+  "Retail & CPG",
+  "Logistics & supply chain",
+  "Manufacturing & industrial",
+  "Real estate & proptech",
+  "Education",
+  "HR & workforce",
+  "Marketing & sales tech",
+  "Security",
+  "Professional services",
+  "Other",
+] as const;
+
+/** Funding stages. "Bootstrapped" added Nov 2026. */
+export const FUNDING_STAGES = ["Bootstrapped", "Pre-seed", "Seed", "Series A", "Series B+"] as const;
 
 /** The founding year as a number, or null when unknown or "Before 1990". */
 export const foundingYear = (v: IntakeValue | null | undefined): number | null => (typeof v === "string" && /^\d{4}$/.test(v) ? Number(v) : typeof v === "number" ? v : null);
@@ -67,13 +93,15 @@ const BASE_SECTIONS: IntakeSection[] = [
       { id: "website", label: "Website", kind: "text", required: false, placeholder: "acme.com", column: "website" },
       {
         id: "industry",
-        label: "Industry",
+        label: "Vertical",
         kind: "select",
         required: true,
-        options: ["AI / Automation", "B2B SaaS", "Fintech", "HealthTech", "Other"],
+        options: VERTICALS,
+        legacyOptions: ["B2B SaaS"],
         column: "industry",
-        help: "Your main market. We compare you with companies in the same industry.",
+        help: "Your company's main market. We compare you with companies in the same vertical.",
       },
+      { id: "industry_other", label: "Vertical (if Other)", kind: "text", required: false, placeholder: "e.g. Insurance" },
       {
         id: "founded_year",
         label: "Founding year",
@@ -82,7 +110,7 @@ const BASE_SECTIONS: IntakeSection[] = [
         options: FOUNDING_YEARS,
         help: "The year the company was started. We compare you with companies founded around the same time.",
       },
-      { id: "stage", label: "Stage", kind: "select", required: true, options: ["Pre-seed", "Seed", "Series A", "Series B+"], column: "stage" },
+      { id: "stage", label: "Funding stage", kind: "select", required: true, options: FUNDING_STAGES, column: "stage" },
       { id: "arr", label: "ARR ($)", kind: "currency", required: true, placeholder: "4,200,000", metric: "arr", column: "arr" },
       { id: "growth", label: "YoY Growth (%)", kind: "percent", required: true, placeholder: "72", metric: "arr_growth", column: "growthPct" },
       { id: "funding", label: "Total Funding ($)", kind: "currency", required: false, placeholder: "8,500,000", column: "funding", help: "All the equity and convertible money you've raised to date (SAFEs, notes and priced rounds), not loans." },
@@ -124,7 +152,8 @@ const BASE_SECTIONS: IntakeSection[] = [
     label: "GTM",
     fields: [
       { id: "sales_reps", label: "Sales reps (AE)", kind: "integer", required: true, placeholder: "5", metric: "sales_reps" },
-      { id: "sdrs", label: "SDRs / BDRs", kind: "integer", required: false, placeholder: "2", metric: "sdrs" },
+      { id: "sdrs", label: "BDRs / SDRs", kind: "integer", required: false, placeholder: "2", metric: "sdrs" },
+      { id: "cs", label: "Customer success", kind: "integer", required: false, placeholder: "1", help: "Customer success and account management headcount." },
       { id: "marketing", label: "Marketing team", kind: "integer", required: false, placeholder: "1" },
       { id: "partnerships", label: "Partnership team", kind: "integer", required: false, placeholder: "0" },
       { id: "channels", label: "Primary channels", kind: "text", required: true, placeholder: "Outbound, content, events" },
@@ -135,7 +164,7 @@ const BASE_SECTIONS: IntakeSection[] = [
     id: "icp",
     label: "ICP",
     fields: [
-      { id: "industries", label: "Target industries", kind: "text", required: true, placeholder: "B2B SaaS, AI/tech companies" },
+      { id: "industries", label: "Target industries", kind: "text", required: true, placeholder: "e.g. Retail, CPG", help: "The industries your customers are in, e.g. retail, CPG, health systems, logistics." },
       { id: "size", label: "Company size", kind: "text", required: true, placeholder: "100–2,000 employees" },
       { id: "buyer", label: "Primary buyer", kind: "text", required: true, placeholder: "VP Sales, CRO, CEO" },
       { id: "geo", label: "Geography", kind: "select", required: true, options: ["North America", "North America + EU", "Global", "Europe"] },
@@ -146,7 +175,7 @@ const BASE_SECTIONS: IntakeSection[] = [
     id: "hiring",
     label: "Hiring",
     fields: [
-      { id: "current_team", label: "Current team", kind: "textarea", required: false, placeholder: "5 AEs, 2 SDRs, 1 marketing, 1 CS" },
+      { id: "current_team", label: "Anything else about the current team", kind: "textarea", required: false, help: "Headcount comes from your GTM answers. Add anything it doesn't capture, e.g. a part-time sales lead." },
       { id: "planned_hires", label: "Planned hires", kind: "textarea", required: true, placeholder: "Enterprise AE, CS manager" },
       { id: "timeline", label: "Hiring timeline", kind: "select", required: true, options: ["Next quarter", "Next 6 months", "Next 12 months", "No hires planned"] },
       { id: "key_gaps", label: "Key gaps", kind: "textarea", required: true, placeholder: "No partnerships owner; CS stretched across 87 accounts" },
@@ -221,7 +250,7 @@ export function parseFieldValue(
     return { ok: true, value: text };
   }
   if (field.kind === "select") {
-    return field.options?.includes(text) ? { ok: true, value: text } : { ok: false, error: "Choose one of the options." };
+    return field.options?.includes(text) || field.legacyOptions?.includes(text) ? { ok: true, value: text } : { ok: false, error: "Choose one of the options." };
   }
 
   const m = text

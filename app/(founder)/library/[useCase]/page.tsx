@@ -140,7 +140,8 @@ export default async function UseCasePage({ params }: { params: Promise<{ useCas
             </div>
           )}
           {company ? (
-            <QuestionnaireForm useCaseId={def.id} fields={fields} initial={{ ...(row?.objective ?? {}) }} save={saveAnswer} submit={submitQuestionnaire} snapshotHref={`/library/${def.id}/snapshot`} />
+            // Keyed by question, so moving between questions never keeps another question's steps.
+            <QuestionnaireForm key={def.id} useCaseId={def.id} fields={fields} initial={{ ...(row?.objective ?? {}) }} save={saveAnswer} submit={submitQuestionnaire} snapshotHref={`/library/${def.id}/snapshot`} />
           ) : (
             <p className="text-base" style={{ color: "var(--muted-foreground)" }}>
               Your company isn&apos;t set up yet.

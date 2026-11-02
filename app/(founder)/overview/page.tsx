@@ -14,7 +14,7 @@ import { progressView } from "@/lib/data/plan";
 import { formatMetric } from "@/lib/metrics";
 import { HEADLINE_METRICS } from "@/lib/performance";
 import { formatPrice, pricing } from "@/lib/pricing";
-import { getUseCase, recommendedUseCases, targetSummary } from "@/lib/use-cases";
+import { firstUseCase, getUseCase, targetSummary } from "@/lib/use-cases";
 import { journeyStage, nextAction } from "@/lib/use-cases/steps";
 
 const STATUS: Record<string, { label: string; tone: Tone }> = {
@@ -62,7 +62,7 @@ export default async function OverviewPage() {
   const headline = HEADLINE_METRICS.filter((m) => perf?.metrics.has(m)).slice(0, 4).map((m) => perf!.metrics.get(m)!);
   const firstName = user.name?.split(" ")[0];
   const stage = journeyStage(state);
-  const recommended = company ? getUseCase(recommendedUseCases(company)[0] ?? "growth_leak") : undefined;
+  const startWith = firstUseCase();
 
   // Top three actions: the committed plan with its statuses, else the brief's proposed plan.
   const actions = plan
@@ -103,7 +103,7 @@ export default async function OverviewPage() {
             <div className="label mb-2" style={{ color: "var(--green)" }}>Next step</div>
             <h2 className="font-display text-3xl sm:text-4xl leading-tight" style={{ color: "var(--foreground)" }}>{STAGE_COPY[stage]!.title}</h2>
             <p className="text-lg mt-3 max-w-2xl" style={{ color: "var(--muted-foreground)" }}>
-              {stage === 0 && recommended ? `${STAGE_COPY[0]!.body} Not sure where to start? “${recommended.question}” fits your stage.` : STAGE_COPY[stage]!.body}
+              {stage === 0 ? `${STAGE_COPY[0]!.body} Not sure where to start? Try “${startWith.question}”.` : STAGE_COPY[stage]!.body}
             </p>
             <div className="mt-6 flex items-center gap-4 flex-wrap">
               <Link href={action.path} className="btn btn-primary btn-lg">{action.label} →</Link>

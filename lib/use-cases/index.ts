@@ -9,8 +9,8 @@ import { isUseCaseId, USE_CASE_IDS, type ObjectiveField, type ProfileQuestion, t
 
 export { isUseCaseId, USE_CASE_IDS, type ObjectiveField, type ProfileQuestion, type UseCaseDef, type UseCaseId };
 
-/** The library, in display order. */
-export const USE_CASES: readonly UseCaseDef[] = [growthLeak, seriesAReady, seriesBReady, hireOrFix, winningIcp, founderHandoff];
+/** The library, in display order (owner decision, Nov 2 2026: sales motion, hiring plan, churn; coming-soon last). */
+export const USE_CASES: readonly UseCaseDef[] = [winningIcp, hireOrFix, growthLeak, seriesAReady, seriesBReady, founderHandoff];
 
 const BY_ID = new Map(USE_CASES.map((u) => [u.id, u]));
 
@@ -19,11 +19,11 @@ export const getUseCase = (id: string): UseCaseDef | undefined => (isUseCaseId(i
 /** Listed as "Coming soon": nothing can be started, bought or granted for it yet. */
 export const isComingSoon = (id: string): boolean => Boolean(getUseCase(id)?.comingSoon);
 
-/** Library recommendation (HANDOFF §13.3): early companies see fundraise readiness first. */
-export function recommendedUseCases(company: { stage: string | null; revenueBand: string | null }): UseCaseId[] {
-  const early = company.stage === "Pre-seed" || company.stage === "Seed" || company.revenueBand === "lt_1m" || company.revenueBand === "1m_3m";
-  return (early ? (["series_a_ready", "growth_leak"] as UseCaseId[]) : (["growth_leak"] as UseCaseId[])).filter((id) => !isComingSoon(id));
-}
+/**
+ * Where to point a founder who hasn't picked a question yet: the first available one in library
+ * order. There's no per-company "Recommended" tag for now (owner decision, Nov 2 2026).
+ */
+export const firstUseCase = (): UseCaseDef => USE_CASES.find((u) => !u.comingSoon)!;
 
 /**
  * Questions earlier questionnaires asked and no longer do (the challenge in free text, the goal and
@@ -50,11 +50,15 @@ export const objectiveFields = (useCase: UseCaseDef): ObjectiveField[] => useCas
 /** Every question an answer may exist for, including retired ones: for reading answers, never for asking. */
 export const answeredObjectiveFields = (useCase: UseCaseDef): ObjectiveField[] => [...retiredFields(useCase), ...objectiveFields(useCase)];
 
-/** Stage and sales model decide whether the assessment fits, and founding year places the company among its peers, so they're required (asked only if the profile lacks them). */
+/**
+ * Stage, founding year and vertical place the company among its peers, so they're required. New
+ * founders give them at sign-up; the questionnaire asks only when the profile lacks them (companies
+ * set up before Nov 2026).
+ */
 export const REQUIRED_PROFILE: readonly ProfileQuestion[] = [
   { section: "company", field: "stage" },
   { section: "company", field: "founded_year" },
-  { section: "gtm", field: "model" },
+  { section: "company", field: "industry" },
 ];
 
 export const profileFieldId = (q: ProfileQuestion) => `profile.${q.section}.${q.field}`;
@@ -63,18 +67,12 @@ export function parseProfileFieldId(id: string): ProfileQuestion | null {
   return m ? { section: m[1]!, field: m[2]! } : null;
 }
 
-/** Asked on every questionnaire: industry (for peer comparisons) and employees (as a range). */
-const ALWAYS: readonly ProfileQuestion[] = [
-  { section: "company", field: "industry" },
-  { section: "company", field: "employees" },
-];
-
-/** Every profile question the use case's questionnaire may ask (figures are asked as ranges). */
-export const profileQuestions = (useCase: UseCaseDef): ProfileQuestion[] => {
-  const out = [...REQUIRED_PROFILE, ...useCase.snapshotProfile];
-  for (const q of ALWAYS) if (!out.some((o) => o.section === q.section && o.field === q.field)) out.push(q);
-  return out;
-};
+/**
+ * Every profile question the use case's questionnaire may ask: only the required basics, and only
+ * when missing. Before the free Snapshot the profile is the six sign-up basics (owner decision,
+ * Nov 2 2026); every other profile figure is optional and asked afterwards, on the profile.
+ */
+export const profileQuestions = (): ProfileQuestion[] => [...REQUIRED_PROFILE];
 
 export type Objective = Record<string, string>;
 

@@ -1,24 +1,30 @@
 import { describe, expect, it } from "vitest";
 import { founderOnboardingSchema, needsOnboarding, staffProfileSchema } from "@/lib/onboarding";
 
-const valid = { name: "Sam Ahmed", title: "CEO", companyName: "Acme AI", website: "acme-ai.com", revenueBand: "3m_10m" };
+const valid = { name: "Sam Ahmed", title: "CEO", companyName: "Acme AI", revenueBand: "3m_10m", foundedYear: "2020", vertical: "Fintech", stage: "Seed", aes: "4", bdrs: "", cs: "1" };
 
 describe("founderOnboardingSchema", () => {
-  it("accepts company basics and normalises the website", () => {
+  it("accepts the six company basics, with headcounts as numbers and blank optional ones as null", () => {
     const parsed = founderOnboardingSchema.parse(valid);
-    expect(parsed.website).toBe("https://acme-ai.com");
-    expect(founderOnboardingSchema.parse({ ...valid, website: "https://www.acme.com/about" }).website).toBe("https://www.acme.com");
+    expect(parsed).toMatchObject({ companyName: "Acme AI", foundedYear: "2020", vertical: "Fintech", stage: "Seed", aes: 4, bdrs: null, cs: 1, verticalOther: null });
   });
 
-  it("treats an empty website as missing", () => {
-    expect(founderOnboardingSchema.parse({ ...valid, website: "  " }).website).toBeNull();
+  it("accepts Bootstrapped and 0 account executives", () => {
+    expect(founderOnboardingSchema.parse({ ...valid, stage: "Bootstrapped", aes: "0" })).toMatchObject({ stage: "Bootstrapped", aes: 0 });
+  });
+
+  it("doesn't offer B2B SaaS as a vertical, and needs a name for Other", () => {
+    expect(founderOnboardingSchema.safeParse({ ...valid, vertical: "B2B SaaS" }).success).toBe(false);
+    const other = founderOnboardingSchema.safeParse({ ...valid, vertical: "Other", verticalOther: " " });
+    expect(other.error?.issues.map((i) => i.path[0])).toEqual(["verticalOther"]);
+    expect(founderOnboardingSchema.parse({ ...valid, vertical: "Other", verticalOther: "Insurance" }).verticalOther).toBe("Insurance");
   });
 
   it("rejects bad input with a field-specific message", () => {
-    const r = founderOnboardingSchema.safeParse({ ...valid, companyName: " ", website: "not a site", revenueBand: "100m_plus" });
+    const r = founderOnboardingSchema.safeParse({ ...valid, companyName: " ", revenueBand: "100m_plus", foundedYear: "", stage: "IPO", aes: "", cs: "2.5" });
     expect(r.success).toBe(false);
     const fields = r.error!.issues.map((i) => i.path[0]);
-    expect(fields).toEqual(expect.arrayContaining(["companyName", "website", "revenueBand"]));
+    expect(fields).toEqual(expect.arrayContaining(["companyName", "revenueBand", "foundedYear", "stage", "aes", "cs"]));
   });
 });
 

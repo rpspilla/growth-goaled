@@ -31,6 +31,15 @@ const INDUSTRY: Record<string, string> = {
   Fintech: "fintech companies",
   HealthTech: "health tech companies",
   "B2B SaaS": "B2B SaaS companies",
+  "Retail & CPG": "retail and CPG companies",
+  "Logistics & supply chain": "logistics and supply chain companies",
+  "Manufacturing & industrial": "manufacturing and industrial companies",
+  "Real estate & proptech": "real estate and proptech companies",
+  Education: "education companies",
+  "HR & workforce": "HR and workforce companies",
+  "Marketing & sales tech": "marketing and sales tech companies",
+  Security: "security companies",
+  "Professional services": "professional services companies",
 };
 const SEGMENT: Record<string, string> = { SMB: "small businesses", "Mid-market": "mid-market companies", Enterprise: "enterprise buyers", Mixed: "a mix of segments" };
 const BAND: Record<string, string> = { lt_1m: "under $1M ARR", "1m_3m": "$1–3M ARR", "3m_10m": "$3–10M ARR", "10m_20m": "$10–20M ARR", "20m_50m": "$20–50M ARR" };

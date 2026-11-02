@@ -1,6 +1,6 @@
 import { ActivateForm } from "@/components/use-cases/ActivateForm";
 import { userName } from "@/lib/data/portfolio";
-import { answeredObjectiveFields, recommendedUseCases, USE_CASES } from "@/lib/use-cases";
+import { answeredObjectiveFields, USE_CASES } from "@/lib/use-cases";
 import { activateForCompany } from "../actions";
 import { companyContext } from "../context";
 
@@ -9,7 +9,6 @@ const card = { background: "var(--card)", borderColor: "var(--border)" };
 /** Step 2 mirrored: the founder's objective answers per use case, and pilot activation. */
 export default async function CompanyLibraryPage({ params }: { params: Promise<{ id: string }> }) {
   const { company, useCases } = await companyContext((await params).id);
-  const recommended = recommendedUseCases(company);
   const activators = new Map(await Promise.all(useCases.filter((u) => u.activatedBy).map(async (u) => [u.activatedBy!, await userName(u.activatedBy)] as const)));
 
   return (
@@ -26,7 +25,6 @@ export default async function CompanyLibraryPage({ params }: { params: Promise<{
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-base font-semibold" style={{ color: "var(--foreground)" }}>{def.shortTitle}</h2>
               <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>{def.question}</span>
-              {recommended.includes(def.id) && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "var(--green-muted)", color: "var(--green)" }}>Recommended</span>}
               <span className="ml-auto text-xs font-medium" style={{ color: row?.activatedAt ? "var(--green)" : "var(--muted-foreground)" }}>
                 {row?.activatedAt ? "Purchased" : def.comingSoon ? "Coming soon" : row ? "Snapshot only" : "Not started"}
               </span>

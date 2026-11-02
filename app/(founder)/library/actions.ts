@@ -29,9 +29,8 @@ export async function saveAnswer(useCaseId: string, fieldId: string, value: stri
   if (isComingSoon(useCaseId)) return { ok: false, error: "This question isn't available yet." };
   const profile = parseProfileFieldId(fieldId);
   if (profile) {
-    const useCase = getUseCase(useCaseId)!;
-    // The profile question itself, or its range (figures are asked as ranges).
-    if (!profileQuestions(useCase).some((q) => q.section === profile.section && (q.field === profile.field || rangeFieldId(q.field) === profile.field))) return { ok: false, error: "Unknown question." };
+    // Only the required basics are asked on the questionnaire now.
+    if (!profileQuestions().some((q) => q.section === profile.section && (q.field === profile.field || rangeFieldId(q.field) === profile.field))) return { ok: false, error: "Unknown question." };
     const result = await saveIntakeAnswer(user, company, profile.section, profile.field, value);
     if (!result.ok) return result;
     revalidatePath("/", "layout");

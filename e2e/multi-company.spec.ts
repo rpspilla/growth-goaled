@@ -23,6 +23,10 @@ test("an allowed founder can run several company profiles, each with its own dat
   await expect(page.getByRole("heading", { name: "Add a company" })).toBeVisible();
   await page.getByLabel("Company name").fill("Second Co");
   await page.getByLabel("Annual revenue").selectOption("3m_10m");
+  await page.getByLabel("Founding year").selectOption("2021");
+  await page.getByLabel("Funding stage").selectOption("Seed");
+  await page.getByLabel("Vertical").selectOption("HealthTech");
+  await page.getByLabel("Account executives").fill("2");
   await page.getByRole("button", { name: "Create company and pick a question" }).click();
   await expect(page).toHaveURL(/\/library\?welcome=1/);
   await expect(page.getByText(/You're set up, Second Co\./)).toBeVisible();

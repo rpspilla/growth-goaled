@@ -14,7 +14,7 @@ const answered = (v: unknown) => v !== null && v !== undefined && v !== "";
 export function questionnaire(useCase: UseCaseDef, answers: IntakeAnswers, revenueBand: string | null = null): { fields: ObjectiveField[]; known: { label: string; value: string }[] } {
   const known: { label: string; value: string }[] = [];
   const profileFields: ObjectiveField[] = [];
-  for (const q of profileQuestions(useCase)) {
+  for (const q of profileQuestions()) {
     const field = getField(q.section, q.field);
     if (!field) continue;
     const exact = answers[`${q.section}.${q.field}`];
@@ -56,6 +56,9 @@ export function questionnaire(useCase: UseCaseDef, answers: IntakeAnswers, reven
       group: "company",
     });
   }
+  // Revenue is a sign-up basic: listed as known whenever the founder gave their band.
+  const band = REVENUE_BANDS.find((b) => b.value === revenueBand);
+  if (band && !known.some((k) => k.label === "Annual revenue") && !answered(answers["company.arr"])) known.unshift({ label: "Annual revenue", value: band.label });
   const objective = objectiveFields(useCase);
   return { fields: [...objective.filter((f) => f.group === "challenge"), ...profileFields, ...objective.filter((f) => f.group !== "challenge")], known };
 }

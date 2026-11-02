@@ -6,11 +6,12 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { requireUser } from "@/lib/auth/session";
 import { getFounderCompany } from "@/lib/data/companies";
+import { saveCompanyBasics } from "@/lib/data/intake";
 import { homePathFor } from "@/lib/access";
 import { track } from "@/lib/events";
 import { founderOnboardingSchema, founderProfileSchema, needsOnboarding, staffProfileSchema } from "@/lib/onboarding";
 
-export type OnboardingState = { errors?: Record<string, string> };
+export type OnboardingState = { errors?: Record<string, string>; values?: Record<string, string> };
 
 function fieldErrors(issues: { path: PropertyKey[]; message: string }[]): Record<string, string> {
   const errors: Record<string, string> = {};
@@ -20,6 +21,9 @@ function fieldErrors(issues: { path: PropertyKey[]; message: string }[]): Record
   }
   return errors;
 }
+
+/** What was typed, to refill the form after a failed submit. */
+const textValues = (formData: FormData): Record<string, string> => Object.fromEntries([...formData].filter(([k, v]) => typeof v === "string" && !k.startsWith("$")).map(([k, v]) => [k, v as string]));
 
 export async function completeOnboarding(_prev: OnboardingState, formData: FormData): Promise<OnboardingState> {
   const user = await requireUser({ allowIncomplete: true });
@@ -33,15 +37,17 @@ export async function completeOnboarding(_prev: OnboardingState, formData: FormD
   // otherwise the new company goes to the unassigned queue for an advisor to claim.
   if (user.role === "founder" && !(await getFounderCompany(user))) {
     const parsed = founderOnboardingSchema.safeParse(raw);
-    if (!parsed.success) return { errors: fieldErrors(parsed.error.issues) };
-    const { name, title, companyName, website, revenueBand } = parsed.data;
+    if (!parsed.success) return { errors: fieldErrors(parsed.error.issues), values: textValues(formData) };
+    const { name, title, companyName, revenueBand } = parsed.data;
     const companyId = randomUUID();
     await db.batch([
-      db.insert(schema.companies).values({ id: companyId, name: companyName, website, revenueBand, advisorId: null }),
+      db.insert(schema.companies).values({ id: companyId, name: companyName, revenueBand, advisorId: null }),
       db.insert(schema.companyMembers).values({ companyId, userId: user.id, memberRole: "owner" }),
-      profileUpdate(name, title),
     ]);
-    await track("onboarding_completed", { userId: user.id, companyId, props: { revenue_band: revenueBand } });
+    // Founding year, vertical, stage and team go through the intake so the profile and figures match.
+    await saveCompanyBasics(user, companyId, parsed.data);
+    await profileUpdate(name, title);
+    await track("onboarding_completed", { userId: user.id, companyId, props: { revenue_band: revenueBand, stage: parsed.data.stage, vertical: parsed.data.vertical } });
     // Straight to the first real step: choosing the growth question to answer.
     redirect("/library?welcome=1");
   }
