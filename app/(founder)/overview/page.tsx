@@ -44,7 +44,7 @@ const TIMING: Record<string, string> = { next_30_days: "Days 1–30", days_31_60
 
 /** What a founder sees at each stage before results exist: one sentence and one button. */
 const STAGE_COPY = [
-  { title: "Want an answer built from your own data?", body: "Pick a growth question for a free Growth Snapshot from one file, then a full assessment of your data when you're ready." },
+  { title: "Want an answer built from your own data?", body: "Pick a growth question for a free Growth Snapshot from one file, then build an action plan in the conversation when you're ready." },
   { title: "Share your data to get your answer", body: "Your assessment is ready for your data. Share what you have; it works with whatever you've got and says what's missing." },
   { title: "Your results are being built", body: "We're working through your answers and figures and checking every number. This usually takes a few minutes." },
   { title: "Keep your plan moving", body: "Track your actions and the metrics they should move." },
@@ -113,7 +113,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         <div className="surface p-5 -mt-6 flex gap-4 items-start" style={{ background: "var(--green-muted)", borderColor: "transparent" }} role="status">
           <div>
             <div className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>You&apos;re set up, {company.name}. Ask your first question below.</div>
-            <p className="text-base mt-0.5" style={{ color: "var(--muted-foreground)" }}>Conversations are free. When you want an answer built from your own data, run a full assessment from the <Link href="/library" className="link">Library</Link>.</p>
+            <p className="text-base mt-0.5" style={{ color: "var(--muted-foreground)" }}>Conversations are free. When you&apos;re ready, turn one into a 30/60/90-day action plan, from {formatPrice(pricing().actionPlanCents)}.</p>
           </div>
         </div>
       )}
@@ -164,7 +164,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
             </p>
             <div className="mt-6 flex items-center gap-4 flex-wrap">
               <Link href={action.path} className="btn btn-primary btn-lg">{action.label} →</Link>
-              {stage === 0 && <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>Free. A full assessment is {formatPrice(pricing().assessmentCents)}, only if you choose it.</span>}
+              {stage === 0 && <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>Free. An action plan is from {formatPrice(pricing().actionPlanCents)}, only if you choose it.</span>}
             </div>
           </div>
         )}

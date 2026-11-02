@@ -41,6 +41,8 @@ Local development points at the Neon `dev` branch.
 | `ANTHROPIC_API_KEY` | Claude API (document extraction now; Draft/QA agents from M8). Server-side only |
 | `BLOB_READ_WRITE_TOKEN` | Private Vercel Blob store for uploaded documents |
 | `ASSESSMENT_AI_DRAFT` | Optional. `on` runs the Draft Agent for paid assessments; unset (the default, owner decision Nov 2026) gives every assessment the summary report built from the figures and rule-based diagnosis, shown as "Summary brief" |
+| `ACTION_PLAN_PRICE_CENTS`, `SUPPORTED_PLAN_MONTHLY_CENTS` | Optional. Action plan prices (defaults $499 once, $799 a month) |
+| `ASSESSMENT_SALES` | Optional. `on` keeps selling the $149 assessment to new buyers; off by default since action plans replaced it (past buyers keep theirs) |
 | `CHAT_DAILY_LIMIT` | Optional. Founder chat messages per company per rolling 24 hours (default 80); chat is free, so it's capped |
 
 Each Vercel environment points at its own Neon branch: Production → `main`, Preview and Development → `dev`.
@@ -140,6 +142,16 @@ Owner decisions, Nov 2026: chat is free and is the founder's main entry; the ful
 - **Pay and equity** (`usesCompensationData` topics): only Benchmark Library records whose metric id starts `comp_` or `equity_`, in a **published** version, from a source with **customer display allowed**, are given to the model, and it must cite source, cohort, period and sample size. With none on file it gives a reasoned estimate labelled as an estimate. To load **Wellfound** and **Carta** data: add each as a source (licence: allow customer display), create a dataset, import records with ids such as `comp_ae_base`, `comp_ae_ote`, `comp_first_sales_leader_base`, `equity_first_sales_hire`, `equity_vp_sales` (unit `usd` or `percent`, stage, geography and role in the cohort fields, sample size), then validate and publish.
 - **Limits and isolation**: a conversation belongs to one company and every read and write is scoped to the signed-in founder's company (tests: `tests/chat-db.test.ts`, `e2e/chat.spec.ts`). Messages are capped per company per day (`CHAT_DAILY_LIMIT`).
 - **Data use** (`/data-use`, public, linked from sign-up and every conversation): data is used for the company's own analysis and never shown to other companies; in anonymized, aggregated form only, it also improves recommendations and benchmarks.
+
+### Action plans (what founders buy)
+
+Owner decisions, Nov 2026: instead of the $149 assessment, founders buy an **action plan** from a conversation, one question each (`lib/data/action-plans.ts`, `action_plans`).
+
+- **Where**: the latest recommendation card in a conversation offers "Build my action plan" (`components/chat/PlanOffer.tsx`); Library questions and their Snapshot lead into the matching conversation ("Talk it through and build my plan", `TOPIC_FOR_USE_CASE`).
+- **$499 action plan** (Stripe one-time): status `collecting` → the AI gathers what the plan needs in the conversation (each turn reports what's still missing, shown to the founder; files can be attached in the chat with the paperclip and are read like any upload) → the founder **submits** → `drafting` (the 30/60/90 plan is written from the conversation, `lib/ai/plan.ts`) → `in_review`: an advisor reviews, edits and **approves** it on Advisor → Action plans within **24 hours** (the company's advisor, or `OWNER_NOTIFY_EMAIL`, is emailed on submission; overdue plans are flagged) → `delivered`: the founder is emailed and sees the plan, and can tick off milestones. The founder never sees the unapproved draft. If drafting fails, the plan still goes to the advisor to write.
+- **$799/month supported plan** (Stripe subscription): `active` straight away; the first plan is written from the conversation, and the founder or advisor can update it from the conversation. The company's advisor is **in the conversation**: their messages appear in the founder's thread (`role = advisor`), the AI sees them and follows their direction, and either can tick off milestones. Advisors can only post while the subscription is active; when Stripe ends it (`customer.subscription.deleted`, or updated to canceled/unpaid) the plan becomes `cancelled` and stays readable.
+- **Payments**: `payments.purpose` `action_plan` / `action_plan_supported`, linked by `action_plan_id`; granted only from a Stripe-verified paid session for the company's own plan (webhook or return URL). The Stripe webhook needs the `customer.subscription.updated` and `customer.subscription.deleted` events enabled. Founders cancel a subscription through the team for now (no billing portal yet).
+- **$149 assessment**: no longer sold to new buyers unless `ASSESSMENT_SALES=on`; people who bought one keep their Data step, results and plan.
 
 ### Pricing and the founder journey
 

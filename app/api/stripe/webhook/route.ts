@@ -1,10 +1,11 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
+import { cancelSupportedPlan, writePlan } from "@/lib/data/action-plans";
 import { markSession, recordPaidSession } from "@/lib/data/payments";
 import { stripe } from "@/lib/stripe";
 
 /**
- * Stripe webhook: grants a purchased assessment when its Checkout is paid, and records
- * expired or failed sessions. The signature is verified with STRIPE_WEBHOOK_SECRET;
+ * Stripe webhook: grants a purchased assessment or starts an action plan when its Checkout is
+ * paid, ends a supported plan when its subscription ends, and records expired or failed sessions. The signature is verified with STRIPE_WEBHOOK_SECRET;
  * nothing is trusted otherwise. Handlers are idempotent (Stripe may retry).
  */
 export async function POST(request: Request) {
@@ -18,7 +19,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
   if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
-    await recordPaidSession(event.data.object);
+    const session = event.data.object;
+    await recordPaidSession(session);
+    // A supported plan's first draft is written as soon as it's paid (no-op for anything else).
+    const planId = session.metadata?.actionPlanId;
+    if (planId && session.metadata?.purpose === "action_plan_supported") after(() => writePlan(planId, { onlyIfEmpty: true }));
+  } else if (event.type === "customer.subscription.deleted" || (event.type === "customer.subscription.updated" && ["canceled", "unpaid", "incomplete_expired"].includes(event.data.object.status))) {
+    await cancelSupportedPlan(event.data.object.id);
   } else if (event.type === "checkout.session.expired") {
     await markSession(event.data.object.id, "expired");
   } else if (event.type === "checkout.session.async_payment_failed") {

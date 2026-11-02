@@ -19,6 +19,7 @@ export function UseCaseCards({
   hrefFor,
   price,
   sellable,
+  planFrom,
   extra,
 }: {
   useCases: readonly UseCaseDef[];
@@ -27,6 +28,8 @@ export function UseCaseCards({
   /** Formatted assessment price, or null where prices aren't shown (advisor view). */
   price?: string | null;
   sellable?: readonly string[];
+  /** When action plans replace the assessment: e.g. "from $499". */
+  planFrom?: string | null;
   /** A last card after the questions (the founder library's "Don't see what you're looking for?"). */
   extra?: React.ReactNode;
 }) {
@@ -87,7 +90,7 @@ export function UseCaseCards({
               </Link>
               {price !== null && price !== undefined && (
                 <span data-label className="text-[11px] font-mono px-2 py-1 rounded" style={{ background: "var(--muted)", color: "var(--muted-foreground)" }}>
-                  {sellable?.includes(u.id) ? `Snapshot free · Assessment ${price}` : "Snapshot free · Assessment soon"}
+                  {sellable?.includes(u.id) ? `Snapshot free · Assessment ${price}` : planFrom ? `Snapshot free · Action plan ${planFrom}` : "Snapshot free · Assessment soon"}
                 </span>
               )}
             </div>

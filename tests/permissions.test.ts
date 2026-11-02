@@ -18,7 +18,7 @@ const appFiles = walk(path.join(root, "app"));
 const read = (p: string) => readFileSync(p, "utf8");
 const rel = (p: string) => path.relative(root, p);
 
-const GUARDS = /requireRole\(|requireUser\(|founderCompany\(\)|founderMetric\(|managed\(|managedItemCompany\(|staff\(\)/;
+const GUARDS = /requireRole\(|requireUser\(|founderCompany\(\)|founderMetric\(|managed\(|managedItemCompany\(|staff\(\)|staffPlan\(/;
 // Actions visitors call before they have an account. Each must accept only fixed values (z.enum).
 const PUBLIC_ACTIONS: Record<string, string> = { trackSignupEvent: "Sign-up funnel events from signed-out visitors; fixed names only, no personal data." };
 // Shared loaders that call requireRole themselves (asserted below).
@@ -46,7 +46,7 @@ describe("server actions", () => {
   it("helper guards themselves call requireRole", () => {
     for (const file of files) {
       const src = read(file);
-      for (const helper of ["founderCompany", "founderMetric", "managed", "managedItemCompany", "staff"]) {
+      for (const helper of ["founderCompany", "founderMetric", "managed", "managedItemCompany", "staff", "staffPlan"]) {
         const def = src.match(new RegExp(`(?:async function ${helper}\\(|const ${helper} = \\(\\) =>)[\\s\\S]{0,200}`));
         if (def) expect(def[0], `${rel(file)} ${helper}`).toMatch(/requireRole\(|founderContext\(\)/);
       }

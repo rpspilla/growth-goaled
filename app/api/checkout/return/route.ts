@@ -1,5 +1,9 @@
 import { cookies } from "next/headers";
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
+import { z } from "zod";
+import { db, schema } from "@/lib/db";
+import { and, eq } from "drizzle-orm";
+import { writePlan } from "@/lib/data/action-plans";
 import { requireRole } from "@/lib/auth/session";
 import { getFounderCompany } from "@/lib/data/companies";
 import { confirmCheckout } from "@/lib/data/payments";
@@ -16,6 +20,17 @@ export async function GET(request: NextRequest) {
   const user = await requireRole(["founder"]);
   const company = await getFounderCompany(user);
   const sessionId = request.nextUrl.searchParams.get("session_id");
+  // Action plans: confirm, then back to the conversation the plan is built in.
+  const planId = z.uuid().safeParse(request.nextUrl.searchParams.get("plan"));
+  if (planId.success) {
+    if (!company) return NextResponse.redirect(new URL("/chat", request.url));
+    const [plan] = await db.select().from(schema.actionPlans).where(and(eq(schema.actionPlans.id, planId.data), eq(schema.actionPlans.companyId, company.id))).limit(1);
+    if (!plan) return NextResponse.redirect(new URL("/chat", request.url));
+    const outcome = sessionId && stripeConfigured() ? await confirmCheckout(company, sessionId).catch((err) => (console.error("[stripe] Confirming plan checkout failed", err), "unknown" as const)) : "unknown";
+    if (outcome === "paid" && plan.tier === "supported") after(() => writePlan(plan.id, { onlyIfEmpty: true }));
+    const state = outcome === "paid" ? "started" : outcome === "failed" ? "failed" : "pending";
+    return NextResponse.redirect(new URL(`/chat/${plan.conversationId}?checkout=${state}`, request.url));
+  }
   const useCase = request.nextUrl.searchParams.get("use_case");
   if (!useCase || !isUseCaseId(useCase)) return NextResponse.redirect(new URL("/library", request.url));
   const outcome = company && sessionId && stripeConfigured() ? await confirmCheckout(company, sessionId).catch((err) => (console.error("[stripe] Confirming checkout failed", err), "unknown" as const)) : "unknown";

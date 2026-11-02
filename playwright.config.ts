@@ -30,6 +30,8 @@ export default defineConfig({
       SELF_ADVISOR_EMAILS: "multi@e2e.test",
       // The full pipeline, with the stand-in draft (production uses the summary report for now).
       ASSESSMENT_AI_DRAFT: "on",
+      // The legacy $149 assessment journey (journey.spec) still runs; new buyers get action plans.
+      ASSESSMENT_SALES: "on",
     },
   },
 });

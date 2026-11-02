@@ -5,8 +5,13 @@ import { isUseCaseId, USE_CASE_IDS, type UseCaseId } from "@/lib/use-cases/types
  * Offerings and prices (integer cents), configurable by environment so the
  * price shown is always the price charged. Read on the server only.
  *
- * - Growth Snapshot: free.
- * - Single Assessment: one use case, paid once (ASSESSMENT_PRICE_CENTS, default $149).
+ * - Growth Snapshot and conversations: free.
+ * - Action plan (owner decision, Nov 2026): bought from a conversation, one question each.
+ *   Plan: ACTION_PLAN_PRICE_CENTS (default $499), once; built from the conversation and approved by
+ *   an advisor before delivery (about 24 hours). Supported: SUPPORTED_PLAN_MONTHLY_CENTS (default
+ *   $799/month), with a CRO-level advisor in the conversation.
+ * - Single Assessment: retired for new buyers unless ASSESSMENT_SALES=on (ASSESSMENT_PRICE_CENTS,
+ *   default $149); past buyers keep it.
  * - Advisory Session: optional, from ADVISORY_PRICE_CENTS (default $750); booked through
  *   ADVISORY_BOOKING_URL when set, otherwise as a request to the team.
  * - Growth Intelligence subscription: reserved (SUBSCRIPTION_PRICE_CENTS, $299/month). Not
@@ -21,6 +26,8 @@ export const CURRENCY = "usd";
 
 export const pricing = () => ({
   assessmentCents: cents("ASSESSMENT_PRICE_CENTS", 14_900),
+  actionPlanCents: cents("ACTION_PLAN_PRICE_CENTS", 49_900),
+  supportedMonthlyCents: cents("SUPPORTED_PLAN_MONTHLY_CENTS", 79_900),
   advisoryFromCents: cents("ADVISORY_PRICE_CENTS", 75_000),
   subscriptionMonthlyCents: cents("SUBSCRIPTION_PRICE_CENTS", 29_900),
   subscriptionAvailable: false as const,
@@ -46,9 +53,14 @@ export const advisoryHref = (useCase: string, kind: AdvisoryKind) =>
  * a comma-separated list of ids, narrows it; the rest offer the free Snapshot and "coming soon".
  */
 export function sellableUseCases(): UseCaseId[] {
+  // The $149 assessment is no longer sold to new buyers (action plans replace it) unless switched back on.
+  if (!assessmentSalesOn()) return [];
   const raw = process.env.SELLABLE_USE_CASES?.trim() || USE_CASE_IDS.join(",");
   // A "Coming soon" question is never sold, whatever the environment says.
   return raw.split(",").map((s) => s.trim()).filter(isUseCaseId).filter((id) => !isComingSoon(id));
 }
 
 export const formatPrice = (c: number) => `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: c % 100 ? 2 : 0, maximumFractionDigits: 2 })}`;
+
+/** The $149 Single Assessment is still sold (ASSESSMENT_SALES=on). Off by default since action plans replaced it. */
+export const assessmentSalesOn = () => process.env.ASSESSMENT_SALES === "on";

@@ -1,5 +1,5 @@
 /** Instant preliminary Benchmark + per-use-case $1 activation, against Postgres (PGlite). Models and Stripe are stubbed. */
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
 
 const h = vi.hoisted(() => ({ db: null as unknown as Record<string | symbol, unknown> }));
@@ -161,6 +161,9 @@ describe("preliminary benchmark", () => {
 });
 
 describe("assessment purchase", () => {
+  // The $149 assessment is only sold with ASSESSMENT_SALES=on (action plans replaced it for new buyers).
+  beforeEach(() => void (process.env.ASSESSMENT_SALES = "on"));
+  afterEach(() => void delete process.env.ASSESSMENT_SALES);
   const fakeStripe = (session: Record<string, unknown>) => ({
     checkout: {
       sessions: {

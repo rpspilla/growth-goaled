@@ -8,6 +8,7 @@ import { CURRENCY, pricing, sellableUseCases } from "@/lib/pricing";
 import { stripe } from "@/lib/stripe";
 import { getUseCase, isUseCaseId, type UseCaseId } from "@/lib/use-cases";
 import { activateUseCase, getCompanyUseCase } from "./use-cases";
+import { isPlanPurpose, recordPaidPlan } from "./action-plans";
 
 /** A Single Assessment for one use case. */
 export const PURPOSE = "assessment";
@@ -101,7 +102,7 @@ export async function createAssessmentCheckout(
   return session.url;
 }
 
-type SessionLike = Pick<Stripe.Checkout.Session, "id" | "payment_status" | "client_reference_id" | "metadata" | "amount_total">;
+type SessionLike = Pick<Stripe.Checkout.Session, "id" | "payment_status" | "client_reference_id" | "metadata" | "amount_total"> & { subscription?: string | { id: string } | null };
 
 /**
  * Records a completed Checkout and grants the assessment for that company and use case.
@@ -111,9 +112,14 @@ type SessionLike = Pick<Stripe.Checkout.Session, "id" | "payment_status" | "clie
 export async function recordPaidSession(session: SessionLike): Promise<boolean> {
   if (session.payment_status !== "paid") return false;
   const [payment] = await db.select().from(schema.payments).where(eq(schema.payments.stripeSessionId, session.id)).limit(1);
-  if (!payment || (payment.purpose !== PURPOSE && !LEGACY_PURPOSES.includes(payment.purpose))) return false;
+  if (!payment || (payment.purpose !== PURPOSE && !LEGACY_PURPOSES.includes(payment.purpose) && !isPlanPurpose(payment.purpose))) return false;
   if (session.client_reference_id !== payment.companyId || session.metadata?.companyId !== payment.companyId) return false;
   if (session.amount_total !== null && session.amount_total < payment.amountCents) return false;
+  // Action plans ($499 once, or $799/month): start the plan; there's no use case to activate.
+  if (isPlanPurpose(payment.purpose)) {
+    await recordPaidPlan(session, payment);
+    return true;
+  }
   const useCase = payment.purpose === "benchmark_unlock" ? "growth_leak" : payment.useCase;
   if (!useCase || !isUseCaseId(useCase)) return false;
   if (payment.status !== "paid") {

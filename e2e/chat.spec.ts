@@ -35,7 +35,7 @@ test("a founder talks a decision through and gets a recommendation card", async 
   await expect(page.getByRole("article", { name: "Recommendation" })).toHaveCount(0);
   const url = page.url();
 
-  // Answering gives the decision card, with the paid deep assessment offered alongside.
+  // Answering gives the decision card, with the action plan offered alongside.
   await page.getByLabel("Your reply").fill("We have 3 reps and close about $20k deals.");
   await page.getByRole("button", { name: "Send" }).click();
   const card = page.getByRole("article", { name: "Recommendation" });
@@ -44,7 +44,8 @@ test("a founder talks a decision through and gets a recommendation card", async 
   await expect(card).toContainText("Low confidence");
   await expect(card).toContainText("Days 1–30");
   await expect(card).toContainText("Assumption");
-  await expect(card.getByRole("link", { name: /Go deeper with your data/ })).toHaveAttribute("href", "/library/hire_or_fix");
+  // The card converts into an action plan: $499 once, or $799 a month with an advisor.
+  await expect(page.getByRole("region", { name: "Build my action plan" })).toContainText("$499");
 
   // Feedback is kept against the recommendation.
   await card.getByRole("button", { name: "Helpful" }).click();

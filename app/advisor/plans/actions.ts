@@ -1,0 +1,86 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
+import { after } from "next/server";
+import { eq } from "drizzle-orm";
+import { z } from "zod";
+import { canViewCompany } from "@/lib/access";
+import { requireRole } from "@/lib/auth/session";
+import { db, schema } from "@/lib/db";
+import { approvePlan, postAdvisorMessage, requestPlanUpdate, setStepDone, writePlan, type PlanResult } from "@/lib/data/action-plans";
+
+/** The signed-in advisor or admin, and the plan's company if they may see it. */
+async function staffPlan(planId: string) {
+  const user = await requireRole(["advisor", "admin"]);
+  const id = z.uuid().safeParse(planId);
+  if (!id.success) return null;
+  const [row] = await db
+    .select({ plan: schema.actionPlans, company: schema.companies })
+    .from(schema.actionPlans)
+    .innerJoin(schema.companies, eq(schema.companies.id, schema.actionPlans.companyId))
+    .where(eq(schema.actionPlans.id, id.data))
+    .limit(1);
+  if (!row || !canViewCompany(user, row.company, [])) return null;
+  return { user, ...row };
+}
+
+const step = z.object({ action: z.string().max(500), owner: z.string().max(120), measure: z.string().max(300), done: z.boolean().optional() });
+const contentSchema = z.object({
+  goal: z.string().max(500),
+  summary: z.string().max(2000),
+  days30: z.array(step).max(10),
+  days60: z.array(step).max(10),
+  days90: z.array(step).max(10),
+  risks: z.array(z.string().max(300)).max(10),
+  assumptions: z.array(z.string().max(300)).max(10),
+});
+
+/** Approve a $499 plan (with the advisor's edits): it's delivered to the founder and they're emailed. */
+export async function approvePlanAction(planId: string, content: unknown, note: string | null): Promise<PlanResult> {
+  const ctx = await staffPlan(planId);
+  if (!ctx) return { ok: false, error: "Plan not found." };
+  const parsed = contentSchema.safeParse(content);
+  if (!parsed.success) return { ok: false, error: "Check the plan's fields." };
+  const h = await headers();
+  const appUrl = process.env.APP_URL?.replace(/\/$/, "") ?? `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
+  const result = await approvePlan(ctx.user, ctx.company, ctx.plan.id, parsed.data, typeof note === "string" ? note : null, appUrl);
+  revalidatePath("/advisor", "layout");
+  return result;
+}
+
+/** Re-draft a plan from its conversation (a failed or out-of-date draft). Runs after the response. */
+export async function redraftPlanAction(planId: string): Promise<PlanResult> {
+  const ctx = await staffPlan(planId);
+  if (!ctx) return { ok: false, error: "Plan not found." };
+  if (ctx.plan.tier === "plan") {
+    if (ctx.plan.status !== "in_review") return { ok: false, error: "Only a plan in review can be re-drafted." };
+    await db.update(schema.actionPlans).set({ status: "drafting" }).where(eq(schema.actionPlans.id, ctx.plan.id));
+  } else {
+    const ok = await requestPlanUpdate(ctx.company, ctx.plan.id);
+    if (!ok.ok) return ok;
+  }
+  after(() => writePlan(ctx.plan.id));
+  revalidatePath(`/advisor/plans/${ctx.plan.id}`);
+  return { ok: true };
+}
+
+/** The advisor's message in a supported plan's conversation. */
+export async function advisorMessageAction(planId: string, text: string): Promise<PlanResult> {
+  const ctx = await staffPlan(planId);
+  if (!ctx) return { ok: false, error: "Plan not found." };
+  if (typeof text !== "string") return { ok: false, error: "Type a message first." };
+  const result = await postAdvisorMessage(ctx.user, ctx.company.id, ctx.plan.conversationId, text);
+  revalidatePath(`/advisor/plans/${ctx.plan.id}`);
+  return result;
+}
+
+export async function advisorStepAction(planId: string, period: string, index: number, done: boolean): Promise<PlanResult> {
+  const ctx = await staffPlan(planId);
+  if (!ctx) return { ok: false, error: "Plan not found." };
+  const p = z.enum(["days30", "days60", "days90"]).safeParse(period);
+  if (!p.success || !Number.isInteger(index) || index < 0) return { ok: false, error: "That change isn't valid." };
+  const result = await setStepDone(ctx.company, ctx.plan.id, p.data, index, Boolean(done));
+  revalidatePath(`/advisor/plans/${ctx.plan.id}`);
+  return result;
+}

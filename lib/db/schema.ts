@@ -837,6 +837,8 @@ export const payments = pgTable(
     purpose: text("purpose").notNull(),
     // Use case the payment activates (null for the retired benchmark unlock)
     useCase: text("use_case"),
+    // Action plan the payment is for (purpose action_plan / action_plan_supported)
+    actionPlanId: uuid("action_plan_id"),
     stripeSessionId: text("stripe_session_id").notNull(),
     // Hosted Checkout link, reused while the session is open so repeat clicks don't create a second charge
     checkoutUrl: text("checkout_url"),
@@ -889,7 +891,7 @@ export const events = pgTable(
 // Conversations (the founder's chat with Growth Goaled) and what they produce
 // ---------------------------------------------------------------------------
 
-export const messageRole = pgEnum("message_role", ["user", "assistant"]);
+export const messageRole = pgEnum("message_role", ["user", "assistant", "advisor"]);
 export const factStatus = pgEnum("fact_status", ["stated", "assumption", "verified"]);
 export const feedbackKind = pgEnum("feedback_kind", [
   "helpful",
@@ -930,6 +932,10 @@ export const conversationMessages = pgTable(
       .references(() => conversations.id, { onDelete: "cascade" }),
     role: messageRole("role").notNull(),
     content: text("content").notNull(),
+    // Advisor messages: who wrote it
+    authorId: uuid("author_id").references(() => users.id, { onDelete: "set null" }),
+    // Files the founder attached to this message (documents rows)
+    documentIds: jsonb("document_ids").$type<string[]>(),
     // Assistant turns: follow-up questions asked, and the recommendation card when one was given
     questions: jsonb("questions").$type<string[]>(),
     recommendationId: uuid("recommendation_id"),
@@ -1010,6 +1016,71 @@ export const recommendationFeedback = pgTable(
   (t) => [index("recommendation_feedback_recommendation_idx").on(t.recommendationId)],
 );
 
+// ---------------------------------------------------------------------------
+// Action plans: bought from a conversation, built from it
+// ---------------------------------------------------------------------------
+
+/** plan: $499 once, built once and approved by an advisor before delivery. supported: $799/month with a CRO-level advisor in the conversation. */
+export const actionPlanTier = pgEnum("action_plan_tier", ["plan", "supported"]);
+export const actionPlanStatus = pgEnum("action_plan_status", [
+  "pending_payment",
+  // plan: the AI gathers what the plan needs in the conversation, then the founder submits it
+  "collecting",
+  "drafting",
+  // plan: with an advisor for review (expect up to 24 hours), then delivered
+  "in_review",
+  "delivered",
+  // supported: live while the subscription is
+  "active",
+  "cancelled",
+]);
+
+export type PlanStep = { action: string; owner: string; measure: string; done?: boolean };
+export type ActionPlanContent = {
+  goal: string;
+  summary: string;
+  days30: PlanStep[];
+  days60: PlanStep[];
+  days90: PlanStep[];
+  risks: string[];
+  assumptions: string[];
+};
+
+export const actionPlans = pgTable(
+  "action_plans",
+  {
+    id: id(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    topic: text("topic").notNull(),
+    tier: actionPlanTier("tier").notNull(),
+    status: actionPlanStatus("status").notNull().default("pending_payment"),
+    // What the AI still needs from the founder before the plan can be built well
+    needs: jsonb("needs").$type<string[]>().notNull().default([]),
+    content: jsonb("content").$type<ActionPlanContent>(),
+    // Set while a draft is being written, so only one runs at a time
+    draftingStartedAt: timestamp("drafting_started_at", { withTimezone: true }),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    approvedBy: uuid("approved_by").references(() => users.id, { onDelete: "set null" }),
+    reviewNote: text("review_note"),
+    stripeSubscriptionId: text("stripe_subscription_id"),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("action_plans_conversation_idx").on(t.conversationId),
+    index("action_plans_company_idx").on(t.companyId),
+    index("action_plans_status_idx").on(t.status),
+    index("action_plans_subscription_idx").on(t.stripeSubscriptionId),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type Role = (typeof userRole.enumValues)[number];
 export type Company = typeof companies.$inferSelect;
@@ -1018,3 +1089,4 @@ export type Conversation = typeof conversations.$inferSelect;
 export type ConversationMessage = typeof conversationMessages.$inferSelect;
 export type CompanyFact = typeof companyFacts.$inferSelect;
 export type Recommendation = typeof recommendations.$inferSelect;
+export type ActionPlan = typeof actionPlans.$inferSelect;

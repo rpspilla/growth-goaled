@@ -109,3 +109,11 @@ export const getChatTopic = (id: string): ChatTopic | undefined => BY_ID.get(id)
 
 /** Bumped whenever the chat's instructions, topics or output shape change; stored on every recommendation. */
 export const CHAT_METHODOLOGY_VERSION = "chat-2026-11-02.1";
+
+/** The conversation a Library question leads into (its action plan is bought there). */
+export const TOPIC_FOR_USE_CASE: Partial<Record<UseCaseId, string>> = {
+  winning_icp: "revenue_engine",
+  hire_or_fix: "more_salespeople",
+  growth_leak: "retention_efficiency",
+  series_a_ready: "fundraising",
+};

@@ -13,6 +13,7 @@ const ADVISOR_NAV: { title: string; items: Item[] }[] = [
     items: [
       { href: "/advisor/portfolio", label: "Portfolio" },
       { href: "/advisor/review", label: "Review queue", badgeKey: "review" },
+      { href: "/advisor/plans", label: "Action plans", badgeKey: "plans" },
       { href: "/advisor/unassigned", label: "Unassigned", badgeKey: "unassigned" },
       { href: "/advisor/registers", label: "Registers" },
     ],
@@ -35,7 +36,7 @@ const ADMIN_NAV: { title: string; items: Item[] } = {
   ],
 };
 
-export type AdvisorBadges = { unassigned: number; review: number };
+export type AdvisorBadges = { unassigned: number; review: number; plans: number };
 
 export function AdvisorSidebar({
   badges,

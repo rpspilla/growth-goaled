@@ -6,6 +6,7 @@ import { db, schema } from "@/lib/db";
 import type { User } from "@/lib/db/schema";
 import { Shell, StagingBadge, UserMenu } from "@/components/shell/Shell";
 import { AdvisorSidebar, type AdvisorBadges } from "@/components/shell/AdvisorSidebar";
+import { plansForReview } from "@/lib/data/action-plans";
 
 async function getBadges(user: User): Promise<AdvisorBadges> {
   const { companies, deliverables } = schema;
@@ -23,7 +24,7 @@ async function getBadges(user: User): Promise<AdvisorBadges> {
     // Benchmarks wait for review. Assessments publish straight away (reviewRequired is no longer set).
     .where(and(eq(deliverables.status, "in_review"), or(eq(deliverables.type, "benchmark"), eq(deliverables.reviewRequired, true)), scope));
 
-  return { unassigned: unassigned?.n ?? 0, review: review?.n ?? 0 };
+  return { unassigned: unassigned?.n ?? 0, review: review?.n ?? 0, plans: (await plansForReview(user)).length };
 }
 
 export default async function AdvisorLayout({ children }: { children: ReactNode }) {

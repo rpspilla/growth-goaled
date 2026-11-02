@@ -11,7 +11,8 @@ import { QuestionIllustration } from "@/components/visual/QuestionIllustration";
 import { founderContext } from "@/lib/data/founder-context";
 import { getIntakeAnswers } from "@/lib/data/intake";
 import { track } from "@/lib/events";
-import { formatPrice, pricing, sellableUseCases } from "@/lib/pricing";
+import { assessmentSalesOn, formatPrice, pricing, sellableUseCases } from "@/lib/pricing";
+import { TOPIC_FOR_USE_CASE } from "@/lib/chat/topics";
 import { getUseCase } from "@/lib/use-cases";
 import { questionnaire } from "@/lib/use-cases/questionnaire";
 import { visualFor } from "@/lib/use-cases/visual";
@@ -27,6 +28,8 @@ export default async function UseCasePage({ params }: { params: Promise<{ useCas
   const { fields, known } = questionnaire(def, answers, company?.revenueBand ?? null);
   const price = formatPrice(pricing().assessmentCents);
   const sellable = sellableUseCases().includes(def.id);
+  // Action plans replace the $149 assessment for new buyers.
+  const planFrom = TOPIC_FOR_USE_CASE[def.id] && !assessmentSalesOn() ? `from ${formatPrice(pricing().actionPlanCents)}` : null;
   const v = visualFor(def.id);
   if (company) await track("use_case_viewed", { userId: user.id, companyId: company.id, props: { use_case: def.id, coming_soon: Boolean(def.comingSoon) } });
 
@@ -98,7 +101,7 @@ export default async function UseCasePage({ params }: { params: Promise<{ useCas
       {hero}
 
       <div className="surface p-4 sm:p-5 mb-6">
-        <StepStrip price={sellable ? price : null} />
+        <StepStrip price={sellable ? price : planFrom} />
       </div>
 
       {row?.activatedAt && (
@@ -193,10 +196,10 @@ export default async function UseCasePage({ params }: { params: Promise<{ useCas
             </div>
             <div className="flex items-center justify-between text-sm mt-1.5">
               <span className="font-semibold" style={{ color: "var(--foreground)" }}>
-                Full assessment
+                {planFrom ? "Action plan" : "Full assessment"}
               </span>
               <span className="font-mono font-semibold" style={{ color: "var(--foreground)" }}>
-                {sellable ? price : "Soon"}
+                {sellable ? price : (planFrom ?? "Soon")}
               </span>
             </div>
             <div className="mt-3">
@@ -204,9 +207,11 @@ export default async function UseCasePage({ params }: { params: Promise<{ useCas
                 <p>
                   {sellable
                     ? "One-time, for this question. Built from your answers and data; no meeting needed. You decide after seeing the Snapshot."
-                    : "The free Snapshot is available now; the full assessment for this question is launching soon."}
+                    : planFrom
+                      ? `Talk it through for free, then build a 30/60/90-day action plan in the conversation: ${formatPrice(pricing().actionPlanCents)} once (advisor-approved, about 24 hours) or ${formatPrice(pricing().supportedMonthlyCents)} a month with a CRO-level advisor.`
+                      : "The free Snapshot is available now; the full assessment for this question is launching soon."}
                 </p>
-                <HowItWorks price={price} sellable={sellable} />
+                {(sellable || !planFrom) && <HowItWorks price={price} sellable={sellable} />}
               </ExpandableDetail>
             </div>
           </section>

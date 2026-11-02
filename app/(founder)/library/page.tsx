@@ -5,7 +5,7 @@ import { suggestUseCase } from "./actions";
 import { UseCaseCards, type CardState } from "@/components/use-cases/UseCaseCards";
 import { founderContext } from "@/lib/data/founder-context";
 import { track } from "@/lib/events";
-import { formatPrice, pricing, sellableUseCases } from "@/lib/pricing";
+import { formatPrice, pricing, sellableUseCases, assessmentSalesOn } from "@/lib/pricing";
 import { firstUseCase, USE_CASES } from "@/lib/use-cases";
 
 /** Growth questions: pick the decision you're facing. New founders land here straight after setup. */
@@ -36,6 +36,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Prom
         hrefFor={(id) => `/library/${id}`}
         price={price}
         sellable={sellableUseCases()}
+        planFrom={assessmentSalesOn() ? null : `from ${formatPrice(pricing().actionPlanCents)}`}
         extra={company ? <SuggestUseCaseCard defaultEmail={user.email} submit={suggestUseCase} /> : null}
       />
       <Faq className="mt-10 max-w-3xl" />

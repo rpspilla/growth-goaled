@@ -200,7 +200,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   {
     const db = new Client({ connectionString: E2E_DATABASE_URL });
     await db.connect();
-    expect((await db.query("select count(*)::int as n from payments")).rows[0].n).toBe(0);
+    expect((await db.query("select count(*)::int as n from payments where company_id in (select id from companies where name = 'E2E Analytics')")).rows[0].n).toBe(0);
     await db.end();
   }
   await expect(steps.getByRole("link", { name: /Data/ })).toHaveCount(0);
@@ -211,7 +211,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   {
     const db = new Client({ connectionString: E2E_DATABASE_URL });
     await db.connect();
-    const { rows } = await db.query("select amount_cents, status, use_case, purpose from payments");
+    const { rows } = await db.query("select amount_cents, status, use_case, purpose from payments where company_id in (select id from companies where name = 'E2E Analytics')");
     expect(rows).toEqual([{ amount_cents: 14900, status: "paid", use_case: "growth_leak", purpose: "assessment" }]);
     await db.end();
   }

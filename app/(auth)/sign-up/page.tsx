@@ -18,7 +18,7 @@ const NEXT = [
 
 /** The main conversion page: what this is, why it matters at your stage, and exactly what happens next. */
 export default function SignUpPage() {
-  const price = formatPrice(pricing().assessmentCents);
+  const { actionPlanCents, supportedMonthlyCents } = pricing();
   return (
     <AuthShell
       brand={
@@ -53,7 +53,7 @@ export default function SignUpPage() {
           ))}
         </ol>
         <div className="mt-6 space-y-2 text-sm" style={{ color: "var(--muted-foreground)" }}>
-          <p><span className="font-semibold" style={{ color: "var(--foreground)" }}>Pricing:</span> the account and Snapshot are free. A full assessment from your own data is {price} per question, only if you choose it. No subscription.</p>
+          <p><span className="font-semibold" style={{ color: "var(--foreground)" }}>Pricing:</span> the account, conversations and Snapshot are free. An action plan is {formatPrice(actionPlanCents)} once (approved by an advisor), or {formatPrice(supportedMonthlyCents)} a month with a CRO-level advisor, only if you choose it.</p>
           <p>
             <span className="font-semibold" style={{ color: "var(--foreground)" }}>Your data:</span> used for your own analysis and never shown to other companies. In anonymized,
             aggregated form only, it also helps improve our recommendations and benchmarks. <Link href="/data-use" className="link">How we use your data</Link>

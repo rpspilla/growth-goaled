@@ -22,7 +22,7 @@ export default async function AssessmentsPage() {
       {entries.length === 0 ? (
         <EmptyState
           title="No assessments yet"
-          body="Pick the growth question you most need answered. Your Snapshot is free; you only pay if you want the full assessment."
+          body="Pick the growth question you most need answered. Your Snapshot and conversations are free; you only pay if you want an action plan."
           action={<Link href="/library" className="btn btn-primary">Pick a growth question →</Link>}
         />
       ) : (

@@ -27,11 +27,14 @@ export const chatOutputSchema = z.object({
   questions: z.array(z.string()),
   facts: z.array(z.object({ key: z.string(), label: z.string(), value: z.string(), status: z.enum(["stated", "assumption"]) })),
   recommendation: cardSchema.nullable(),
+  plan_needs: z.array(z.string()),
 });
 
 export type ChatOutput = z.infer<typeof chatOutputSchema>;
-export type ChatTurn = { role: "user" | "assistant"; content: string };
-export type ChatInput = { topic: ChatTopic; context: ChatContext; history: ChatTurn[] };
+/** Advisor messages are part of the conversation; the model sees them labelled as the advisor's. */
+export type ChatTurn = { role: "user" | "assistant" | "advisor"; content: string; author?: string | null };
+export type PlanMode = { tier: "plan" | "supported"; status: string; needs: string[] };
+export type ChatInput = { topic: ChatTopic; context: ChatContext; history: ChatTurn[]; plan?: PlanMode | null };
 
 const SYSTEM = `You are Growth Goaled: an experienced CRO advising founders of Seed and Series A B2B SaaS companies on commercial decisions. Talk like a strong CRO in a one-to-one conversation: direct, plain English, short paragraphs. Not a survey, not a report.
 
@@ -51,7 +54,12 @@ Output fields:
 - reply: what you say this turn (plain text, no markdown headings; short lists are fine). Don't repeat the recommendation card's content in it.
 - questions: the one or two questions you're asking now (also woven into the reply), or [] when you aren't asking.
 - facts: anything new the founder stated about their company this turn that's worth remembering (team size, ACV, sales cycle, target, plans…). key: short snake_case id, reusing an existing fact key when updating one. status: "stated" when they said it as fact, "assumption" when they said they're guessing. [] when nothing new.
-- recommendation: give one when you have enough to recommend something useful, even with caveats (often by the second or third turn; at once when the context already covers it). Otherwise null. When you give one, it's the founder's decision card: takeaway (one sentence), diagnosis, evidence (each item marked fact/figure/assumption/hypothesis), confidence (high/medium/low and why), priority, recommendation, next_steps, success_measures, a 30/60/90-day plan, and missing (what would raise confidence). Keep every field short and scannable. Give an updated card when new information changes your view.`;
+- plan_needs: only when ACTION PLAN says it's being built: the specific information still missing for a strong 30/60/90-day plan (each a short phrase, most important first), or [] when you have enough. Otherwise [].
+- recommendation: give one when you have enough to recommend something useful, even with caveats (often by the second or third turn; at once when the context already covers it). Otherwise null. When you give one, it's the founder's decision card: takeaway (one sentence), diagnosis, evidence (each item marked fact/figure/assumption/hypothesis), confidence (high/medium/low and why), priority, recommendation, next_steps, success_measures, a 30/60/90-day plan, and missing (what would raise confidence). Keep every field short and scannable. Give an updated card when new information changes your view.
+
+When ACTION PLAN is present, the founder has bought a plan for this question:
+- While it's being collected, your job is to gather what the plan needs: ask for the most important missing information first, invite them to attach files (CRM exports, revenue by customer, org chart, comp plans) in the chat, and say when you have enough for them to submit it. An advisor reviews the plan before it's delivered (expect up to 24 hours).
+- On the supported plan, a CRO-level advisor takes part in this conversation. Their messages are marked ADVISOR; follow their direction, and don't contradict them without saying why.`;
 
 function contextBlock(input: ChatInput): string {
   const { topic, context } = input;
@@ -68,6 +76,9 @@ function contextBlock(input: ChatInput): string {
     .join("\n");
 }
 
+export const planLine = (p: PlanMode) =>
+  `ACTION PLAN: ${p.tier === "supported" ? "supported plan ($799/month, advisor in the conversation)" : "one-time plan ($499, advisor-approved before delivery)"}; status ${p.status}${p.needs.length ? `; still needed after the last turn: ${p.needs.join("; ")}` : ""}.`;
+
 export class ChatError extends Error {}
 
 export type ChatResult = { output: ChatOutput; model: string; tokensIn: number; tokensOut: number };
@@ -76,10 +87,13 @@ export type ChatResult = { output: ChatOutput; model: string; tokensIn: number; 
 export async function chatTurn(input: ChatInput): Promise<ChatResult> {
   if (e2eEnabled()) return { output: fakeChat(input), model: "e2e-fake", tokensIn: 0, tokensOut: 0 };
   // Company context leads the first user turn, so the cached prefix stays stable as the conversation grows.
-  const messages: Anthropic.Beta.BetaMessageParam[] = input.history.map((t, i) => ({
-    role: t.role,
-    content: i === 0 ? `${contextBlock(input)}\n\nFOUNDER:\n${t.content}` : t.content,
-  }));
+  const messages: Anthropic.Beta.BetaMessageParam[] = input.history.map((t, i) => {
+    const text = t.role === "advisor" ? `ADVISOR${t.author ? ` (${t.author})` : ""}:\n${t.content}` : t.content;
+    return { role: t.role === "assistant" ? "assistant" : "user", content: i === 0 ? `${contextBlock(input)}\n\nFOUNDER:\n${text}` : text };
+  });
+  // The plan's state changes as the conversation goes, so it rides on the latest message (the cached prefix stays stable).
+  const last = messages.at(-1);
+  if (input.plan && last && typeof last.content === "string") last.content += `\n\n${planLine(input.plan)}`;
   const response = await anthropic().beta.messages.parse({
     model: AI_MODEL,
     max_tokens: 8000,
@@ -113,6 +127,7 @@ export function fakeChat(input: ChatInput): ChatOutput {
       questions: ["How many people sell today, including you?", "What's your average deal size?"],
       facts,
       recommendation: null,
+      plan_needs: input.plan?.status === "collecting" ? ["Closed deals export", "Current quota"] : [],
     };
   }
   return {
@@ -133,5 +148,6 @@ export function fakeChat(input: ChatInput): ChatOutput {
       plan_90: ["Test 90-day step"],
       missing: ["Pipeline export"],
     },
+    plan_needs: input.plan?.status === "collecting" ? (/attached|export/i.test(last) ? [] : ["Closed deals export"]) : [],
   };
 }

@@ -10,13 +10,16 @@ import { TeaserVerdict } from "@/components/use-cases/TeaserVerdict";
 import { teaserVerdict } from "@/lib/data/teaser";
 import { companyBlobPrefix } from "@/lib/data/documents";
 import { PeerComparisons } from "@/components/use-cases/PeerComparisons";
+import { ActionPlanNext } from "@/components/use-cases/ActionPlanNext";
+import { TOPIC_FOR_USE_CASE } from "@/lib/chat/topics";
+import { startTopicAction } from "@/app/(founder)/chat/actions";
 import { PurchaseButton } from "@/components/use-cases/PurchaseButton";
 import { founderContext } from "@/lib/data/founder-context";
 import { getIntakeAnswers } from "@/lib/data/intake";
 import { snapshotPeers } from "@/lib/data/peers";
 import { getReadiness } from "@/lib/data/readiness";
 import { track } from "@/lib/events";
-import { formatPrice, pricing, sellableUseCases } from "@/lib/pricing";
+import { assessmentSalesOn, formatPrice, pricing, sellableUseCases } from "@/lib/pricing";
 import { getItem } from "@/lib/readiness";
 import { stripeConfigured } from "@/lib/stripe";
 import { getUseCase, missingRequired } from "@/lib/use-cases";
@@ -77,6 +80,9 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
   const suggested = suggestedDef?.comingSoon ? undefined : suggestedDef;
   const price = formatPrice(pricing().assessmentCents);
   const sellable = sellableUseCases().includes(def.id) && stripeConfigured();
+  // Action plans replace the $149 assessment for new buyers: the question leads into its conversation.
+  const planTopic = TOPIC_FOR_USE_CASE[def.id];
+  const planOffer = Boolean(planTopic && !assessmentSalesOn());
   const message = checkout ? CHECKOUT_MESSAGE[checkout] : undefined;
   await track("snapshot_viewed", { userId: user.id, companyId: company.id, props: { use_case: def.id, signals: snapshot.signals.length } });
 
@@ -147,9 +153,14 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
               useCase={def}
               files={readiness.files}
               blobPrefix={companyBlobPrefix(company.id)}
-              price={price}
+              price={planOffer ? `in your action plan, from ${formatPrice(pricing().actionPlanCents)}` : price}
               unlock={
-                sellable ? (
+                planOffer ? (
+                  <form action={startTopicAction}>
+                    <input type="hidden" name="topic" value={planTopic} />
+                    <button type="submit" className="btn btn-primary w-full">Build my action plan</button>
+                  </form>
+                ) : sellable ? (
                   <PurchaseButton useCaseId={def.id} label={`Unlock the full answer · ${price}`} checkout={startAssessmentCheckout} />
                 ) : (
                   <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
@@ -242,55 +253,61 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
 
         </div>
 
-        <aside className="surface p-5 lg:sticky lg:top-6 space-y-3" style={{ borderColor: "var(--green)", borderWidth: 2 }} aria-label="Full assessment">
-          <div className="label" style={{ color: "var(--green)" }}>
-            Next: the full assessment
-          </div>
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="font-display text-2xl leading-tight" style={{ color: "var(--foreground)" }}>
-              {def.shortTitle}
-            </span>
-            <span className="font-mono text-2xl font-semibold" style={{ color: "var(--foreground)" }}>
-              {sellableUseCases().includes(def.id) ? price : "Soon"}
-            </span>
-          </div>
-          <ul className="grid grid-cols-3 gap-1.5" aria-label="What you get">
-            {visualFor(def.id).outcomes.map((o) => {
-              const Icon = OUTCOME_ICONS[o.icon];
-              return (
-                <li key={o.label} data-label className="rounded-lg p-2 flex flex-col items-center text-center gap-1 text-[11px] font-semibold leading-tight" style={{ background: "var(--green-muted)", color: "var(--green)" }}>
-                  <Icon size={16} aria-hidden />
-                  {o.label}
-                </li>
-              );
-            })}
-          </ul>
-          {row?.activatedAt ? (
-            <Link href="/data" className="btn btn-primary btn-lg w-full">
-              You have this assessment · continue →
-            </Link>
-          ) : sellable ? (
-            <>
-              <PurchaseButton useCaseId={def.id} label={`Get the full assessment · ${price}`} checkout={startAssessmentCheckout} />
-              <p data-label className="text-xs text-center" style={{ color: "var(--muted-foreground)" }}>
-                One-time · Stripe · no subscription
-              </p>
-            </>
-          ) : (
-            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-              {sellableUseCases().includes(def.id) ? "Payments aren't set up in this environment yet." : "The full assessment for this question is launching soon. Your answers are saved, so you'll be ready when it does."}
-            </p>
-          )}
-          <ExpandableDetail summary="Everything it includes">
-            <p>Tests these hypotheses against your own data and gives you a decision and a 30–90 day plan.</p>
-            <ul className="space-y-1">
-              {def.youGet.map((g) => (
-                <li key={g}>• {g}</li>
-              ))}
+        {planOffer && planTopic && !row?.activatedAt ? (
+          <aside className="surface p-5 lg:sticky lg:top-6" style={{ borderColor: "var(--green)", borderWidth: 2 }} aria-label="Action plan">
+            <ActionPlanNext topicId={planTopic} planPrice={formatPrice(pricing().actionPlanCents)} supportedPrice={formatPrice(pricing().supportedMonthlyCents)} start={startTopicAction} />
+          </aside>
+        ) : (
+          <aside className="surface p-5 lg:sticky lg:top-6 space-y-3" style={{ borderColor: "var(--green)", borderWidth: 2 }} aria-label="Full assessment">
+            <div className="label" style={{ color: "var(--green)" }}>
+              Next: the full assessment
+            </div>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="font-display text-2xl leading-tight" style={{ color: "var(--foreground)" }}>
+                {def.shortTitle}
+              </span>
+              <span className="font-mono text-2xl font-semibold" style={{ color: "var(--foreground)" }}>
+                {sellableUseCases().includes(def.id) ? price : "Soon"}
+              </span>
+            </div>
+            <ul className="grid grid-cols-3 gap-1.5" aria-label="What you get">
+              {visualFor(def.id).outcomes.map((o) => {
+                const Icon = OUTCOME_ICONS[o.icon];
+                return (
+                  <li key={o.label} data-label className="rounded-lg p-2 flex flex-col items-center text-center gap-1 text-[11px] font-semibold leading-tight" style={{ background: "var(--green-muted)", color: "var(--green)" }}>
+                    <Icon size={16} aria-hidden />
+                    {o.label}
+                  </li>
+                );
+              })}
             </ul>
-            <p>Your assessment opens as soon as Stripe confirms the payment.</p>
-          </ExpandableDetail>
-        </aside>
+            {row?.activatedAt ? (
+              <Link href="/data" className="btn btn-primary btn-lg w-full">
+                You have this assessment · continue →
+              </Link>
+            ) : sellable ? (
+              <>
+                <PurchaseButton useCaseId={def.id} label={`Get the full assessment · ${price}`} checkout={startAssessmentCheckout} />
+                <p data-label className="text-xs text-center" style={{ color: "var(--muted-foreground)" }}>
+                  One-time · Stripe · no subscription
+                </p>
+              </>
+            ) : (
+              <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+                {sellableUseCases().includes(def.id) ? "Payments aren't set up in this environment yet." : "The full assessment for this question is launching soon. Your answers are saved, so you'll be ready when it does."}
+              </p>
+            )}
+            <ExpandableDetail summary="Everything it includes">
+              <p>Tests these hypotheses against your own data and gives you a decision and a 30–90 day plan.</p>
+              <ul className="space-y-1">
+                {def.youGet.map((g) => (
+                  <li key={g}>• {g}</li>
+                ))}
+              </ul>
+              <p>Your assessment opens as soon as Stripe confirms the payment.</p>
+            </ExpandableDetail>
+          </aside>
+        )}
       </div>
     </div>
   );

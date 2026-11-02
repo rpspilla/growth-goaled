@@ -173,10 +173,16 @@ describe("Growth Snapshot", () => {
 });
 
 describe("pricing", () => {
-  it("defaults to $149 assessments for every available use case, $750 advisory and a reserved, unavailable $299 subscription", () => {
-    expect(sellableUseCases()).toEqual(["growth_leak", "series_a_ready", "hire_or_fix", "winning_icp"]);
+  it("defaults to $499 / $799-a-month action plans, no $149 assessment for new buyers, $750 advisory and a reserved $299 subscription", () => {
+    expect(sellableUseCases()).toEqual([]);
+    process.env.ASSESSMENT_SALES = "on";
+    try {
+      expect(sellableUseCases()).toEqual(["growth_leak", "series_a_ready", "hire_or_fix", "winning_icp"]);
+    } finally {
+      delete process.env.ASSESSMENT_SALES;
+    }
     expect(USE_CASES.filter((u) => u.comingSoon).map((u) => u.id)).toEqual(["series_b_ready", "founder_handoff"]);
-    expect(pricing()).toEqual({ assessmentCents: 14_900, advisoryFromCents: 75_000, subscriptionMonthlyCents: 29_900, subscriptionAvailable: false });
+    expect(pricing()).toEqual({ assessmentCents: 14_900, actionPlanCents: 49_900, supportedMonthlyCents: 79_900, advisoryFromCents: 75_000, subscriptionMonthlyCents: 29_900, subscriptionAvailable: false });
     expect(formatPrice(14_900)).toBe("$149");
     expect(formatPrice(75_000)).toBe("$750");
     expect(formatPrice(1_250)).toBe("$12.50");
@@ -185,8 +191,9 @@ describe("pricing", () => {
   it("reads prices, the booking link and sellable assessments from configuration", () => {
     const env = { ...process.env };
     try {
-      Object.assign(process.env, { ASSESSMENT_PRICE_CENTS: "59900", ADVISORY_PRICE_CENTS: "nonsense", ADVISORY_BOOKING_URL: "http://insecure.test", SELLABLE_USE_CASES: "growth_leak, winning_icp, made_up, series_a_ready" });
+      Object.assign(process.env, { ASSESSMENT_SALES: "on", ACTION_PLAN_PRICE_CENTS: "39900", ASSESSMENT_PRICE_CENTS: "59900", ADVISORY_PRICE_CENTS: "nonsense", ADVISORY_BOOKING_URL: "http://insecure.test", SELLABLE_USE_CASES: "growth_leak, winning_icp, made_up, series_a_ready" });
       expect(pricing().assessmentCents).toBe(59_900);
+      expect(pricing().actionPlanCents).toBe(39_900);
       expect(pricing().advisoryFromCents).toBe(75_000);
       expect(advisoryBookingUrl()).toBeNull();
       expect(sellableUseCases()).toEqual(["growth_leak", "winning_icp", "series_a_ready"]);

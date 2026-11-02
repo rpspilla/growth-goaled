@@ -3,6 +3,10 @@ import { db, schema } from "@/lib/db";
 
 export type EventName =
   | "conversation_started"
+  | "action_plan_purchased"
+  | "action_plan_submitted"
+  | "action_plan_delivered"
+  | "advisor_message"
   | "conversation_message"
   | "recommendation_feedback"
   | "intake_section_completed"

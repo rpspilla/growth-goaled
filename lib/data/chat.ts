@@ -7,6 +7,7 @@ import { isAiConfigError } from "@/lib/ai/config";
 import { characteristics, chatContext } from "@/lib/chat/context";
 import { CHAT_METHODOLOGY_VERSION, getChatTopic } from "@/lib/chat/topics";
 import { track } from "@/lib/events";
+import { registerDocument } from "./documents";
 
 /** Founder messages per company per rolling 24 hours (CHAT_DAILY_LIMIT, default 80): chat is free, so it's capped. */
 export const chatDailyLimit = () => {
@@ -41,6 +42,13 @@ export async function getConversation(company: Pick<Company, "id">, conversation
     .from(schema.conversationMessages)
     .where(eq(schema.conversationMessages.conversationId, conversation.id))
     .orderBy(asc(schema.conversationMessages.createdAt));
+  const authorIds = [...new Set(messages.flatMap((m) => (m.authorId ? [m.authorId] : [])))];
+  const authors = authorIds.length ? await db.select({ id: schema.users.id, name: schema.users.name, email: schema.users.email }).from(schema.users).where(inArray(schema.users.id, authorIds)) : [];
+  const docIds = [...new Set(messages.flatMap((m) => m.documentIds ?? []))];
+  const docs = docIds.length
+    ? await db.select({ id: schema.documents.id, filename: schema.documents.filename, status: schema.documents.status }).from(schema.documents).where(and(inArray(schema.documents.id, docIds), eq(schema.documents.companyId, company.id)))
+    : [];
+  const [plan] = await db.select().from(schema.actionPlans).where(eq(schema.actionPlans.conversationId, conversation.id)).limit(1);
   const recIds = messages.flatMap((m) => (m.recommendationId ? [m.recommendationId] : []));
   const [recs, feedback] = recIds.length
     ? await Promise.all([
@@ -51,6 +59,9 @@ export async function getConversation(company: Pick<Company, "id">, conversation
   return {
     conversation,
     messages,
+    plan: plan ?? null,
+    authors: new Map(authors.map((a) => [a.id, a.name || a.email])),
+    documents: new Map(docs.map((d) => [d.id, d])),
     recommendations: new Map(recs.map((r) => [r.id, r])),
     feedback: new Map(recIds.map((id) => [id, feedback.filter((f) => f.recommendationId === id)])),
   };
@@ -115,12 +126,13 @@ export async function sendMessage(user: User, company: Company, conversationId: 
   }
 
   await db.insert(schema.conversationMessages).values({ conversationId, role: "user", content: text });
-  const history = [...view.messages.map((m) => ({ role: m.role, content: m.content })), { role: "user" as const, content: text }];
+  const history = [...view.messages.map((m) => ({ role: m.role, content: m.content, author: m.authorId ? (view.authors.get(m.authorId) ?? null) : null })), { role: "user" as const, content: text }];
   const context = await chatContext(company, { compensation: Boolean(topic.usesCompensationData) });
+  const plan = view.plan && view.plan.status !== "pending_payment" ? { tier: view.plan.tier, status: view.plan.status, needs: view.plan.needs } : null;
 
   let result;
   try {
-    result = await chatTurn({ topic, context, history });
+    result = await chatTurn({ topic, context, history, plan });
   } catch (err) {
     console.error("[chat] Turn failed", err);
     const error = err instanceof ChatError ? err.message : isAiConfigError(err) ? "Answers aren't available right now. Your message is saved; try again shortly." : "Something went wrong. Your message is saved; try again.";
@@ -172,6 +184,10 @@ export async function sendMessage(user: User, company: Company, conversationId: 
     tokensOut: result.tokensOut,
   });
   await db.update(schema.conversations).set({ updatedAt: new Date() }).where(eq(schema.conversations.id, conversationId));
+  // While a $499 plan is being collected, keep what's still needed up to date for the founder.
+  if (view.plan?.status === "collecting") {
+    await db.update(schema.actionPlans).set({ needs: output.plan_needs.slice(0, 8).map((n) => n.slice(0, 200)), updatedAt: new Date() }).where(eq(schema.actionPlans.id, view.plan.id));
+  }
   await track("conversation_message", { userId: user.id, companyId: company.id, props: { topic: topic.id, recommendation: Boolean(output.recommendation) } });
   return { ok: true };
 }
@@ -180,7 +196,7 @@ export async function sendMessage(user: User, company: Company, conversationId: 
 export async function retryLastMessage(user: User, company: Company, conversationId: string): Promise<ChatResult> {
   const view = await getConversation(company, conversationId);
   const last = view?.messages.at(-1);
-  if (!view || !last || last.role !== "user") return { ok: false, error: "Nothing to retry." };
+  if (!view || !last || last.role !== "user" || last.documentIds?.length) return { ok: false, error: "Nothing to retry." };
   await db.delete(schema.conversationMessages).where(eq(schema.conversationMessages.id, last.id));
   return sendMessage(user, company, conversationId, last.content);
 }
@@ -222,4 +238,34 @@ export async function removeFact(company: Pick<Company, "id">, factId: string): 
     .where(and(eq(schema.companyFacts.id, factId), eq(schema.companyFacts.companyId, company.id)))
     .returning({ id: schema.companyFacts.id });
   return removed.length ? { ok: true } : { ok: false, error: "Fact not found." };
+}
+
+/**
+ * Files the founder attaches in the conversation: stored like any upload (read, extracted and sorted
+ * by the caller after the response) and noted in the conversation so the next answer knows.
+ */
+export async function attachFiles(
+  user: User,
+  company: Company,
+  conversationId: string,
+  files: { pathname: string; filename: string; contentHash?: string }[],
+): Promise<{ ok: true; process: string[] } | { ok: false; error: string }> {
+  if (!files.length) return { ok: false, error: "Choose a file." };
+  const [conversation] = await db
+    .select({ id: schema.conversations.id })
+    .from(schema.conversations)
+    .where(and(eq(schema.conversations.id, conversationId), eq(schema.conversations.companyId, company.id)))
+    .limit(1);
+  if (!conversation) return { ok: false, error: "Conversation not found." };
+  const ids: string[] = [];
+  const process: string[] = [];
+  for (const f of files) {
+    const { doc, duplicate } = await registerDocument(user, company, { ...f, docType: "other" });
+    ids.push(doc.id);
+    if (!duplicate) process.push(doc.id);
+  }
+  const names = files.map((f) => f.filename).join(", ");
+  await db.insert(schema.conversationMessages).values({ conversationId, role: "user", content: `Shared ${files.length === 1 ? "a file" : "files"}: ${names}`, documentIds: ids });
+  await db.update(schema.conversations).set({ updatedAt: new Date() }).where(eq(schema.conversations.id, conversationId));
+  return { ok: true, process };
 }
