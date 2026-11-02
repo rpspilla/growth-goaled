@@ -44,6 +44,7 @@ Local development points at the Neon `dev` branch.
 | `ACTION_PLAN_PRICE_CENTS`, `SUPPORTED_PLAN_MONTHLY_CENTS` | Optional. Action plan prices (defaults $499 once, $799 a month) |
 | `ASSESSMENT_SALES` | Optional. `on` keeps selling the $149 assessment to new buyers; off by default since action plans replaced it (past buyers keep theirs) |
 | `GUEST_DAILY_PER_IP` | Optional. New guest chats on the sign-in page per visitor network per day (default 20) |
+| `SEED_PORTFOLIO` | Optional, dev only. `on` re-creates the fake advisor portfolio (six demo companies) on each dev deploy; off by default so dev stays as you leave it. The Acme AI sample (for `/sample`) is always kept |
 | `CHAT_DAILY_LIMIT` | Optional. Founder chat messages per company per rolling 24 hours (default 80); chat is free, so it's capped |
 
 Each Vercel environment points at its own Neon branch: Production → `main`, Preview and Development → `dev`.

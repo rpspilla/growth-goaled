@@ -22,7 +22,8 @@ if (args.has("--auto")) {
     console.log("[seed] Not on Vercel; skipping automatic seed (run npm run db:seed).");
     process.exit(0);
   }
-  withPortfolio = process.env.VERCEL_ENV === "preview";
+  // The fake advisor portfolio is opt-in on dev (SEED_PORTFOLIO=on), so dev can be cleared for testing.
+  withPortfolio = process.env.VERCEL_ENV === "preview" && process.env.SEED_PORTFOLIO === "on";
 } else {
   withPortfolio = !args.has("--sample-only");
 }
