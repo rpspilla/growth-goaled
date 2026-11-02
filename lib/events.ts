@@ -2,6 +2,9 @@ import "server-only";
 import { db, schema } from "@/lib/db";
 
 export type EventName =
+  | "conversation_started"
+  | "conversation_message"
+  | "recommendation_feedback"
   | "intake_section_completed"
   | "document_uploaded"
   | "extraction_completed"
