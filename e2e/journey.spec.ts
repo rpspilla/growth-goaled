@@ -156,13 +156,16 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   for (const [i, title] of ["Build a repeatable sales motion", "Build a growth hiring plan", "How do I fix churn?"].entries()) await expect(titles.nth(i)).toHaveText(title);
   await expect(leakCard).toContainText("Snapshot free · Assessment $149");
   // Coming-soon questions are listed but can't be started or bought.
-  for (const soon of ["Are we ready to raise a Series A?", "Are we ready to raise a Series B?", "Build me an investor update"]) {
+  for (const soon of ["Are we ready to raise a Series B?", "Build me an investor update"]) {
     const card = founder.page.getByRole("article", { name: `${soon} (coming soon)` });
     await expect(card).toContainText("Coming soon");
     await expect(card.getByRole("link")).toHaveCount(0);
   }
-  await founder.page.goto("/library/series_a_ready/snapshot");
-  await expect(founder.page).toHaveURL(/\/library\/series_a_ready$/);
+  // Series A readiness is live (owner decision, Nov 2026); Series B is still coming soon.
+  await expect(founder.page.getByRole("article", { name: "Are we ready to raise a Series A? (coming soon)" })).toHaveCount(0);
+  await expect(founder.page.locator("article", { has: founder.page.getByRole("heading", { name: "Are we ready to raise a Series A?" }) }).getByRole("link", { name: /^Start with a free Snapshot/ })).toBeVisible();
+  await founder.page.goto("/library/series_b_ready/snapshot");
+  await expect(founder.page).toHaveURL(/\/library\/series_b_ready$/);
   await expect(founder.page.getByRole("heading", { name: "Coming soon", exact: true })).toBeVisible();
   await expect(founder.page.getByRole("button")).not.toContainText([/Snapshot|\$149/]);
   await founder.page.goto("/library");

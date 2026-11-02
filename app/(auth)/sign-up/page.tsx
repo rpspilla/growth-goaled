@@ -54,7 +54,10 @@ export default function SignUpPage() {
         </ol>
         <div className="mt-6 space-y-2 text-sm" style={{ color: "var(--muted-foreground)" }}>
           <p><span className="font-semibold" style={{ color: "var(--foreground)" }}>Pricing:</span> the account and Snapshot are free. A full assessment from your own data is {price} per question, only if you choose it. No subscription.</p>
-          <p><span className="font-semibold" style={{ color: "var(--foreground)" }}>Your data:</span> used only for your own analysis, never shown to other companies.</p>
+          <p>
+            <span className="font-semibold" style={{ color: "var(--foreground)" }}>Your data:</span> used for your own analysis and never shown to other companies. In anonymized,
+            aggregated form only, it also helps improve our recommendations and benchmarks. <Link href="/data-use" className="link">How we use your data</Link>
+          </p>
           <p><Link href="/sample" className="link">See a sample company first →</Link></p>
         </div>
         <Faq className="mt-6" />

@@ -174,8 +174,8 @@ describe("Growth Snapshot", () => {
 
 describe("pricing", () => {
   it("defaults to $149 assessments for every available use case, $750 advisory and a reserved, unavailable $299 subscription", () => {
-    expect(sellableUseCases()).toEqual(["growth_leak", "hire_or_fix", "winning_icp"]);
-    expect(USE_CASES.filter((u) => u.comingSoon).map((u) => u.id)).toEqual(["series_a_ready", "series_b_ready", "founder_handoff"]);
+    expect(sellableUseCases()).toEqual(["growth_leak", "series_a_ready", "hire_or_fix", "winning_icp"]);
+    expect(USE_CASES.filter((u) => u.comingSoon).map((u) => u.id)).toEqual(["series_b_ready", "founder_handoff"]);
     expect(pricing()).toEqual({ assessmentCents: 14_900, advisoryFromCents: 75_000, subscriptionMonthlyCents: 29_900, subscriptionAvailable: false });
     expect(formatPrice(14_900)).toBe("$149");
     expect(formatPrice(75_000)).toBe("$750");
@@ -189,7 +189,7 @@ describe("pricing", () => {
       expect(pricing().assessmentCents).toBe(59_900);
       expect(pricing().advisoryFromCents).toBe(75_000);
       expect(advisoryBookingUrl()).toBeNull();
-      expect(sellableUseCases()).toEqual(["growth_leak", "winning_icp"]);
+      expect(sellableUseCases()).toEqual(["growth_leak", "winning_icp", "series_a_ready"]);
       process.env.ADVISORY_BOOKING_URL = "https://calendly.com/growthgoaled/session";
       expect(advisoryBookingUrl()).toBe("https://calendly.com/growthgoaled/session");
       expect(advisoryBookingUrl("monthly")).toBe("https://calendly.com/growthgoaled/session");

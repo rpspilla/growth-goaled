@@ -24,7 +24,9 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
   const view = await getConversation(company, id.data);
   if (!view) notFound();
   const topic = getChatTopic(view.conversation.topic);
-  const deep = topic?.deepAssessment ? getUseCase(topic.deepAssessment) : undefined;
+  // "Next round" means Series B for a company that has already raised its A.
+  const deepId = topic?.id === "fundraising" && (company.stage === "Series A" || company.stage === "Series B+") ? "series_b_ready" : topic?.deepAssessment;
+  const deep = deepId ? getUseCase(deepId) : undefined;
   const deeper = deep && !deep.comingSoon ? { href: `/library/${deep.id}`, label: `Go deeper with your data: "${deep.question}" (${formatPrice(pricing().assessmentCents)}) →` } : null;
   const last = view.messages.at(-1);
 
@@ -64,7 +66,8 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
 
       <Composer conversationId={view.conversation.id} send={sendMessageAction} retry={retryMessageAction} awaitingAnswer={last?.role === "user"} />
       <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-        Facts you mention are remembered for your company, so you won&apos;t be asked twice. <Link href="/chat#facts" className="link">See or correct them</Link>.
+        Facts you mention are remembered for your company, so you won&apos;t be asked twice. <Link href="/chat#facts" className="link">See or correct them</Link>. Never shown to other
+        companies; <Link href="/data-use" className="link">how we use your data</Link>.
       </p>
     </div>
   );

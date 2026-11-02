@@ -26,7 +26,11 @@ export const seriesAReady: UseCaseDef = {
   nextUseCase: "growth_leak",
   objectiveQuestions: [],
   retiredQuestions: raiseQuestions("Series A"),
-  comingSoon: true,
+  keyFile: {
+    label: "Monthly revenue by customer",
+    hint: "From billing or accounting: each customer's recurring revenue by month, for the last 12–24 months. It gives ARR, growth, retention and concentration, the first things a Series A investor checks.",
+    items: ["revenue_by_customer", "monthly_revenue"],
+  },
   requiredItems: ["monthly_revenue", "monthly_burn", "cash_balances", "customer_list", "revenue_by_customer"],
   helpfulItems: ["gross_margin", "runway", "grr_nrr", "churn", "active_usage"],
   optionalItems: ["opportunities", "win_loss"],

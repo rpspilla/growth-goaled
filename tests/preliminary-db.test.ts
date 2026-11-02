@@ -249,7 +249,7 @@ describe("assessment purchase", () => {
 
   it("sells every available assessment by default, never a coming-soon one, and only those listed when SELLABLE_USE_CASES narrows it", async () => {
     expect(await createAssessmentCheckout(founder, acme, "hire_or_fix", "https://dev.test", fakeStripe({}) as never)).toContain("checkout.stripe.com");
-    for (const soon of ["series_a_ready", "series_b_ready", "founder_handoff"] as const)
+    for (const soon of ["series_b_ready", "founder_handoff"] as const)
       await expect(createAssessmentCheckout(founder, acme, soon, "https://dev.test", fakeStripe({}) as never)).rejects.toThrow("isn't available to buy yet");
     process.env.SELLABLE_USE_CASES = "growth_leak";
     try {
@@ -309,7 +309,7 @@ describe("assessment purchase", () => {
     expect(await activateUseCase(acme.id, "hire_or_fix", { activation: "paid", by: founder.id })).toEqual({ activated: false });
     expect((await getCompanyUseCase(acme.id, "hire_or_fix"))!.activation).toBe("advisor");
     // Coming-soon questions can't be granted either.
-    await expect(activateWithoutPayment(advisor, acme, "series_a_ready", "Pilot")).rejects.toThrow(/coming soon/);
+    await expect(activateWithoutPayment(advisor, acme, "series_b_ready", "Pilot")).rejects.toThrow(/coming soon/);
     await expect(activateWithoutPayment(founder, acme, "growth_leak", "me")).rejects.toThrow();
   });
 

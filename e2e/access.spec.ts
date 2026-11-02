@@ -35,10 +35,14 @@ const as = async (browser: import("@playwright/test").Browser, email: string) =>
 };
 
 test("signed-out visitors go to sign-in", async ({ page }) => {
-  for (const path of ["/overview", "/data", "/advisor/portfolio", "/advisor/review"]) {
+  for (const path of ["/overview", "/data", "/chat", "/advisor/portfolio", "/advisor/review"]) {
     await page.goto(path);
     await expect(page, path).toHaveURL(/\/sign-in/);
   }
+  // How we use data is public, and says aggregated use is anonymized.
+  await page.goto("/data-use");
+  await expect(page.getByRole("heading", { name: "How we use your data" })).toBeVisible();
+  await expect(page.getByText(/anonymized, aggregated form/)).toBeVisible();
 });
 
 test("founders can't open advisor pages", async ({ browser }) => {
