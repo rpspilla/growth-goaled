@@ -885,7 +885,136 @@ export const events = pgTable(
   (t) => [index("events_name_created_idx").on(t.name, t.createdAt)],
 );
 
+// ---------------------------------------------------------------------------
+// Conversations (the founder's chat with Growth Goaled) and what they produce
+// ---------------------------------------------------------------------------
+
+export const messageRole = pgEnum("message_role", ["user", "assistant"]);
+export const factStatus = pgEnum("fact_status", ["stated", "assumption", "verified"]);
+export const feedbackKind = pgEnum("feedback_kind", [
+  "helpful",
+  "incomplete",
+  "incorrect",
+  "not_relevant",
+  "disagree",
+  "implemented",
+  "partially_implemented",
+  "not_implemented",
+  "result_achieved",
+  "no_improvement",
+  "different_approach",
+]);
+
+export const conversations = pgTable(
+  "conversations",
+  {
+    id: id(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    // Starter topic id (lib/chat/topics.ts); "other" for "Something else"
+    topic: text("topic").notNull(),
+    title: text("title").notNull(),
+    ...timestamps,
+  },
+  (t) => [index("conversations_company_idx").on(t.companyId, t.updatedAt)],
+);
+
+export const conversationMessages = pgTable(
+  "conversation_messages",
+  {
+    id: id(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    role: messageRole("role").notNull(),
+    content: text("content").notNull(),
+    // Assistant turns: follow-up questions asked, and the recommendation card when one was given
+    questions: jsonb("questions").$type<string[]>(),
+    recommendationId: uuid("recommendation_id"),
+    model: text("model"),
+    tokensIn: integer("tokens_in"),
+    tokensOut: integer("tokens_out"),
+    ...timestamps,
+  },
+  (t) => [index("conversation_messages_conversation_idx").on(t.conversationId, t.createdAt)],
+);
+
+/** What the founder has told us in conversation, kept so it's never asked again; editable on the profile. */
+export const companyFacts = pgTable(
+  "company_facts",
+  {
+    id: id(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    key: text("key").notNull(),
+    label: text("label").notNull(),
+    value: text("value").notNull(),
+    status: factStatus("status").notNull().default("stated"),
+    conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
+    updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("company_facts_company_key_idx").on(t.companyId, t.key)],
+);
+
+export type RecommendationCard = {
+  takeaway: string;
+  diagnosis: string;
+  evidence: { text: string; kind: "fact" | "figure" | "assumption" | "hypothesis" }[];
+  confidence: { level: "high" | "medium" | "low"; why: string };
+  priority: string;
+  recommendation: string;
+  nextSteps: string[];
+  successMeasures: string[];
+  plan: { days30: string[]; days60: string[]; days90: string[] };
+  missing: string[];
+};
+
+/** One recommendation as a record: what was asked, about which company, what we said and on what basis. */
+export const recommendations = pgTable(
+  "recommendations",
+  {
+    id: id(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
+    topic: text("topic").notNull(),
+    question: text("question").notNull(),
+    // Company characteristics when it was made (stage, industry, revenue band, headcount…)
+    context: jsonb("context").$type<Record<string, string | number | null>>().notNull(),
+    card: jsonb("card").$type<RecommendationCard>().notNull(),
+    confidence: confidence("confidence").notNull(),
+    methodologyVersion: text("methodology_version").notNull(),
+    model: text("model"),
+    ...timestamps,
+  },
+  (t) => [index("recommendations_company_idx").on(t.companyId, t.createdAt), index("recommendations_topic_idx").on(t.topic)],
+);
+
+export const recommendationFeedback = pgTable(
+  "recommendation_feedback",
+  {
+    id: id(),
+    recommendationId: uuid("recommendation_id")
+      .notNull()
+      .references(() => recommendations.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    kind: feedbackKind("kind").notNull(),
+    note: text("note"),
+    ...timestamps,
+  },
+  (t) => [index("recommendation_feedback_recommendation_idx").on(t.recommendationId)],
+);
+
 export type User = typeof users.$inferSelect;
 export type Role = (typeof userRole.enumValues)[number];
 export type Company = typeof companies.$inferSelect;
 export type CompanyUseCase = typeof companyUseCases.$inferSelect;
+export type Conversation = typeof conversations.$inferSelect;
+export type ConversationMessage = typeof conversationMessages.$inferSelect;
+export type CompanyFact = typeof companyFacts.$inferSelect;
+export type Recommendation = typeof recommendations.$inferSelect;
