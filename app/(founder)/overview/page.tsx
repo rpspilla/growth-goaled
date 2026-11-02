@@ -6,6 +6,10 @@ import { Section } from "@/components/ui/Section";
 import { Sparkline } from "@/components/ui/Sparkline";
 import { assessmentCompletions, founderAssessment } from "@/lib/data/assessments";
 import { founderContext } from "@/lib/data/founder-context";
+import { listConversations } from "@/lib/data/chat";
+import { CHAT_TOPICS } from "@/lib/chat/topics";
+import { ChatStart } from "@/components/chat/ChatStart";
+import { startChatAction } from "../chat/actions";
 import { getIntakeAnswers } from "@/lib/data/intake";
 import { snapshotPeers } from "@/lib/data/peers";
 import { PeerComparisons } from "@/components/use-cases/PeerComparisons";
@@ -40,7 +44,7 @@ const TIMING: Record<string, string> = { next_30_days: "Days 1–30", days_31_60
 
 /** What a founder sees at each stage before results exist: one sentence and one button. */
 const STAGE_COPY = [
-  { title: "Start with the decision you're facing", body: "Pick a growth question and get a free Growth Snapshot in minutes." },
+  { title: "Want an answer built from your own data?", body: "Pick a growth question for a free Growth Snapshot from one file, then a full assessment of your data when you're ready." },
   { title: "Share your data to get your answer", body: "Your assessment is ready for your data. Share what you have; it works with whatever you've got and says what's missing." },
   { title: "Your results are being built", body: "We're working through your answers and figures and checking every number. This usually takes a few minutes." },
   { title: "Keep your plan moving", body: "Track your actions and the metrics they should move." },
@@ -67,17 +71,22 @@ function benchmarkLead(peers: PeerComparison[]): string {
 }
 
 /** Growth Command Center: the main finding, the numbers that matter, the next three actions, and where each question stands. */
-export default async function OverviewPage() {
+// A starter is answered before the conversation opens.
+export const maxDuration = 300;
+
+export default async function OverviewPage({ searchParams }: { searchParams: Promise<{ welcome?: string }> }) {
+  const { welcome } = await searchParams;
   const { user, company, useCases, active } = await founderContext();
   const state = active && { useCase: active.def.id, status: active.status };
   const started = useCases.find((u) => !u.activatedAt);
   const action = nextAction(state, started ? (getUseCase(started.useCase)?.id ?? null) : null);
-  const [brief, plan, perf, completed, peers] = await Promise.all([
+  const [brief, plan, perf, completed, peers, conversations] = await Promise.all([
     company && active ? founderAssessment(company.id, active.def.id) : null,
     company && active ? progressView(company, active.def.id) : null,
     company ? companyPerformance(company) : null,
     company ? assessmentCompletions(company.id) : ({} as Partial<Record<string, Date>>),
     company ? getIntakeAnswers(company).then((a) => snapshotPeers(company, a)) : null,
+    company ? listConversations(company, 3) : [],
   ]);
   const view = brief?.state === "ready" ? brief.view : null;
   // AE ramp time always has a place on the Overview (James's feedback): the figure, or what would give it.
@@ -100,8 +109,33 @@ export default async function OverviewPage() {
     <div className="px-4 sm:px-8 py-8 max-w-6xl space-y-12">
       <PageHeader eyebrow={company?.name} title={firstName ? `Welcome back, ${firstName}` : "Your growth command center"} />
 
+      {welcome !== undefined && company && (
+        <div className="surface p-5 -mt-6 flex gap-4 items-start" style={{ background: "var(--green-muted)", borderColor: "transparent" }} role="status">
+          <div>
+            <div className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>You&apos;re set up, {company.name}. Ask your first question below.</div>
+            <p className="text-base mt-0.5" style={{ color: "var(--muted-foreground)" }}>Conversations are free. When you want an answer built from your own data, run a full assessment from the <Link href="/library" className="link">Library</Link>.</p>
+          </div>
+        </div>
+      )}
+
+      {/* The main entry: talk a decision through. */}
+      {company && (
+        <div className="space-y-4">
+          <ChatStart starters={CHAT_TOPICS.map((t) => ({ id: t.id, starter: t.starter }))} start={startChatAction} />
+          {conversations.length > 0 && (
+            <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-base">
+              <span style={{ color: "var(--muted-foreground)" }}>Pick up where you left off:</span>
+              {conversations.map((c) => (
+                <Link key={c.id} href={`/chat/${c.id}`} className="link">{c.title}</Link>
+              ))}
+              <Link href="/chat" className="link text-sm">All conversations →</Link>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* The focal point: the main finding, or the one thing to do next. */}
-      <section aria-label="Main finding" className="-mt-6">
+      <section aria-label="Main finding">
         {view && active ? (
           <div className="surface p-6 sm:p-8" style={{ borderColor: "var(--green)", boxShadow: "0 0 0 1px var(--green)" }}>
             <div className="flex items-center gap-2 flex-wrap mb-3">

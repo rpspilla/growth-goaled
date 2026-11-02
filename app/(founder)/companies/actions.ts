@@ -56,5 +56,5 @@ export async function addCompany(_prev: AddCompanyState, formData: FormData): Pr
   await saveCompanyBasics(user, companyId, parsed.data);
   await track("company_added", { userId: user.id, companyId, props: { revenue_band: revenueBand } });
   await workOn(companyId);
-  redirect("/library?welcome=1");
+  redirect("/overview?welcome=1");
 }

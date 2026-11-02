@@ -137,9 +137,9 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await founder.page.locator("#aes").fill("5");
   await founder.page.locator("#bdrs").fill("2");
   await founder.page.getByRole("button", { name: "Continue to growth questions" }).click();
-  // Straight to the first real step, with a progress cue.
-  await expect(founder.page).toHaveURL(/\/library\?welcome=1$/);
-  await expect(founder.page.getByText(/You're set up, E2E Analytics\. Last step: pick a question\./)).toBeVisible();
+  // Straight to the main entry: the conversation starters.
+  await expect(founder.page).toHaveURL(/\/overview\?welcome=1$/);
+  await expect(founder.page.getByText(/You're set up, E2E Analytics\. Ask your first question below\./)).toBeVisible();
   // The Command Center points to the same first step.
   await founder.page.goto("/overview");
 

@@ -28,7 +28,7 @@ test("an allowed founder can run several company profiles, each with its own dat
   await page.getByLabel("Vertical").selectOption("HealthTech");
   await page.getByLabel("Account executives").fill("2");
   await page.getByRole("button", { name: "Create company and pick a question" }).click();
-  await expect(page).toHaveURL(/\/library\?welcome=1/);
+  await expect(page).toHaveURL(/\/overview\?welcome=1/);
   await expect(page.getByText(/You're set up, Second Co\./)).toBeVisible();
 
   // Each company keeps its own profile: what's set on one doesn't show on the other.

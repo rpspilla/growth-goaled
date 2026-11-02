@@ -28,6 +28,7 @@ export default async function FounderLayout({ children }: { children: ReactNode 
           libraryHint="Pick a growth question"
           extra={[
             { href: "/overview", label: "Overview" },
+            { href: "/chat", label: "Conversations" },
             { href: "/performance", label: "Performance" },
             { href: "/assessments", label: "All assessments" },
             { href: "/profile", label: "Company profile" },

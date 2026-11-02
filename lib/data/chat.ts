@@ -92,7 +92,7 @@ export async function startConversation(
 ): Promise<{ ok: false; error: string } | { ok: true; conversationId: string; error: string | null }> {
   const topic = getChatTopic(topicId);
   if (!topic) return { ok: false, error: "Unknown question." };
-  const first = (text ?? "").trim() || (topic.id === "other" ? "" : topic.starter);
+  const first = topic.id === "other" ? (text ?? "").trim() : topic.starter;
   if (!first) return { ok: false, error: "Tell us what you'd like to work through." };
   const title = (topic.id === "other" ? first : topic.starter).slice(0, 120);
   const [conversation] = await db.insert(schema.conversations).values({ companyId: company.id, userId: user.id, topic: topic.id, title }).returning({ id: schema.conversations.id });

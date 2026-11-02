@@ -31,7 +31,11 @@ test("sign-up basics carry through, and every growth question opens its own page
   await expect(page.locator("#companyName")).toHaveValue("Deer in Headlights");
   await page.locator("#verticalOther").fill("Customer experience");
   await page.getByRole("button", { name: "Continue to growth questions" }).click();
-  await expect(page).toHaveURL(/\/library\?welcome=1$/);
+  // Sign-up lands on the main entry: the conversation starters.
+  await expect(page).toHaveURL(/\/overview\?welcome=1$/);
+  await expect(page.getByText(/You're set up, Deer in Headlights\. Ask your first question below\./)).toBeVisible();
+  await expect(page.getByRole("button", { name: "How do I build a repeatable revenue engine?" })).toBeVisible();
+  await page.goto("/library");
 
   // --- Library: fixed order, no "Recommended" tag ---
   await expect(page.getByText("Recommended for you")).toHaveCount(0);
