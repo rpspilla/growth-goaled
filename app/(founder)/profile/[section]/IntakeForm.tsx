@@ -140,10 +140,14 @@ export function IntakeForm({
               </div>
             )}
             <div className="grid grid-cols-2 gap-4">
-              {section.fields.filter((f) => !f.rangeOf).map((f) => {
+              {section.fields.filter((f) => (f.rangeOf ? section.fields.find((x) => x.id === f.rangeOf)?.askAsRange : !f.askAsRange)).map((f) => {
                 const id = `intake-${f.id}`;
                 // A range picked on a questionnaire, shown until an exact figure replaces it.
                 const range = !values[f.id] ? section.fields.find((r) => r.rangeOf === f.id && values[r.id]) : undefined;
+                // A field asked as a range: the exact figure from a file, if there is one.
+                const exact = f.rangeOf && values[f.rangeOf] ? values[f.rangeOf] : null;
+                // Examples for written answers move under the field; numbers get none (they read as data).
+                const example = (f.kind === "text" || f.kind === "textarea") && f.placeholder ? (f.placeholder.startsWith("e.g.") ? f.placeholder : `e.g. ${f.placeholder}`) : null;
                 const common = {
                   id,
                   name: f.id,
@@ -167,7 +171,7 @@ export function IntakeForm({
                           save(f.id, e.target.value);
                         }}
                       >
-                        <option value="">Select…</option>
+                        <option value="">Please complete this</option>
                         {f.options?.map((o) => (
                           <option key={o} value={o}>{o}</option>
                         ))}
@@ -180,7 +184,7 @@ export function IntakeForm({
                       <textarea
                         {...common}
                         rows={3}
-                        placeholder={f.placeholder}
+                        placeholder="Please complete this"
                         onChange={(e) => setValues((v) => ({ ...v, [f.id]: e.target.value }))}
                         onBlur={(e) => save(f.id, e.target.value)}
                       />
@@ -189,12 +193,14 @@ export function IntakeForm({
                         {...common}
                         type="text"
                         inputMode={f.kind === "text" ? undefined : "decimal"}
-                        placeholder={f.placeholder}
+                        placeholder="Please complete this"
                         onChange={(e) => setValues((v) => ({ ...v, [f.id]: e.target.value }))}
                         onBlur={(e) => save(f.id, e.target.value)}
                       />
                     )}
                     {f.help && <div className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>{f.help}</div>}
+                    {example && <div className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>{example}</div>}
+                    {exact && <div className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>Exact figure on file: {exact}.</div>}
                     {hints[f.id] && !values[f.id] && <div className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>{hints[f.id]}</div>}
                     {range && <div className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>You told us {values[range.id]}. Add the exact figure if you know it.</div>}
                     {errors[f.id] && <div className="text-xs mt-1" style={{ color: "var(--red)" }}>{errors[f.id]}</div>}

@@ -140,7 +140,7 @@ describe("Growth Snapshot", () => {
     expect(snap("winning_icp", { "customers.count_range": "10–19" }).signals[0]!.title).toBe("Segment comparisons will be directional");
     expect(snap("winning_icp", { "customers.count_range": "20–49" }).signals.map((s) => s.title)).not.toContain("Segment comparisons will be directional");
     // A range alone still counts as an answer, and an unknown label is ignored.
-    expect(snap("growth_leak", { "company.employees_range": "6–10" }).answersOnly).toBe(false);
+    expect(snap("growth_leak", { "company.employees_range": "5–10" }).answersOnly).toBe(false);
     expect(snap("growth_leak", { "customers.nrr_range": "about 100" }).answersOnly).toBe(true);
   });
 

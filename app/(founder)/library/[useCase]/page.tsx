@@ -116,10 +116,10 @@ export default async function UseCasePage({ params }: { params: Promise<{ useCas
       <div className="grid lg:grid-cols-[minmax(0,1fr)_21rem] gap-6 items-start">
         <section className="surface surface-pad" aria-labelledby="questionnaire">
           <h2 id="questionnaire" className="text-xl sm:text-2xl font-semibold" style={{ color: "var(--foreground)" }}>
-            A few quick questions
+            {fields.length ? "A few quick questions" : "Your free Growth Snapshot"}
           </h2>
           <p className="text-sm mt-1 mb-5" style={{ color: "var(--muted-foreground)" }}>
-            Free. Saved as you go.
+            {fields.length ? "Free. Saved as you go." : "Free. Nothing to fill in: it uses what you told us at sign-up."}
           </p>
           {known.length > 0 && (
             <div className="mb-5" aria-label="Already known from your profile">

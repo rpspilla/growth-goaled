@@ -60,7 +60,8 @@ export function UseCaseSidebar({
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Steps">
-        <div className="px-3 pb-2 text-xs font-medium" style={{ color: "#8FA3B8" }}>Your plan</div>
+        {/* Section labels look like labels (small caps, muted), not like smaller nav items. */}
+        <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#8FA3B8" }}>Your plan</div>
         <div className="space-y-0.5">
           {steps.map((step, i) => {
             const href = hrefFor(step.path);
@@ -118,7 +119,7 @@ export function UseCaseSidebar({
         </div>
         {extra.length > 0 && (
           <>
-            <div className="px-3 pt-6 pb-2 text-xs font-medium" style={{ color: "#8FA3B8" }}>Company</div>
+            <div className="px-3 pt-6 pb-2 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#8FA3B8" }}>Company</div>
             <div className="space-y-0.5">
               {extra.map((l) => (
                 <NavLink key={l.href} href={l.href}>

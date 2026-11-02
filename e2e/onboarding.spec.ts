@@ -38,6 +38,12 @@ test("sign-up basics carry through, and every growth question opens its own page
   const titles = page.locator("article h2");
   for (const [i, title] of ["Build a repeatable sales motion", "Build a growth hiring plan", "How do I fix churn?"].entries()) await expect(titles.nth(i)).toHaveText(title);
 
+  // --- Batch 2: short cards (when to use it + the questions it answers), section labels look like labels ---
+  const hiringCard = page.locator("article", { has: page.getByRole("heading", { name: "Build a growth hiring plan" }) });
+  await expect(hiringCard).toContainText("Use it when:");
+  await expect(hiringCard.getByRole("list", { name: "Questions it answers" }).getByRole("listitem")).toHaveCount(3);
+  await expect(hiringCard.getByText("Details")).toHaveCount(0);
+
   // --- 1.9: open another question first, come back, then the hiring plan opens its own page ---
   await page.locator("article", { has: page.getByRole("heading", { name: "How do I fix churn?" }) }).getByRole("link").click();
   await expect(page).toHaveURL(/\/library\/growth_leak$/);
@@ -71,6 +77,14 @@ test("sign-up basics carry through, and every growth question opens its own page
   await expect(page.locator("#intake-industry_other")).toHaveValue("Customer experience");
   await expect(page.getByText("You told us $10M–$20M at sign-up.")).toBeVisible();
   await expect(page.getByText("All optional.")).toBeVisible();
+  // No grey example figures: empty fields ask to be completed.
+  await expect(page.locator("#intake-arr")).toHaveAttribute("placeholder", "Please complete this");
+  await expect(page.locator("#intake-growth")).toHaveAttribute("placeholder", "Please complete this");
+  // Employees is asked as one of the new ranges.
+  await expect(page.locator("#intake-employees")).toHaveCount(0);
+  await expect(page.locator("#intake-employees_range option")).toHaveText(["Please complete this", "<5", "5–10", "11–20", "21–50", "51–100", "100+"]);
+  await page.locator("#intake-employees_range").selectOption("51–100");
+  await expect(page.locator('label[for="intake-employees_range"]')).toContainText("✓");
   await page.goto("/profile/gtm");
   await expect(page.locator("#intake-sales_reps")).toHaveValue("10");
   await expect(page.locator("#intake-sdrs")).toHaveValue("4");

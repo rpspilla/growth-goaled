@@ -21,7 +21,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Prom
           <div>
             <div className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>You&apos;re set up{company ? `, ${company.name}` : ""}. Last step: pick a question.</div>
             <p className="text-base mt-0.5" style={{ color: "var(--muted-foreground)" }}>
-              You&apos;ll answer a few questions and see your free Growth Snapshot straight away. Not sure where to start? Try &ldquo;{first.question}&rdquo;.
+              Pick one and see your free Growth Snapshot straight away. Not sure where to start? Try &ldquo;{first.question}&rdquo;.
             </p>
           </div>
         </div>

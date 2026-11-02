@@ -134,6 +134,13 @@
       "when": 1793219187572,
       "tag": "0018_review_required",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793631004128,
+      "tag": "0019_employee_ranges",
+      "breakpoints": true
     }
   ]
 }

@@ -18,7 +18,8 @@ export const RANGES: Readonly<Record<string, { label: string; options: readonly 
   },
   "company.employees": {
     label: "Number of employees",
-    options: [r("1–5", 1, 5), r("6–10", 6, 10), r("11–25", 11, 25), r("26–50", 26, 50), r("50+", 50, null)],
+    // Owner decision, Nov 2026 (migration 0019 moved earlier answers).
+    options: [r("<5", 0, 4), r("5–10", 5, 10), r("11–20", 11, 20), r("21–50", 21, 50), r("51–100", 51, 100), r("100+", 101, null)],
   },
   "company.funding": {
     label: "Total funding raised",

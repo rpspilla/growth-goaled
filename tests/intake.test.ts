@@ -74,3 +74,13 @@ describe("intake config", () => {
     expect(displayValue(f("company", "arr"), null)).toBe("");
   });
 });
+
+describe("employee-count ranges (Nov 2026)", () => {
+  it("are <5, 5–10, 11–20, 21–50, 51–100, 100+, asked as a range on the profile", async () => {
+    const { RANGES } = await import("@/lib/ranges");
+    const { getField } = await import("@/lib/intake");
+    expect(RANGES["company.employees"]!.options.map((o) => o.label)).toEqual(["<5", "5–10", "11–20", "21–50", "51–100", "100+"]);
+    expect(getField("company", "employees")!.askAsRange).toBe(true);
+    expect(getField("company", "employees_range")!.options).toEqual(["<5", "5–10", "11–20", "21–50", "51–100", "100+"]);
+  });
+});

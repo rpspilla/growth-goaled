@@ -9,6 +9,7 @@ export const growthLeak: UseCaseDef = {
   forWho: "Founders losing customers or revenue they expected to keep. The best place to start if growth has slowed and you're unsure why.",
   decision: "What's driving churn, and the first fix to make: retention, expansion or new business.",
   whenUseful: "Customers are cancelling or shrinking, or growth has slowed and you suspect churn.",
+  answers: ["Where are we losing revenue?", "Which customers is it coming from?", "What should we fix first?"],
   youGet: [
     "Your churn, retention and growth metrics, with the evidence behind each figure",
     "Comparison with approved peer reference data, where it exists",

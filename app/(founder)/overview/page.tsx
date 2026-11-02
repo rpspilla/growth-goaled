@@ -39,7 +39,7 @@ const TIMING: Record<string, string> = { next_30_days: "Days 1–30", days_31_60
 
 /** What a founder sees at each stage before results exist: one sentence and one button. */
 const STAGE_COPY = [
-  { title: "Start with the decision you're facing", body: "Pick a growth question, answer a few questions, and get a free Growth Snapshot in minutes." },
+  { title: "Start with the decision you're facing", body: "Pick a growth question and get a free Growth Snapshot in minutes." },
   { title: "Share your data to get your answer", body: "Your assessment is ready for your data. Share what you have; it works with whatever you've got and says what's missing." },
   { title: "Your results are being built", body: "We're working through your answers and figures and checking every number. This usually takes a few minutes." },
   { title: "Keep your plan moving", body: "Track your actions and the metrics they should move." },

@@ -58,6 +58,8 @@ export type UseCaseDef = {
   /** The decision it helps the founder make, in one line (shown on the library card). */
   decision: string;
   whenUseful: string;
+  /** The 2–3 questions it answers for the founder, shown on the library card. */
+  answers?: readonly string[];
   /** Key outputs of the full assessment. */
   youGet: readonly string[];
   /** Profile figures that make the free Snapshot more useful (only asked when missing). */

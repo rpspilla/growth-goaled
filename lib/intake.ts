@@ -47,6 +47,11 @@ export type IntakeField = {
   asChurn?: boolean;
   /** Set on range fields: the exact field this range stands in for. Never a figure. */
   rangeOf?: string;
+  /**
+   * Asked as its range on the profile (lib/ranges.ts), not as an exact number. An exact figure from
+   * a file still counts and is shown under the range.
+   */
+  askAsRange?: boolean;
   /** Earlier options no longer offered: answers already given stay valid and are shown back. */
   legacyOptions?: readonly string[];
 };
@@ -114,7 +119,7 @@ const BASE_SECTIONS: IntakeSection[] = [
       { id: "arr", label: "ARR ($)", kind: "currency", required: true, placeholder: "4,200,000", metric: "arr", column: "arr" },
       { id: "growth", label: "YoY Growth (%)", kind: "percent", required: true, placeholder: "72", metric: "arr_growth", column: "growthPct" },
       { id: "funding", label: "Total Funding ($)", kind: "currency", required: false, placeholder: "8,500,000", column: "funding", help: "All the equity and convertible money you've raised to date (SAFEs, notes and priced rounds), not loans." },
-      { id: "employees", label: "Employees", kind: "integer", required: true, placeholder: "38", metric: "employees", column: "employees" },
+      { id: "employees", label: "Employees", kind: "integer", required: false, metric: "employees", column: "employees", askAsRange: true },
     ],
   },
   {

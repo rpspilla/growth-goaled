@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 import { Pill } from "@/components/ui/Pill";
-import { OUTCOME_ICONS } from "@/components/visual/icons";
-import { ExpandableDetail, StatusChip } from "@/components/visual/primitives";
+import { StatusChip } from "@/components/visual/primitives";
 import { QuestionIllustration } from "@/components/visual/QuestionIllustration";
 import type { UseCaseDef } from "@/lib/use-cases";
 import { visualFor } from "@/lib/use-cases/visual";
@@ -10,9 +9,9 @@ import { visualFor } from "@/lib/use-cases/visual";
 export type CardState = "active" | "started" | null;
 
 /**
- * The library: each card is a question the founder is facing, shown as an illustration, the
- * question, one line on when to ask it and three outcome chips. "Use it when" and "You'll decide"
- * stay one tap away under Details. Cards keep the library order; coming-soon questions go last.
+ * The library: each card is a question the founder is facing: an illustration, the question, one
+ * line on when to use it and the 2–3 questions it answers. Nothing else (owner decision, Nov 2026).
+ * Cards keep the library order; coming-soon questions go last.
  */
 export function UseCaseCards({
   useCases,
@@ -66,29 +65,19 @@ export function UseCaseCards({
               {u.question}
             </h2>
             <p className="text-sm -mt-1" style={{ color: "var(--muted-foreground)" }}>
+              <span className="font-semibold" style={{ color: "var(--foreground)" }}>Use it when: </span>
               {v.oneLine}
             </p>
-            <ul className="flex flex-wrap gap-1.5" aria-label="What you get">
-              {v.outcomes.map((o) => {
-                const Icon = OUTCOME_ICONS[o.icon];
-                return (
-                  <li key={o.label} data-label className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full" style={{ background: "var(--green-muted)", color: "var(--green)" }}>
-                    <Icon size={13} aria-hidden />
-                    {o.label}
+            {u.answers && (
+              <ul className="text-sm space-y-1" aria-label="Questions it answers" style={{ color: "var(--foreground)" }}>
+                {u.answers.map((q) => (
+                  <li key={q} className="flex gap-2">
+                    <Check size={15} className="shrink-0 mt-0.5" style={{ color: "var(--green)" }} aria-hidden />
+                    <span>{q}</span>
                   </li>
-                );
-              })}
-            </ul>
-            <ExpandableDetail summary="Details">
-              <p>
-                <span className="font-semibold" style={{ color: "var(--foreground)" }}>Use it when: </span>
-                {u.forWho}
-              </p>
-              <p>
-                <span className="font-semibold" style={{ color: "var(--foreground)" }}>You&apos;ll decide: </span>
-                {u.decision}
-              </p>
-            </ExpandableDetail>
+                ))}
+              </ul>
+            )}
             <div className="mt-auto pt-2 flex items-center justify-between gap-2 flex-wrap">
               <Link href={hrefFor(u.id)} className={`btn ${state === "active" ? "btn-primary" : "btn-secondary"}`} aria-label={`${cta}: ${u.question}`}>
                 {cta} <ArrowRight size={16} aria-hidden />
