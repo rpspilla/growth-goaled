@@ -10,6 +10,7 @@ export type EventName =
   | "action_plan_purchased"
   | "action_plan_submitted"
   | "action_plan_delivered"
+  | "action_plan_email_failed"
   | "advisor_message"
   | "conversation_message"
   | "recommendation_feedback"

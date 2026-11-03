@@ -4,15 +4,15 @@ import { useState } from "react";
 import { MagicLinkForm } from "./MagicLinkForm";
 
 /** Returning founders and advisors: the email sign-in link, one click away from the conversation. */
-export function ReturningSignIn() {
-  const [open, setOpen] = useState(false);
+export function ReturningSignIn({ next, open: startOpen = false, title = "Welcome back" }: { next?: string; open?: boolean; title?: string } = {}) {
+  const [open, setOpen] = useState(startOpen);
   return (
-    <div className="pt-6 border-t" style={{ borderColor: "var(--border)" }}>
+    <div className={startOpen ? "" : "pt-6 border-t"} style={{ borderColor: "var(--border)" }}>
       {open ? (
         <div className="space-y-3">
-          <h2 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>Welcome back</h2>
+          <h2 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>{title}</h2>
           <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Enter your work email and we&apos;ll send you a sign-in link.</p>
-          <MagicLinkForm mode="sign-in" />
+          <MagicLinkForm mode="sign-in" next={next} />
         </div>
       ) : (
         <p className="text-sm text-center" style={{ color: "var(--muted-foreground)" }}>

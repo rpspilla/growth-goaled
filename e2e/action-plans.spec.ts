@@ -59,7 +59,25 @@ test("a founder buys an action plan from the conversation; an advisor approves i
   await expect(cro.page.getByText("Delivered", { exact: true })).toBeVisible();
   await expect(cro.page.getByText("Hire one more AE once payers convert")).toBeVisible();
 
-  // Delivered to the founder.
+  // Delivered to the founder: the Overview says it's ready and opens it.
+  await page.goto("/overview");
+  const ready = page.getByRole("region", { name: "Your action plans" });
+  await expect(ready).toContainText("Your action plan is ready");
+  await ready.getByRole("link", { name: "Open your action plan" }).click();
+  await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}#your-plan$/);
+  await expect(panel).toContainText("Approved by your advisor");
+  // The email's link: straight to the plan when signed in; a log-in form that lands there when not.
+  const conversationPath = new URL(planUrl).pathname;
+  await page.goto(`/sign-in?next=${encodeURIComponent(`${conversationPath}#your-plan`)}`);
+  await expect(page).toHaveURL(new RegExp(`${conversationPath}#your-plan$`));
+  const visitor = await browser.newContext();
+  const signedOut = await visitor.newPage();
+  await signedOut.goto(`/sign-in?next=${encodeURIComponent(`${conversationPath}#your-plan`)}`);
+  await expect(signedOut.getByRole("heading", { name: "Log in to see your action plan" })).toBeVisible();
+  await expect(signedOut.getByLabel(/email/i)).toBeVisible();
+  await expect(signedOut.getByRole("heading", { name: "How can we help you grow?" })).toHaveCount(0);
+  await visitor.close();
+
   await page.goto(planUrl);
   await expect(panel).toContainText("Approved by your advisor");
   await expect(panel).toContainText("Hire one more AE once payers convert");

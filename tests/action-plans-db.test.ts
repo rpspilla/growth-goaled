@@ -2,13 +2,13 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 
-const h = vi.hoisted(() => ({ db: null as unknown as Record<string | symbol, unknown>, inputs: [] as unknown[], emails: [] as { to: string; subject: string }[] }));
+const h = vi.hoisted(() => ({ db: null as unknown as Record<string | symbol, unknown>, inputs: [] as unknown[], emails: [] as { to: string; subject: string; text: string }[], emailFails: false }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", async () => {
   const schema = await import("@/lib/db/schema");
   return { db: new Proxy({}, { get: (_t, p) => Reflect.get(h.db, p) }), schema };
 });
-vi.mock("@/lib/email", () => ({ sendEmail: async (m: { to: string; subject: string }) => (h.emails.push(m), { sent: true }) }));
+vi.mock("@/lib/email", () => ({ sendEmail: async (m: { to: string; subject: string; text: string }) => (h.emails.push(m), h.emailFails ? { sent: false, reason: "Email provider returned 401." } : { sent: true }) }));
 vi.mock("@/lib/ai/chat", async (original) => {
   const actual = await original<typeof import("@/lib/ai/chat")>();
   return { ...actual, chatTurn: async (input: import("@/lib/ai/chat").ChatInput) => (h.inputs.push(input), { output: actual.fakeChat(input), model: "test", tokensIn: 1, tokensOut: 1 }) };
@@ -21,7 +21,7 @@ vi.mock("@/lib/ai/plan", async (original) => {
 import { schema } from "@/lib/db";
 import type { ChatInput } from "@/lib/ai/chat";
 import type { ActionPlanContent, Company, User } from "@/lib/db/schema";
-import { approvePlan, cancelSupportedPlan, createPlanCheckout, planForConversation, plansForReview, postAdvisorMessage, setStepDone, submitPlan, supportedPlans, writePlan } from "@/lib/data/action-plans";
+import { approvePlan, cancelSupportedPlan, founderPlans, createPlanCheckout, planForConversation, plansForReview, postAdvisorMessage, setStepDone, submitPlan, supportedPlans, writePlan } from "@/lib/data/action-plans";
 import { getConversation, sendMessage, startConversation } from "@/lib/data/chat";
 import { recordPaidSession } from "@/lib/data/payments";
 
@@ -71,6 +71,7 @@ beforeEach(async () => {
   [co, other] = (await db().insert(schema.companies).values([{ name: "Plan Co", stage: "Seed", advisorId: advisor.id }, { name: "Other Co" }]).returning()) as [Company, Company];
   h.inputs.length = 0;
   h.emails.length = 0;
+  h.emailFails = false;
   const r = await startConversation(founder, co, "more_salespeople", null);
   if (!r.ok) throw new Error(r.error);
   conversationId = r.conversationId;
@@ -142,6 +143,11 @@ describe("$499 action plan", () => {
     expect(delivered.content!.goal).toBe("Hire one AE by March");
     expect(delivered.content!.days60).toHaveLength(1);
     expect(h.emails.at(-1)).toMatchObject({ to: "f@co.test", subject: "Your Growth Goaled action plan is ready" });
+    // The email takes them through sign-in straight to the plan in its conversation.
+    expect(h.emails.at(-1)!.text).toContain(`https://dev.test/sign-in?next=${encodeURIComponent(`/chat/${conversationId}#your-plan`)}`);
+    // And the Overview lists it as ready.
+    expect(await founderPlans(co)).toMatchObject([{ id: plan.id, status: "delivered", conversationId }]);
+    expect(await founderPlans(other)).toEqual([]);
     expect(await approvePlan(advisor, co, plan.id, edited, null, "https://dev.test")).toEqual({ ok: false, error: "This plan isn't waiting for review." });
     // Delivered: the founder ticks off milestones.
     expect(await setStepDone(co, plan.id, "days30", 0, true)).toEqual({ ok: true });
@@ -194,5 +200,22 @@ describe("$799/month supported plan", () => {
     expect(ended.status).toBe("cancelled");
     expect(ended.content).not.toBeNull();
     expect(await postAdvisorMessage(advisor, co.id, conversationId, "Still here?")).toMatchObject({ ok: false });
+  });
+});
+
+describe("delivery email", () => {
+  it("a failed email doesn't stop delivery, and is logged and recorded", async () => {
+    const bought = await buy("plan");
+    expect(await submitPlan(founder, co, bought.id)).toEqual({ ok: true });
+    expect(await writePlan(bought.id)).toBe(true);
+    const plan = (await planForConversation(co, conversationId))!;
+    h.emailFails = true;
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await approvePlan(advisor, co, plan.id, plan.content!, null, "https://dev.test")).toEqual({ ok: true });
+    expect((await planForConversation(co, conversationId))!.status).toBe("delivered");
+    expect(err.mock.calls.some((c) => String(c[0]).includes("Delivery email to the founder wasn't sent"))).toBe(true);
+    err.mockRestore();
+    const events = await db().select().from(schema.events).where(eq(schema.events.name, "action_plan_email_failed"));
+    expect(events[0]!.props).toMatchObject({ plan_id: plan.id, reason: "Email provider returned 401." });
   });
 });

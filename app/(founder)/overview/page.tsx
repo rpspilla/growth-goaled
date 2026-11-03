@@ -7,6 +7,7 @@ import { Sparkline } from "@/components/ui/Sparkline";
 import { assessmentCompletions, founderAssessment } from "@/lib/data/assessments";
 import { founderContext } from "@/lib/data/founder-context";
 import { listConversations } from "@/lib/data/chat";
+import { founderPlans, REVIEW_HOURS } from "@/lib/data/action-plans";
 import { CHAT_TOPICS } from "@/lib/chat/topics";
 import { ChatStart } from "@/components/chat/ChatStart";
 import { startChatAction } from "../chat/actions";
@@ -80,13 +81,14 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   const state = active && { useCase: active.def.id, status: active.status };
   const started = useCases.find((u) => !u.activatedAt);
   const action = nextAction(state, started ? (getUseCase(started.useCase)?.id ?? null) : null);
-  const [brief, plan, perf, completed, peers, conversations] = await Promise.all([
+  const [brief, plan, perf, completed, peers, conversations, actionPlans] = await Promise.all([
     company && active ? founderAssessment(company.id, active.def.id) : null,
     company && active ? progressView(company, active.def.id) : null,
     company ? companyPerformance(company) : null,
     company ? assessmentCompletions(company.id) : ({} as Partial<Record<string, Date>>),
     company ? getIntakeAnswers(company).then((a) => snapshotPeers(company, a)) : null,
     company ? listConversations(company, 3) : [],
+    company ? founderPlans(company) : [],
   ]);
   const view = brief?.state === "ready" ? brief.view : null;
   // AE ramp time always has a place on the Overview (James's feedback): the figure, or what would give it.
@@ -116,6 +118,37 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
             <p className="text-base mt-0.5" style={{ color: "var(--muted-foreground)" }}>Conversations are free. When you&apos;re ready, turn one into a 30/60/90-day action plan, from {formatPrice(pricing().actionPlanCents)}.</p>
           </div>
         </div>
+      )}
+
+      {/* Action plans: ready ones first and loud, so an advisor's approval is the first thing they see. */}
+      {actionPlans.length > 0 && (
+        <section aria-label="Your action plans" className="space-y-3 -mt-4">
+          {actionPlans.map((p) => {
+            const ready = p.status === "delivered" || p.status === "active";
+            const day = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+            return (
+              <div key={p.id} className="surface p-5 flex gap-4 items-center flex-wrap" style={ready ? { background: "var(--green-muted)", borderColor: "var(--green)" } : undefined}>
+                <div className="flex-1 min-w-[16rem]">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Pill tone={ready ? "green" : "amber"}>{p.status === "active" ? "Supported plan · live" : ready ? "Ready" : "With your advisor"}</Pill>
+                    {ready && p.approvedAt && <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>Approved {day(p.approvedAt)}</span>}
+                  </div>
+                  <div className="text-lg font-semibold mt-1" style={{ color: "var(--foreground)" }}>
+                    {ready ? "Your action plan is ready" : "Your action plan is being reviewed"}: {p.title}
+                  </div>
+                  <p className="text-base" style={{ color: "var(--muted-foreground)" }}>
+                    {ready
+                      ? "Reviewed and approved by your Growth Goaled advisor: your 30/60/90-day milestones, risks and how to measure progress."
+                      : `An advisor is reviewing it${p.submittedAt ? `; expect it by ${day(new Date(p.submittedAt.getTime() + REVIEW_HOURS * 3600 * 1000))}` : " within 24 hours"}. We'll email you when it's ready.`}
+                  </p>
+                </div>
+                <Link href={`/chat/${p.conversationId}#your-plan`} className={`btn ${ready ? "btn-primary" : "btn-secondary"}`}>
+                  {ready ? "Open your action plan" : "See where it's at"}
+                </Link>
+              </div>
+            );
+          })}
+        </section>
       )}
 
       {/* The main entry: talk a decision through. */}

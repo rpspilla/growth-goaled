@@ -23,6 +23,20 @@ export type PlanResult<T = object> = ({ ok: true } & T) | { ok: false; error: st
 
 export class PlanCheckoutError extends Error {}
 
+/** The company's action plans a founder should hear about on the Overview: in review, ready, or live. */
+export async function founderPlans(company: Pick<Company, "id">) {
+  return db
+    .select({ id: schema.actionPlans.id, conversationId: schema.actionPlans.conversationId, status: schema.actionPlans.status, tier: schema.actionPlans.tier, submittedAt: schema.actionPlans.submittedAt, approvedAt: schema.actionPlans.approvedAt, title: schema.conversations.title })
+    .from(schema.actionPlans)
+    .innerJoin(schema.conversations, eq(schema.conversations.id, schema.actionPlans.conversationId))
+    .where(and(eq(schema.actionPlans.companyId, company.id), inArray(schema.actionPlans.status, ["drafting", "in_review", "delivered", "active"])))
+    .orderBy(desc(schema.actionPlans.updatedAt))
+    .limit(5);
+}
+
+/** Where a founder opens a plan: its conversation, at the plan panel (through sign-in if they're signed out). */
+export const planLink = (appUrl: string, conversationId: string) => `${appUrl}/sign-in?next=${encodeURIComponent(`/chat/${conversationId}#your-plan`)}`;
+
 export async function planForConversation(company: Pick<Company, "id">, conversationId: string): Promise<ActionPlan | null> {
   const [plan] = await db
     .select()
@@ -278,17 +292,22 @@ export async function approvePlan(advisor: User, company: Pick<Company, "id" | "
   await track("action_plan_delivered", { userId: advisor.id, companyId: company.id, props: { topic: plan.topic } });
   const [founder] = plan.createdBy ? await db.select().from(schema.users).where(eq(schema.users.id, plan.createdBy)).limit(1) : [];
   if (founder) {
-    const link = `${appUrl}/chat/${plan.conversationId}`;
-    await sendEmail({
+    const link = planLink(appUrl, plan.conversationId);
+    const sent = await sendEmail({
       to: founder.email,
       subject: "Your Growth Goaled action plan is ready",
-      text: `Your action plan for ${company.name} has been reviewed and approved by your Growth Goaled advisor.\n\nGoal: ${clean.goal}\n\nOpen it here: ${link}\n`,
+      text: `Your action plan for ${company.name} has been reviewed and approved by your Growth Goaled advisor.\n\nGoal: ${clean.goal}\n\nLog in to Growth Goaled to see it: ${link}\n`,
       html: `<div style="font-family:Inter,Arial,sans-serif;color:#0D1B2A;max-width:520px">
 <p style="font-size:15px">Your action plan for <strong>${escapeHtml(company.name)}</strong> has been reviewed and approved by your Growth Goaled advisor.</p>
 <p style="font-size:15px"><strong>Goal:</strong> ${escapeHtml(clean.goal)}</p>
-<p><a href="${escapeHtml(link)}" style="display:inline-block;background:#155A3C;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600">Open your action plan</a></p>
+<p><a href="${escapeHtml(link)}" style="display:inline-block;background:#155A3C;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600">Log in to see your action plan</a></p>
 </div>`,
-    }).catch((err) => console.error("[plan] Delivery email failed", err));
+    }).catch((err) => ({ sent: false as const, reason: err instanceof Error ? err.message : String(err) }));
+    if (!sent.sent) {
+      // The plan is delivered in the app either way; say so loudly rather than dropping the email silently.
+      console.error(`[plan] Delivery email to the founder wasn't sent (plan ${plan.id}): ${sent.reason}`);
+      await track("action_plan_email_failed", { userId: advisor.id, companyId: company.id, props: { plan_id: plan.id, reason: sent.reason.slice(0, 200) } });
+    }
   }
   return { ok: true };
 }

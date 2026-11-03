@@ -37,7 +37,7 @@ export function PlanPanel({ plan, submit, update, toggle }: { plan: PlanPanelDat
   const tierLabel = plan.tier === "supported" ? "Supported plan" : "Action plan";
 
   return (
-    <section aria-label="Your action plan" className="surface p-5 sm:p-6 space-y-4" style={{ borderColor: "var(--green)" }}>
+    <section id="your-plan" aria-label="Your action plan" className="surface p-5 sm:p-6 space-y-4 scroll-mt-20" style={{ borderColor: "var(--green)" }}>
       <BuildingRefresh active={working} />
       <div className="flex items-center gap-2 flex-wrap">
         <h2 className="text-xl font-semibold flex-1" style={{ color: "var(--foreground)" }}>Your {tierLabel.toLowerCase()}</h2>
