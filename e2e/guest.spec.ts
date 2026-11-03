@@ -71,16 +71,26 @@ test("a visitor talks it through, unlocks the recommendation with an email, and 
   await expect(page.getByRole("article", { name: "Recommendation" })).toHaveCount(0);
   // The chat stays open under the questions: answering refines the recommendation.
   await expect(page.getByLabel("Your answer")).toBeEnabled();
+  // A conversion button under the recommendation and another at the end of the chat, by company name.
+  const cta = (where: string) => page.getByTestId(`plan-cta-${where}`).getByRole("button", { name: "Get a CRO-Built GTM action plan for Guestly" });
+  await expect(cta("card")).toBeVisible();
+  await expect(cta("chat")).toBeVisible();
+  // Before the email, it takes them to the email box.
+  await cta("chat").click();
+  await expect(gate.getByLabel("Work email")).toBeFocused();
   await gate.getByLabel("Work email").fill("robin@guestly.test");
   await gate.getByRole("button", { name: "See my recommendation" }).click();
   const card = page.getByRole("article", { name: "Recommendation" });
   await expect(card).toBeVisible();
+  await expect(cta("card")).toBeVisible();
+  await expect(cta("chat")).toBeVisible();
   await expect(card).toContainText("Test mode takeaway");
 
   // Signing in (the link's landing, /claim) saves it as their account, company and conversation.
   await ctx.addCookies([{ name: "gg_e2e_user", value: "robin@guestly.test", domain: "localhost", path: "/" }]);
-  await page.goto("/claim");
-  await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/);
+  // The link from the action-plan button opens the saved conversation at the plan offer.
+  await page.goto("/claim?plan=1");
+  await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}#build-plan$/);
   await expect(page.getByRole("heading", { name: "Our pipeline isn't converting and I don't know whether to hire." })).toBeVisible();
   await expect(page.getByRole("article", { name: "Recommendation" })).toContainText("Test mode takeaway");
   await expect(page.getByRole("region", { name: "Build my action plan" })).toContainText("$499");

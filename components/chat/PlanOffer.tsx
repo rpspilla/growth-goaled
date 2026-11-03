@@ -37,7 +37,7 @@ export function PlanOffer({ conversationId, planPrice, supportedPrice, buy }: { 
     </div>
   );
   return (
-    <section aria-label="Build my action plan" className="rounded-xl p-4 sm:p-5 space-y-3" style={{ background: "var(--green-muted)" }}>
+    <section id="build-plan" aria-label="Build my action plan" className="rounded-xl p-4 sm:p-5 space-y-3 scroll-mt-20" style={{ background: "var(--green-muted)" }}>
       <div>
         <h4 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>Build my action plan</h4>
         <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Turn this into a 30/60/90-day plan. We gather what it needs right here in the conversation, files included.</p>

@@ -217,6 +217,7 @@ export function guestView(g: GuestSession | null) {
     card: g?.card ?? null,
     unlocked: Boolean(g?.email),
     email: g?.email ?? null,
+    companyName: profile.companyName?.trim() || null,
     outOfTurns: (g?.aiTurns ?? 0) >= GUEST_AI_TURNS,
     totalSteps: GUEST_STEPS.length,
   };

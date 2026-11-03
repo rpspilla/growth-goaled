@@ -17,6 +17,7 @@ export type GuestViewData = {
   card: RecommendationCard | null;
   unlocked: boolean;
   email: string | null;
+  companyName: string | null;
   outOfTurns: boolean;
 };
 
@@ -33,6 +34,8 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
   const [outgoing, setOutgoing] = useState<{ text: string; base: number } | null>(null);
   const sent = outgoing && view.messages.length === outgoing.base ? outgoing.text : null;
   const [error, setError] = useState<string | null>(null);
+  // Set by "Get a CRO-built GTM action plan": the sign-in link then opens at the plan offer.
+  const [planIntent, setPlanIntent] = useState(false);
   const [pending, start] = useTransition();
   const router = useRouter();
   const end = useRef<HTMLDivElement>(null);
@@ -88,7 +91,7 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
   return (
     <div className="flex flex-col gap-4 w-full">
       <h2 className="font-display text-3xl sm:text-4xl leading-tight" style={{ color: "var(--foreground)" }}>{view.messages[0]?.content}</h2>
-      {view.card && <GuestCard card={view.card} unlocked={view.unlocked} email={view.email} giveEmail={giveEmail} />}
+      {view.card && <GuestCard card={view.card} unlocked={view.unlocked} email={view.email} giveEmail={giveEmail} planIntent={planIntent} cta={<PlanCta company={view.companyName} unlocked={view.unlocked} email={view.email} onIntent={() => setPlanIntent(true)} where="card" />} />}
       <ol className="space-y-3" aria-label="Conversation">
         {view.messages.map((m, i) =>
           i === 0 ? null : 
@@ -161,21 +164,19 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
           Start over
         </button>
       )}
+      {view.card && <PlanCta company={view.companyName} unlocked={view.unlocked} email={view.email} onIntent={() => setPlanIntent(true)} where="chat" />}
       <div ref={end} />
     </div>
   );
 }
 
 /** The recommendation, blurred behind an email until the visitor gives one; then the link that saves it. */
-function GuestCard({ card, unlocked, email, giveEmail }: { card: RecommendationCard; unlocked: boolean; email: string | null; giveEmail: (email: string) => Promise<Result> }) {
+function GuestCard({ card, unlocked, email, giveEmail, planIntent, cta }: { card: RecommendationCard; unlocked: boolean; email: string | null; giveEmail: (email: string) => Promise<Result>; planIntent: boolean; cta: React.ReactNode }) {
   const [value, setValue] = useState("");
   const [state, setState] = useState<{ kind: "idle" | "sending" | "sent" } | { kind: "error"; message: string }>({ kind: unlocked ? "sent" : "idle" });
   const router = useRouter();
 
-  async function sendLink(address: string) {
-    const { error } = await authClient.signIn.magicLink({ email: address, callbackURL: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/claim")}` });
-    if (error) throw new Error(error.message ?? "couldn't send");
-  }
+  const sendLink = (address: string) => sendSignInLink(address, planIntent);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -230,6 +231,7 @@ function GuestCard({ card, unlocked, email, giveEmail }: { card: RecommendationC
             </form>
           </div>
         </div>
+        <div className="px-5 sm:px-6 py-5 sm:py-6 border-t" style={{ borderColor: "var(--border)" }}>{cta}</div>
       </section>
     );
   }
@@ -248,6 +250,7 @@ function GuestCard({ card, unlocked, email, giveEmail }: { card: RecommendationC
           Send the link again
         </button>
       </div>
+      {cta}
     </div>
   );
 }
@@ -301,6 +304,51 @@ function SpinUpProgress() {
       <p className="text-xs tabular-nums" style={{ color: "var(--muted-foreground)" }}>
         {seconds < 60 ? clock : "Taking a little longer than usual. Hang tight, it's still working."}
       </p>
+    </div>
+  );
+}
+
+async function sendSignInLink(address: string, plan: boolean) {
+  const next = plan ? "/claim?plan=1" : "/claim";
+  const { error } = await authClient.signIn.magicLink({ email: address, callbackURL: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}` });
+  if (error) throw new Error(error.message ?? "couldn't send");
+}
+
+/**
+ * "Get a CRO-built GTM action plan for <company>": under the recommendation and at the end of the chat.
+ * Before the email it takes them to the email box (the link then opens at the plan offer); after it,
+ * it sends that link.
+ */
+function PlanCta({ company, unlocked, email, onIntent, where }: { company: string | null; unlocked: boolean; email: string | null; onIntent: () => void; where: "card" | "chat" }) {
+  const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const label = `Get a CRO-Built GTM action plan for ${company ?? "your company"}`;
+  const click = async () => {
+    onIntent();
+    if (!unlocked || !email) {
+      const box = document.getElementById("guest-email") as HTMLInputElement | null;
+      box?.scrollIntoView({ behavior: "smooth", block: "center" });
+      box?.focus({ preventScroll: true });
+      return;
+    }
+    setState("sending");
+    try {
+      await sendSignInLink(email, true);
+      setState("sent");
+    } catch {
+      setState("error");
+    }
+  };
+  return (
+    <div className="space-y-2" data-testid={`plan-cta-${where}`}>
+      <button type="button" className="btn btn-primary w-full sm:w-auto" disabled={state === "sending"} onClick={click}>
+        {state === "sending" ? "Sending your link…" : label}
+      </button>
+      {state === "sent" && (
+        <p className="text-sm" role="status" style={{ color: "var(--foreground)" }}>
+          We&apos;ve sent a link to <strong>{email}</strong>. Open it to build your action plan{company ? ` for ${company}` : ""}.
+        </p>
+      )}
+      {state === "error" && <p className="text-sm" role="alert" style={{ color: "var(--red)" }}>We couldn&apos;t send the link. Try again in a minute.</p>}
     </div>
   );
 }
