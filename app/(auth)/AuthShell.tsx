@@ -61,9 +61,6 @@ export function Positioning({ compact = false }: { compact?: boolean }) {
       <h1 className="font-display text-3xl sm:text-5xl font-normal leading-[1.08] text-white" style={{ letterSpacing: "-0.015em" }}>
         Find out what&apos;s holding your growth back.
       </h1>
-      <p className="text-base sm:text-lg mt-3 sm:mt-5" style={{ color: "#B7C5D4" }}>
-        CRO-level growth intelligence for Seed and Series A B2B SaaS founders. Find your biggest growth opportunity, decide where your capital goes, and build a more repeatable path to revenue.
-      </p>
       {!compact && (
         <div className="mt-8 hidden lg:block">
           <Points
