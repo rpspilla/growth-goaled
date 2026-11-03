@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
-import { ArrowUp, Loader2, Lock } from "lucide-react";
+import { ArrowUp, Check, Loader2, Lock } from "lucide-react";
 import { SPIN_UP, type GuestStep } from "@/lib/guest/steps";
 import { understand } from "@/lib/guest/understand";
 import { authClient } from "@/lib/auth/client";
@@ -28,7 +28,10 @@ export type GuestViewData = {
  */
 export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestViewData; reply: (text: string) => Promise<Result>; giveEmail: (email: string) => Promise<Result>; restart: () => Promise<void> }) {
   const [text, setText] = useState("");
-  const [sent, setSent] = useState<string | null>(null);
+  // The message on its way, shown straight away (outside the transition, whose updates React holds
+  // until the server answers) until the transcript has it.
+  const [outgoing, setOutgoing] = useState<{ text: string; base: number } | null>(null);
+  const sent = outgoing && view.messages.length === outgoing.base ? outgoing.text : null;
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
@@ -55,25 +58,26 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
     void trackSignupEvent("signup_viewed");
   }, []);
 
-  const send = (value: string) =>
+  const send = (value: string) => {
+    setError(null);
+    setOutgoing({ text: value, base: view.messages.length });
+    setText("");
+    if (input.current) input.current.style.height = "auto";
     start(async () => {
-      setError(null);
-      setSent(value);
-      setText("");
-      if (input.current) input.current.style.height = "auto";
       const r = await reply(value);
       if (!r.ok) {
+        setOutgoing(null);
         setText(value);
         setError(r.error ?? "Something went wrong.");
       }
-      setSent(null);
       router.refresh();
       input.current?.focus();
     });
+  };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (pending) return;
+    if (pending || sent !== null) return;
     if (!text.trim()) return;
     send(text);
   };
@@ -104,7 +108,7 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
           </li>
         )}
         {/* The last sign-up answer (customer success) hands over to the AI, as does any reply after it. */}
-        {pending && sent !== null && (spinningUp ? (
+        {sent !== null && (spinningUp ? (
           <li role="status" aria-live="polite" className="space-y-2">
             <p className="text-base flex items-start gap-2 leading-relaxed" style={{ color: "var(--foreground)" }}>
               <Loader2 size={18} className="animate-spin shrink-0 mt-1" style={{ color: "var(--green)" }} aria-hidden />
@@ -135,7 +139,7 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
           style={{ color: "var(--foreground)", border: 0, boxShadow: "none", outline: "none" }}
           value={text}
           autoFocus
-          placeholder={view.outOfTurns ? "Enter your email above to keep going" : (step?.placeholder ?? "Reply…")}
+          placeholder={view.outOfTurns ? "Enter your email above to keep going" : spinningUp ? "Building your recommendation…" : (step?.placeholder ?? "Reply…")}
           onChange={(e) => {
             setText(e.target.value);
             e.target.style.height = "auto";
@@ -146,7 +150,7 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
           }}
           disabled={view.outOfTurns}
         />
-        <button type="submit" aria-label="Send" title="Send" className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center disabled:opacity-40" style={{ background: "var(--navy)", color: "#fff" }} disabled={pending || !text.trim() || view.outOfTurns}>
+        <button type="submit" aria-label="Send" title="Send" className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center disabled:opacity-40" style={{ background: "var(--navy)", color: "#fff" }} disabled={pending || sent !== null || !text.trim() || view.outOfTurns}>
           <ArrowUp size={18} aria-hidden />
         </button>
       </form>
@@ -258,16 +262,45 @@ export function teaserInsights(card: RecommendationCard): string[] {
 
 const LAST_STEP = "cs";
 
-/** Fills over about a minute while the first recommendation is written, so the wait reads as progress. */
+const SPIN_UP_STEPS = [
+  "Reading your answers",
+  "Matching you with companies at your stage and in your vertical",
+  "Checking your numbers against industry benchmarks",
+  "Weighing the options for your situation",
+  "Writing your recommendation and 30/60/90-day plan",
+];
+
+/**
+ * While the first recommendation is written (up to about a minute): a bar that keeps filling, the step
+ * it's on, and a running clock, so the wait never looks frozen.
+ */
 function SpinUpProgress() {
-  const [started, setStarted] = useState(false);
+  const [seconds, setSeconds] = useState(0);
   useEffect(() => {
-    const id = requestAnimationFrame(() => setStarted(true));
-    return () => cancelAnimationFrame(id);
+    const id = setInterval(() => setSeconds((s) => s + 1), 1000);
+    return () => clearInterval(id);
   }, []);
+  // Eases towards full without reaching it; the answer replaces this when it's ready.
+  const share = Math.min(0.96, 1 - Math.exp(-seconds / 25));
+  const at = Math.min(SPIN_UP_STEPS.length - 1, Math.floor(seconds / 11));
+  const clock = `0:${String(Math.min(seconds, 59)).padStart(2, "0")}`;
   return (
-    <div className="h-1.5 rounded-full overflow-hidden ml-7" style={{ background: "var(--muted)" }} aria-hidden>
-      <div className="h-full rounded-full" style={{ width: started ? "92%" : "4%", background: "var(--green)", transition: "width 60s cubic-bezier(0.1, 0.6, 0.3, 1)" }} />
+    <div className="ml-7 space-y-2">
+      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--muted)" }} role="progressbar" aria-label="Building your recommendation" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(share * 100)}>
+        <div className="h-full rounded-full" style={{ width: `${Math.max(4, share * 100)}%`, background: "var(--green)", transition: "width 1s linear" }} />
+      </div>
+      <ol className="space-y-1 text-sm" aria-label="Progress">
+        {SPIN_UP_STEPS.slice(0, at + 1).map((label, i) => (
+          <li key={label} className="flex items-center gap-2" style={{ color: i === at ? "var(--foreground)" : "var(--muted-foreground)" }}>
+            {i === at ? <Loader2 size={14} className="animate-spin shrink-0" style={{ color: "var(--green)" }} aria-hidden /> : <Check size={14} className="shrink-0" style={{ color: "var(--green)" }} aria-hidden />}
+            {label}
+            {i === at && "…"}
+          </li>
+        ))}
+      </ol>
+      <p className="text-xs tabular-nums" style={{ color: "var(--muted-foreground)" }}>
+        {seconds < 60 ? clock : "Taking a little longer than usual. Hang tight, it's still working."}
+      </p>
     </div>
   );
 }

@@ -36,16 +36,23 @@ export function Composer({
   const [pending, start] = useTransition();
   const router = useRouter();
 
-  const run = (fn: () => Promise<Result>, message: string | null) =>
+  // The message shows and the box clears straight away: updates inside the async transition are held
+  // by React until the answer arrives, which made the page look frozen.
+  const run = (fn: () => Promise<Result>, message: string | null) => {
+    setError(null);
+    setSent(message);
+    if (message !== null) setText("");
     start(async () => {
-      setError(null);
-      setSent(message);
       const r = await fn();
-      if (r.ok) setText("");
-      else setError(r.error ?? "Something went wrong.");
-      setSent(null);
+      if (!r.ok) {
+        if (message !== null) setText(message);
+        setError(r.error ?? "Something went wrong.");
+      }
       router.refresh();
+      // Cleared together with the refreshed conversation, so the message never blinks out.
+      start(() => setSent(null));
     });
+  };
 
   async function sendFiles(list: File[]) {
     if (!attach || !blobPrefix || !list.length) return;

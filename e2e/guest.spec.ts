@@ -35,8 +35,25 @@ test("a visitor talks it through, unlocks the recommendation with an email, and 
   await answer("2");
   await answer("skip");
   await expect(page.getByText("Last one: how many in customer success?")).toBeVisible();
+  // The recommendation takes up to a minute in production: hold the answer back to check the wait
+  // shows straight away (the message, a moving progress bar and steps) instead of a frozen page.
+  let release: () => void = () => {};
+  const held = new Promise<void>((r) => (release = r));
+  let holding = true;
+  await page.route("**/sign-in", async (route) => {
+    if (holding && route.request().method() === "POST") {
+      holding = false;
+      await held;
+    }
+    await route.fallback();
+  });
   await answer("1");
-  await expect(page.getByText("Super. Give me 60 Seconds while we spin-up an Industry Benchmarked Recommendation")).toBeVisible();
+  await expect(page.getByText("1", { exact: true }).last()).toBeVisible();
+  await expect(page.getByText("Super. Give me 60 Seconds while we spin-up an Industry Benchmarked Recommendation")).toBeVisible({ timeout: 3000 });
+  await expect(page.getByRole("progressbar", { name: "Building your recommendation" })).toBeVisible();
+  await expect(page.getByText("Reading your answers")).toBeVisible();
+  await expect(page.getByLabel("Your answer")).toHaveValue("");
+  release();
 
   // The AI asks before it recommends; still no email asked for.
   await expect(page.getByText(/Test mode: let's work through/)).toBeVisible();
