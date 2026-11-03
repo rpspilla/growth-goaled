@@ -97,14 +97,14 @@ describe("guest chat", () => {
     expect(await guestReply(g, "We close $20k deals.")).toEqual({ ok: true });
     g = await current();
     expect(g.card?.takeaway).toMatch(/Test mode takeaway/);
-    expect(guestView(g)).toMatchObject({ unlocked: false });
+    expect(guestView(g)).toMatchObject({ emailed: false });
     // The chat stays open after the recommendation: answering its questions refines it (still locked).
     expect(await guestReply(g, "Mostly referrals.")).toEqual({ ok: true });
     g = await current();
     expect(g.card?.takeaway).toMatch(/Test mode takeaway/);
-    expect(guestView(g)).toMatchObject({ unlocked: false });
+    expect(guestView(g)).toMatchObject({ emailed: false });
     expect(await guestEmail(g, "  Sam@Acme.test ")).toEqual({ ok: true });
-    expect(guestView(await current())).toMatchObject({ unlocked: true, email: "sam@acme.test" });
+    expect(guestView(await current())).toMatchObject({ emailed: true, email: "sam@acme.test" });
   });
 
   it("after the sign-in link, becomes the founder's company, profile and conversation, for that email only and once", async () => {

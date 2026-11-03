@@ -83,15 +83,16 @@ test("a visitor talks it through, unlocks the recommendation with an email, and 
   await expect(gate.getByLabel("Work email")).toBeFocused();
   await gate.getByLabel("Work email").fill("robin@guestly.test");
   await gate.getByRole("button", { name: "See my recommendation" }).click();
-  const card = page.getByRole("article", { name: "Recommendation" });
-  await expect(card).toBeVisible();
-  await expect(page.getByRole("complementary", { name: "How to read your recommendation" })).toBeVisible();
-  // With the email given, the conversation and the chat box come back.
-  await expect(page.getByRole("list", { name: "Conversation" })).toBeVisible();
-  await expect(page.getByLabel("Your answer")).toBeEnabled();
-  await expect(cta("card")).toBeVisible();
-  await expect(cta("chat")).toBeVisible();
-  await expect(card).toContainText("Test mode takeaway");
+  // Giving the email sends them to their inbox: the full recommendation is behind the sign-in link.
+  const inbox = page.getByRole("region", { name: "Check your inbox" });
+  await expect(inbox).toContainText("robin@guestly.test");
+  await expect(inbox).toContainText("Test mode takeaway");
+  await expect(inbox.getByRole("link", { name: /^Open (Gmail|Outlook)$/ }).first()).toBeVisible();
+  await expect(page.getByRole("article", { name: "Recommendation" })).toHaveCount(0);
+  await expect(page.getByLabel("Your answer")).toHaveCount(0);
+  // Coming back to the page keeps them on the inbox step.
+  await page.reload();
+  await expect(page.getByRole("region", { name: "Check your inbox" })).toBeVisible();
 
   // Signing in (the link's landing, /claim) saves it as their account, company and conversation.
   await ctx.addCookies([{ name: "gg_e2e_user", value: "robin@guestly.test", domain: "localhost", path: "/" }]);

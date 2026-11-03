@@ -215,7 +215,7 @@ export function guestView(g: GuestSession | null) {
     messages: g?.messages ?? [{ role: "assistant" as const, content: OPENING }],
     step: step ? { key: step.key, kind: step.kind, options: step.options ?? null, optional: Boolean(step.optional), placeholder: step.placeholder ?? null } : null,
     card: g?.card ?? null,
-    unlocked: Boolean(g?.email),
+    emailed: Boolean(g?.email),
     email: g?.email ?? null,
     companyName: profile.companyName?.trim() || null,
     outOfTurns: (g?.aiTurns ?? 0) >= GUEST_AI_TURNS,

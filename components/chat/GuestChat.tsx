@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
-import { ArrowUp, Check, Loader2, Lock } from "lucide-react";
+import { ArrowUp, Check, Loader2, Lock, Mail } from "lucide-react";
 import { SPIN_UP, type GuestStep } from "@/lib/guest/steps";
 import { understand } from "@/lib/guest/understand";
 import { authClient } from "@/lib/auth/client";
@@ -10,14 +10,14 @@ import type { RecommendationCard } from "@/lib/db/schema";
 import { trackSignupEvent } from "@/app/(auth)/actions";
 import { RecommendationCardView } from "./RecommendationCardView";
 import { HumanPresence } from "@/components/brand/HumanPresence";
-import { RecommendationLegend } from "./RecommendationLegend";
 
 type Result = { ok: boolean; error?: string };
 export type GuestViewData = {
   messages: { role: "user" | "assistant"; content: string }[];
   step: { key: string; kind: "text" | "choice" | "select" | "number"; options: readonly { value: string; label: string }[] | null; optional: boolean; placeholder: string | null } | null;
   card: RecommendationCard | null;
-  unlocked: boolean;
+  /** They've given their email: the next step is the sign-in link in their inbox. */
+  emailed: boolean;
   email: string | null;
   companyName: string | null;
   outOfTurns: boolean;
@@ -29,7 +29,7 @@ export type GuestViewData = {
  * then the AI's recommendation, blurred until the visitor gives an email (which also sends the
  * sign-in link that saves it all to their account).
  */
-export function GuestChat({ view, reply, giveEmail, restart, prices }: { view: GuestViewData; reply: (text: string) => Promise<Result>; giveEmail: (email: string) => Promise<Result>; restart: () => Promise<void>; prices: { plan: string; supported: string } }) {
+export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestViewData; reply: (text: string) => Promise<Result>; giveEmail: (email: string) => Promise<Result>; restart: () => Promise<void> }) {
   const [text, setText] = useState("");
   // The message on its way, shown straight away (outside the transition, whose updates React holds
   // until the server answers) until the transcript has it.
@@ -38,6 +38,8 @@ export function GuestChat({ view, reply, giveEmail, restart, prices }: { view: G
   const [error, setError] = useState<string | null>(null);
   // Set by "Get a CRO-built GTM action plan": the sign-in link then opens at the plan offer.
   const [planIntent, setPlanIntent] = useState(false);
+  // Whether the sign-in link went out when they gave their email (null: not tried in this visit).
+  const [linkSent, setLinkSent] = useState<boolean | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
   const end = useRef<HTMLDivElement>(null);
@@ -88,17 +90,17 @@ export function GuestChat({ view, reply, giveEmail, restart, prices }: { view: G
   };
 
   const step = view.step;
-  // With a recommendation still behind the email, only the recommendation and the email box show:
-  // the conversation and the chat box come back once they've given it.
-  const locked = Boolean(view.card && !view.unlocked);
+  // With a recommendation waiting behind the email, only the recommendation and the email box show.
+  const locked = Boolean(view.card);
   // The last sign-up answer (if it reads as one) hands over to the AI: say so, and show it working.
   const spinningUp = Boolean(step && sent !== null && step.key === LAST_STEP && understand({ ...step, options: step.options ?? undefined } as GuestStep, sent) !== null);
+  // Email given: the full recommendation is behind the sign-in link, so send them to their inbox.
+  if (view.emailed && view.email) return <CheckInbox email={view.email} card={view.card} company={view.companyName} planIntent={planIntent} giveEmail={giveEmail} firstSend={linkSent} />;
   return (
     <div className="flex flex-col gap-4 w-full">
       <h2 className="font-display text-3xl sm:text-4xl leading-tight" style={{ color: "var(--foreground)" }}>{view.messages[0]?.content}</h2>
       <HumanPresence />
-      {view.card && <GuestCard card={view.card} unlocked={view.unlocked} email={view.email} giveEmail={giveEmail} planIntent={planIntent} cta={<PlanCta company={view.companyName} unlocked={view.unlocked} email={view.email} onIntent={() => setPlanIntent(true)} where="card" />} />}
-      {view.card && view.unlocked && <RecommendationLegend stage="recommendation" planPrice={prices.plan} supportedPrice={prices.supported} />}
+      {view.card && <GuestCard card={view.card} giveEmail={giveEmail} planIntent={planIntent} onSent={setLinkSent} cta={<PlanCta company={view.companyName} onIntent={() => setPlanIntent(true)} where="card" />} />}
       {!locked && (
         <>
       <ol className="space-y-3" aria-label="Conversation">
@@ -175,36 +177,29 @@ export function GuestChat({ view, reply, giveEmail, restart, prices }: { view: G
           Start over
         </button>
       )}
-      {view.card && <PlanCta company={view.companyName} unlocked={view.unlocked} email={view.email} onIntent={() => setPlanIntent(true)} where="chat" />}
+      {view.card && <PlanCta company={view.companyName} onIntent={() => setPlanIntent(true)} where="chat" />}
       <div ref={end} />
     </div>
   );
 }
 
-/** The recommendation, blurred behind an email until the visitor gives one; then the link that saves it. */
-function GuestCard({ card, unlocked, email, giveEmail, planIntent, cta }: { card: RecommendationCard; unlocked: boolean; email: string | null; giveEmail: (email: string) => Promise<Result>; planIntent: boolean; cta: React.ReactNode }) {
+/** The recommendation's teaser, blurred behind an email: giving it sends the sign-in link to the full recommendation. */
+function GuestCard({ card, giveEmail, planIntent, onSent, cta }: { card: RecommendationCard; giveEmail: (email: string) => Promise<Result>; planIntent: boolean; onSent: (sent: boolean) => void; cta: React.ReactNode }) {
   const [value, setValue] = useState("");
-  const [state, setState] = useState<{ kind: "idle" | "sending" | "sent" } | { kind: "error"; message: string }>({ kind: unlocked ? "sent" : "idle" });
+  const [state, setState] = useState<{ kind: "idle" | "sending" } | { kind: "error"; message: string }>({ kind: "idle" });
   const router = useRouter();
-
-  const sendLink = (address: string) => sendSignInLink(address, planIntent);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setState({ kind: "sending" });
     const r = await giveEmail(value);
     if (!r.ok) return setState({ kind: "error", message: r.error ?? "Check the address and try again." });
+    // Send the link, then show the inbox screen (it offers to send again if this didn't go out).
+    onSent(await sendSignInLink(value.trim().toLowerCase(), planIntent).then(() => true, () => false));
     router.refresh();
-    try {
-      await sendLink(value.trim().toLowerCase());
-      setState({ kind: "sent" });
-    } catch {
-      setState({ kind: "error", message: "Your recommendation is unlocked, but we couldn't send the sign-in link. Try again below." });
-    }
   }
 
   const view = <RecommendationCardView id="guest" card={card} given={[]} deeper={null} />;
-  if (!unlocked) {
     const insights = teaserInsights(card);
     return (
       <section className="surface overflow-hidden" data-testid="guest-recommendation" aria-label="Your recommendation" style={{ borderColor: "var(--green)", boxShadow: "0 0 0 1px var(--green)" }}>
@@ -234,10 +229,10 @@ function GuestCard({ card, unlocked, email, giveEmail, planIntent, cta }: { card
             <form onSubmit={onSubmit} className="surface p-5 w-full max-w-sm space-y-3 shadow-lg" aria-label="See your recommendation">
               <Lock size={22} className="mx-auto" style={{ color: "var(--green)" }} aria-hidden />
               <h3 className="text-lg font-semibold text-center" style={{ color: "var(--foreground)" }}>See what to do about it</h3>
-              <p className="text-sm text-center" style={{ color: "var(--muted-foreground)" }}>Enter your work email for the full recommendation: what to do, your 30/60/90-day plan and how to measure it. We&apos;ll also send a link to save it. No password needed.</p>
+              <p className="text-sm text-center" style={{ color: "var(--muted-foreground)" }}>Enter your work email and we&apos;ll send you a sign-in link to the full recommendation: what to do, your 30/60/90-day plan and how to measure it. No password needed.</p>
               <label htmlFor="guest-email" className="label">Work email</label>
               <input id="guest-email" type="email" required className="field w-full" placeholder="you@company.com" value={value} onChange={(e) => setValue(e.target.value)} autoComplete="email" />
-              <button type="submit" className="btn btn-primary w-full" disabled={state.kind === "sending"}>{state.kind === "sending" ? "Unlocking…" : "See my recommendation"}</button>
+              <button type="submit" className="btn btn-primary w-full" disabled={state.kind === "sending"}>{state.kind === "sending" ? "Sending your link…" : "See my recommendation"}</button>
               {state.kind === "error" && <p role="alert" className="text-sm" style={{ color: "var(--red)" }}>{state.message}</p>}
             </form>
           </div>
@@ -245,24 +240,89 @@ function GuestCard({ card, unlocked, email, giveEmail, planIntent, cta }: { card
         <div className="px-5 sm:px-6 py-5 sm:py-6 border-t" style={{ borderColor: "var(--border)" }}>{cta}</div>
       </section>
     );
-  }
+}
+
+const MAILBOXES: { name: string; href: string; match: RegExp }[] = [
+  { name: "Gmail", href: "https://mail.google.com/mail/u/0/#search/growthgoaled", match: /@(gmail|googlemail)\.com$/i },
+  { name: "Outlook", href: "https://outlook.office.com/mail/", match: /@(outlook|hotmail|live|msn)\.[a-z.]+$/i },
+];
+
+/**
+ * After the email: the full recommendation is in the sign-in link, so the page sends them to their
+ * inbox (with a reminder of what's waiting), and lets them resend or fix the address.
+ */
+function CheckInbox({ email, card, company, planIntent, giveEmail, firstSend }: { email: string; card: RecommendationCard | null; company: string | null; planIntent: boolean; giveEmail: (email: string) => Promise<Result>; firstSend: boolean | null }) {
+  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "failed">(firstSend === false ? "failed" : "idle");
+  const [changing, setChanging] = useState(false);
+  const [next, setNext] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  const resend = async (address: string) => {
+    setStatus("sending");
+    setStatus(await sendSignInLink(address, planIntent).then(() => "sent" as const, () => "failed" as const));
+  };
+  const change = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    const r = await giveEmail(next);
+    if (!r.ok) return setError(r.error ?? "Check the address and try again.");
+    setChanging(false);
+    await resend(next.trim().toLowerCase());
+    router.refresh();
+  };
+  const own = MAILBOXES.find((m) => m.match.test(email));
+  const boxes = own ? [own] : MAILBOXES;
   return (
-    <div className="space-y-3" data-testid="guest-recommendation">
-      {view}
-      <div className="rounded-xl px-4 py-3 text-base" style={{ background: "var(--green-muted)", color: "var(--foreground)" }} role="status">
-        {state.kind === "error" ? (
-          <span>{state.message}</span>
-        ) : (
-          <span>
-            We&apos;ve sent a sign-in link to <strong>{email}</strong>. Open it to save this conversation to your account, then build your action plan from here.
-          </span>
-        )}{" "}
-        <button type="button" className="link text-sm" onClick={() => email && sendLink(email).then(() => setState({ kind: "sent" }), () => setState({ kind: "error", message: "We couldn't send the link. Try again in a minute." }))}>
-          Send the link again
-        </button>
+    <section aria-label="Check your inbox" className="flex flex-col gap-5 w-full">
+      <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: "var(--green-muted)" }}>
+        <Mail size={22} style={{ color: "var(--green)" }} aria-hidden />
       </div>
-      {cta}
-    </div>
+      <div>
+        <h2 className="font-display text-3xl sm:text-4xl leading-tight" style={{ color: "var(--foreground)" }}>Check your inbox</h2>
+        <p className="text-base mt-2" style={{ color: "var(--muted-foreground)" }}>
+          We&apos;ve sent a sign-in link to <strong style={{ color: "var(--foreground)" }}>{email}</strong>. Open it to see your full recommendation{company ? ` for ${company}` : ""}: what to do, your 30/60/90-day plan and how to measure it. No password needed.
+        </p>
+      </div>
+      {card && (
+        <div className="rounded-xl px-4 py-3" style={{ background: "var(--muted)" }}>
+          <div className="label mb-1" style={{ color: "var(--green)" }}>Waiting for you</div>
+          <p className="text-base font-medium" style={{ color: "var(--foreground)" }}>{card.takeaway}</p>
+        </div>
+      )}
+      <div className="flex gap-2 flex-wrap">
+        {boxes.map((m) => (
+          <a key={m.name} href={m.href} target="_blank" rel="noopener" className="btn btn-primary">
+            Open {m.name}
+          </a>
+        ))}
+      </div>
+      <div className="text-sm space-y-2" style={{ color: "var(--muted-foreground)" }}>
+        {status === "failed" && <p role="alert" style={{ color: "var(--red)" }}>We couldn&apos;t send the link just now. Try sending it again.</p>}
+        {status === "sent" && <p role="status" style={{ color: "var(--green)" }}>Sent again. It can take a minute; check spam too.</p>}
+        <p>
+          Not there after a minute? Check spam, or{" "}
+          <button type="button" className="link" disabled={status === "sending"} onClick={() => resend(email)}>
+            {status === "sending" ? "sending…" : "send the link again"}
+          </button>
+          .
+        </p>
+        {changing ? (
+          <form onSubmit={change} className="flex gap-2 flex-wrap items-end" aria-label="Use a different email">
+            <label htmlFor="guest-email-change" className="sr-only">Work email</label>
+            <input id="guest-email-change" type="email" required className="field flex-1 min-w-[14rem]" placeholder="you@company.com" value={next} onChange={(e) => setNext(e.target.value)} autoComplete="email" />
+            <button type="submit" className="btn btn-secondary">Send the link</button>
+            {error && <p role="alert" className="w-full" style={{ color: "var(--red)" }}>{error}</p>}
+          </form>
+        ) : (
+          <p>
+            Wrong address?{" "}
+            <button type="button" className="link" onClick={() => setChanging(true)}>
+              Use a different email
+            </button>
+          </p>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -327,39 +387,21 @@ async function sendSignInLink(address: string, plan: boolean) {
 
 /**
  * "Get a CRO-built GTM action plan for <company>": under the recommendation and at the end of the chat.
- * Before the email it takes them to the email box (the link then opens at the plan offer); after it,
- * it sends that link.
+ * It takes them to the email box; the sign-in link they get then opens at the plan offer.
  */
-function PlanCta({ company, unlocked, email, onIntent, where }: { company: string | null; unlocked: boolean; email: string | null; onIntent: () => void; where: "card" | "chat" }) {
-  const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+function PlanCta({ company, onIntent, where }: { company: string | null; onIntent: () => void; where: "card" | "chat" }) {
   const label = `Get a CRO-Built GTM action plan for ${company ?? "your company"}`;
-  const click = async () => {
+  const click = () => {
     onIntent();
-    if (!unlocked || !email) {
-      const box = document.getElementById("guest-email") as HTMLInputElement | null;
-      box?.scrollIntoView({ behavior: "smooth", block: "center" });
-      box?.focus({ preventScroll: true });
-      return;
-    }
-    setState("sending");
-    try {
-      await sendSignInLink(email, true);
-      setState("sent");
-    } catch {
-      setState("error");
-    }
+    const box = document.getElementById("guest-email") as HTMLInputElement | null;
+    box?.scrollIntoView({ behavior: "smooth", block: "center" });
+    box?.focus({ preventScroll: true });
   };
   return (
-    <div className="space-y-2" data-testid={`plan-cta-${where}`}>
-      <button type="button" className="btn btn-primary w-full sm:w-auto" disabled={state === "sending"} onClick={click}>
-        {state === "sending" ? "Sending your link…" : label}
+    <div data-testid={`plan-cta-${where}`}>
+      <button type="button" className="btn btn-primary w-full sm:w-auto" onClick={click}>
+        {label}
       </button>
-      {state === "sent" && (
-        <p className="text-sm" role="status" style={{ color: "var(--foreground)" }}>
-          We&apos;ve sent a link to <strong>{email}</strong>. Open it to build your action plan{company ? ` for ${company}` : ""}.
-        </p>
-      )}
-      {state === "error" && <p className="text-sm" role="alert" style={{ color: "var(--red)" }}>We couldn&apos;t send the link. Try again in a minute.</p>}
     </div>
   );
 }
