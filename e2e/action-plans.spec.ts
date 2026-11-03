@@ -58,6 +58,9 @@ test("a founder buys an action plan from the conversation; an advisor approves i
   await cro.page.getByRole("button", { name: "Approve and deliver" }).click();
   await expect(cro.page.getByText("Delivered", { exact: true })).toBeVisible();
   await expect(cro.page.getByText("Hire one more AE once payers convert")).toBeVisible();
+  // The founder's email can be re-sent from here; when email isn't working it says why.
+  await cro.page.getByRole("button", { name: "Re-send the email to the founder" }).click();
+  await expect(cro.page.getByText(/The email wasn.t sent/)).toBeVisible();
 
   // Delivered to the founder: the Overview says it's ready and opens it.
   await page.goto("/overview");

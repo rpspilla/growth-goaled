@@ -8,7 +8,7 @@ import { z } from "zod";
 import { canViewCompany } from "@/lib/access";
 import { requireRole } from "@/lib/auth/session";
 import { db, schema } from "@/lib/db";
-import { approvePlan, postAdvisorMessage, requestPlanUpdate, setStepDone, writePlan, type PlanResult } from "@/lib/data/action-plans";
+import { approvePlan, postAdvisorMessage, requestPlanUpdate, resendPlanEmail, setStepDone, writePlan, type PlanResult } from "@/lib/data/action-plans";
 
 /** The signed-in advisor or admin, and the plan's company if they may see it. */
 async function staffPlan(planId: string) {
@@ -83,4 +83,13 @@ export async function advisorStepAction(planId: string, period: string, index: n
   const result = await setStepDone(ctx.company, ctx.plan.id, p.data, index, Boolean(done));
   revalidatePath(`/advisor/plans/${ctx.plan.id}`);
   return result;
+}
+
+/** Re-sends the founder's "your action plan is ready" email for a delivered plan. */
+export async function resendPlanEmailAction(planId: string): Promise<{ ok: true; to: string } | { ok: false; error: string }> {
+  const ctx = await staffPlan(planId);
+  if (!ctx) return { ok: false, error: "Plan not found." };
+  const h = await headers();
+  const appUrl = process.env.APP_URL?.replace(/\/$/, "") ?? `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
+  return resendPlanEmail(ctx.user, ctx.company, ctx.plan.id, appUrl);
 }

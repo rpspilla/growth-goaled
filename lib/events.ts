@@ -11,6 +11,7 @@ export type EventName =
   | "action_plan_submitted"
   | "action_plan_delivered"
   | "action_plan_email_failed"
+  | "action_plan_email_resent"
   | "advisor_message"
   | "conversation_message"
   | "recommendation_feedback"

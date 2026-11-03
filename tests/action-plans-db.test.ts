@@ -21,7 +21,7 @@ vi.mock("@/lib/ai/plan", async (original) => {
 import { schema } from "@/lib/db";
 import type { ChatInput } from "@/lib/ai/chat";
 import type { ActionPlanContent, Company, User } from "@/lib/db/schema";
-import { approvePlan, cancelSupportedPlan, founderPlans, createPlanCheckout, planForConversation, plansForReview, postAdvisorMessage, setStepDone, submitPlan, supportedPlans, writePlan } from "@/lib/data/action-plans";
+import { approvePlan, cancelSupportedPlan, founderPlans, resendPlanEmail, createPlanCheckout, planForConversation, plansForReview, postAdvisorMessage, setStepDone, submitPlan, supportedPlans, writePlan } from "@/lib/data/action-plans";
 import { getConversation, sendMessage, startConversation } from "@/lib/data/chat";
 import { recordPaidSession } from "@/lib/data/payments";
 
@@ -214,8 +214,14 @@ describe("delivery email", () => {
     expect(await approvePlan(advisor, co, plan.id, plan.content!, null, "https://dev.test")).toEqual({ ok: true });
     expect((await planForConversation(co, conversationId))!.status).toBe("delivered");
     expect(err.mock.calls.some((c) => String(c[0]).includes("Delivery email to the founder wasn't sent"))).toBe(true);
-    err.mockRestore();
     const events = await db().select().from(schema.events).where(eq(schema.events.name, "action_plan_email_failed"));
     expect(events[0]!.props).toMatchObject({ plan_id: plan.id, reason: "Email provider returned 401." });
+    // Once email works again, the advisor re-sends it; only for a delivered plan of that company.
+    expect(await resendPlanEmail(advisor, co, plan.id, "https://dev.test")).toEqual({ ok: false, error: "The email wasn't sent: Email provider returned 401." });
+    h.emailFails = false;
+    expect(await resendPlanEmail(advisor, co, plan.id, "https://dev.test")).toEqual({ ok: true, to: "f@co.test" });
+    expect(h.emails.at(-1)).toMatchObject({ to: "f@co.test", subject: "Your Growth Goaled action plan is ready" });
+    expect(await resendPlanEmail(advisor, other, plan.id, "https://dev.test")).toEqual({ ok: false, error: "Only a delivered plan's email can be re-sent." });
+    err.mockRestore();
   });
 });

@@ -290,26 +290,44 @@ export async function approvePlan(advisor: User, company: Pick<Company, "id" | "
   const plan = updated[0];
   if (!plan) return { ok: false, error: "This plan isn't waiting for review." };
   await track("action_plan_delivered", { userId: advisor.id, companyId: company.id, props: { topic: plan.topic } });
+  await sendPlanReadyEmail(advisor, company, plan, clean.goal, appUrl);
+  return { ok: true };
+}
+
+/**
+ * Emails the founder who bought the plan that it's ready, with a link through sign-in to it. A failure
+ * is logged and recorded (the plan is delivered in the app either way) and returned to the caller.
+ */
+async function sendPlanReadyEmail(advisor: Pick<User, "id">, company: Pick<Company, "id" | "name">, plan: Pick<ActionPlan, "id" | "createdBy" | "conversationId">, goal: string, appUrl: string): Promise<{ sent: true; to: string } | { sent: false; reason: string }> {
   const [founder] = plan.createdBy ? await db.select().from(schema.users).where(eq(schema.users.id, plan.createdBy)).limit(1) : [];
-  if (founder) {
-    const link = planLink(appUrl, plan.conversationId);
-    const sent = await sendEmail({
-      to: founder.email,
-      subject: "Your Growth Goaled action plan is ready",
-      text: `Your action plan for ${company.name} has been reviewed and approved by your Growth Goaled advisor.\n\nGoal: ${clean.goal}\n\nLog in to Growth Goaled to see it: ${link}\n`,
-      html: `<div style="font-family:Inter,Arial,sans-serif;color:#0D1B2A;max-width:520px">
+  if (!founder) return { sent: false, reason: "The founder who bought this plan no longer has an account." };
+  const link = planLink(appUrl, plan.conversationId);
+  const sent = await sendEmail({
+    to: founder.email,
+    subject: "Your Growth Goaled action plan is ready",
+    text: `Your action plan for ${company.name} has been reviewed and approved by your Growth Goaled advisor.\n\nGoal: ${goal}\n\nLog in to Growth Goaled to see it: ${link}\n`,
+    html: `<div style="font-family:Inter,Arial,sans-serif;color:#0D1B2A;max-width:520px">
 <p style="font-size:15px">Your action plan for <strong>${escapeHtml(company.name)}</strong> has been reviewed and approved by your Growth Goaled advisor.</p>
-<p style="font-size:15px"><strong>Goal:</strong> ${escapeHtml(clean.goal)}</p>
+<p style="font-size:15px"><strong>Goal:</strong> ${escapeHtml(goal)}</p>
 <p><a href="${escapeHtml(link)}" style="display:inline-block;background:#155A3C;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600">Log in to see your action plan</a></p>
 </div>`,
-    }).catch((err) => ({ sent: false as const, reason: err instanceof Error ? err.message : String(err) }));
-    if (!sent.sent) {
-      // The plan is delivered in the app either way; say so loudly rather than dropping the email silently.
-      console.error(`[plan] Delivery email to the founder wasn't sent (plan ${plan.id}): ${sent.reason}`);
-      await track("action_plan_email_failed", { userId: advisor.id, companyId: company.id, props: { plan_id: plan.id, reason: sent.reason.slice(0, 200) } });
-    }
+  }).catch((err) => ({ sent: false as const, reason: err instanceof Error ? err.message : String(err) }));
+  if (!sent.sent) {
+    console.error(`[plan] Delivery email to the founder wasn't sent (plan ${plan.id}): ${sent.reason}`);
+    await track("action_plan_email_failed", { userId: advisor.id, companyId: company.id, props: { plan_id: plan.id, reason: sent.reason.slice(0, 200) } });
+    return sent;
   }
-  return { ok: true };
+  return { sent: true, to: founder.email };
+}
+
+/** An advisor re-sends the "your action plan is ready" email for a delivered plan (e.g. after an email outage). */
+export async function resendPlanEmail(advisor: Pick<User, "id">, company: Pick<Company, "id" | "name">, planId: string, appUrl: string): Promise<{ ok: true; to: string } | { ok: false; error: string }> {
+  const [plan] = await db.select().from(schema.actionPlans).where(and(eq(schema.actionPlans.id, planId), eq(schema.actionPlans.companyId, company.id))).limit(1);
+  if (!plan || plan.status !== "delivered" || !plan.content) return { ok: false, error: "Only a delivered plan's email can be re-sent." };
+  const sent = await sendPlanReadyEmail(advisor, company, plan, plan.content.goal, appUrl);
+  if (!sent.sent) return { ok: false, error: `The email wasn't sent: ${sent.reason}` };
+  await track("action_plan_email_resent", { userId: advisor.id, companyId: company.id, props: { plan_id: plan.id } });
+  return { ok: true, to: sent.to };
 }
 
 /** An advisor's message in a supported plan's conversation (only while the subscription is active). */

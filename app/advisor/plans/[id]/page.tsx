@@ -11,7 +11,8 @@ import { requireRole } from "@/lib/auth/session";
 import { db, schema } from "@/lib/db";
 import { REVIEW_HOURS } from "@/lib/data/action-plans";
 import { getConversation } from "@/lib/data/chat";
-import { advisorMessageAction, advisorStepAction, approvePlanAction, redraftPlanAction } from "../actions";
+import { advisorMessageAction, advisorStepAction, approvePlanAction, redraftPlanAction, resendPlanEmailAction } from "../actions";
+import { ResendPlanEmail } from "@/components/chat/ResendPlanEmail";
 
 export const maxDuration = 300;
 
@@ -71,6 +72,7 @@ export default async function AdvisorPlanPage({ params }: { params: Promise<{ id
           {plan.content && (plan.status === "delivered" || plan.tier === "supported") && (
             <div className="surface p-5 space-y-4">
               {plan.status === "delivered" && <p className="text-sm" style={muted}>Approved {plan.approvedAt?.toLocaleDateString("en-US", { month: "short", day: "numeric" })}{plan.reviewNote ? ` · Note: ${plan.reviewNote}` : ""}</p>}
+              {plan.status === "delivered" && <ResendPlanEmail planId={plan.id} resend={resendPlanEmailAction} />}
               <ActionPlanView content={plan.content} toggle={plan.status === "active" ? advisorStepAction.bind(null, plan.id) : undefined} />
             </div>
           )}
