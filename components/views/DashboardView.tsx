@@ -59,7 +59,7 @@ export function DashboardView({ data, hrefFor }: { data: Dashboard; hrefFor: (pa
   ];
 
   return (
-    <div className="p-8 max-w-6xl">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-6xl">
       <div className="mb-8">
         <div className="label mb-2" style={{ color: "var(--muted-foreground)" }}>{today()}</div>
         <h1 className="font-display text-3xl font-normal mb-1" style={{ color: "var(--foreground)" }}>Welcome back, {data.companyName}</h1>
@@ -67,16 +67,16 @@ export function DashboardView({ data, hrefFor }: { data: Dashboard; hrefFor: (pa
       </div>
 
       {data.metrics.length > 0 && (
-        <div className="grid grid-cols-6 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6">
           {data.metrics.map((m) => (
             <MetricCard key={m.label} {...m} />
           ))}
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Growth Intelligence Score */}
-        <div className="col-span-1 rounded-xl border p-6 flex flex-col" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+        <div className="lg:col-span-1 rounded-xl border p-6 flex flex-col" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
           <div className="label mb-4" style={{ color: "var(--muted-foreground)" }}>
             Growth Intelligence Score
           </div>
@@ -133,7 +133,7 @@ export function DashboardView({ data, hrefFor }: { data: Dashboard; hrefFor: (pa
           )}
         </div>
 
-        <div className="col-span-2 space-y-4">
+        <div className="lg:col-span-2 space-y-4">
           {/* Benchmark preview */}
           {bench ? (
             <MaybeLink
@@ -173,7 +173,7 @@ export function DashboardView({ data, hrefFor }: { data: Dashboard; hrefFor: (pa
           )}
 
           {/* Quick actions */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {quick.map((q) => {
               const ready = published.has(q.type);
               return (

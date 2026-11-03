@@ -48,7 +48,7 @@ export function BenchmarkView({
   }, []);
 
   return (
-    <div className="p-8 max-w-6xl">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-6xl">
       <SourceTrailPanel claim={openClaim ? (data.claims[openClaim] ?? null) : null} onClose={() => setOpenClaim(null)} />
 
       <div className="mb-8">
@@ -93,8 +93,8 @@ export function BenchmarkView({
         ))}
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
-        <div className="col-span-2 space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-4">
           <div className="rounded-xl border overflow-hidden" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
             <div className="grid grid-cols-4 px-5 py-3 border-b" style={{ borderColor: "var(--border)", background: "var(--muted)" }}>
               {["Metric", companyName, "Top Quartile", "Status"].map((h) => (
