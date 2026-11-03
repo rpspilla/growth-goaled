@@ -70,6 +70,7 @@ test("a visitor talks it through, unlocks the recommendation with an email, and 
   const gate = page.getByRole("form", { name: "See your recommendation" });
   await expect(gate).toBeVisible();
   await expect(page.getByRole("article", { name: "Recommendation" })).toHaveCount(0);
+  await expect(page.getByRole("complementary", { name: "How to read your recommendation" })).toHaveCount(0);
   // Until the email is given, only the recommendation shows: the conversation and the chat box are hidden.
   await expect(page.getByRole("list", { name: "Conversation" })).toHaveCount(0);
   await expect(page.getByLabel("Your answer")).toHaveCount(0);
@@ -84,6 +85,7 @@ test("a visitor talks it through, unlocks the recommendation with an email, and 
   await gate.getByRole("button", { name: "See my recommendation" }).click();
   const card = page.getByRole("article", { name: "Recommendation" });
   await expect(card).toBeVisible();
+  await expect(page.getByRole("complementary", { name: "How to read your recommendation" })).toBeVisible();
   // With the email given, the conversation and the chat box come back.
   await expect(page.getByRole("list", { name: "Conversation" })).toBeVisible();
   await expect(page.getByLabel("Your answer")).toBeEnabled();

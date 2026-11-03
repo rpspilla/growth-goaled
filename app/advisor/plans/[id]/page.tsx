@@ -37,7 +37,7 @@ export default async function AdvisorPlanPage({ params }: { params: Promise<{ id
   const due = plan.submittedAt ? new Date(plan.submittedAt.getTime() + REVIEW_HOURS * 3600 * 1000) : null;
 
   return (
-    <div className="px-4 sm:px-8 py-8 max-w-6xl space-y-6">
+    <div className="px-4 sm:px-8 py-8 w-full space-y-6">
       <BuildingRefresh active={plan.status === "drafting" || Boolean(plan.draftingStartedAt)} />
       <div>
         <Link href="/advisor/plans" className="link text-sm">← Action plans</Link>
@@ -49,8 +49,9 @@ export default async function AdvisorPlanPage({ params }: { params: Promise<{ id
         {due && plan.status === "in_review" && <p className="text-base mt-1" style={muted}>Due {due.toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</p>}
       </div>
 
-      <div className="grid lg:grid-cols-[1fr_1.2fr] gap-6 items-start">
-        <section aria-label="Conversation" className="surface p-4 space-y-3 max-h-[75vh] overflow-y-auto">
+      {/* The whole screen: the conversation as a narrow, pinned column; the plan gets the rest. */}
+      <div className="grid lg:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)] 2xl:grid-cols-[28rem_minmax(0,1fr)] gap-6 items-start">
+        <section aria-label="Conversation" className="surface p-4 space-y-3 max-h-[75vh] lg:max-h-[calc(100vh-7rem)] lg:sticky lg:top-6 overflow-y-auto">
           <h2 className="label">Conversation</h2>
           {view.messages.map((m) => (
             <div key={m.id} className="text-sm">

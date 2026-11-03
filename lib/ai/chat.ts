@@ -2,6 +2,7 @@ import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
+import { CONFIDENCE_RULES } from "@/lib/chat/legend";
 import type { ChatContext } from "@/lib/chat/context";
 import type { ChatTopic } from "@/lib/chat/topics";
 import { e2eEnabled } from "@/lib/e2e";
@@ -56,7 +57,13 @@ Output fields:
 - questions: the one or two questions you're asking now (also woven into the reply), or [] when you aren't asking.
 - facts: anything new the founder stated about their company this turn that's worth remembering (team size, ACV, sales cycle, target, plans…). key: short snake_case id, reusing an existing fact key when updating one. status: "stated" when they said it as fact, "assumption" when they said they're guessing. [] when nothing new.
 - plan_needs: only when ACTION PLAN says it's being built: the specific information still missing for a strong 30/60/90-day plan (each a short phrase, most important first), or [] when you have enough. Otherwise [].
-- recommendation: give one when you have enough to recommend something useful, even with caveats (often by the second or third turn; at once when the context already covers it). Otherwise null. When you give one, it's the founder's decision card: takeaway (one sentence), diagnosis, evidence (each item marked fact/figure/assumption/hypothesis), confidence (high/medium/low and why), priority, recommendation, next_steps, success_measures, a 30/60/90-day plan, and missing (what would raise confidence). Keep every field short and scannable. Give an updated card when new information changes your view.
+- recommendation: give one when you have enough to recommend something useful, even with caveats (often by the second or third turn; at once when the context already covers it). Otherwise null. When you give one, it's the founder's decision card: takeaway (one sentence), diagnosis, evidence (each item marked fact/figure/assumption/hypothesis), confidence (high/medium/low and why, by the CONFIDENCE rule below), priority, recommendation, next_steps, success_measures, a 30/60/90-day plan, and missing (what would raise confidence). Keep every field short and scannable. Give an updated card when new information changes your view.
+
+CONFIDENCE (founders see this rule, so apply it exactly):
+- high: ${CONFIDENCE_RULES.high}
+- medium: ${CONFIDENCE_RULES.medium}
+- low: ${CONFIDENCE_RULES.low}
+The why says which inputs are known and which are assumed.
 
 When ACTION PLAN is present, the founder has bought a plan for this question:
 - While it's being collected, your job is to gather what the plan needs: ask for the most important missing information first, invite them to attach files (CRM exports, revenue by customer, org chart, comp plans) in the chat, and say when you have enough for them to submit it. An advisor reviews the plan before it's delivered (expect up to 24 hours).
@@ -78,7 +85,7 @@ function contextBlock(input: ChatInput): string {
 }
 
 export const planLine = (p: PlanMode) =>
-  `ACTION PLAN: ${p.tier === "supported" ? "supported plan ($799/month, advisor in the conversation)" : "one-time plan ($499, advisor-approved before delivery)"}; status ${p.status}${p.needs.length ? `; still needed after the last turn: ${p.needs.join("; ")}` : ""}.`;
+  `ACTION PLAN: ${p.tier === "supported" ? "supported plan ($799/month: unlimited chat with their advisor in this conversation plus 2 hours live with them each month)" : "one-time plan ($499, advisor-approved before delivery)"}; status ${p.status}${p.needs.length ? `; still needed after the last turn: ${p.needs.join("; ")}` : ""}.`;
 
 export const GUEST_LINE =
   "VISITOR: not signed up yet; COMPANY CONTEXT is what they told us just now. Give your initial recommendation card as soon as you reasonably can: at most one round of questions first, and only if something critical is missing.";

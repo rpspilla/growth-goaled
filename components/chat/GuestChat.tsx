@@ -10,6 +10,7 @@ import type { RecommendationCard } from "@/lib/db/schema";
 import { trackSignupEvent } from "@/app/(auth)/actions";
 import { RecommendationCardView } from "./RecommendationCardView";
 import { HumanPresence } from "@/components/brand/HumanPresence";
+import { RecommendationLegend } from "./RecommendationLegend";
 
 type Result = { ok: boolean; error?: string };
 export type GuestViewData = {
@@ -28,7 +29,7 @@ export type GuestViewData = {
  * then the AI's recommendation, blurred until the visitor gives an email (which also sends the
  * sign-in link that saves it all to their account).
  */
-export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestViewData; reply: (text: string) => Promise<Result>; giveEmail: (email: string) => Promise<Result>; restart: () => Promise<void> }) {
+export function GuestChat({ view, reply, giveEmail, restart, prices }: { view: GuestViewData; reply: (text: string) => Promise<Result>; giveEmail: (email: string) => Promise<Result>; restart: () => Promise<void>; prices: { plan: string; supported: string } }) {
   const [text, setText] = useState("");
   // The message on its way, shown straight away (outside the transition, whose updates React holds
   // until the server answers) until the transcript has it.
@@ -97,6 +98,7 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
       <h2 className="font-display text-3xl sm:text-4xl leading-tight" style={{ color: "var(--foreground)" }}>{view.messages[0]?.content}</h2>
       <HumanPresence />
       {view.card && <GuestCard card={view.card} unlocked={view.unlocked} email={view.email} giveEmail={giveEmail} planIntent={planIntent} cta={<PlanCta company={view.companyName} unlocked={view.unlocked} email={view.email} onIntent={() => setPlanIntent(true)} where="card" />} />}
+      {view.card && view.unlocked && <RecommendationLegend stage="recommendation" planPrice={prices.plan} supportedPrice={prices.supported} />}
       {!locked && (
         <>
       <ol className="space-y-3" aria-label="Conversation">

@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { GuestChat } from "@/components/chat/GuestChat";
+import { formatPrice, pricing } from "@/lib/pricing";
 import { GUEST_COOKIE, guestByToken, guestView } from "@/lib/data/guest";
 import { guestEmailAction, guestReplyAction, guestRestartAction } from "./guest-actions";
 import { ReturningSignIn } from "./ReturningSignIn";
@@ -10,7 +11,7 @@ export async function GuestEntry() {
   const view = guestView(g && !g.claimedAt ? g : null);
   return (
     <div className="space-y-8">
-      <GuestChat view={view} reply={guestReplyAction} giveEmail={guestEmailAction} restart={guestRestartAction} />
+      <GuestChat view={view} reply={guestReplyAction} giveEmail={guestEmailAction} restart={guestRestartAction} prices={{ plan: formatPrice(pricing().actionPlanCents), supported: formatPrice(pricing().supportedMonthlyCents) }} />
       <ReturningSignIn />
     </div>
   );

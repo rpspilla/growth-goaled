@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { PLAN_INCLUDES, SUPPORTED_INCLUDES, type OfferPoint } from "@/lib/plan-offer";
 
 type Buy = (conversationId: string, tier: string) => Promise<{ ok: true; url: string } | { ok: false; error: string }>;
 
-/** Turns the conversation's recommendation into an action plan: $499 once, or $799 a month with an advisor. */
+/** Turns the conversation's recommendation into an action plan: $499 once, or $799 a month with an advisor (unlimited chat, 2 hours live a month). */
 export function PlanOffer({ conversationId, planPrice, supportedPrice, buy }: { conversationId: string; planPrice: string; supportedPrice: string; buy: Buy }) {
   const [pending, start] = useTransition();
   const [chosen, setChosen] = useState<string | null>(null);
@@ -17,7 +18,7 @@ export function PlanOffer({ conversationId, planPrice, supportedPrice, buy }: { 
       if (r.ok) window.location.href = r.url;
       else setError(r.error);
     });
-  const option = (tier: "plan" | "supported", title: string, price: string, per: string, points: string[], primary: boolean) => (
+  const option = (tier: "plan" | "supported", title: string, price: string, per: string, points: OfferPoint[], primary: boolean) => (
     <div className="rounded-xl p-4 flex flex-col gap-3" style={{ border: `1px solid ${primary ? "var(--green)" : "var(--border)"}`, background: "var(--card)" }}>
       <div>
         <div className="text-base font-semibold" style={{ color: "var(--foreground)" }}>{title}</div>
@@ -28,7 +29,14 @@ export function PlanOffer({ conversationId, planPrice, supportedPrice, buy }: { 
       </div>
       <ul className="text-sm space-y-1 list-disc pl-4 flex-1" style={{ color: "var(--foreground)" }}>
         {points.map((p) => (
-          <li key={p}>{p}</li>
+          <li key={p.text}>
+            {p.text}
+            {p.soon && (
+              <span className="ml-1.5 text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap" style={{ background: "var(--muted)", color: "var(--muted-foreground)" }}>
+                Coming soon
+              </span>
+            )}
+          </li>
         ))}
       </ul>
       <button type="button" disabled={pending} onClick={() => go(tier)} className={`btn ${primary ? "btn-primary" : "btn-secondary"}`}>
@@ -43,8 +51,8 @@ export function PlanOffer({ conversationId, planPrice, supportedPrice, buy }: { 
         <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Turn this into a 30/60/90-day plan. We gather what it needs right here in the conversation, files included.</p>
       </div>
       <div className="grid sm:grid-cols-2 gap-3">
-        {option("plan", "Action plan", planPrice, "once", ["Built from this conversation and your data", "Reviewed and approved by a Growth Goaled advisor", "Delivered within about 24 hours of submitting", "Yours to run; no ongoing support"], false)}
-        {option("supported", "Supported plan", supportedPrice, "a month", ["Everything in the action plan, kept up to date", "A CRO-level advisor in this conversation with you", "Milestones tracked as you go", "Cancel any time"], true)}
+        {option("plan", "Action plan", planPrice, "once", PLAN_INCLUDES, false)}
+        {option("supported", "Supported plan", supportedPrice, "a month", SUPPORTED_INCLUDES, true)}
       </div>
       {error && <p role="alert" className="text-sm" style={{ color: "var(--red)" }}>{error}</p>}
     </section>

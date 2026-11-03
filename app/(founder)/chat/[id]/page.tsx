@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { Composer } from "@/components/chat/Composer";
+import { RecommendationLegend, type LegendStage } from "@/components/chat/RecommendationLegend";
 import { HumanPresence } from "@/components/brand/HumanPresence";
 import { FileProgress } from "@/components/chat/FileProgress";
 import { BuildingRefresh } from "@/components/deliverables/BuildingRefresh";
@@ -68,8 +69,22 @@ export default async function ConversationPage({ params, searchParams }: { param
       }
     : null;
 
+  // The legend sits to the right of the conversation once there's a recommendation to read.
+  const legendStage: LegendStage | null = !lastCardId
+    ? null
+    : !plan
+      ? "recommendation"
+      : plan.status === "collecting"
+        ? "collecting"
+        : plan.status === "drafting" || plan.status === "in_review"
+          ? "review"
+          : plan.status === "active"
+            ? "supported"
+            : "delivered";
+
   return (
-    <div className="px-4 sm:px-8 py-8 max-w-3xl space-y-6">
+    <div className={`px-4 sm:px-8 py-8 ${legendStage ? "max-w-6xl lg:grid lg:grid-cols-[minmax(0,48rem)_20rem] lg:gap-8 lg:items-start" : "max-w-3xl"}`}>
+    <div className="space-y-6 min-w-0">
       <div>
         <Link href="/chat" className="link text-sm">← All conversations</Link>
         <h1 className="font-display text-3xl font-normal mt-2" style={fg}>{view.conversation.title}</h1>
@@ -155,6 +170,12 @@ export default async function ConversationPage({ params, searchParams }: { param
         Facts you mention are remembered for your company, so you won&apos;t be asked twice. <Link href="/chat#facts" className="link">See or correct them</Link>. Never shown to other
         companies; <Link href="/data-use" className="link">how we use your data</Link>.
       </p>
+    </div>
+      {legendStage && (
+        <div className="mt-8 lg:mt-0 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
+          <RecommendationLegend stage={legendStage} planPrice={formatPrice(actionPlanCents)} supportedPrice={formatPrice(supportedMonthlyCents)} />
+        </div>
+      )}
     </div>
   );
 }

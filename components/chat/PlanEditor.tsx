@@ -35,13 +35,15 @@ export function PlanEditor({ planId, initial, approve, redraft }: { planId: stri
   return (
     <div className="space-y-5">
       {!initial && <p className="text-base" style={{ color: "var(--amber)" }}>No draft yet (still drafting, or the draft failed). Re-draft it from the conversation, or write it here.</p>}
+      <div className="grid xl:grid-cols-2 gap-4">
       <div className="space-y-1">
         <label className="label" htmlFor="plan-goal">Goal</label>
-        <input id="plan-goal" className="field w-full" value={plan.goal} onChange={(e) => setPlan({ ...plan, goal: e.target.value })} />
+        <textarea id="plan-goal" rows={3} className="field w-full" value={plan.goal} onChange={(e) => setPlan({ ...plan, goal: e.target.value })} />
       </div>
       <div className="space-y-1">
         <label className="label" htmlFor="plan-summary">Summary</label>
         <textarea id="plan-summary" rows={3} className="field w-full" value={plan.summary} onChange={(e) => setPlan({ ...plan, summary: e.target.value })} />
+      </div>
       </div>
       {PERIODS.map(([key, label]) => (
         <fieldset key={key} className="space-y-2">
@@ -57,7 +59,7 @@ export function PlanEditor({ planId, initial, approve, redraft }: { planId: stri
           <button type="button" className="text-sm link" onClick={() => setPlan((p) => ({ ...p, [key]: [...p[key], { action: "", owner: "Founder", measure: "" }] }))}>+ Add a milestone</button>
         </fieldset>
       ))}
-      <div className="grid sm:grid-cols-2 gap-3">
+      <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
         <div className="space-y-1">
           <label className="label" htmlFor="plan-risks">Risks (one per line)</label>
           <textarea id="plan-risks" rows={3} className="field w-full" defaultValue={plan.risks.join("\n")} onChange={(e) => setPlan({ ...plan, risks: lines(e.target.value) })} />
@@ -66,10 +68,10 @@ export function PlanEditor({ planId, initial, approve, redraft }: { planId: stri
           <label className="label" htmlFor="plan-assumptions">Assumptions (one per line)</label>
           <textarea id="plan-assumptions" rows={3} className="field w-full" defaultValue={plan.assumptions.join("\n")} onChange={(e) => setPlan({ ...plan, assumptions: lines(e.target.value) })} />
         </div>
-      </div>
-      <div>
+        <div className="space-y-1 sm:col-span-2 xl:col-span-1">
         <label className="label" htmlFor="plan-tools">Tools to evaluate (one per line: Name (category): why)</label>
         <textarea id="plan-tools" rows={4} className="field w-full" defaultValue={(plan.tools ?? []).map(toolLine).join("\n")} onChange={(e) => setPlan({ ...plan, tools: lines(e.target.value).map(parseToolLine) })} />
+        </div>
       </div>
       <div className="space-y-1">
         <label className="label" htmlFor="plan-note">Note to the founder (optional)</label>

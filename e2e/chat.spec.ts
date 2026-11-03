@@ -49,6 +49,10 @@ test("a founder talks a decision through and gets a recommendation card", async 
   await expect(card).toContainText("Assumption");
   // The card converts into an action plan: $499 once, or $799 a month with an advisor.
   await expect(page.getByRole("region", { name: "Build my action plan" })).toContainText("$499");
+  // Beside the card: how to read it, and where they are on the way to an action plan.
+  const legend = page.getByRole("complementary", { name: "How to read your recommendation" });
+  await expect(legend).toContainText("Confidence reflects how much of the recommendation rests on");
+  await expect(legend.locator('[aria-current="step"]')).toContainText("Your recommendation");
 
   // A shared file being read: it shows in the conversation with live progress, and the reply box stays
   // under the conversation and above the latest recommendation.

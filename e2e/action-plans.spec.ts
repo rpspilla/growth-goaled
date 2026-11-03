@@ -44,6 +44,7 @@ test("a founder buys an action plan from the conversation; an advisor approves i
   await expect(panel).toContainText("Closed deals export");
   await panel.getByRole("button", { name: "Submit my plan for review" }).click();
   await expect(panel).toContainText("With your advisor for review");
+  await expect(page.getByRole("complementary", { name: "How to read your recommendation" }).locator('[aria-current="step"]')).toContainText("a CRO advisor is reviewing it");
   await expect(panel).toContainText(/approve it by|within 24 hours/);
   const planUrl = page.url().replace(/\?.*$/, "");
 
