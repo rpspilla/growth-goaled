@@ -36,6 +36,7 @@ test("a visitor talks it through, unlocks the recommendation with an email, and 
   await answer("skip");
   await expect(page.getByText("Last one: how many in customer success?")).toBeVisible();
   await answer("1");
+  await expect(page.getByText("Super. Give me 60 Seconds while we spin-up an Industry Benchmarked Recommendation")).toBeVisible();
 
   // The AI asks before it recommends; still no email asked for.
   await expect(page.getByText(/Test mode: let's work through/)).toBeVisible();

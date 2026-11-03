@@ -17,7 +17,7 @@ import { schema } from "@/lib/db";
 import type { ChatInput } from "@/lib/ai/chat";
 import type { GuestSession, User } from "@/lib/db/schema";
 import { claimGuest, guestByToken, guestEmail, guestReply, guestView, newToken, startGuest } from "@/lib/data/guest";
-import { OPENING } from "@/lib/guest/steps";
+import { OPENING, SPIN_UP } from "@/lib/guest/steps";
 
 type DB = typeof import("@/lib/db").db;
 const db = () => h.db as unknown as DB;
@@ -90,6 +90,10 @@ describe("guest chat", () => {
     expect(input.context.company).toMatchObject({ name: "Acme", stage: "Seed", industry: "Fintech", revenue_band: "$1M–$3M", gtm_team: "3 AEs, 1 in customer success" });
     expect(guestView(g).step).toBeNull();
     expect(g.card).toBeNull();
+    // After the last answer the chat says it's on it, then the AI's first reply follows.
+    const contents = g.messages.map((m) => m.content);
+    expect(contents.indexOf(SPIN_UP)).toBe(contents.indexOf("1") + 1);
+    expect(g.messages.at(-1)?.content).toMatch(/Test mode: let's work through/);
     expect(await guestReply(g, "We close $20k deals.")).toEqual({ ok: true });
     g = await current();
     expect(g.card?.takeaway).toMatch(/Test mode takeaway/);

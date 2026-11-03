@@ -8,7 +8,7 @@ import { isAiConfigError } from "@/lib/ai/config";
 import type { ChatContext } from "@/lib/chat/context";
 import { CHAT_METHODOLOGY_VERSION, getChatTopic } from "@/lib/chat/topics";
 import { track } from "@/lib/events";
-import { basicsFrom, GUEST_STEPS, interpretAnswer, nextStep, OPENING } from "@/lib/guest/steps";
+import { basicsFrom, GUEST_STEPS, interpretAnswer, nextStep, OPENING, SPIN_UP } from "@/lib/guest/steps";
 import { REVENUE_BANDS } from "@/lib/onboarding";
 import { getFounderCompany } from "./companies";
 import { saveCompanyBasics } from "./intake";
@@ -100,7 +100,8 @@ export async function guestReply(g: GuestSession, raw: string): Promise<GuestRes
       await save(g.id, { profile, messages });
       return { ok: true };
     }
-    // Profile done: the AI takes over with the founder's challenge.
+    // Profile done: the AI takes over with the founder's challenge (and says it's on it).
+    messages.push({ role: "assistant", content: SPIN_UP });
     await save(g.id, { profile, messages });
     return aiTurn({ ...g, profile, messages });
   }

@@ -2,7 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
-import { ArrowUp, Lock } from "lucide-react";
+import { ArrowUp, Loader2, Lock } from "lucide-react";
+import { SPIN_UP, type GuestStep } from "@/lib/guest/steps";
+import { understand } from "@/lib/guest/understand";
 import { authClient } from "@/lib/auth/client";
 import type { RecommendationCard } from "@/lib/db/schema";
 import { trackSignupEvent } from "@/app/(auth)/actions";
@@ -77,6 +79,8 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
   };
 
   const step = view.step;
+  // The last sign-up answer (if it reads as one) hands over to the AI: say so, and show it working.
+  const spinningUp = Boolean(step && sent !== null && step.key === LAST_STEP && understand({ ...step, options: step.options ?? undefined } as GuestStep, sent) !== null);
   return (
     <div className="flex flex-col gap-4 w-full">
       <h2 className="font-display text-3xl sm:text-4xl leading-tight" style={{ color: "var(--foreground)" }}>{view.messages[0]?.content}</h2>
@@ -100,16 +104,24 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
           </li>
         )}
         {/* The last sign-up answer (customer success) hands over to the AI, as does any reply after it. */}
-        {pending && sent !== null && (
+        {pending && sent !== null && (spinningUp ? (
+          <li role="status" aria-live="polite" className="space-y-2">
+            <p className="text-base flex items-start gap-2 leading-relaxed" style={{ color: "var(--foreground)" }}>
+              <Loader2 size={18} className="animate-spin shrink-0 mt-1" style={{ color: "var(--green)" }} aria-hidden />
+              <span>{SPIN_UP}</span>
+            </p>
+            <SpinUpProgress />
+          </li>
+        ) : (
           <li role="status" className="text-base flex items-center gap-2" style={{ color: "var(--muted-foreground)" }}>
             <span className="flex gap-1" aria-hidden>
               {[0, 150, 300].map((d) => (
                 <span key={d} className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: "var(--muted-foreground)", animationDelay: `${d}ms` }} />
               ))}
             </span>
-            {aiPhase || step?.key === "cs" ? "Thinking it through…" : <span className="sr-only">Typing…</span>}
+            {aiPhase ? "Thinking it through…" : <span className="sr-only">Typing…</span>}
           </li>
-        )}
+        ))}
       </ol>
 
       <form onSubmit={submit} className="rounded-2xl p-2 pl-4 flex items-end gap-2 focus-within:ring-2 focus-within:ring-[var(--green)]" style={{ border: "1px solid var(--border)", background: "var(--card)", boxShadow: "0 1px 3px rgba(13,27,42,0.06)" }}>
@@ -242,4 +254,20 @@ const CONFIDENCE = { high: "High confidence", medium: "Medium confidence", low: 
 export function teaserInsights(card: RecommendationCard): string[] {
   const firm = card.evidence.find((e) => e.kind === "fact" || e.kind === "figure") ?? card.evidence[0];
   return [card.diagnosis, firm?.text].filter((t): t is string => Boolean(t?.trim())).slice(0, 2);
+}
+
+const LAST_STEP = "cs";
+
+/** Fills over about a minute while the first recommendation is written, so the wait reads as progress. */
+function SpinUpProgress() {
+  const [started, setStarted] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setStarted(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  return (
+    <div className="h-1.5 rounded-full overflow-hidden ml-7" style={{ background: "var(--muted)" }} aria-hidden>
+      <div className="h-full rounded-full" style={{ width: started ? "92%" : "4%", background: "var(--green)", transition: "width 60s cubic-bezier(0.1, 0.6, 0.3, 1)" }} />
+    </div>
+  );
 }
