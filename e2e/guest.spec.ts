@@ -22,13 +22,18 @@ test("a visitor talks it through, unlocks the recommendation with an email, and 
   await answer("Robin Guest");
   await expect(page.getByText("Thanks, Robin. What's your company called?")).toBeVisible();
   await answer("Guestly");
-  await page.getByRole("button", { name: "$1M–$3M" }).click();
-  await page.getByLabel("Your answer").selectOption("2022");
-  await page.getByRole("button", { name: "Next", exact: true }).click();
-  await page.getByRole("button", { name: "Seed", exact: true }).click();
-  await page.getByRole("button", { name: "Fintech" }).click();
+  // Every answer is typed, like any chat: no buttons or dropdowns.
+  await expect(page.getByRole("button", { name: "$1M–$3M" })).toHaveCount(0);
+  await expect(page.locator("select")).toHaveCount(0);
+  await answer("lots");
+  await expect(page.getByText(/didn't catch a revenue figure/)).toBeVisible();
+  await answer("about $2M");
+  await expect(page.getByText("What year was it founded?")).toBeVisible();
+  await answer("2022");
+  await answer("we raised a seed round");
+  await answer("fintech");
   await answer("2");
-  await page.getByRole("button", { name: "Skip" }).click();
+  await answer("skip");
   await expect(page.getByText("Last one: how many in customer success?")).toBeVisible();
   await answer("1");
 

@@ -50,29 +50,32 @@ async function answerAll() {
 }
 
 describe("guest chat", () => {
-  it("asks how we can help, then the sign-up questions one at a time, checking each answer", async () => {
+  it("asks how we can help, then the sign-up questions one at a time, all answered by typing", async () => {
     expect(guestView(null).messages).toEqual([{ role: "assistant", content: OPENING }]);
     await startGuest(token, "1.2.3.4");
     expect(guestView(await current()).step).toMatchObject({ key: "challenge", kind: "text" });
     expect(await say("Our pipeline isn't converting.")).toEqual({ ok: true });
     expect(await say("Sam Founder")).toEqual({ ok: true });
     expect(await say("Acme")).toEqual({ ok: true });
-    expect(guestView(await current()).step).toMatchObject({ key: "revenueBand", kind: "choice" });
-    expect(await say("a lot")).toEqual({ ok: false, error: "Choose one of the options." });
-    await say("1m_3m");
-    await say("2021");
-    await say("Seed");
-    await say("Other");
-    expect(guestView(await current()).step?.key).toBe("verticalOther");
-    await say("Customer experience");
-    expect(await say("three")).toEqual({ ok: false, error: "Enter a whole number, e.g. 3." });
-    await say("3");
+    expect(guestView(await current()).step).toMatchObject({ key: "revenueBand" });
+    expect(await say("   ")).toEqual({ ok: false, error: "Type a message first." });
+    // Unclear answers get a follow-up in the chat, not a form error, and the question stays open.
+    expect(await say("a lot")).toEqual({ ok: true });
+    let g = await current();
+    expect(g.messages.at(-2)).toEqual({ role: "user", content: "a lot" });
+    expect(g.messages.at(-1)?.content).toMatch(/didn't catch a revenue figure/);
+    expect(guestView(g).step?.key).toBe("revenueBand");
+    await say("about $2M ARR");
+    await say("we started in 2021");
+    await say("we just closed our seed round");
+    await say("we help support teams with customer experience");
+    await say("three");
     expect(guestView(await current()).step).toMatchObject({ key: "bdrs", optional: true });
-    await say("");
-    const g = await current();
-    expect(g.profile).toMatchObject({ challenge: "Our pipeline isn't converting.", name: "Sam Founder", companyName: "Acme", revenueBand: "1m_3m", vertical: "Other", verticalOther: "Customer experience", aes: "3", bdrs: "" });
-    // Answers show as their labels; the next question is asked by name.
-    expect(g.messages.map((m) => m.content)).toContain("$1M–$3M");
+    await say("skip");
+    g = await current();
+    expect(g.profile).toMatchObject({ challenge: "Our pipeline isn't converting.", name: "Sam Founder", companyName: "Acme", revenueBand: "1m_3m", foundedYear: "2021", stage: "Seed", vertical: "Other", verticalOther: "we help support teams with customer experience", aes: "3", bdrs: "" });
+    // The founder's words appear as typed; the next question is asked by name.
+    expect(g.messages.map((m) => m.content)).toContain("about $2M ARR");
     expect(g.messages.map((m) => m.content)).toContain("Thanks, Sam. What's your company called?");
     expect(g.messages.at(-1)?.content).toBe("Last one: how many in customer success?");
   });

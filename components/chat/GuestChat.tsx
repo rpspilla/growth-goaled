@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
-import { Lock } from "lucide-react";
+import { ArrowUp, Lock } from "lucide-react";
 import { authClient } from "@/lib/auth/client";
 import type { RecommendationCard } from "@/lib/db/schema";
 import { trackSignupEvent } from "@/app/(auth)/actions";
@@ -19,7 +19,8 @@ export type GuestViewData = {
 };
 
 /**
- * The sign-in page's conversation: "How can we help you grow?", the sign-up questions one at a time,
+ * The sign-in page's conversation: "How can we help you grow?", the sign-up questions one at a time
+ * (typed like any chat reply: no buttons or dropdowns),
  * then the AI's recommendation, blurred until the visitor gives an email (which also sends the
  * sign-in link that saves it all to their account).
  */
@@ -30,6 +31,7 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
   const [pending, start] = useTransition();
   const router = useRouter();
   const end = useRef<HTMLDivElement>(null);
+  const input = useRef<HTMLTextAreaElement>(null);
   const aiPhase = !view.step;
   // When the recommendation first appears, take the founder back to the top where it is; otherwise
   // keep the latest exchange (and the answer box under it) in view.
@@ -51,21 +53,26 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
     void trackSignupEvent("signup_viewed");
   }, []);
 
-  const send = (value: string, shown?: string) =>
+  const send = (value: string) =>
     start(async () => {
       setError(null);
-      setSent(shown ?? value);
+      setSent(value);
+      setText("");
+      if (input.current) input.current.style.height = "auto";
       const r = await reply(value);
-      if (r.ok) setText("");
-      else setError(r.error ?? "Something went wrong.");
+      if (!r.ok) {
+        setText(value);
+        setError(r.error ?? "Something went wrong.");
+      }
       setSent(null);
       router.refresh();
+      input.current?.focus();
     });
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (pending) return;
-    if (!text.trim() && !view.step?.optional) return;
+    if (!text.trim()) return;
     send(text);
   };
 
@@ -93,69 +100,44 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
           </li>
         )}
         {/* The last sign-up answer (customer success) hands over to the AI, as does any reply after it. */}
-        {pending && (aiPhase || step?.key === "cs") && (
-          <li role="status" className="text-base" style={{ color: "var(--muted-foreground)" }}>Thinking it through…</li>
+        {pending && sent !== null && (
+          <li role="status" className="text-base flex items-center gap-2" style={{ color: "var(--muted-foreground)" }}>
+            <span className="flex gap-1" aria-hidden>
+              {[0, 150, 300].map((d) => (
+                <span key={d} className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: "var(--muted-foreground)", animationDelay: `${d}ms` }} />
+              ))}
+            </span>
+            {aiPhase || step?.key === "cs" ? "Thinking it through…" : <span className="sr-only">Typing…</span>}
+          </li>
         )}
       </ol>
 
-      {step && (step.kind === "choice" || step.kind === "select") && step.options && (
-        step.kind === "choice" ? (
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Choose one">
-            {step.options.map((o) => (
-              <button key={o.value} type="button" disabled={pending} onClick={() => send(o.value, o.label)} className="rounded-full px-4 py-2 text-base font-medium hover:bg-[var(--muted)] disabled:opacity-60" style={{ border: "1px solid var(--border)", color: "var(--foreground)", background: "var(--card)" }}>
-                {o.label}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <form onSubmit={submit} className="flex gap-2">
-            <label htmlFor="guest-select" className="sr-only">Your answer</label>
-            <select id="guest-select" className="field flex-1" value={text} onChange={(e) => setText(e.target.value)} disabled={pending}>
-              <option value="">Choose…</option>
-              {step.options.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
-            <button type="submit" className="btn btn-primary" disabled={pending || !text}>Next</button>
-          </form>
-        )
-      )}
-
-      {(!step || step.kind === "text" || step.kind === "number") && (
-        <form onSubmit={submit} className="flex gap-2 items-end">
-          <label htmlFor="guest-input" className="sr-only">Your answer</label>
-          {step?.key === "challenge" || !step ? (
-            <textarea
-              id="guest-input"
-              rows={step?.key === "challenge" ? 3 : 2}
-              maxLength={2000}
-              className="field flex-1 resize-y"
-              value={text}
-              autoFocus
-              placeholder={step?.placeholder ?? "Reply…"}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) submit(e);
-              }}
-              disabled={pending || view.outOfTurns}
-            />
-          ) : (
-            <input
-              id="guest-input"
-              className="field flex-1"
-              inputMode={step.kind === "number" ? "numeric" : undefined}
-              value={text}
-              autoFocus
-              placeholder={step.placeholder ?? ""}
-              onChange={(e) => setText(e.target.value)}
-              disabled={pending}
-            />
-          )}
-          <button type="submit" className="btn btn-primary" disabled={pending || (!text.trim() && !step?.optional) || view.outOfTurns}>
-            {step?.optional && !text.trim() ? "Skip" : "Send"}
-          </button>
-        </form>
-      )}
+      <form onSubmit={submit} className="rounded-2xl p-2 pl-4 flex items-end gap-2 focus-within:ring-2 focus-within:ring-[var(--green)]" style={{ border: "1px solid var(--border)", background: "var(--card)", boxShadow: "0 1px 3px rgba(13,27,42,0.06)" }}>
+        <label htmlFor="guest-input" className="sr-only">Your answer</label>
+        <textarea
+          id="guest-input"
+          ref={input}
+          rows={1}
+          maxLength={2000}
+          className="guest-composer flex-1 resize-none bg-transparent py-2 text-base max-h-48"
+          style={{ color: "var(--foreground)", border: 0, boxShadow: "none", outline: "none" }}
+          value={text}
+          autoFocus
+          placeholder={view.outOfTurns ? "Enter your email above to keep going" : (step?.placeholder ?? "Reply…")}
+          onChange={(e) => {
+            setText(e.target.value);
+            e.target.style.height = "auto";
+            e.target.style.height = `${e.target.scrollHeight}px`;
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) submit(e);
+          }}
+          disabled={view.outOfTurns}
+        />
+        <button type="submit" aria-label="Send" title="Send" className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center disabled:opacity-40" style={{ background: "var(--navy)", color: "#fff" }} disabled={pending || !text.trim() || view.outOfTurns}>
+          <ArrowUp size={18} aria-hidden />
+        </button>
+      </form>
 
       {error && <p role="alert" className="text-sm" style={{ color: "var(--red)" }}>{error}</p>}
       {view.messages.length > 1 && (

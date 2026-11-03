@@ -8,7 +8,7 @@ import { isAiConfigError } from "@/lib/ai/config";
 import type { ChatContext } from "@/lib/chat/context";
 import { CHAT_METHODOLOGY_VERSION, getChatTopic } from "@/lib/chat/topics";
 import { track } from "@/lib/events";
-import { answerLabel, basicsFrom, checkAnswer, GUEST_STEPS, nextStep, OPENING } from "@/lib/guest/steps";
+import { basicsFrom, GUEST_STEPS, interpretAnswer, nextStep, OPENING } from "@/lib/guest/steps";
 import { REVENUE_BANDS } from "@/lib/onboarding";
 import { getFounderCompany } from "./companies";
 import { saveCompanyBasics } from "./intake";
@@ -82,10 +82,18 @@ export async function guestReply(g: GuestSession, raw: string): Promise<GuestRes
   const messages: GuestMessage[] = [...g.messages];
 
   if (step) {
-    const checked = checkAnswer(step, raw);
-    if (!checked.ok) return { ok: false, error: checked.error };
-    const profile = { ...g.profile, [step.key]: checked.value };
-    messages.push({ role: "user", content: answerLabel(step, checked.value) });
+    const typed = raw.trim();
+    if (typed.length > 2000) return { ok: false, error: "Please keep it under 2,000 characters." };
+    if (!typed && !step.optional) return { ok: false, error: "Type a message first." };
+    // Every answer is typed, as in any chat; when it isn't clear, the reply asks again in the conversation.
+    const read = interpretAnswer(step, typed);
+    messages.push({ role: "user", content: typed || "Skip" });
+    if (!read.ok) {
+      messages.push({ role: "assistant", content: read.reply });
+      await save(g.id, { messages });
+      return { ok: true };
+    }
+    const profile = { ...g.profile, ...read.values };
     const following = nextStep(profile);
     if (following) {
       messages.push({ role: "assistant", content: following.ask(profile) });
