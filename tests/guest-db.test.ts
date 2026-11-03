@@ -91,7 +91,11 @@ describe("guest chat", () => {
     g = await current();
     expect(g.card?.takeaway).toMatch(/Test mode takeaway/);
     expect(guestView(g)).toMatchObject({ unlocked: false });
-    expect(await guestReply(g, "more?")).toEqual({ ok: false, error: "Enter your email to see your recommendation and continue." });
+    // The chat stays open after the recommendation: answering its questions refines it (still locked).
+    expect(await guestReply(g, "Mostly referrals.")).toEqual({ ok: true });
+    g = await current();
+    expect(g.card?.takeaway).toMatch(/Test mode takeaway/);
+    expect(guestView(g)).toMatchObject({ unlocked: false });
     expect(await guestEmail(g, "  Sam@Acme.test ")).toEqual({ ok: true });
     expect(guestView(await current())).toMatchObject({ unlocked: true, email: "sam@acme.test" });
   });

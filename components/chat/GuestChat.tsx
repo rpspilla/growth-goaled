@@ -31,10 +31,18 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
   const router = useRouter();
   const end = useRef<HTMLDivElement>(null);
   const aiPhase = !view.step;
-
+  // When the recommendation first appears, take the founder back to the top where it is; otherwise
+  // keep the latest exchange (and the answer box under it) in view.
+  const shownCard = useRef(view.card?.takeaway ?? null);
   useEffect(() => {
+    const takeaway = view.card?.takeaway ?? null;
+    if (takeaway && takeaway !== shownCard.current) {
+      shownCard.current = takeaway;
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
     if (view.messages.length > 1) end.current?.scrollIntoView({ block: "end" });
-  }, [view.messages.length, sent]);
+  }, [view.messages.length, sent, view.card?.takeaway]);
   // The sign-up funnel's first step, counted once per page view (the ref survives dev double-mounts).
   const viewed = useRef(false);
   useEffect(() => {
@@ -64,19 +72,18 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
   const step = view.step;
   return (
     <div className="flex flex-col gap-4 w-full">
+      <h2 className="font-display text-3xl sm:text-4xl leading-tight" style={{ color: "var(--foreground)" }}>{view.messages[0]?.content}</h2>
+      {view.card && <GuestCard card={view.card} unlocked={view.unlocked} email={view.email} giveEmail={giveEmail} />}
       <ol className="space-y-3" aria-label="Conversation">
         {view.messages.map((m, i) =>
+          i === 0 ? null : 
           m.role === "user" ? (
             <li key={i} className="flex justify-end">
               <p className="rounded-2xl px-4 py-2.5 text-base max-w-[85%] whitespace-pre-wrap" style={{ background: "var(--navy)", color: "#fff" }}>{m.content}</p>
             </li>
           ) : (
             <li key={i}>
-              {i === 0 ? (
-                <h2 className="font-display text-3xl sm:text-4xl leading-tight" style={{ color: "var(--foreground)" }}>{m.content}</h2>
-              ) : (
-                <p className="text-base whitespace-pre-wrap leading-relaxed" style={{ color: "var(--foreground)" }}>{m.content}</p>
-              )}
+              <p className="text-base whitespace-pre-wrap leading-relaxed" style={{ color: "var(--foreground)" }}>{m.content}</p>
             </li>
           ),
         )}
@@ -91,9 +98,7 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
         )}
       </ol>
 
-      {view.card && <GuestCard card={view.card} unlocked={view.unlocked} email={view.email} giveEmail={giveEmail} />}
-
-      {!view.card && step && (step.kind === "choice" || step.kind === "select") && step.options && (
+      {step && (step.kind === "choice" || step.kind === "select") && step.options && (
         step.kind === "choice" ? (
           <div className="flex flex-wrap gap-2" role="group" aria-label="Choose one">
             {step.options.map((o) => (
@@ -116,7 +121,7 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
         )
       )}
 
-      {!view.card && (!step || step.kind === "text" || step.kind === "number") && (
+      {(!step || step.kind === "text" || step.kind === "number") && (
         <form onSubmit={submit} className="flex gap-2 items-end">
           <label htmlFor="guest-input" className="sr-only">Your answer</label>
           {step?.key === "challenge" || !step ? (
@@ -190,21 +195,44 @@ function GuestCard({ card, unlocked, email, giveEmail }: { card: RecommendationC
 
   const view = <RecommendationCardView id="guest" card={card} given={[]} deeper={null} />;
   if (!unlocked) {
+    const insights = teaserInsights(card);
     return (
-      <div className="relative" data-testid="guest-recommendation">
-        <div aria-hidden inert style={{ filter: "blur(8px)", pointerEvents: "none", userSelect: "none" }}>{view}</div>
-        <div className="absolute inset-0 flex items-start justify-center p-4 pt-16" style={{ background: "rgba(247,248,250,0.5)" }}>
-          <form onSubmit={onSubmit} className="surface p-5 w-full max-w-sm space-y-3 shadow-lg" aria-label="See your recommendation">
-            <Lock size={22} className="mx-auto" style={{ color: "var(--green)" }} aria-hidden />
-            <h3 className="text-lg font-semibold text-center" style={{ color: "var(--foreground)" }}>Your recommendation is ready</h3>
-            <p className="text-sm text-center" style={{ color: "var(--muted-foreground)" }}>Enter your work email to see it. We&apos;ll also send a link to save it and keep going. No password needed.</p>
-            <label htmlFor="guest-email" className="label">Work email</label>
-            <input id="guest-email" type="email" required className="field w-full" placeholder="you@company.com" value={value} onChange={(e) => setValue(e.target.value)} autoComplete="email" />
-            <button type="submit" className="btn btn-primary w-full" disabled={state.kind === "sending"}>{state.kind === "sending" ? "Unlocking…" : "See my recommendation"}</button>
-            {state.kind === "error" && <p role="alert" className="text-sm" style={{ color: "var(--red)" }}>{state.message}</p>}
-          </form>
+      <section className="surface overflow-hidden" data-testid="guest-recommendation" aria-label="Your recommendation" style={{ borderColor: "var(--green)", boxShadow: "0 0 0 1px var(--green)" }}>
+        <div className="p-5 sm:p-6 space-y-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="label" style={{ color: "var(--green)" }}>Your recommendation</span>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "var(--muted)", color: "var(--foreground)" }}>{CONFIDENCE[card.confidence.level]}</span>
+          </div>
+          <p className="font-display text-2xl sm:text-3xl leading-tight" style={{ color: "var(--foreground)" }}>{card.takeaway}</p>
+          {insights.length > 0 && (
+            <div>
+              <h3 className="label mb-2">What we&apos;re seeing</h3>
+              <ul className="space-y-2">
+                {insights.map((t) => (
+                  <li key={t} className="flex gap-2 items-start text-base" style={{ color: "var(--foreground)" }}>
+                    <span className="mt-2 w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "var(--green)" }} aria-hidden />
+                    <span>{t}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
-      </div>
+        <div className="relative min-h-[27rem]">
+          <div aria-hidden inert className="max-h-[27rem] overflow-hidden" style={{ filter: "blur(7px)", pointerEvents: "none", userSelect: "none" }}>{view}</div>
+          <div className="absolute inset-0 flex items-start justify-center p-4" style={{ background: "linear-gradient(rgba(247,248,250,0.4), rgba(247,248,250,0.85))" }}>
+            <form onSubmit={onSubmit} className="surface p-5 w-full max-w-sm space-y-3 shadow-lg" aria-label="See your recommendation">
+              <Lock size={22} className="mx-auto" style={{ color: "var(--green)" }} aria-hidden />
+              <h3 className="text-lg font-semibold text-center" style={{ color: "var(--foreground)" }}>See what to do about it</h3>
+              <p className="text-sm text-center" style={{ color: "var(--muted-foreground)" }}>Enter your work email for the full recommendation: what to do, your 30/60/90-day plan and how to measure it. We&apos;ll also send a link to save it. No password needed.</p>
+              <label htmlFor="guest-email" className="label">Work email</label>
+              <input id="guest-email" type="email" required className="field w-full" placeholder="you@company.com" value={value} onChange={(e) => setValue(e.target.value)} autoComplete="email" />
+              <button type="submit" className="btn btn-primary w-full" disabled={state.kind === "sending"}>{state.kind === "sending" ? "Unlocking…" : "See my recommendation"}</button>
+              {state.kind === "error" && <p role="alert" className="text-sm" style={{ color: "var(--red)" }}>{state.message}</p>}
+            </form>
+          </div>
+        </div>
+      </section>
     );
   }
   return (
@@ -224,4 +252,12 @@ function GuestCard({ card, unlocked, email, giveEmail }: { card: RecommendationC
       </div>
     </div>
   );
+}
+
+const CONFIDENCE = { high: "High confidence", medium: "Medium confidence", low: "Low confidence" } as const;
+
+/** The two most telling things in the recommendation, shown before the email: what's happening, and the strongest evidence from their own answers. */
+export function teaserInsights(card: RecommendationCard): string[] {
+  const firm = card.evidence.find((e) => e.kind === "fact" || e.kind === "figure") ?? card.evidence[0];
+  return [card.diagnosis, firm?.text].filter((t): t is string => Boolean(t?.trim())).slice(0, 2);
 }

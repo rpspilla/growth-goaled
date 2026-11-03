@@ -78,7 +78,6 @@ const aiHistory = (g: Pick<GuestSession, "profile" | "messages">) => [
  */
 export async function guestReply(g: GuestSession, raw: string): Promise<GuestResult> {
   if (g.claimedAt) return { ok: false, error: "This conversation is saved to your account. Sign in to continue it." };
-  if (g.card) return { ok: false, error: "Enter your email to see your recommendation and continue." };
   const step = nextStep(g.profile);
   const messages: GuestMessage[] = [...g.messages];
 
@@ -106,7 +105,7 @@ export async function guestReply(g: GuestSession, raw: string): Promise<GuestRes
   return aiTurn({ ...g, messages });
 }
 
-async function aiTurn(g: Pick<GuestSession, "id" | "profile" | "messages" | "aiTurns">): Promise<GuestResult> {
+async function aiTurn(g: Pick<GuestSession, "id" | "profile" | "messages" | "aiTurns" | "card">): Promise<GuestResult> {
   if (g.aiTurns >= GUEST_AI_TURNS) return { ok: false, error: "Enter your email to keep going: we'll save this conversation to your account." };
   let result;
   try {
@@ -130,8 +129,9 @@ async function aiTurn(g: Pick<GuestSession, "id" | "profile" | "messages" | "aiT
         missing: output.recommendation.missing,
       }
     : null;
-  await save(g.id, { messages: [...g.messages, { role: "assistant", content: output.reply, ai: true }], card, aiTurns: g.aiTurns + 1 });
-  if (card) await track("guest_recommendation", { props: {} });
+  // Answering the follow-up questions refines the recommendation; an answer without a new card keeps the last one.
+  await save(g.id, { messages: [...g.messages, { role: "assistant", content: output.reply, ai: true }], card: card ?? g.card, aiTurns: g.aiTurns + 1 });
+  if (card && !g.card) await track("guest_recommendation", { props: {} });
   return { ok: true };
 }
 

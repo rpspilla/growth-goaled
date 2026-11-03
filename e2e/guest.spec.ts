@@ -38,10 +38,16 @@ test("a visitor talks it through, unlocks the recommendation with an email, and 
   await page.getByLabel("Your answer").fill("We close about $20k deals.");
   await page.getByRole("button", { name: "Send" }).click();
 
-  // The recommendation is blurred until they give an email.
+  // The headline and two insights show straight away; the rest is blurred until they give an email.
+  const teaser = page.getByRole("region", { name: "Your recommendation" });
+  await expect(teaser).toContainText("Test mode takeaway");
+  await expect(teaser).toContainText("Test mode diagnosis.");
+  await expect(teaser).toContainText("Stated by the founder in this conversation.");
   const gate = page.getByRole("form", { name: "See your recommendation" });
   await expect(gate).toBeVisible();
   await expect(page.getByRole("article", { name: "Recommendation" })).toHaveCount(0);
+  // The chat stays open under the questions: answering refines the recommendation.
+  await expect(page.getByLabel("Your answer")).toBeEnabled();
   await gate.getByLabel("Work email").fill("robin@guestly.test");
   await gate.getByRole("button", { name: "See my recommendation" }).click();
   const card = page.getByRole("article", { name: "Recommendation" });

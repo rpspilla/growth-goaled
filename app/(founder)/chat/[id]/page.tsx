@@ -41,6 +41,8 @@ export default async function ConversationPage({ params, searchParams }: { param
   const last = view.messages.at(-1);
   const plan = view.plan && view.plan.status !== "pending_payment" ? view.plan : null;
   const lastCardId = [...view.messages].reverse().find((m) => m.recommendationId)?.recommendationId ?? null;
+  // The latest answer's card goes below the reply box, so the box sits right under the questions it asks.
+  const trailing = last?.role === "assistant" && last.recommendationId ? view.recommendations.get(last.recommendationId) : undefined;
   const offer = !plan && stripeConfigured();
   const { actionPlanCents, supportedMonthlyCents } = pricing();
   const [advisor] = company.advisorId ? await db.select({ name: schema.users.name, email: schema.users.email }).from(schema.users).where(eq(schema.users.id, company.advisorId)).limit(1) : [];
@@ -100,7 +102,7 @@ export default async function ConversationPage({ params, searchParams }: { param
           return (
             <li key={m.id} className="space-y-4">
               <div className="text-base whitespace-pre-wrap leading-relaxed" style={fg}>{m.content}</div>
-              {rec && (
+              {rec && rec !== trailing && (
                 <RecommendationCardView
                   id={rec.id}
                   card={rec.card}
@@ -109,7 +111,7 @@ export default async function ConversationPage({ params, searchParams }: { param
                   feedback={feedbackAction}
                 />
               )}
-              {rec && offer && rec.id === lastCardId && (
+              {rec && rec !== trailing && offer && rec.id === lastCardId && (
                 <PlanOffer conversationId={view.conversation.id} planPrice={formatPrice(actionPlanCents)} supportedPrice={formatPrice(supportedMonthlyCents)} buy={buyPlanAction} />
               )}
             </li>
@@ -125,6 +127,14 @@ export default async function ConversationPage({ params, searchParams }: { param
         attach={attachFilesAction}
         blobPrefix={companyBlobPrefix(company.id)}
       />
+      {trailing && (
+        <div className="space-y-4">
+          <RecommendationCardView id={trailing.id} card={trailing.card} given={(view.feedback.get(trailing.id) ?? []).map((f) => f.kind)} deeper={null} feedback={feedbackAction} />
+          {offer && trailing.id === lastCardId && (
+            <PlanOffer conversationId={view.conversation.id} planPrice={formatPrice(actionPlanCents)} supportedPrice={formatPrice(supportedMonthlyCents)} buy={buyPlanAction} />
+          )}
+        </div>
+      )}
       <p className="text-sm" style={muted}>
         Facts you mention are remembered for your company, so you won&apos;t be asked twice. <Link href="/chat#facts" className="link">See or correct them</Link>. Never shown to other
         companies; <Link href="/data-use" className="link">how we use your data</Link>.
