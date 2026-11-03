@@ -9,6 +9,7 @@ import { authClient } from "@/lib/auth/client";
 import type { RecommendationCard } from "@/lib/db/schema";
 import { trackSignupEvent } from "@/app/(auth)/actions";
 import { RecommendationCardView } from "./RecommendationCardView";
+import { HumanPresence } from "@/components/brand/HumanPresence";
 
 type Result = { ok: boolean; error?: string };
 export type GuestViewData = {
@@ -91,6 +92,7 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
   return (
     <div className="flex flex-col gap-4 w-full">
       <h2 className="font-display text-3xl sm:text-4xl leading-tight" style={{ color: "var(--foreground)" }}>{view.messages[0]?.content}</h2>
+      <HumanPresence />
       {view.card && <GuestCard card={view.card} unlocked={view.unlocked} email={view.email} giveEmail={giveEmail} planIntent={planIntent} cta={<PlanCta company={view.companyName} unlocked={view.unlocked} email={view.email} onIntent={() => setPlanIntent(true)} where="card" />} />}
       <ol className="space-y-3" aria-label="Conversation">
         {view.messages.map((m, i) =>

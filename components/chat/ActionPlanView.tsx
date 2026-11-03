@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { Wrench } from "lucide-react";
+import { HumanPresence } from "@/components/brand/HumanPresence";
 import type { ActionPlanContent } from "@/lib/db/schema";
 
 const PERIODS = [
@@ -10,7 +12,7 @@ const PERIODS = [
   ["days90", "Days 61–90"],
 ] as const;
 
-/** The plan: goal, approach, milestones by period (tickable when allowed), risks and assumptions. */
+/** The plan: goal, approach, milestones by period (tickable when allowed), risks and assumptions, tools to evaluate. */
 export function ActionPlanView({
   content,
   toggle,
@@ -29,6 +31,7 @@ export function ActionPlanView({
   const done = all.filter(Boolean).length;
   return (
     <div className="space-y-4">
+      <HumanPresence variant="plan" />
       <div>
         <div className="label mb-1" style={{ color: "var(--green)" }}>Goal</div>
         <p className="font-display text-2xl leading-tight" style={{ color: "var(--foreground)" }}>{content.goal}</p>
@@ -89,6 +92,24 @@ export function ActionPlanView({
             </div>
           )}
         </div>
+      )}
+      {content.tools && content.tools.length > 0 && (
+        <section aria-label="Tools to evaluate" className="rounded-xl p-4" style={{ border: "1px solid var(--border)", background: "var(--card)" }}>
+          <h4 className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>Tools to evaluate</h4>
+          <p className="text-sm mb-2" style={{ color: "var(--muted-foreground)" }}>Worth a look to get better results from this plan or save time on it.</p>
+          <ul className="space-y-2">
+            {content.tools.map((t) => (
+              <li key={t.name} className="text-sm flex gap-2 items-start" style={{ color: "var(--foreground)" }}>
+                <Wrench size={14} className="shrink-0 mt-1" style={{ color: "var(--green)" }} aria-hidden />
+                <span>
+                  <strong>{t.name}</strong>
+                  {t.category && <span style={{ color: "var(--muted-foreground)" }}> · {t.category}</span>}
+                  {t.why && <span className="block" style={{ color: "var(--muted-foreground)" }}>{t.why}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
       {error && <p role="alert" className="text-sm" style={{ color: "var(--red)" }}>{error}</p>}
     </div>

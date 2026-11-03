@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import type { ActionPlanContent, PlanStep } from "@/lib/db/schema";
+import type { ActionPlanContent, PlanStep, PlanTool } from "@/lib/db/schema";
 
 type Result = { ok: boolean; error?: string };
 const PERIODS = [
@@ -10,7 +10,7 @@ const PERIODS = [
   ["days60", "Days 31–60"],
   ["days90", "Days 61–90"],
 ] as const;
-const empty: ActionPlanContent = { goal: "", summary: "", days30: [], days60: [], days90: [], risks: [], assumptions: [] };
+const empty: ActionPlanContent = { goal: "", summary: "", days30: [], days60: [], days90: [], risks: [], assumptions: [], tools: [] };
 
 /** The advisor edits a submitted plan, then approves it for delivery. */
 export function PlanEditor({ planId, initial, approve, redraft }: { planId: string; initial: ActionPlanContent | null; approve: (id: string, content: ActionPlanContent, note: string | null) => Promise<Result>; redraft: (id: string) => Promise<Result> }) {
@@ -66,6 +66,10 @@ export function PlanEditor({ planId, initial, approve, redraft }: { planId: stri
           <label className="label" htmlFor="plan-assumptions">Assumptions (one per line)</label>
           <textarea id="plan-assumptions" rows={3} className="field w-full" defaultValue={plan.assumptions.join("\n")} onChange={(e) => setPlan({ ...plan, assumptions: lines(e.target.value) })} />
         </div>
+      </div>
+      <div>
+        <label className="label" htmlFor="plan-tools">Tools to evaluate (one per line: Name (category): why)</label>
+        <textarea id="plan-tools" rows={4} className="field w-full" defaultValue={(plan.tools ?? []).map(toolLine).join("\n")} onChange={(e) => setPlan({ ...plan, tools: lines(e.target.value).map(parseToolLine) })} />
       </div>
       <div className="space-y-1">
         <label className="label" htmlFor="plan-note">Note to the founder (optional)</label>
@@ -134,4 +138,11 @@ export function RedraftButton({ planId, redraft, label }: { planId: string; redr
       {msg && <span className="text-sm" role="status" style={{ color: "var(--muted-foreground)" }}>{msg}</span>}
     </div>
   );
+}
+
+const toolLine = (t: PlanTool) => `${t.name}${t.category ? ` (${t.category})` : ""}: ${t.why}`;
+/** "HubSpot (CRM): keeps pipeline in one place" → a tool; a bare name is fine too. */
+function parseToolLine(line: string): PlanTool {
+  const m = line.match(/^(.+?)(?:\s*\(([^)]+)\))?\s*[:—–]\s*(.+)$/);
+  return m ? { name: m[1]!.trim(), category: (m[2] ?? "").trim(), why: m[3]!.trim() } : { name: line.trim(), category: "", why: "" };
 }

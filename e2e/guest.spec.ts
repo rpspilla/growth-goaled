@@ -10,6 +10,7 @@ test("a visitor talks it through, unlocks the recommendation with an email, and 
   const page = await ctx.newPage();
   await page.goto("/sign-in");
   await expect(page.getByRole("heading", { name: "How can we help you grow?" })).toBeVisible();
+  await expect(page.getByTestId("human-presence")).toContainText("2,000+ startup investments");
   await expect(page.getByLabel("Work email")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
 

@@ -85,6 +85,10 @@ test("a founder buys an action plan from the conversation; an advisor approves i
   await expect(panel).toContainText("Approved by your advisor");
   await expect(panel).toContainText("Hire one more AE once payers convert");
   await expect(panel).toContainText("Start with the payer ICP.");
+  // Every plan carries tools worth evaluating, and Ryan's name as the person behind it.
+  await expect(panel.getByRole("region", { name: "Tools to evaluate" })).toContainText("Test CRM");
+  await expect(panel.getByTestId("human-presence-plan")).toContainText("Ryan Spillane, CEO & Founder");
+  await expect(panel.getByTestId("human-presence-plan")).toContainText("2 IPOs");
   await panel.getByRole("checkbox", { name: /Done: Test 30-day milestone/ }).check();
   await expect(panel).toContainText("1 of 3 milestones done");
 

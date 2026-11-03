@@ -34,6 +34,7 @@ const contentSchema = z.object({
   days90: z.array(step).max(10),
   risks: z.array(z.string().max(300)).max(10),
   assumptions: z.array(z.string().max(300)).max(10),
+  tools: z.array(z.object({ name: z.string().max(120), category: z.string().max(60), why: z.string().max(400) })).max(8).optional(),
 });
 
 /** Approve a $499 plan (with the advisor's edits): it's delivered to the founder and they're emailed. */

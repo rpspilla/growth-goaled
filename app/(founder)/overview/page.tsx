@@ -10,6 +10,7 @@ import { listConversations } from "@/lib/data/chat";
 import { founderPlans, REVIEW_HOURS } from "@/lib/data/action-plans";
 import { CHAT_TOPICS } from "@/lib/chat/topics";
 import { ChatStart } from "@/components/chat/ChatStart";
+import { HumanPresence } from "@/components/brand/HumanPresence";
 import { startChatAction } from "../chat/actions";
 import { getIntakeAnswers } from "@/lib/data/intake";
 import { snapshotPeers } from "@/lib/data/peers";
@@ -154,6 +155,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
       {/* The main entry: talk a decision through. */}
       {company && (
         <div className="space-y-4">
+          <HumanPresence />
           <ChatStart starters={CHAT_TOPICS.map((t) => ({ id: t.id, starter: t.starter }))} start={startChatAction} />
           {conversations.length > 0 && (
             <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-base">

@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { Composer } from "@/components/chat/Composer";
+import { HumanPresence } from "@/components/brand/HumanPresence";
 import { FileProgress } from "@/components/chat/FileProgress";
 import { BuildingRefresh } from "@/components/deliverables/BuildingRefresh";
 import { PlanOffer } from "@/components/chat/PlanOffer";
@@ -72,6 +73,9 @@ export default async function ConversationPage({ params, searchParams }: { param
       <div>
         <Link href="/chat" className="link text-sm">← All conversations</Link>
         <h1 className="font-display text-3xl font-normal mt-2" style={fg}>{view.conversation.title}</h1>
+        <div className="mt-3">
+          <HumanPresence advisorName={advisor ? advisor.name || advisor.email : null} />
+        </div>
       </div>
 
       {checkout && CHECKOUT[checkout] && (

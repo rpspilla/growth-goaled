@@ -270,6 +270,15 @@ export async function supportedPlans(advisor: Pick<User, "id" | "role">) {
 const cleanSteps = (steps: { action: string; owner: string; measure: string; done?: boolean }[]) =>
   steps.map((s) => ({ action: s.action.trim(), owner: s.owner.trim(), measure: s.measure.trim(), ...(s.done ? { done: true } : {}) })).filter((s) => s.action);
 
+/** Tools to evaluate, trimmed and without blanks or repeats (at most eight). */
+export const cleanTools = (tools: ActionPlanContent["tools"]) => {
+  const seen = new Set<string>();
+  return (tools ?? [])
+    .map((t) => ({ name: t.name.trim().slice(0, 120), category: t.category.trim().slice(0, 60), why: t.why.trim().slice(0, 400) }))
+    .filter((t) => t.name && !seen.has(t.name.toLowerCase()) && seen.add(t.name.toLowerCase()))
+    .slice(0, 8);
+};
+
 /** The advisor approves a $499 plan (with any edits): it's delivered to the founder, who's emailed. */
 export async function approvePlan(advisor: User, company: Pick<Company, "id" | "name">, planId: string, content: ActionPlanContent, note: string | null, appUrl: string): Promise<PlanResult> {
   const clean: ActionPlanContent = {
@@ -280,6 +289,7 @@ export async function approvePlan(advisor: User, company: Pick<Company, "id" | "
     days90: cleanSteps(content.days90),
     risks: content.risks.map((r) => r.trim()).filter(Boolean),
     assumptions: content.assumptions.map((r) => r.trim()).filter(Boolean),
+    tools: cleanTools(content.tools),
   };
   if (!clean.goal || !clean.days30.length) return { ok: false, error: "A plan needs a goal and at least one 30-day milestone." };
   const updated = await db

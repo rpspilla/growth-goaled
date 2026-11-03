@@ -21,7 +21,7 @@ vi.mock("@/lib/ai/plan", async (original) => {
 import { schema } from "@/lib/db";
 import type { ChatInput } from "@/lib/ai/chat";
 import type { ActionPlanContent, Company, User } from "@/lib/db/schema";
-import { approvePlan, cancelSupportedPlan, founderPlans, resendPlanEmail, createPlanCheckout, planForConversation, plansForReview, postAdvisorMessage, setStepDone, submitPlan, supportedPlans, writePlan } from "@/lib/data/action-plans";
+import { approvePlan, cancelSupportedPlan, cleanTools, founderPlans, resendPlanEmail, createPlanCheckout, planForConversation, plansForReview, postAdvisorMessage, setStepDone, submitPlan, supportedPlans, writePlan } from "@/lib/data/action-plans";
 import { getConversation, sendMessage, startConversation } from "@/lib/data/chat";
 import { recordPaidSession } from "@/lib/data/payments";
 
@@ -223,5 +223,19 @@ describe("delivery email", () => {
     expect(h.emails.at(-1)).toMatchObject({ to: "f@co.test", subject: "Your Growth Goaled action plan is ready" });
     expect(await resendPlanEmail(advisor, other, plan.id, "https://dev.test")).toEqual({ ok: false, error: "Only a delivered plan's email can be re-sent." });
     err.mockRestore();
+  });
+});
+
+describe("tools to evaluate", () => {
+  it("are trimmed, de-duplicated and capped; plans without any stay valid", () => {
+    expect(cleanTools(undefined)).toEqual([]);
+    const tools = cleanTools([
+      { name: " HubSpot ", category: " CRM ", why: " Pipeline in one place " },
+      { name: "hubspot", category: "CRM", why: "again" },
+      { name: "  ", category: "x", why: "blank" },
+      ...Array.from({ length: 10 }, (_, i) => ({ name: `Tool ${i}`, category: "", why: "" })),
+    ]);
+    expect(tools[0]).toEqual({ name: "HubSpot", category: "CRM", why: "Pipeline in one place" });
+    expect(tools).toHaveLength(8);
   });
 });

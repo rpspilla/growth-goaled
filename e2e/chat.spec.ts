@@ -32,6 +32,8 @@ test("a founder talks a decision through and gets a recommendation card", async 
   await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/);
   await expect(page.getByRole("heading", { name: "Should we hire more salespeople?" })).toBeVisible();
   await expect(page.getByText(/Test mode: let's work through/)).toBeVisible();
+  // A person is behind the conversation.
+  await expect(page.getByTestId("human-presence")).toContainText("Ryan Spillane, CEO & Founder");
   await expect(page.getByRole("article", { name: "Recommendation" })).toHaveCount(0);
   const url = page.url();
 

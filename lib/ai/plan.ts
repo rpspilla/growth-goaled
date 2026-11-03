@@ -16,6 +16,7 @@ export const planOutputSchema = z.object({
   days90: z.array(step),
   risks: z.array(z.string()),
   assumptions: z.array(z.string()),
+  tools: z.array(z.object({ name: z.string(), category: z.string(), why: z.string() })),
 });
 
 export type PlanInput = {
@@ -33,6 +34,7 @@ const SYSTEM = `You are Growth Goaled, a CRO for Seed and Series A B2B SaaS foun
 - summary: two or three sentences: the problem, and the approach.
 - days30 / days60 / days90: milestones in order, 2 to 5 per period. Each has a concrete action, an owner (a role, or "Founder"), and how to measure it's done. Early steps settle what later ones depend on.
 - risks and assumptions: what could derail it, and what the plan takes as given that isn't confirmed. Label estimates as estimates.
+- tools: 3 to 6 tools worth evaluating to improve outcomes or save time on this plan. Each has its name (a real, widely used product, or a short list of alternatives like "Gong or Chorus"), its category (e.g. CRM, sales engagement, conversation intelligence, revenue analytics, CPQ, enablement, comp management, recruiting), and why: which milestone it helps and what it improves or saves. Say what to evaluate, not what to buy; never state prices or claim results. If the company already uses a tool for something, suggest getting more from it rather than replacing it.
 - Only use figures from the context or the conversation; never invent company figures or benchmarks. Where the advisor has said something in the conversation, follow it.
 - When updating an existing plan, keep what still holds (and steps marked done), and change only what new information changes.`;
 
@@ -87,5 +89,6 @@ export function fakePlan(input: PlanInput): ActionPlanContent {
     days90: [{ action: "Test 90-day milestone", owner: "Founder", measure: "Win rate" }],
     risks: ["Test risk"],
     assumptions: ["Test assumption"],
+    tools: [{ name: "Test CRM", category: "CRM", why: "Test mode: keeps the 30-day milestone's pipeline in one place." }],
   };
 }

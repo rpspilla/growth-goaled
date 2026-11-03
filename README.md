@@ -166,6 +166,11 @@ Owner decisions, Nov 2026: instead of the $149 assessment, founders buy an **act
 - **Payments**: `payments.purpose` `action_plan` / `action_plan_supported`, linked by `action_plan_id`; granted only from a Stripe-verified paid session for the company's own plan (webhook or return URL). The Stripe webhook needs the `customer.subscription.updated` and `customer.subscription.deleted` events enabled. Founders cancel a subscription through the team for now (no billing portal yet).
 - **$149 assessment**: no longer sold to new buyers unless `ASSESSMENT_SALES=on`; people who bought one keep their Data step, results and plan.
 
+### People behind it, and tools in every plan
+
+- **Human presence** (`components/brand/HumanPresence.tsx`): every conversation (the sign-in chat, the Overview, each conversation page) shows Ryan Spillane, CEO & Founder, that a real CRO reviews every action plan (and the company's advisor by name when it has one), and "Built on a Series A raise, 2 IPOs and 2,000+ startup investments". Every action plan opens with the same, larger. The photo is `public/team/ryan-spillane.jpg`; until that file exists, his initials show.
+- **Tools to evaluate**: every action plan lists 3 to 6 tools worth evaluating to improve results or save time (name, category, why, tied to a milestone), written by the AI (`lib/ai/plan.ts`) and editable by the advisor before approval ("Name (category): why", one per line). Plans written before this have none.
+
 ### Pricing and the founder journey
 
 Self-service model (owner decision, Oct 2026), replacing the $1 use case selection charge:

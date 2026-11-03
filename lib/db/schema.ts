@@ -1044,7 +1044,12 @@ export type ActionPlanContent = {
   days90: PlanStep[];
   risks: string[];
   assumptions: string[];
+  /** Tools worth evaluating to improve outcomes or save time (plans written before Nov 2026 have none). */
+  tools?: PlanTool[];
 };
+
+/** A tool the plan suggests evaluating: what it is, what kind, and why for this plan. */
+export type PlanTool = { name: string; category: string; why: string };
 
 export const actionPlans = pgTable(
   "action_plans",
