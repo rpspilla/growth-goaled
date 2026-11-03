@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
+import { FileProgress } from "./FileProgress";
 import { upload } from "@vercel/blob/client";
 import { Paperclip } from "lucide-react";
 import { contentTypeFor, INBOX_FOLDER, MAX_UPLOAD_BYTES } from "@/lib/documents";
@@ -91,9 +92,12 @@ export function Composer({
         </div>
       )}
       {uploading && (
-        <p className="text-base" role="status" style={{ color: "var(--muted-foreground)" }}>
-          Uploading {uploading}…
-        </p>
+        <div className="flex justify-end">
+          <div className="rounded-2xl px-4 py-3 text-base w-full max-w-[85%]" style={{ background: "var(--navy)", color: "#fff" }}>
+            Sharing {uploading}
+            <FileProgress key={uploading} filename={uploading} uploading />
+          </div>
+        </div>
       )}
       {pending && (
         <p className="text-base" role="status" style={{ color: "var(--muted-foreground)" }}>

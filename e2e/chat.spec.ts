@@ -47,6 +47,28 @@ test("a founder talks a decision through and gets a recommendation card", async 
   // The card converts into an action plan: $499 once, or $799 a month with an advisor.
   await expect(page.getByRole("region", { name: "Build my action plan" })).toContainText("$499");
 
+  // A shared file being read: it shows in the conversation with live progress, and the reply box stays
+  // under the conversation and above the latest recommendation.
+  const conversationId = url.split("/").at(-1)!;
+  const fdb = new Client({ connectionString: E2E_DATABASE_URL });
+  await fdb.connect();
+  const co = await fdb.query("select company_id from conversations where id = $1", [conversationId]);
+  const doc = await fdb.query("insert into documents (company_id, doc_type, blob_url, filename, mime, size, status, inbox) values ($1, 'other', 'e2e://forecast.xlsx', 'forecast.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 100, 'analyzing', true) returning id", [co.rows[0].company_id]);
+  await fdb.query("insert into conversation_messages (conversation_id, role, content, document_ids) values ($1, 'user', 'Shared a file: forecast.xlsx', $2::jsonb)", [conversationId, JSON.stringify([doc.rows[0].id])]);
+  await page.reload();
+  const shared = page.getByText("Shared a file: forecast.xlsx");
+  await expect(shared).toBeVisible();
+  await expect(page.getByRole("progressbar", { name: "Reading forecast.xlsx" })).toBeVisible();
+  const y = async (l: import("@playwright/test").Locator) => (await l.boundingBox())!.y;
+  const reply = page.getByLabel("Your reply");
+  expect(await y(shared)).toBeLessThan(await y(reply));
+  expect(await y(reply)).toBeLessThan(await y(page.getByRole("article", { name: "Recommendation" })));
+  // When reading finishes the page updates by itself.
+  await fdb.query("update documents set status = 'done' where id = $1", [doc.rows[0].id]);
+  await fdb.end();
+  await expect(page.getByText("✓ forecast.xlsx read")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("progressbar", { name: "Reading forecast.xlsx" })).toHaveCount(0);
+
   // Feedback is kept against the recommendation.
   await card.getByRole("button", { name: "Helpful" }).click();
   await expect(card.getByRole("button", { name: "Helpful" })).toHaveAttribute("aria-pressed", "true");

@@ -3,6 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { Composer } from "@/components/chat/Composer";
+import { FileProgress } from "@/components/chat/FileProgress";
+import { BuildingRefresh } from "@/components/deliverables/BuildingRefresh";
 import { PlanOffer } from "@/components/chat/PlanOffer";
 import { PlanPanel, type PlanPanelData } from "@/components/chat/PlanPanel";
 import { RecommendationCardView } from "@/components/chat/RecommendationCardView";
@@ -41,8 +43,11 @@ export default async function ConversationPage({ params, searchParams }: { param
   const last = view.messages.at(-1);
   const plan = view.plan && view.plan.status !== "pending_payment" ? view.plan : null;
   const lastCardId = [...view.messages].reverse().find((m) => m.recommendationId)?.recommendationId ?? null;
-  // The latest answer's card goes below the reply box, so the box sits right under the questions it asks.
-  const trailing = last?.role === "assistant" && last.recommendationId ? view.recommendations.get(last.recommendationId) : undefined;
+  // The latest recommendation always sits below the reply box, so the box stays right under the
+  // conversation (questions, answers, shared files) and above the card, whatever came after it.
+  const trailing = lastCardId ? view.recommendations.get(lastCardId) : undefined;
+  // Files still being read: keep the page refreshing until they're done.
+  const reading = view.messages.some((m) => (m.documentIds ?? []).some((d) => ["uploaded", "analyzing"].includes(view.documents.get(d)?.status ?? "")));
   const offer = !plan && stripeConfigured();
   const { actionPlanCents, supportedMonthlyCents } = pricing();
   const [advisor] = company.advisorId ? await db.select({ name: schema.users.name, email: schema.users.email }).from(schema.users).where(eq(schema.users.id, company.advisorId)).limit(1) : [];
@@ -77,6 +82,7 @@ export default async function ConversationPage({ params, searchParams }: { param
 
       {panel && <PlanPanel plan={panel} submit={submitPlanAction} update={updatePlanAction} toggle={stepDoneAction} />}
 
+      <BuildingRefresh active={reading} />
       <ol className="space-y-5" aria-label="Conversation">
         {view.messages.map((m) => {
           const rec = m.recommendationId ? view.recommendations.get(m.recommendationId) : undefined;
@@ -86,7 +92,13 @@ export default async function ConversationPage({ params, searchParams }: { param
               <li key={m.id} className="flex justify-end">
                 <div className="rounded-2xl px-4 py-3 text-base max-w-[85%] whitespace-pre-wrap" style={{ background: "var(--navy)", color: "#fff" }}>
                   {m.content}
-                  {files.length > 0 && <span className="block text-sm mt-1 opacity-80">{files.map((f) => (f!.status === "done" ? `✓ ${f!.filename} read` : f!.status === "failed" ? `${f!.filename} couldn't be read` : `Reading ${f!.filename}…`)).join(" · ")}</span>}
+                  {files.map((f) =>
+                    f!.status === "uploaded" || f!.status === "analyzing" ? (
+                      <FileProgress key={f!.id} filename={f!.filename} since={m.createdAt.toISOString()} />
+                    ) : (
+                      <span key={f!.id} className="block text-sm mt-1 opacity-80">{f!.status === "failed" ? `${f!.filename} couldn't be read` : `✓ ${f!.filename} read`}</span>
+                    ),
+                  )}
                 </div>
               </li>
             );
