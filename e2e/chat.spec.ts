@@ -33,7 +33,8 @@ test("a founder talks a decision through and gets a recommendation card", async 
   await expect(page.getByRole("heading", { name: "Should we hire more salespeople?" })).toBeVisible();
   await expect(page.getByText(/Test mode: let's work through/)).toBeVisible();
   // A person is behind the conversation.
-  await expect(page.getByTestId("human-presence")).toContainText("Ryan Spillane, CEO & Founder");
+  await expect(page.getByTestId("human-presence")).toContainText("A real CRO reviews every action plan");
+  await expect(page.getByTestId("human-presence")).not.toContainText("Ryan Spillane");
   await expect(page.getByRole("article", { name: "Recommendation" })).toHaveCount(0);
   const url = page.url();
 

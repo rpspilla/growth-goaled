@@ -30,8 +30,8 @@ export function FounderAvatar({ size = 40 }: { size?: number }) {
 }
 
 /**
- * The person behind the conversation: Ryan's face and name, that a human CRO reviews every action
- * plan (and, when the company has one, that their advisor can join), and the experience it's built on.
+ * The person behind the conversation: Ryan's face (his name only on action plans), that a human CRO
+ * reviews every action plan (and, when the company has one, that their advisor can join), and the experience it's built on.
  */
 export function HumanPresence({ advisorName, variant = "chat" }: { advisorName?: string | null; variant?: "chat" | "plan" }) {
   if (variant === "plan")
@@ -52,10 +52,6 @@ export function HumanPresence({ advisorName, variant = "chat" }: { advisorName?:
     <div className="flex items-center gap-3" data-testid="human-presence">
       <FounderAvatar size={36} />
       <p className="text-sm min-w-0" style={{ color: "var(--muted-foreground)" }}>
-        <span style={{ color: "var(--foreground)" }}>
-          <strong>{FOUNDER.name}</strong>, {FOUNDER.title}
-        </span>
-        {" · "}
         {advisorName ? `Your advisor, ${advisorName}, can join this conversation, and a CRO reviews every action plan.` : "A real CRO reviews every action plan."}{" "}
         <span>{PEDIGREE}.</span>
       </p>

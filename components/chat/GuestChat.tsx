@@ -138,7 +138,7 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
         <textarea
           id="guest-input"
           ref={input}
-          rows={1}
+          rows={2}
           maxLength={2000}
           className="guest-composer flex-1 resize-none bg-transparent py-2 text-base max-h-48"
           style={{ color: "var(--foreground)", border: 0, boxShadow: "none", outline: "none" }}
