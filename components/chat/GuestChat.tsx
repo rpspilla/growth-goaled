@@ -87,6 +87,9 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
   };
 
   const step = view.step;
+  // With a recommendation still behind the email, only the recommendation and the email box show:
+  // the conversation and the chat box come back once they've given it.
+  const locked = Boolean(view.card && !view.unlocked);
   // The last sign-up answer (if it reads as one) hands over to the AI: say so, and show it working.
   const spinningUp = Boolean(step && sent !== null && step.key === LAST_STEP && understand({ ...step, options: step.options ?? undefined } as GuestStep, sent) !== null);
   return (
@@ -94,6 +97,8 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
       <h2 className="font-display text-3xl sm:text-4xl leading-tight" style={{ color: "var(--foreground)" }}>{view.messages[0]?.content}</h2>
       <HumanPresence />
       {view.card && <GuestCard card={view.card} unlocked={view.unlocked} email={view.email} giveEmail={giveEmail} planIntent={planIntent} cta={<PlanCta company={view.companyName} unlocked={view.unlocked} email={view.email} onIntent={() => setPlanIntent(true)} where="card" />} />}
+      {!locked && (
+        <>
       <ol className="space-y-3" aria-label="Conversation">
         {view.messages.map((m, i) =>
           i === 0 ? null : 
@@ -161,6 +166,8 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
       </form>
 
       {error && <p role="alert" className="text-sm" style={{ color: "var(--red)" }}>{error}</p>}
+        </>
+      )}
       {view.messages.length > 1 && (
         <button type="button" className="text-sm link self-start" onClick={() => start(async () => (await restart(), router.refresh()))}>
           Start over

@@ -70,8 +70,9 @@ test("a visitor talks it through, unlocks the recommendation with an email, and 
   const gate = page.getByRole("form", { name: "See your recommendation" });
   await expect(gate).toBeVisible();
   await expect(page.getByRole("article", { name: "Recommendation" })).toHaveCount(0);
-  // The chat stays open under the questions: answering refines the recommendation.
-  await expect(page.getByLabel("Your answer")).toBeEnabled();
+  // Until the email is given, only the recommendation shows: the conversation and the chat box are hidden.
+  await expect(page.getByRole("list", { name: "Conversation" })).toHaveCount(0);
+  await expect(page.getByLabel("Your answer")).toHaveCount(0);
   // A conversion button under the recommendation and another at the end of the chat, by company name.
   const cta = (where: string) => page.getByTestId(`plan-cta-${where}`).getByRole("button", { name: "Get a CRO-Built GTM action plan for Guestly" });
   await expect(cta("card")).toBeVisible();
@@ -83,6 +84,9 @@ test("a visitor talks it through, unlocks the recommendation with an email, and 
   await gate.getByRole("button", { name: "See my recommendation" }).click();
   const card = page.getByRole("article", { name: "Recommendation" });
   await expect(card).toBeVisible();
+  // With the email given, the conversation and the chat box come back.
+  await expect(page.getByRole("list", { name: "Conversation" })).toBeVisible();
+  await expect(page.getByLabel("Your answer")).toBeEnabled();
   await expect(cta("card")).toBeVisible();
   await expect(cta("chat")).toBeVisible();
   await expect(card).toContainText("Test mode takeaway");
