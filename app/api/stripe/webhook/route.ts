@@ -1,10 +1,11 @@
 import { after, NextResponse } from "next/server";
 import { cancelSupportedPlan, writePlan } from "@/lib/data/action-plans";
 import { markSession, recordPaidSession } from "@/lib/data/payments";
+import { recordPaidLink } from "@/lib/data/payment-links";
 import { stripe } from "@/lib/stripe";
 
 /**
- * Stripe webhook: grants a purchased assessment or starts an action plan when its Checkout is
+ * Stripe webhook: grants a purchased assessment, starts an action plan or marks a payment link paid when its Checkout is
  * paid, ends a supported plan when its subscription ends, and records expired or failed sessions. The signature is verified with STRIPE_WEBHOOK_SECRET;
  * nothing is trusted otherwise. Handlers are idempotent (Stripe may retry).
  */
@@ -20,6 +21,8 @@ export async function POST(request: Request) {
   }
   if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
     const session = event.data.object;
+    // A custom-project payment link is its own thing; everything else is an assessment or a plan.
+    if (await recordPaidLink(session)) return NextResponse.json({ received: true });
     await recordPaidSession(session);
     // A supported plan's first draft is written as soon as it's paid (no-op for anything else).
     const planId = session.metadata?.actionPlanId;

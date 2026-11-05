@@ -851,6 +851,37 @@ export const payments = pgTable(
   (t) => [uniqueIndex("payments_session_idx").on(t.stripeSessionId), index("payments_company_idx").on(t.companyId)],
 );
 
+export const paymentLinkStatus = pgEnum("payment_link_status", ["open", "paid", "cancelled"]);
+
+/**
+ * A payment link an advisor sends a client for a custom project: their own title, description and
+ * amount, paid once through Stripe Checkout at /pay/<token>. The client needn't have an account.
+ */
+export const paymentLinks = pgTable(
+  "payment_links",
+  {
+    id: id(),
+    // Unguessable; the link is /pay/<token>
+    token: text("token").notNull(),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    amountCents: integer("amount_cents").notNull(),
+    currency: text("currency").notNull().default("usd"),
+    clientName: text("client_name"),
+    clientEmail: text("client_email"),
+    companyId: uuid("company_id").references(() => companies.id, { onDelete: "set null" }),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    status: paymentLinkStatus("status").notNull().default("open"),
+    // The latest Checkout started from the link
+    stripeSessionId: text("stripe_session_id"),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    paidEmail: text("paid_email"),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("payment_links_token_idx").on(t.token), index("payment_links_created_by_idx").on(t.createdBy)],
+);
+export type PaymentLink = typeof paymentLinks.$inferSelect;
+
 export const advisoryRequestStatus = pgEnum("advisory_request_status", ["new", "contacted", "closed"]);
 
 /** Optional advisory sessions a founder asked about (when no booking link is configured, or alongside one). */

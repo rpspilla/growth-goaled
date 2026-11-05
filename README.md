@@ -177,6 +177,15 @@ Owner decisions, Nov 2026: instead of the $149 assessment, founders buy an **act
 - **The packaging** (`lib/plan-offer.ts`, `components/chat/PlanOffer.tsx`) sits right under the latest card: Explore (free), Diagnose ($499 once: the action plan), Execute & Monitor ($899/month: the supported plan, with Slack, Claude and ChatGPT integrations marked coming soon) and Custom Projects (from $5,000). Each paid offer has a buy button (Stripe Checkout) and "Talk to an advisor first"; Custom Projects has "Discuss a Project", which opens the 30-minute scoping call on Calendly directly (`CUSTOM.href`). The talk links go to `/advisory/book` (the `ADVISORY_BOOKING_URL` booking page, or the request form when it isn't set) and record `advisory_link_opened` with the offer.
 - **The nudge** (`lib/chat/nudge.ts`): after six exchanges in a conversation without a plan, the chat keeps answering in full and the AI ends its reply with a gentle one-or-two-sentence suggestion (a free call with Growth Goaled, or Diagnose / Execute & Monitor), on the sixth reply and every third one after. A "Talk to Growth Goaled" bar with "Book a free call" and "See the plans" shows under the reply box from then on.
 
+### Payment links for custom projects
+
+Advisor → **Payment links** (`/advisor/payment-links`, advisors and admins; `lib/data/payment-links.ts`, table `payment_links`, migration `0023_payment_links.sql`).
+
+- An advisor sets a project title, what it covers (shown to the client), the amount in USD ($1–$250,000), and optionally the client's name, email and company. The link (`/pay/<token>`, an unguessable token) comes back to copy, and can be emailed to the client from the form.
+- The client needs no account: the page shows the project, description and total, and "Pay" opens a one-time Stripe Checkout for that amount (`/pay/<token>/checkout`). Paid links are confirmed on the return page and by the Stripe webhook (`checkout.session.completed`, metadata `purpose = payment_link`); only a paid session for that link and at least its amount counts, once.
+- On payment the advisor who sent it (and `OWNER_NOTIFY_EMAIL`) is emailed. Advisors see their own links (admins see all) as Waiting for payment, Paid (when and by whom) or Cancelled; an open link can be copied again or cancelled.
+- Events: `payment_link_created`, `payment_link_checkout_started`, `payment_link_paid`.
+
 ### Pricing and the founder journey
 
 Self-service model (owner decision, Oct 2026), replacing the $1 use case selection charge:

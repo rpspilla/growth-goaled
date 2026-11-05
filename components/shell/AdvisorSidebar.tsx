@@ -14,6 +14,7 @@ const ADVISOR_NAV: { title: string; items: Item[] }[] = [
       { href: "/advisor/portfolio", label: "Portfolio" },
       { href: "/advisor/review", label: "Review queue", badgeKey: "review" },
       { href: "/advisor/plans", label: "Action plans", badgeKey: "plans" },
+      { href: "/advisor/payment-links", label: "Payment links" },
       { href: "/advisor/unassigned", label: "Unassigned", badgeKey: "unassigned" },
       { href: "/advisor/registers", label: "Registers" },
     ],

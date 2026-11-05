@@ -95,8 +95,9 @@ describe("route handlers", () => {
     const routes = appFiles.filter((f) => f.endsWith("route.ts") && !f.includes(`${path.sep}api${path.sep}auth${path.sep}`));
     expect(routes.length).toBeGreaterThan(0);
     // No-user routes verify a signature instead: the Stripe webhook (Stripe's), the cron (CRON_SECRET),
-    // and the email unsubscribe link (an HMAC of the user id).
-    for (const r of routes) expect(read(r), rel(r)).toMatch(/requireRole\(|getCurrentUser\(|webhooks\.constructEvent\(|Bearer \$\{secret\}|validUnsubscribe\(/);
+    // and the email unsubscribe link (an HMAC of the user id). A custom-project payment link is a
+    // capability URL: its unguessable token is the permission, and paying is all it allows.
+    for (const r of routes) expect(read(r), rel(r)).toMatch(/requireRole\(|getCurrentUser\(|webhooks\.constructEvent\(|Bearer \$\{secret\}|validUnsubscribe\(|startLinkCheckout\(token/);
   });
 });
 
