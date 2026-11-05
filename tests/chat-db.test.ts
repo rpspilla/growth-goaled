@@ -121,6 +121,20 @@ describe("conversations", () => {
     expect(await listFacts(other)).toEqual([]);
   });
 
+  it("after six exchanges without a plan, the reply gently suggests talking to Growth Goaled (then every third reply)", async () => {
+    delete process.env.CHAT_DAILY_LIMIT;
+    const id = await start(); // the starter is the first exchange
+    const nudged: boolean[] = [];
+    for (let i = 2; i <= 9; i++) {
+      expect(await sendMessage(founder, co, id, `message ${i}`)).toEqual({ ok: true });
+      nudged.push(Boolean((h.inputs.at(-1) as ChatInput).nudge));
+    }
+    // exchanges 2..9: only the 6th and the 9th carry the suggestion
+    expect(nudged).toEqual([false, false, false, false, true, false, false, true]);
+    const view = await getConversation(co, id);
+    expect(view!.messages.filter((m) => m.role === "assistant").at(-1)!.content).toContain("talk this through with someone at Growth Goaled");
+  });
+
   it("caps founder messages per company per day", async () => {
     process.env.CHAT_DAILY_LIMIT = "2";
     const id = await start();

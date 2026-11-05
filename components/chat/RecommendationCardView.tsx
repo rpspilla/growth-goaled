@@ -38,6 +38,7 @@ export function RecommendationCardView({
   given,
   deeper,
   feedback,
+  compact = false,
 }: {
   id: string;
   card: RecommendationCard;
@@ -45,19 +46,12 @@ export function RecommendationCardView({
   deeper: { href: string; label: string } | null;
   /** Omitted for visitors (nothing to rate yet). */
   feedback?: (recommendationId: string, kind: string, note: string | null) => Promise<{ ok: boolean; error?: string }>;
+  /** Just the headline and how sure we are; the rest folds away behind "Show the full recommendation". */
+  compact?: boolean;
 }) {
   const c = CONFIDENCE[card.confidence.level];
-  return (
-    <article aria-label="Recommendation" className="surface p-5 sm:p-6 space-y-5" style={{ borderColor: "var(--green)", boxShadow: "0 0 0 1px var(--green)" }}>
-      <div>
-        <div className="flex items-center gap-2 flex-wrap mb-2">
-          <span className="label" style={{ color: "var(--green)" }}>Recommendation</span>
-          <Pill tone={c.tone}>{c.label}</Pill>
-        </div>
-        <p className="font-display text-2xl sm:text-3xl leading-tight" style={fg}>{card.takeaway}</p>
-        <p className="text-base mt-2" style={muted}>{card.confidence.why}</p>
-      </div>
-
+  const full = (
+    <>
       <div className="rounded-xl px-4 py-3" style={{ background: "var(--muted)" }}>
         <div className="text-sm font-bold" style={{ color: "var(--green)" }}>Do this</div>
         <p className="text-base font-medium mt-0.5" style={fg}>{card.recommendation}</p>
@@ -126,6 +120,29 @@ export function RecommendationCardView({
           </Link>
         )}
       </div>
+      )}
+    </>
+  );
+  return (
+    <article aria-label="Recommendation" className="surface p-5 sm:p-6 space-y-5" style={{ borderColor: "var(--green)", boxShadow: "0 0 0 1px var(--green)" }}>
+      <div>
+        <div className="flex items-center gap-2 flex-wrap mb-2">
+          <span className="label" style={{ color: "var(--green)" }}>Recommendation</span>
+          <Pill tone={c.tone}>{c.label}</Pill>
+        </div>
+        <p className="font-display text-2xl sm:text-3xl leading-tight" style={fg}>{card.takeaway}</p>
+        <p className="text-base mt-2" style={muted}>{card.confidence.why}</p>
+      </div>
+      {compact ? (
+        <details className="group">
+          <summary className="text-sm link cursor-pointer list-none">
+            <span className="group-open:hidden">Show the full recommendation</span>
+            <span className="hidden group-open:inline">Hide the details</span>
+          </summary>
+          <div className="space-y-5 mt-5">{full}</div>
+        </details>
+      ) : (
+        full
       )}
     </article>
   );

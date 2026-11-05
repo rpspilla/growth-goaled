@@ -8,7 +8,7 @@ const as = async (browser: Browser, email: string) => {
   return { ctx, page: await ctx.newPage() };
 };
 
-/** From a conversation's recommendation to an action plan: $499 approved by an advisor, and $799/month with the advisor in the conversation. */
+/** From a conversation's recommendation to an action plan: Diagnose ($499) approved by an advisor, and Execute & Monitor (monthly) with the advisor in the conversation. */
 test("a founder buys an action plan from the conversation; an advisor approves it or joins the conversation", async ({ browser }) => {
   const db = new Client({ connectionString: E2E_DATABASE_URL });
   await db.connect();
@@ -30,9 +30,9 @@ test("a founder buys an action plan from the conversation; an advisor approves i
   await page.getByRole("button", { name: "Send" }).click();
   const offer = page.getByRole("region", { name: "Build my action plan" });
   await expect(offer).toContainText("$499");
-  await expect(offer).toContainText("$799");
-  await expect(offer).toContainText("Reviewed and approved by a Growth Goaled advisor");
-  await offer.getByRole("button", { name: "Buy the action plan" }).click();
+  await expect(offer).toContainText("$899");
+  await expect(offer).toContainText("CRO-reviewed diagnosis");
+  await offer.getByRole("button", { name: "Diagnose My Growth" }).click();
   await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}\?checkout=started$/);
   const panel = page.getByRole("region", { name: "Your action plan" });
   await expect(panel).toContainText("Gathering what it needs");
@@ -44,7 +44,6 @@ test("a founder buys an action plan from the conversation; an advisor approves i
   await expect(panel).toContainText("Closed deals export");
   await panel.getByRole("button", { name: "Submit my plan for review" }).click();
   await expect(panel).toContainText("With your advisor for review");
-  await expect(page.getByRole("complementary", { name: "How to read your recommendation" }).locator('[aria-current="step"]')).toContainText("a CRO advisor is reviewing it");
   await expect(panel).toContainText(/approve it by|within 24 hours/);
   const planUrl = page.url().replace(/\?.*$/, "");
 
@@ -93,13 +92,13 @@ test("a founder buys an action plan from the conversation; an advisor approves i
   await panel.getByRole("checkbox", { name: /Done: Test 30-day milestone/ }).check();
   await expect(panel).toContainText("1 of 3 milestones done");
 
-  // --- $799/month: the advisor is in the conversation ---
+  // --- Execute & Monitor (monthly): the advisor is in the conversation ---
   await page.goto("/overview");
   await page.getByRole("button", { name: "Who should my first GTM hire be?" }).click();
   await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/);
   await page.getByLabel("Your reply").fill("We have 2 AEs.");
   await page.getByRole("button", { name: "Send" }).click();
-  await page.getByRole("region", { name: "Build my action plan" }).getByRole("button", { name: "Start the supported plan" }).click();
+  await page.getByRole("region", { name: "Build my action plan" }).getByRole("button", { name: "Start Improving Revenue" }).click();
   await expect(page).toHaveURL(/checkout=started$/);
   await expect(panel).toContainText("Supported · Casey CRO");
   await expect(panel).toContainText("Test mode goal for Who should my first GTM hire be?", { timeout: 30_000 });

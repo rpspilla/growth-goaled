@@ -2,6 +2,7 @@ import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
+import { formatPrice, pricing } from "@/lib/pricing";
 import { CONFIDENCE_RULES } from "@/lib/chat/legend";
 import type { ChatContext } from "@/lib/chat/context";
 import type { ChatTopic } from "@/lib/chat/topics";
@@ -36,7 +37,8 @@ export type ChatOutput = z.infer<typeof chatOutputSchema>;
 export type ChatTurn = { role: "user" | "assistant" | "advisor"; content: string; author?: string | null };
 export type PlanMode = { tier: "plan" | "supported"; status: string; needs: string[] };
 /** guest: a visitor on the sign-in page who hasn't signed up; give the recommendation early. */
-export type ChatInput = { topic: ChatTopic; context: ChatContext; history: ChatTurn[]; plan?: PlanMode | null; guest?: boolean };
+/** nudge: six or more exchanges without a plan; this reply gently suggests the next step (see lib/chat/nudge). */
+export type ChatInput = { topic: ChatTopic; context: ChatContext; history: ChatTurn[]; plan?: PlanMode | null; guest?: boolean; nudge?: boolean };
 
 const SYSTEM = `You are Growth Goaled: an experienced CRO advising founders of Seed and Series A B2B SaaS companies on commercial decisions. Talk like a strong CRO in a one-to-one conversation: direct, plain English, short paragraphs. Not a survey, not a report.
 
@@ -85,10 +87,16 @@ function contextBlock(input: ChatInput): string {
 }
 
 export const planLine = (p: PlanMode) =>
-  `ACTION PLAN: ${p.tier === "supported" ? "supported plan ($799/month: unlimited chat with their advisor in this conversation plus 2 hours live with them each month)" : "one-time plan ($499, advisor-approved before delivery)"}; status ${p.status}${p.needs.length ? `; still needed after the last turn: ${p.needs.join("; ")}` : ""}.`;
+  `ACTION PLAN: ${p.tier === "supported" ? "supported plan (Execute & Monitor, ${formatPrice(pricing().supportedMonthlyCents)}/month: a CRO advisor in this conversation, monthly progress reviews and 2 hours of live CRO support each month)" : `one-time plan (Diagnose, ${formatPrice(pricing().actionPlanCents)}, advisor-approved before delivery)`}; status ${p.status}${p.needs.length ? `; still needed after the last turn: ${p.needs.join("; ")}` : ""}.`;
 
 export const GUEST_LINE =
   "VISITOR: not signed up yet; COMPANY CONTEXT is what they told us just now. Give your initial recommendation card as soon as you reasonably can: at most one round of questions first, and only if something critical is missing.";
+
+/** Said on the turns where the conversation should point, gently, at talking to Growth Goaled or a plan. */
+export const nudgeLine = () => {
+  const { actionPlanCents, supportedMonthlyCents } = pricing();
+  return `GROWTH GOALED: this founder has been talking this through for a while without a plan. Keep helping fully, as before. At the end of your reply, once and in one or two sentences, gently suggest the next step that fits what they're working on: a free call with someone at Growth Goaled to talk it through, or turning it into a plan (Diagnose: a CRO-reviewed 30/60/90-day action plan, ${formatPrice(actionPlanCents)} once; or Execute & Monitor: a CRO advisor alongside them, ${formatPrice(supportedMonthlyCents)}/month). Say why it would help with their situation. No pressure, no hard sell, and don't put it in the questions.`;
+};
 
 export class ChatError extends Error {}
 
@@ -106,6 +114,7 @@ export async function chatTurn(input: ChatInput): Promise<ChatResult> {
   const last = messages.at(-1);
   if (input.plan && last && typeof last.content === "string") last.content += `\n\n${planLine(input.plan)}`;
   if (input.guest && last && typeof last.content === "string") last.content += `\n\n${GUEST_LINE}`;
+  if (input.nudge && last && typeof last.content === "string") last.content += `\n\n${nudgeLine()}`;
   const response = await anthropic().beta.messages.parse({
     model: AI_MODEL,
     max_tokens: 8000,
@@ -129,6 +138,11 @@ export async function chatTurn(input: ChatInput): Promise<ChatResult> {
  * team size when the founder states one ("3 reps", "2 AEs").
  */
 export function fakeChat(input: ChatInput): ChatOutput {
+  const out = fakeTurn(input);
+  return input.nudge ? { ...out, reply: `${out.reply} Test mode: want to talk this through with someone at Growth Goaled?` } : out;
+}
+
+function fakeTurn(input: ChatInput): ChatOutput {
   const last = input.history.at(-1)?.content ?? "";
   const turn = input.history.filter((t) => t.role === "user").length;
   const reps = last.match(/(\d+)\s+(?:sales\s*people|salespeople|reps|AEs)/i);

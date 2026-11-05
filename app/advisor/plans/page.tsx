@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatPrice, pricing } from "@/lib/pricing";
 import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/ui/Pill";
 import { Section } from "@/components/ui/Section";
@@ -15,7 +16,7 @@ export default async function AdvisorPlansPage() {
     <div className="px-4 sm:px-8 py-8 max-w-5xl space-y-12">
       <PageHeader title="Action plans" subtitle={`Approve submitted plans within ${REVIEW_HOURS} hours; supported plans have you in the founder's conversation.`} />
 
-      <Section id="review" title={`To approve (${review.length})`} lead="$499 plans the founder has submitted. Check the draft against the conversation, edit it, and approve to deliver it.">
+      <Section id="review" title={`To approve (${review.length})`} lead={`Diagnose (${formatPrice(pricing().actionPlanCents)}) plans the founder has submitted. Check the draft against the conversation, edit it, and approve to deliver it.`}>
         {review.length ? (
           <ul className="surface divide-y" style={{ borderColor: "var(--border)" }}>
             {review.map((r) => {
@@ -39,7 +40,7 @@ export default async function AdvisorPlansPage() {
         )}
       </Section>
 
-      <Section id="supported" title={`Supported plans (${supported.length})`} lead="$799/month. You're in these conversations with the founder; the newest activity is first.">
+      <Section id="supported" title={`Supported plans (${supported.length})`} lead={`Execute & Monitor, ${formatPrice(pricing().supportedMonthlyCents)}/month. You're in these conversations with the founder; the newest activity is first.`}>
         {supported.length ? (
           <ul className="surface divide-y" style={{ borderColor: "var(--border)" }}>
             {supported.map((r) => (

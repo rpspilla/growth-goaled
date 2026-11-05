@@ -9,7 +9,7 @@ import { isUseCaseId, USE_CASE_IDS, type UseCaseId } from "@/lib/use-cases/types
  * - Action plan (owner decision, Nov 2026): bought from a conversation, one question each.
  *   Plan: ACTION_PLAN_PRICE_CENTS (default $499), once; built from the conversation and approved by
  *   an advisor before delivery (about 24 hours). Supported: SUPPORTED_PLAN_MONTHLY_CENTS (default
- *   $799/month), with a CRO-level advisor in the conversation.
+ *   $899/month: Execute & Monitor), with a CRO-level advisor in the conversation.
  * - Single Assessment: retired for new buyers unless ASSESSMENT_SALES=on (ASSESSMENT_PRICE_CENTS,
  *   default $149); past buyers keep it.
  * - Advisory Session: optional, from ADVISORY_PRICE_CENTS (default $750); booked through
@@ -27,7 +27,7 @@ export const CURRENCY = "usd";
 export const pricing = () => ({
   assessmentCents: cents("ASSESSMENT_PRICE_CENTS", 14_900),
   actionPlanCents: cents("ACTION_PLAN_PRICE_CENTS", 49_900),
-  supportedMonthlyCents: cents("SUPPORTED_PLAN_MONTHLY_CENTS", 79_900),
+  supportedMonthlyCents: cents("SUPPORTED_PLAN_MONTHLY_CENTS", 89_900),
   advisoryFromCents: cents("ADVISORY_PRICE_CENTS", 75_000),
   subscriptionMonthlyCents: cents("SUBSCRIPTION_PRICE_CENTS", 29_900),
   subscriptionAvailable: false as const,

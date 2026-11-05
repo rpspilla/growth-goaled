@@ -3,7 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { Composer } from "@/components/chat/Composer";
-import { RecommendationLegend, type LegendStage } from "@/components/chat/RecommendationLegend";
+import { AdvisorNudge } from "@/components/chat/AdvisorNudge";
+import { showNudge } from "@/lib/chat/nudge";
 import { HumanPresence } from "@/components/brand/HumanPresence";
 import { FileProgress } from "@/components/chat/FileProgress";
 import { BuildingRefresh } from "@/components/deliverables/BuildingRefresh";
@@ -69,21 +70,8 @@ export default async function ConversationPage({ params, searchParams }: { param
       }
     : null;
 
-  // The legend sits to the right of the conversation once there's a recommendation to read.
-  const legendStage: LegendStage | null = !lastCardId
-    ? null
-    : !plan
-      ? "recommendation"
-      : plan.status === "collecting"
-        ? "collecting"
-        : plan.status === "drafting" || plan.status === "in_review"
-          ? "review"
-          : plan.status === "active"
-            ? "supported"
-            : "delivered";
-
   return (
-    <div className={`px-4 sm:px-8 py-8 ${legendStage ? "max-w-6xl lg:grid lg:grid-cols-[minmax(0,48rem)_20rem] lg:gap-8 lg:items-start" : "max-w-3xl"}`}>
+    <div className={`px-4 sm:px-8 py-8 ${lastCardId ? "max-w-5xl" : "max-w-3xl"}`}>
     <div className="space-y-6 min-w-0">
       <div>
         <Link href="/chat" className="link text-sm">← All conversations</Link>
@@ -140,10 +128,11 @@ export default async function ConversationPage({ params, searchParams }: { param
                   given={(view.feedback.get(rec.id) ?? []).map((f) => f.kind)}
                   deeper={null}
                   feedback={feedbackAction}
+                  compact
                 />
               )}
               {rec && rec !== trailing && offer && rec.id === lastCardId && (
-                <PlanOffer conversationId={view.conversation.id} planPrice={formatPrice(actionPlanCents)} supportedPrice={formatPrice(supportedMonthlyCents)} buy={buyPlanAction} />
+                <PlanOffer conversationId={view.conversation.id} planPrice={formatPrice(actionPlanCents)} supportedPrice={formatPrice(supportedMonthlyCents)} buy={buyPlanAction} bookHref="/advisory/book?kind=review" />
               )}
             </li>
           );
@@ -158,11 +147,12 @@ export default async function ConversationPage({ params, searchParams }: { param
         attach={attachFilesAction}
         blobPrefix={companyBlobPrefix(company.id)}
       />
+      {showNudge(view.messages.filter((m) => m.role === "user").length, Boolean(plan)) && <AdvisorNudge bookHref="/advisory/book?kind=review&offer=nudge" plansHref={offer ? "#build-plan" : null} />}
       {trailing && (
         <div className="space-y-4">
-          <RecommendationCardView id={trailing.id} card={trailing.card} given={(view.feedback.get(trailing.id) ?? []).map((f) => f.kind)} deeper={null} feedback={feedbackAction} />
+          <RecommendationCardView id={trailing.id} card={trailing.card} given={(view.feedback.get(trailing.id) ?? []).map((f) => f.kind)} deeper={null} feedback={feedbackAction} compact />
           {offer && trailing.id === lastCardId && (
-            <PlanOffer conversationId={view.conversation.id} planPrice={formatPrice(actionPlanCents)} supportedPrice={formatPrice(supportedMonthlyCents)} buy={buyPlanAction} />
+            <PlanOffer conversationId={view.conversation.id} planPrice={formatPrice(actionPlanCents)} supportedPrice={formatPrice(supportedMonthlyCents)} buy={buyPlanAction} bookHref="/advisory/book?kind=review" />
           )}
         </div>
       )}
@@ -171,11 +161,6 @@ export default async function ConversationPage({ params, searchParams }: { param
         companies; <Link href="/data-use" className="link">how we use your data</Link>.
       </p>
     </div>
-      {legendStage && (
-        <div className="mt-8 lg:mt-0 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
-          <RecommendationLegend stage={legendStage} planPrice={formatPrice(actionPlanCents)} supportedPrice={formatPrice(supportedMonthlyCents)} />
-        </div>
-      )}
     </div>
   );
 }

@@ -45,14 +45,22 @@ test("a founder talks a decision through and gets a recommendation card", async 
   await expect(card).toBeVisible();
   await expect(card).toContainText("Test mode takeaway for Should we hire more salespeople?");
   await expect(card).toContainText("Low confidence");
-  await expect(card).toContainText("Days 1–30");
+  // Short by default: the headline and how sure we are; the rest is one click away.
+  await expect(card.getByText("Days 1–30")).toBeHidden();
+  await card.getByText("Show the full recommendation").click();
+  await expect(card.getByText("Days 1–30")).toBeVisible();
   await expect(card).toContainText("Assumption");
-  // The card converts into an action plan: $499 once, or $799 a month with an advisor.
-  await expect(page.getByRole("region", { name: "Build my action plan" })).toContainText("$499");
-  // Beside the card: how to read it, and where they are on the way to an action plan.
-  const legend = page.getByRole("complementary", { name: "How to read your recommendation" });
-  await expect(legend).toContainText("Confidence reflects how much of the recommendation rests on");
-  await expect(legend.locator('[aria-current="step"]')).toContainText("Your recommendation");
+  // Right under it: the packaging, each paid offer with "buy" and "talk to an advisor first".
+  const offer = page.getByRole("region", { name: "Build my action plan" });
+  await expect(offer.getByRole("group", { name: "Explore" })).toContainText("Free");
+  await expect(offer.getByRole("group", { name: "Diagnose" })).toContainText("$499");
+  await expect(offer.getByRole("group", { name: "Execute & Monitor" })).toContainText("$899");
+  await expect(offer.getByRole("group", { name: "Execute & Monitor" })).toContainText("Two hours of live CRO support each month");
+  await expect(offer.getByRole("group", { name: "Custom Projects" })).toContainText("Starting at $5,000");
+  for (const name of ["Diagnose", "Execute & Monitor"]) {
+    await expect(offer.getByRole("group", { name }).getByRole("link", { name: "Talk to an advisor first" })).toHaveAttribute("href", /\/advisory\/book\?kind=review&offer=/);
+  }
+  await expect(page.getByRole("complementary", { name: "How to read your recommendation" })).toHaveCount(0);
 
   // A shared file being read: it shows in the conversation with live progress, and the reply box stays
   // under the conversation and above the latest recommendation.
@@ -76,10 +84,13 @@ test("a founder talks a decision through and gets a recommendation card", async 
   await expect(page.getByText("✓ forecast.xlsx read")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole("progressbar", { name: "Reading forecast.xlsx" })).toHaveCount(0);
 
-  // Feedback is kept against the recommendation.
+  // Feedback is kept against the recommendation (in the full card).
+  const more = card.getByText("Show the full recommendation");
+  if (await more.isVisible()) await more.click();
   await card.getByRole("button", { name: "Helpful" }).click();
   await expect(card.getByRole("button", { name: "Helpful" })).toHaveAttribute("aria-pressed", "true");
   await page.reload();
+  await page.getByRole("article", { name: "Recommendation" }).getByText("Show the full recommendation").click();
   await expect(page.getByRole("article", { name: "Recommendation" }).getByRole("button", { name: "Helpful" })).toHaveAttribute("aria-pressed", "true");
 
   // What they said is remembered and can be corrected.
@@ -101,6 +112,17 @@ test("a founder talks a decision through and gets a recommendation card", async 
   await page.getByRole("button", { name: "Ask" }).click();
   await expect(page.getByRole("heading", { name: "Should we raise prices before hiring?" })).toBeVisible();
   await expect(page.getByText(/Pick up where you left off/)).toHaveCount(0);
+  // The chat keeps going; from the sixth exchange it gently points at talking to Growth Goaled.
+  const conversation = page.getByRole("list", { name: "Conversation" });
+  for (let i = 2; i <= 6; i++) {
+    await expect(page.getByRole("complementary", { name: "Talk to Growth Goaled" })).toHaveCount(0);
+    await page.getByLabel("Your reply").fill(`Exchange ${i}`);
+    await page.getByRole("button", { name: "Send" }).click();
+    await expect(conversation.getByText(`Exchange ${i}`, { exact: true })).toBeVisible();
+  }
+  const nudge = page.getByRole("complementary", { name: "Talk to Growth Goaled" });
+  await expect(nudge.getByRole("link", { name: "Book a free call" })).toHaveAttribute("href", "/advisory/book?kind=review&offer=nudge");
+  await expect(conversation).toContainText("talk this through with someone at Growth Goaled");
   await page.goto("/overview");
   await expect(page.getByText(/Pick up where you left off/)).toBeVisible();
   await ctx.close();

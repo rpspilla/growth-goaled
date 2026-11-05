@@ -10,6 +10,7 @@ import { canViewCompany } from "@/lib/access";
 import { requireRole } from "@/lib/auth/session";
 import { db, schema } from "@/lib/db";
 import { REVIEW_HOURS } from "@/lib/data/action-plans";
+import { formatPrice, pricing } from "@/lib/pricing";
 import { getConversation } from "@/lib/data/chat";
 import { advisorMessageAction, advisorStepAction, approvePlanAction, redraftPlanAction, resendPlanEmailAction } from "../actions";
 import { ResendPlanEmail } from "@/components/chat/ResendPlanEmail";
@@ -44,7 +45,7 @@ export default async function AdvisorPlanPage({ params }: { params: Promise<{ id
         <div className="flex items-center gap-3 flex-wrap mt-2">
           <h1 className="font-display text-3xl font-normal" style={fg}>{company.name}: {view.conversation.title}</h1>
           <Pill tone={plan.status === "in_review" ? "amber" : plan.status === "active" || plan.status === "delivered" ? "green" : "neutral"}>{STATUS[plan.status]}</Pill>
-          <Pill tone="blue">{plan.tier === "supported" ? "Supported · $799/month" : "Action plan · $499"}</Pill>
+          <Pill tone="blue">{plan.tier === "supported" ? `Execute & Monitor · ${formatPrice(pricing().supportedMonthlyCents)}/month` : `Diagnose · ${formatPrice(pricing().actionPlanCents)}`}</Pill>
         </div>
         {due && plan.status === "in_review" && <p className="text-base mt-1" style={muted}>Due {due.toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</p>}
       </div>

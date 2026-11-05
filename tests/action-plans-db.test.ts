@@ -90,7 +90,7 @@ describe("checkout", () => {
     await createPlanCheckout(founder, co, conversationId, "supported", "https://dev.test", sub.client);
     const p2 = sub.create.mock.calls[0]![0] as Record<string, unknown> & { line_items: { price_data: Record<string, unknown> }[]; subscription_data: unknown };
     expect(p2.mode).toBe("subscription");
-    expect(p2.line_items[0]!.price_data).toMatchObject({ unit_amount: 79_900, recurring: { interval: "month" } });
+    expect(p2.line_items[0]!.price_data).toMatchObject({ unit_amount: 89_900, recurring: { interval: "month" } });
     expect(p2.subscription_data).toBeTruthy();
     expect(await db().select().from(schema.actionPlans)).toHaveLength(1);
     expect((await planForConversation(co, conversationId))!.status).toBe("pending_payment");

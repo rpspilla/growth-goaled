@@ -1,4 +1,5 @@
 import "server-only";
+import { nudgeDue } from "@/lib/chat/nudge";
 import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { Company, RecommendationCard, User } from "@/lib/db/schema";
@@ -132,7 +133,7 @@ export async function sendMessage(user: User, company: Company, conversationId: 
 
   let result;
   try {
-    result = await chatTurn({ topic, context, history, plan });
+    result = await chatTurn({ topic, context, history, plan, nudge: nudgeDue(history.filter((t) => t.role === "user").length, Boolean(plan)) });
   } catch (err) {
     console.error("[chat] Turn failed", err);
     const error = err instanceof ChatError ? err.message : isAiConfigError(err) ? "Answers aren't available right now. Your message is saved; try again shortly." : "Something went wrong. Your message is saved; try again.";
