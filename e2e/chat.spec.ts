@@ -57,6 +57,7 @@ test("a founder talks a decision through and gets a recommendation card", async 
   await expect(offer.getByRole("group", { name: "Execute & Monitor" })).toContainText("$899");
   await expect(offer.getByRole("group", { name: "Execute & Monitor" })).toContainText("Two hours of live CRO support each month");
   await expect(offer.getByRole("group", { name: "Custom Projects" })).toContainText("Starting at $5,000");
+  await expect(offer.getByRole("group", { name: "Custom Projects" }).getByRole("link", { name: "Discuss a Project" })).toHaveAttribute("href", "https://calendly.com/spillane-ryan/new-meeting");
   for (const name of ["Diagnose", "Execute & Monitor"]) {
     await expect(offer.getByRole("group", { name }).getByRole("link", { name: "Talk to an advisor first" })).toHaveAttribute("href", /\/advisory\/book\?kind=review&offer=/);
   }

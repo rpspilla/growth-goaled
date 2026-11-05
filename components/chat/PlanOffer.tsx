@@ -105,7 +105,7 @@ export function PlanOffer({ conversationId, planPrice, supportedPrice, buy, book
           </ul>
           <p className="text-xs mt-2" style={{ color: "var(--muted-foreground)" }}>{CUSTOM.note}</p>
         </div>
-        <a href={`${bookHref}${bookHref.includes("?") ? "&" : "?"}offer=custom`} className="btn btn-secondary">
+        <a href={CUSTOM.href} target="_blank" rel="noopener" className="btn btn-secondary">
           {CUSTOM.cta}
         </a>
       </div>

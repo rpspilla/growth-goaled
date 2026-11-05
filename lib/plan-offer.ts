@@ -50,6 +50,8 @@ export const CUSTOM = {
   points: ["Sales process redesign", "Pipeline and forecasting overhaul", "GTM strategy and sales playbooks", "Sales team structure and compensation"],
   note: "Fixed scope and pricing · Free 30-minute scoping call",
   cta: "Discuss a Project",
+  /** Straight to the 30-minute scoping call on Calendly. */
+  href: "https://calendly.com/spillane-ryan/new-meeting",
 };
 
 /** The monthly plan in one line, for anywhere that describes it in passing. */
