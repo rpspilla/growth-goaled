@@ -44,7 +44,7 @@ test("signed-out visitors go to sign-in", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "How we use your data" })).toBeVisible();
   await expect(page.getByText(/anonymized, aggregated form/)).toBeVisible();
   // So are the terms, privacy and refund policies, and the sign-in page links to them.
-  for (const [path, heading] of [["/terms", "Terms of service"], ["/privacy", "Privacy policy"], ["/refunds", "Refund policy"]]) {
+  for (const [path, heading] of [["/terms", "Terms of service"], ["/privacy", "Privacy policy"], ["/refunds", "Refund policy"]] as const) {
     await page.goto(path);
     await expect(page, path).toHaveURL(new RegExp(`${path}$`));
     await expect(page.getByRole("heading", { name: heading })).toBeVisible();

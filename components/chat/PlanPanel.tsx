@@ -19,6 +19,8 @@ export type PlanPanelData = {
   approvedOn: string | null;
   reviewNote: string | null;
   advisorName: string | null;
+  /** Execute & Monitor: where "Manage billing" goes (Stripe's portal, via /billing). */
+  billingHref: string | null;
 };
 
 /** The action plan bought from this conversation, at whatever stage it's at. */
@@ -95,6 +97,11 @@ export function PlanPanel({ plan, submit, update, toggle }: { plan: PlanPanelDat
               </button>
               <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>Your advisor sees everything here and can add to it.</span>
             </div>
+          )}
+          {plan.billingHref && (
+            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+              <a href={plan.billingHref} className="link">Manage billing</a> to change your card, see invoices or cancel (cancelling takes effect at the end of the month you&apos;ve paid for).
+            </p>
           )}
         </>
       )}

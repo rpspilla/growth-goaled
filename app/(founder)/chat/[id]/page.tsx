@@ -35,10 +35,10 @@ const CHECKOUT: Record<string, { text: string; tone: string }> = {
 };
 
 /** One conversation: the founder's messages, each answer, advisor messages, the decision cards, and the action plan built from it. */
-export default async function ConversationPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ checkout?: string }> }) {
+export default async function ConversationPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ checkout?: string; billing_error?: string }> }) {
   const { company } = await founderContext();
   if (!company) redirect("/welcome");
-  const [{ id: raw }, { checkout }] = await Promise.all([params, searchParams]);
+  const [{ id: raw }, { checkout, billing_error: billingError }] = await Promise.all([params, searchParams]);
   const id = z.uuid().safeParse(raw);
   if (!id.success) notFound();
   const view = await getConversation(company, id.data);
@@ -67,6 +67,7 @@ export default async function ConversationPage({ params, searchParams }: { param
         approvedOn: plan.approvedAt ? day(plan.approvedAt) : null,
         reviewNote: plan.reviewNote,
         advisorName: advisor ? advisor.name || advisor.email : null,
+        billingHref: plan.tier === "supported" && plan.stripeSubscriptionId ? `/billing?return=${encodeURIComponent(`/chat/${view.conversation.id}`)}` : null,
       }
     : null;
 
@@ -84,6 +85,12 @@ export default async function ConversationPage({ params, searchParams }: { param
       {checkout && CHECKOUT[checkout] && (
         <p role="status" className="rounded-lg px-4 py-3 text-base" style={{ background: CHECKOUT[checkout]!.tone, color: "var(--foreground)" }}>
           {CHECKOUT[checkout]!.text}
+        </p>
+      )}
+
+      {billingError && (
+        <p role="alert" className="rounded-lg px-4 py-3 text-base" style={{ background: "var(--red-muted, var(--muted))", color: "var(--foreground)" }}>
+          {billingError.slice(0, 200)}
         </p>
       )}
 

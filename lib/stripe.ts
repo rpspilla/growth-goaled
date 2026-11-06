@@ -26,13 +26,26 @@ const fakeStripe = {
       async create(params: Stripe.Checkout.SessionCreateParams) {
         const id = `cs_e2e_${crypto.randomUUID()}`;
         const amount = params.line_items?.reduce((n, li) => n + (li.price_data?.unit_amount ?? 0) * (li.quantity ?? 1), 0) ?? 0;
-        fakeSessions.set(id, { id, status: "complete", payment_status: "paid", client_reference_id: params.client_reference_id, metadata: params.metadata, amount_total: amount });
+        fakeSessions.set(id, { id, status: "complete", payment_status: "paid", client_reference_id: params.client_reference_id, metadata: params.metadata, amount_total: amount, subscription: params.mode === "subscription" ? `sub_e2e_${id.slice(7)}` : null });
         return { id, url: params.success_url?.replace("{CHECKOUT_SESSION_ID}", id) };
       },
       async retrieve(id: string) {
         const session = fakeSessions.get(id);
         if (!session) throw new Error("No such checkout session.");
         return session;
+      },
+    },
+  },
+  subscriptions: {
+    async retrieve(id: string) {
+      return { id, customer: "cus_e2e", status: "active" };
+    },
+  },
+  // The billing portal "opens" straight back to the app, marked so tests can see it was reached.
+  billingPortal: {
+    sessions: {
+      async create(params: { customer: string; return_url: string }) {
+        return { url: `${params.return_url}${params.return_url.includes("?") ? "&" : "?"}billing=portal-e2e` };
       },
     },
   },

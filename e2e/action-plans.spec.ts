@@ -103,6 +103,9 @@ test("a founder buys an action plan from the conversation; an advisor approves i
   await expect(panel).toContainText("Supported · Casey CRO");
   await expect(panel).toContainText("Test mode goal for Who should my first GTM hire be?", { timeout: 30_000 });
   const supportedUrl = page.url().replace(/\?.*$/, "");
+  // Self-serve billing: "Manage billing" goes to Stripe's portal and back to this conversation.
+  await panel.getByRole("link", { name: "Manage billing" }).click();
+  await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}\?billing=portal-e2e$/);
 
   await cro.page.goto("/advisor/plans");
   await cro.page.getByRole("region", { name: /Supported plans/ }).getByRole("link", { name: /Planner Co/ }).click();
