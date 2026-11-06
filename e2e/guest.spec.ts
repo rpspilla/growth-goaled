@@ -50,7 +50,7 @@ test("a visitor talks it through, unlocks the recommendation with an email, and 
   });
   await answer("1");
   await expect(page.getByText("1", { exact: true }).last()).toBeVisible();
-  await expect(page.getByText("Super. Give me 60 Seconds while we spin-up an Industry Benchmarked Recommendation")).toBeVisible({ timeout: 3000 });
+  await expect(page.getByText("Super. Give me 60 seconds while we spin up a CRO-level recommendation")).toBeVisible({ timeout: 3000 });
   await expect(page.getByRole("progressbar", { name: "Building your recommendation" })).toBeVisible();
   await expect(page.getByText("Reading your answers")).toBeVisible();
   await expect(page.getByLabel("Your answer")).toHaveValue("");

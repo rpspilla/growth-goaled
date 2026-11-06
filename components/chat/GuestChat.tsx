@@ -338,8 +338,8 @@ const LAST_STEP = "cs";
 
 const SPIN_UP_STEPS = [
   "Reading your answers",
-  "Matching you with companies at your stage and in your vertical",
-  "Checking your numbers against industry benchmarks",
+  "Thinking through what matters most at your stage",
+  "Pressure-testing it against what you've told us",
   "Weighing the options for your situation",
   "Writing your recommendation and 30/60/90-day plan",
 ];

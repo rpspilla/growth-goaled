@@ -20,7 +20,7 @@ export type GuestStep = {
 
 export const OPENING = "How can we help you grow?";
 /** Said once the last sign-up question is answered, while the first recommendation is written. */
-export const SPIN_UP = "Super. Give me 60 Seconds while we spin-up an Industry Benchmarked Recommendation";
+export const SPIN_UP = "Super. Give me 60 seconds while we spin up a CRO-level recommendation";
 const opts = (values: readonly string[]) => values.map((v) => ({ value: v, label: v }));
 const first = (p: Record<string, string>) => p.name?.split(" ")[0] ?? "";
 
