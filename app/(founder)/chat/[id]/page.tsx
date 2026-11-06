@@ -12,13 +12,15 @@ import { PlanOffer } from "@/components/chat/PlanOffer";
 import { PlanPanel, type PlanPanelData } from "@/components/chat/PlanPanel";
 import { RecommendationCardView } from "@/components/chat/RecommendationCardView";
 import { db, schema } from "@/lib/db";
-import { REVIEW_HOURS } from "@/lib/data/action-plans";
+import { planSessionsFor, REVIEW_HOURS } from "@/lib/data/action-plans";
+import { companyPerformance } from "@/lib/data/performance";
+import { LIVE_MINUTES_PER_MONTH, supportMinutesThisMonth } from "@/lib/plan-tracking";
 import { getConversation } from "@/lib/data/chat";
 import { companyBlobPrefix } from "@/lib/data/documents";
 import { founderContext } from "@/lib/data/founder-context";
 import { formatPrice, pricing } from "@/lib/pricing";
 import { stripeConfigured } from "@/lib/stripe";
-import { attachFilesAction, buyPlanAction, feedbackAction, retryMessageAction, sendMessageAction, stepDoneAction, submitPlanAction, updatePlanAction } from "../actions";
+import { attachFilesAction, buyPlanAction, feedbackAction, planTargetsAction, retryMessageAction, sendMessageAction, stepDetailsAction, stepDoneAction, submitPlanAction, updatePlanAction } from "../actions";
 
 // Each answer is prepared while the founder waits.
 export const maxDuration = 300;
@@ -55,6 +57,10 @@ export default async function ConversationPage({ params, searchParams }: { param
   const { actionPlanCents, supportedMonthlyCents } = pricing();
   const [advisor] = company.advisorId ? await db.select({ name: schema.users.name, email: schema.users.email }).from(schema.users).where(eq(schema.users.id, company.advisorId)).limit(1) : [];
 
+  // For a bought plan: the company's latest figures (targets) and, on Execute & Monitor, the live CRO time logged.
+  const [perf, sessions] = plan ? await Promise.all([companyPerformance(company), plan.tier === "supported" ? planSessionsFor(plan.id) : Promise.resolve([])]) : [null, []];
+  const now = new Date();
+  const lastReview = sessions.find((x) => x.kind === "review");
   const panel: PlanPanelData | null = plan
     ? {
         id: plan.id,
@@ -68,6 +74,18 @@ export default async function ConversationPage({ params, searchParams }: { param
         reviewNote: plan.reviewNote,
         advisorName: advisor ? advisor.name || advisor.email : null,
         billingHref: plan.tier === "supported" && plan.stripeSubscriptionId ? `/billing?return=${encodeURIComponent(`/chat/${view.conversation.id}`)}` : null,
+        today: now.toISOString().slice(0, 10),
+        current: Object.fromEntries([...(perf?.metrics.values() ?? [])].map((m) => [m.metric, m.value])),
+        live:
+          plan.tier === "supported" && plan.status === "active"
+            ? {
+                usedMinutes: supportMinutesThisMonth(sessions, now),
+                allowanceMinutes: LIVE_MINUTES_PER_MONTH,
+                lastReview: lastReview ? day(new Date(`${lastReview.heldOn}T00:00:00Z`)) : null,
+                reviewHref: "/advisory/book?kind=monthly&offer=review",
+                supportHref: "/advisory/book?kind=review&offer=live",
+              }
+            : null,
       }
     : null;
 
@@ -94,7 +112,7 @@ export default async function ConversationPage({ params, searchParams }: { param
         </p>
       )}
 
-      {panel && <PlanPanel plan={panel} submit={submitPlanAction} update={updatePlanAction} toggle={stepDoneAction} />}
+      {panel && <PlanPanel plan={panel} submit={submitPlanAction} update={updatePlanAction} toggle={stepDoneAction} editStep={stepDetailsAction} saveTargets={planTargetsAction} />}
 
       <BuildingRefresh active={reading} />
       <ol className="space-y-5" aria-label="Conversation">

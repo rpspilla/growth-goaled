@@ -1066,7 +1066,10 @@ export const actionPlanStatus = pgEnum("action_plan_status", [
   "cancelled",
 ]);
 
-export type PlanStep = { action: string; owner: string; measure: string; done?: boolean };
+/** due: YYYY-MM-DD (Execute & Monitor tracks deadlines; older plans have none). */
+export type PlanStep = { action: string; owner: string; measure: string; done?: boolean; due?: string };
+/** A metric the plan should move, tracked against the company's current figure (MetricKey from lib/metrics). */
+export type PlanTarget = { metric: string; target: number; by?: string | null };
 export type ActionPlanContent = {
   goal: string;
   summary: string;
@@ -1077,6 +1080,8 @@ export type ActionPlanContent = {
   assumptions: string[];
   /** Tools worth evaluating to improve outcomes or save time (plans written before Nov 2026 have none). */
   tools?: PlanTool[];
+  /** Metric targets (Execute & Monitor), set by the founder or advisor. */
+  targets?: PlanTarget[];
 };
 
 /** A tool the plan suggests evaluating: what it is, what kind, and why for this plan. */
@@ -1116,6 +1121,33 @@ export const actionPlans = pgTable(
     index("action_plans_subscription_idx").on(t.stripeSubscriptionId),
   ],
 );
+
+export const planSessionKind = pgEnum("plan_session_kind", ["review", "support"]);
+
+/**
+ * Live time with the CRO advisor on an Execute & Monitor plan, logged by the advisor: the monthly
+ * progress review, and live support (two hours a month are included).
+ */
+export const planSessions = pgTable(
+  "plan_sessions",
+  {
+    id: id(),
+    planId: uuid("plan_id")
+      .notNull()
+      .references(() => actionPlans.id, { onDelete: "cascade" }),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    advisorId: uuid("advisor_id").references(() => users.id, { onDelete: "set null" }),
+    kind: planSessionKind("kind").notNull(),
+    minutes: integer("minutes").notNull(),
+    heldOn: date("held_on", { mode: "string" }).notNull(),
+    note: text("note").notNull().default(""),
+    ...timestamps,
+  },
+  (t) => [index("plan_sessions_plan_idx").on(t.planId, t.heldOn)],
+);
+export type PlanSession = typeof planSessions.$inferSelect;
 
 // ---------------------------------------------------------------------------
 // Guest conversations: the chat on the sign-in page, before there's an account

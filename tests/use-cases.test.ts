@@ -182,7 +182,7 @@ describe("pricing", () => {
       delete process.env.ASSESSMENT_SALES;
     }
     expect(USE_CASES.filter((u) => u.comingSoon).map((u) => u.id)).toEqual(["series_b_ready", "founder_handoff"]);
-    expect(pricing()).toEqual({ assessmentCents: 14_900, actionPlanCents: 49_900, supportedMonthlyCents: 89_900, advisoryFromCents: 75_000, subscriptionMonthlyCents: 29_900, subscriptionAvailable: false });
+    expect(pricing()).toEqual({ assessmentCents: 14_900, actionPlanCents: 49_900, supportedMonthlyCents: 119_900, advisoryFromCents: 75_000, subscriptionMonthlyCents: 29_900, subscriptionAvailable: false });
     expect(formatPrice(14_900)).toBe("$149");
     expect(formatPrice(75_000)).toBe("$750");
     expect(formatPrice(1_250)).toBe("$12.50");

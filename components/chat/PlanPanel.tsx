@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { BuildingRefresh } from "@/components/deliverables/BuildingRefresh";
 import { Pill } from "@/components/ui/Pill";
-import type { ActionPlanContent } from "@/lib/db/schema";
+import type { ActionPlanContent, PlanTarget } from "@/lib/db/schema";
+import { formatMinutes } from "@/lib/plan-tracking";
 import { ActionPlanView } from "./ActionPlanView";
 
 type Result = { ok: boolean; error?: string };
@@ -21,10 +22,30 @@ export type PlanPanelData = {
   advisorName: string | null;
   /** Execute & Monitor: where "Manage billing" goes (Stripe's portal, via /billing). */
   billingHref: string | null;
+  /** Today (YYYY-MM-DD), for overdue milestones. */
+  today: string;
+  /** The company's latest figure per metric, for targets. */
+  current: Record<string, number | null>;
+  /** Execute & Monitor: live CRO time this month and the last progress review. */
+  live: { usedMinutes: number; allowanceMinutes: number; lastReview: string | null; reviewHref: string; supportHref: string } | null;
 };
 
 /** The action plan bought from this conversation, at whatever stage it's at. */
-export function PlanPanel({ plan, submit, update, toggle }: { plan: PlanPanelData; submit: (id: string) => Promise<Result>; update: (id: string) => Promise<Result>; toggle: (id: string, period: string, index: number, done: boolean) => Promise<Result> }) {
+export function PlanPanel({
+  plan,
+  submit,
+  update,
+  toggle,
+  editStep,
+  saveTargets,
+}: {
+  plan: PlanPanelData;
+  submit: (id: string) => Promise<Result>;
+  update: (id: string) => Promise<Result>;
+  toggle: (id: string, period: string, index: number, done: boolean) => Promise<Result>;
+  editStep: (id: string, period: string, index: number, owner: string, due: string | null) => Promise<Result>;
+  saveTargets: (id: string, targets: PlanTarget[]) => Promise<Result>;
+}) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -89,7 +110,14 @@ export function PlanPanel({ plan, submit, update, toggle }: { plan: PlanPanelDat
               {plan.approvedOn ? `Approved on ${plan.approvedOn}.` : ""} {plan.reviewNote ? `Advisor's note: ${plan.reviewNote}` : ""}
             </p>
           )}
-          <ActionPlanView content={plan.content} toggle={plan.status === "cancelled" ? undefined : (period, index, done) => toggle(plan.id, period, index, done)} />
+          {plan.live && <LiveSupport live={plan.live} />}
+          <ActionPlanView
+            content={plan.content}
+            today={plan.status === "cancelled" ? null : plan.today}
+            toggle={plan.status === "cancelled" ? undefined : (period, index, done) => toggle(plan.id, period, index, done)}
+            editStep={plan.status === "active" ? (period, index, owner, due) => editStep(plan.id, period, index, owner, due) : undefined}
+            targets={{ current: plan.current, save: plan.status === "active" ? (targets) => saveTargets(plan.id, targets) : undefined }}
+          />
           {plan.status === "active" && (
             <div className="flex items-center gap-3 flex-wrap">
               <button type="button" className="btn btn-secondary" disabled={pending || plan.drafting} onClick={() => run(() => update(plan.id))}>
@@ -106,6 +134,25 @@ export function PlanPanel({ plan, submit, update, toggle }: { plan: PlanPanelDat
         </>
       )}
       {error && <p role="alert" className="text-sm" style={{ color: "var(--red)" }}>{error}</p>}
+    </section>
+  );
+}
+
+/** Execute & Monitor: the CRO time included each month, and the next review. */
+function LiveSupport({ live }: { live: NonNullable<PlanPanelData["live"]> }) {
+  const left = Math.max(0, live.allowanceMinutes - live.usedMinutes);
+  return (
+    <section aria-label="Your CRO advisor" className="rounded-xl p-4 flex gap-4 items-center flex-wrap" style={{ background: "var(--green-muted)" }}>
+      <div className="flex-1 min-w-[14rem] text-sm space-y-0.5" style={{ color: "var(--foreground)" }}>
+        <div>
+          <strong>Live CRO support this month:</strong> {formatMinutes(live.usedMinutes)} of {formatMinutes(live.allowanceMinutes)} used{left > 0 ? `, ${formatMinutes(left)} left` : ""}.
+        </div>
+        <div style={{ color: "var(--muted-foreground)" }}>{live.lastReview ? `Last progress review: ${live.lastReview}.` : "Book your first monthly progress review."}</div>
+      </div>
+      <div className="flex gap-2 flex-wrap">
+        <a href={live.reviewHref} className="btn btn-primary text-sm">Book your monthly review</a>
+        <a href={live.supportHref} className="btn btn-secondary text-sm">Book live support</a>
+      </div>
     </section>
   );
 }

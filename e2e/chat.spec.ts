@@ -54,7 +54,7 @@ test("a founder talks a decision through and gets a recommendation card", async 
   const offer = page.getByRole("region", { name: "Build my action plan" });
   await expect(offer.getByRole("group", { name: "Explore" })).toContainText("Free");
   await expect(offer.getByRole("group", { name: "Diagnose" })).toContainText("$499");
-  await expect(offer.getByRole("group", { name: "Execute & Monitor" })).toContainText("$899");
+  await expect(offer.getByRole("group", { name: "Execute & Monitor" })).toContainText("$1,199");
   await expect(offer.getByRole("group", { name: "Execute & Monitor" })).toContainText("Two hours of live CRO support each month");
   await expect(offer.getByRole("group", { name: "Custom Projects" })).toContainText("Starting at $5,000");
   await expect(offer.getByRole("group", { name: "Custom Projects" }).getByRole("link", { name: "Discuss a Project" })).toHaveAttribute("href", "https://calendly.com/spillane-ryan/new-meeting");

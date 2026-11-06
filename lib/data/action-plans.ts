@@ -3,6 +3,7 @@ import { and, asc, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
 import type Stripe from "stripe";
 import { db, schema } from "@/lib/db";
 import type { ActionPlan, ActionPlanContent, Company, User } from "@/lib/db/schema";
+import { carryDues, cleanTargets, isDay, MAX_TARGETS, withDefaultDues } from "@/lib/plan-tracking";
 import { draftPlan } from "@/lib/ai/plan";
 import { chatContext } from "@/lib/chat/context";
 import { getChatTopic } from "@/lib/chat/topics";
@@ -167,7 +168,10 @@ export async function writePlan(planId: string, opts: { onlyIfEmpty?: boolean } 
     const [company] = await db.select().from(schema.companies).where(eq(schema.companies.id, plan.companyId)).limit(1);
     const topic = getChatTopic(plan.topic) ?? getChatTopic("other")!;
     const context = await chatContext(company!, { compensation: Boolean(topic.usesCompensationData) });
-    const { plan: content } = await draftPlan({ topic, context, transcript: await transcript(plan.conversationId), current: plan.content });
+    const { plan: drafted } = await draftPlan({ topic, context, transcript: await transcript(plan.conversationId), current: plan.content });
+    // Deadlines and targets carry over a rewrite; a live plan's new milestones get the end of their period.
+    const carried = carryDues(drafted, plan.content);
+    const content = plan.tier === "supported" ? withDefaultDues(carried, new Date()) : carried;
     await db
       .update(schema.actionPlans)
       .set({ content, draftingStartedAt: null, status: plan.tier === "plan" ? "in_review" : "active", updatedAt: new Date() })
@@ -237,6 +241,54 @@ export async function setStepDone(company: Pick<Company, "id">, planId: string, 
   return { ok: true };
 }
 
+export type Period = "days30" | "days60" | "days90";
+/** Owners, deadlines and targets are edited on live (Execute & Monitor) plans. */
+const LIVE = ["active"] as const;
+
+/** A milestone's owner and deadline on a live (Execute & Monitor) plan. */
+export async function updateStep(company: Pick<Company, "id">, planId: string, period: Period, index: number, change: { owner: string; due: string | null }): Promise<PlanResult> {
+  const owner = change.owner.trim();
+  if (!owner || owner.length > 120) return { ok: false, error: "Give the milestone an owner." };
+  if (change.due !== null && !isDay(change.due)) return { ok: false, error: "Pick a valid date." };
+  const [plan] = await db.select().from(schema.actionPlans).where(and(eq(schema.actionPlans.id, planId), eq(schema.actionPlans.companyId, company.id))).limit(1);
+  if (!plan?.content || !(LIVE as readonly string[]).includes(plan.status)) return { ok: false, error: "Owners and deadlines can be changed on a live plan." };
+  const step = plan.content[period][index];
+  if (!step) return { ok: false, error: "Unknown milestone." };
+  const next = { ...step, owner };
+  if (change.due) next.due = change.due;
+  else delete next.due;
+  const content: ActionPlanContent = { ...plan.content, [period]: plan.content[period].map((s, i) => (i === index ? next : s)) };
+  await db.update(schema.actionPlans).set({ content, updatedAt: new Date() }).where(eq(schema.actionPlans.id, plan.id));
+  return { ok: true };
+}
+
+/** The metric targets on a live plan (replaces the list). */
+export async function setPlanTargets(company: Pick<Company, "id">, planId: string, raw: unknown): Promise<PlanResult> {
+  const targets = cleanTargets(raw);
+  if (!targets) return { ok: false, error: `Check the targets (up to ${MAX_TARGETS}, one per metric).` };
+  const [plan] = await db.select().from(schema.actionPlans).where(and(eq(schema.actionPlans.id, planId), eq(schema.actionPlans.companyId, company.id))).limit(1);
+  if (!plan?.content || !(LIVE as readonly string[]).includes(plan.status)) return { ok: false, error: "Targets can be set on a live plan." };
+  await db.update(schema.actionPlans).set({ content: { ...plan.content, targets }, updatedAt: new Date() }).where(eq(schema.actionPlans.id, plan.id));
+  return { ok: true };
+}
+
+/** The advisor logs a monthly review or live support on a live plan. */
+export async function logPlanSession(advisor: Pick<User, "id" | "role">, company: Pick<Company, "id">, planId: string, input: { kind: "review" | "support"; minutes: number; heldOn: string; note: string }): Promise<PlanResult> {
+  if (advisor.role !== "advisor" && advisor.role !== "admin") return { ok: false, error: "Only advisors log sessions." };
+  if (!Number.isInteger(input.minutes) || input.minutes < 5 || input.minutes > 480) return { ok: false, error: "Enter the length in minutes (5 to 480)." };
+  if (!isDay(input.heldOn) || input.heldOn > new Date().toISOString().slice(0, 10)) return { ok: false, error: "Pick the date it happened." };
+  const [plan] = await db.select().from(schema.actionPlans).where(and(eq(schema.actionPlans.id, planId), eq(schema.actionPlans.companyId, company.id))).limit(1);
+  if (!plan || plan.tier !== "supported" || !(LIVE as readonly string[]).includes(plan.status)) return { ok: false, error: "Sessions are logged on a live Execute & Monitor plan." };
+  await db.insert(schema.planSessions).values({ planId: plan.id, companyId: company.id, advisorId: advisor.id, kind: input.kind, minutes: input.minutes, heldOn: input.heldOn, note: input.note.trim().slice(0, 1000) });
+  await track("plan_session_logged", { userId: advisor.id, companyId: company.id, props: { plan_id: plan.id, kind: input.kind, minutes: input.minutes } });
+  return { ok: true };
+}
+
+/** A plan's logged sessions, newest first. */
+export async function planSessionsFor(planId: string) {
+  return db.select().from(schema.planSessions).where(eq(schema.planSessions.planId, planId)).orderBy(desc(schema.planSessions.heldOn), desc(schema.planSessions.createdAt)).limit(100);
+}
+
 /** Plans waiting for an advisor: $499 plans in review, oldest first, for companies the advisor may see. */
 export async function plansForReview(advisor: Pick<User, "id" | "role">) {
   const rows = await db
@@ -267,8 +319,8 @@ export async function supportedPlans(advisor: Pick<User, "id" | "role">) {
   return rows.filter((r) => advisor.role === "admin" || r.advisorId === advisor.id || r.advisorId === null);
 }
 
-const cleanSteps = (steps: { action: string; owner: string; measure: string; done?: boolean }[]) =>
-  steps.map((s) => ({ action: s.action.trim(), owner: s.owner.trim(), measure: s.measure.trim(), ...(s.done ? { done: true } : {}) })).filter((s) => s.action);
+const cleanSteps = (steps: { action: string; owner: string; measure: string; done?: boolean; due?: string }[]) =>
+  steps.map((s) => ({ action: s.action.trim(), owner: s.owner.trim(), measure: s.measure.trim(), ...(s.done ? { done: true } : {}), ...(isDay(s.due) ? { due: s.due } : {}) })).filter((s) => s.action);
 
 /** Tools to evaluate, trimmed and without blanks or repeats (at most eight). */
 export const cleanTools = (tools: ActionPlanContent["tools"]) => {
@@ -290,8 +342,11 @@ export async function approvePlan(advisor: User, company: Pick<Company, "id" | "
     risks: content.risks.map((r) => r.trim()).filter(Boolean),
     assumptions: content.assumptions.map((r) => r.trim()).filter(Boolean),
     tools: cleanTools(content.tools),
+    ...(content.targets?.length ? { targets: cleanTargets(content.targets) ?? [] } : {}),
   };
   if (!clean.goal || !clean.days30.length) return { ok: false, error: "A plan needs a goal and at least one 30-day milestone." };
+  // Milestones the advisor didn't date get the end of their period, counted from approval.
+  Object.assign(clean, withDefaultDues(clean, new Date()));
   const updated = await db
     .update(schema.actionPlans)
     .set({ content: clean, status: "delivered", approvedAt: new Date(), approvedBy: advisor.id, reviewNote: note?.trim() || null, updatedAt: new Date() })

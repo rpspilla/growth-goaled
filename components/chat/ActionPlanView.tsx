@@ -4,7 +4,9 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Wrench } from "lucide-react";
 import { HumanPresence } from "@/components/brand/HumanPresence";
-import type { ActionPlanContent } from "@/lib/db/schema";
+import type { ActionPlanContent, PlanTarget } from "@/lib/db/schema";
+import { PlanTargets } from "./PlanTargets";
+import { StepMeta } from "./StepMeta";
 
 const PERIODS = [
   ["days30", "Days 1–30"],
@@ -16,8 +18,17 @@ const PERIODS = [
 export function ActionPlanView({
   content,
   toggle,
+  today = null,
+  editStep,
+  targets,
 }: {
   content: ActionPlanContent;
+  /** YYYY-MM-DD from the server, for "Overdue" (null: don't flag). */
+  today?: string | null;
+  /** Execute & Monitor: change a milestone's owner and deadline. */
+  editStep?: (period: string, index: number, owner: string, due: string | null) => Promise<{ ok: boolean; error?: string }>;
+  /** The plan's targets with the company's current figures; `save` when they can be edited. */
+  targets?: { current: Record<string, number | null>; save?: (targets: PlanTarget[]) => Promise<{ ok: boolean; error?: string }> };
   /** When set, milestones can be ticked off. */
   toggle?: (period: string, index: number, done: boolean) => Promise<{ ok: boolean; error?: string }>;
 }) {
@@ -69,7 +80,7 @@ export function ActionPlanView({
                   )}
                   <div className="min-w-0">
                     <div className="text-sm font-medium" style={{ color: "var(--foreground)", textDecoration: isDone(key, i, s) ? "line-through" : undefined }}>{s.action}</div>
-                    <div className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>{s.owner} · {s.measure}</div>
+                    <StepMeta step={s} today={today} save={editStep ? (owner, due) => editStep(key, i, owner, due) : undefined} />
                   </div>
                 </li>
               ))}
@@ -77,6 +88,7 @@ export function ActionPlanView({
           </div>
         ))}
       </div>
+      {targets && (targets.save || (content.targets?.length ?? 0) > 0) && <PlanTargets targets={content.targets ?? []} current={targets.current} save={targets.save} />}
       {(content.risks.length > 0 || content.assumptions.length > 0) && (
         <div className="grid sm:grid-cols-2 gap-3 text-sm" style={{ color: "var(--foreground)" }}>
           {content.risks.length > 0 && (

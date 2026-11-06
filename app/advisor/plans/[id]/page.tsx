@@ -9,10 +9,13 @@ import { Pill } from "@/components/ui/Pill";
 import { canViewCompany } from "@/lib/access";
 import { requireRole } from "@/lib/auth/session";
 import { db, schema } from "@/lib/db";
-import { REVIEW_HOURS } from "@/lib/data/action-plans";
+import { planSessionsFor, REVIEW_HOURS } from "@/lib/data/action-plans";
+import { companyPerformance } from "@/lib/data/performance";
+import { LIVE_MINUTES_PER_MONTH, supportMinutesThisMonth } from "@/lib/plan-tracking";
+import { SessionLog } from "@/components/chat/SessionLog";
 import { formatPrice, pricing } from "@/lib/pricing";
 import { getConversation } from "@/lib/data/chat";
-import { advisorMessageAction, advisorStepAction, approvePlanAction, redraftPlanAction, resendPlanEmailAction } from "../actions";
+import { advisorMessageAction, advisorStepAction, advisorStepDetailsAction, advisorTargetsAction, approvePlanAction, logSessionAction, redraftPlanAction, resendPlanEmailAction } from "../actions";
 import { ResendPlanEmail } from "@/components/chat/ResendPlanEmail";
 
 export const maxDuration = 300;
@@ -36,6 +39,10 @@ export default async function AdvisorPlanPage({ params }: { params: Promise<{ id
   const { plan, company } = row;
   const view = (await getConversation(company, plan.conversationId))!;
   const due = plan.submittedAt ? new Date(plan.submittedAt.getTime() + REVIEW_HOURS * 3600 * 1000) : null;
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  const [perf, sessions] = await Promise.all([companyPerformance(company), plan.tier === "supported" ? planSessionsFor(plan.id) : Promise.resolve([])]);
+  const current = Object.fromEntries([...perf.metrics.values()].map((m) => [m.metric, m.value]));
 
   return (
     <div className="px-4 sm:px-8 py-8 w-full space-y-6">
@@ -75,11 +82,18 @@ export default async function AdvisorPlanPage({ params }: { params: Promise<{ id
             <div className="surface p-5 space-y-4">
               {plan.status === "delivered" && <p className="text-sm" style={muted}>Approved {plan.approvedAt?.toLocaleDateString("en-US", { month: "short", day: "numeric" })}{plan.reviewNote ? ` · Note: ${plan.reviewNote}` : ""}</p>}
               {plan.status === "delivered" && <ResendPlanEmail planId={plan.id} resend={resendPlanEmailAction} />}
-              <ActionPlanView content={plan.content} toggle={plan.status === "active" ? advisorStepAction.bind(null, plan.id) : undefined} />
+              <ActionPlanView
+                content={plan.content}
+                today={plan.status === "cancelled" ? null : today}
+                toggle={plan.status === "active" ? advisorStepAction.bind(null, plan.id) : undefined}
+                editStep={plan.status === "active" ? advisorStepDetailsAction.bind(null, plan.id) : undefined}
+                targets={{ current, save: plan.status === "active" ? advisorTargetsAction.bind(null, plan.id) : undefined }}
+              />
             </div>
           )}
           {plan.tier === "supported" && plan.status === "active" && (
             <div className="surface p-5 space-y-4">
+              <SessionLog sessions={sessions.map((x) => ({ id: x.id, kind: x.kind, minutes: x.minutes, heldOn: x.heldOn, note: x.note }))} usedMinutes={supportMinutesThisMonth(sessions, now)} allowanceMinutes={LIVE_MINUTES_PER_MONTH} today={today} log={logSessionAction.bind(null, plan.id)} />
               <AdvisorReply planId={plan.id} send={advisorMessageAction} />
               <RedraftButton planId={plan.id} redraft={redraftPlanAction} label="Update the plan from the conversation" />
             </div>

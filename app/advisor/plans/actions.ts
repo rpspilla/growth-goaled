@@ -8,7 +8,7 @@ import { z } from "zod";
 import { canViewCompany } from "@/lib/access";
 import { requireRole } from "@/lib/auth/session";
 import { db, schema } from "@/lib/db";
-import { approvePlan, postAdvisorMessage, requestPlanUpdate, resendPlanEmail, setStepDone, writePlan, type PlanResult } from "@/lib/data/action-plans";
+import { approvePlan, logPlanSession, postAdvisorMessage, requestPlanUpdate, resendPlanEmail, setPlanTargets, setStepDone, updateStep, writePlan, type PlanResult } from "@/lib/data/action-plans";
 
 /** The signed-in advisor or admin, and the plan's company if they may see it. */
 async function staffPlan(planId: string) {
@@ -25,7 +25,7 @@ async function staffPlan(planId: string) {
   return { user, ...row };
 }
 
-const step = z.object({ action: z.string().max(500), owner: z.string().max(120), measure: z.string().max(300), done: z.boolean().optional() });
+const step = z.object({ action: z.string().max(500), owner: z.string().max(120), measure: z.string().max(300), done: z.boolean().optional(), due: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() });
 const contentSchema = z.object({
   goal: z.string().max(500),
   summary: z.string().max(2000),
@@ -35,6 +35,7 @@ const contentSchema = z.object({
   risks: z.array(z.string().max(300)).max(10),
   assumptions: z.array(z.string().max(300)).max(10),
   tools: z.array(z.object({ name: z.string().max(120), category: z.string().max(60), why: z.string().max(400) })).max(8).optional(),
+  targets: z.array(z.object({ metric: z.string().max(60), target: z.number(), by: z.string().nullable().optional() })).max(6).optional(),
 });
 
 /** Approve a $499 plan (with the advisor's edits): it's delivered to the founder and they're emailed. */
@@ -93,4 +94,34 @@ export async function resendPlanEmailAction(planId: string): Promise<{ ok: true;
   const h = await headers();
   const appUrl = process.env.APP_URL?.replace(/\/$/, "") ?? `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
   return resendPlanEmail(ctx.user, ctx.company, ctx.plan.id, appUrl);
+}
+
+/** Execute & Monitor: a milestone's owner and deadline, from the advisor's side. */
+export async function advisorStepDetailsAction(planId: string, period: string, index: number, owner: string, due: string | null): Promise<PlanResult> {
+  const ctx = await staffPlan(planId);
+  if (!ctx) return { ok: false, error: "Plan not found." };
+  const p = z.enum(["days30", "days60", "days90"]).safeParse(period);
+  if (!p.success || !Number.isInteger(index) || index < 0 || typeof owner !== "string") return { ok: false, error: "That change isn't valid." };
+  const result = await updateStep(ctx.company, ctx.plan.id, p.data, index, { owner, due: typeof due === "string" && due ? due : null });
+  revalidatePath(`/advisor/plans/${ctx.plan.id}`);
+  return result;
+}
+
+export async function advisorTargetsAction(planId: string, targets: unknown): Promise<PlanResult> {
+  const ctx = await staffPlan(planId);
+  if (!ctx) return { ok: false, error: "Plan not found." };
+  const result = await setPlanTargets(ctx.company, ctx.plan.id, targets);
+  revalidatePath(`/advisor/plans/${ctx.plan.id}`);
+  return result;
+}
+
+/** Logs a monthly review or live support on an Execute & Monitor plan. */
+export async function logSessionAction(planId: string, kind: string, minutes: number, heldOn: string, note: string): Promise<PlanResult> {
+  const ctx = await staffPlan(planId);
+  if (!ctx) return { ok: false, error: "Plan not found." };
+  const k = z.enum(["review", "support"]).safeParse(kind);
+  if (!k.success || typeof heldOn !== "string" || typeof note !== "string") return { ok: false, error: "That entry isn't valid." };
+  const result = await logPlanSession(ctx.user, ctx.company, ctx.plan.id, { kind: k.data, minutes: Math.round(Number(minutes)), heldOn, note });
+  revalidatePath(`/advisor/plans/${ctx.plan.id}`);
+  return result;
 }

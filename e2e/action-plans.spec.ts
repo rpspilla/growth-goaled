@@ -30,7 +30,7 @@ test("a founder buys an action plan from the conversation; an advisor approves i
   await page.getByRole("button", { name: "Send" }).click();
   const offer = page.getByRole("region", { name: "Build my action plan" });
   await expect(offer).toContainText("$499");
-  await expect(offer).toContainText("$899");
+  await expect(offer).toContainText("$1,199");
   await expect(offer).toContainText("CRO-reviewed diagnosis");
   await offer.getByRole("button", { name: "Diagnose My Growth" }).click();
   await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}\?checkout=started$/);
@@ -107,15 +107,44 @@ test("a founder buys an action plan from the conversation; an advisor approves i
   await panel.getByRole("link", { name: "Manage billing" }).click();
   await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}\?billing=portal-e2e$/);
 
+  // Execute & Monitor: milestones have deadlines the founder can change, and targets track their numbers.
+  await expect(panel).toContainText(/Due \w{3} \d+/);
+  await panel.getByRole("button", { name: "Edit owner and deadline: Test 30-day milestone" }).click();
+  const edit = panel.getByRole("form", { name: "Edit Test 30-day milestone" });
+  await edit.getByLabel("Owner").fill("Head of Sales");
+  await edit.getByLabel("Due date").fill("2020-01-15");
+  await edit.getByRole("button", { name: "Save" }).click();
+  await expect(panel).toContainText("Head of Sales");
+  await expect(panel).toContainText("Overdue: was due Jan 15");
+  const targets = panel.getByRole("region", { name: "Targets" });
+  await targets.getByRole("button", { name: "+ Add a target" }).click();
+  const add = targets.getByRole("form", { name: "Add a target" });
+  await add.getByLabel("Metric").selectOption({ label: "Win Rate" });
+  await add.getByLabel("Target").fill("25");
+  await add.getByRole("button", { name: "Add" }).click();
+  await expect(targets).toContainText("Win Rate");
+  await expect(targets).toContainText("target 25%");
+  const live = panel.getByRole("region", { name: "Your CRO advisor" });
+  await expect(live).toContainText("0m of 2h used");
+  await expect(live.getByRole("link", { name: "Book your monthly review" })).toHaveAttribute("href", "/advisory/book?kind=monthly&offer=review");
+
   await cro.page.goto("/advisor/plans");
   await cro.page.getByRole("region", { name: /Supported plans/ }).getByRole("link", { name: /Planner Co/ }).click();
   await cro.page.getByLabel("Your message to the founder").fill("Let's talk about a player-coach first.");
   await cro.page.getByRole("button", { name: "Send to founder" }).click();
   await expect(cro.page.getByText("Let's talk about a player-coach first.")).toBeVisible();
+  // The advisor logs live support; it counts against the founder's two hours this month.
+  const log = cro.page.getByRole("form", { name: "Log a session" });
+  await log.getByLabel("Type").selectOption("support");
+  await log.getByLabel("Minutes").fill("45");
+  await log.getByLabel("Note (optional)").fill("Pipeline review");
+  await log.getByRole("button", { name: "Log it" }).click();
+  await expect(cro.page.getByRole("region", { name: "Live time with the founder" })).toContainText("Pipeline review");
 
   await page.goto(supportedUrl);
   await expect(page.getByText("Your advisor · Casey CRO")).toBeVisible();
   await expect(page.getByText("Let's talk about a player-coach first.")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Your CRO advisor" })).toContainText("45m of 2h used, 1h 15m left");
   await founder.ctx.close();
   await cro.ctx.close();
 });

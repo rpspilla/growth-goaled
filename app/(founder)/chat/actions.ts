@@ -7,7 +7,7 @@ import { after } from "next/server";
 import { z } from "zod";
 import { founderContext } from "@/lib/data/founder-context";
 import { attachFiles, FEEDBACK_KINDS, giveFeedback, removeFact, retryLastMessage, sendMessage, startConversation, updateFact, type ChatResult } from "@/lib/data/chat";
-import { createPlanCheckout, PlanCheckoutError, requestPlanUpdate, setStepDone, submitPlan, writePlan } from "@/lib/data/action-plans";
+import { createPlanCheckout, PlanCheckoutError, requestPlanUpdate, setPlanTargets, setStepDone, submitPlan, updateStep, writePlan } from "@/lib/data/action-plans";
 import { processInboxDocument } from "@/lib/data/documents";
 import { stripeConfigured } from "@/lib/stripe";
 
@@ -136,6 +136,27 @@ export async function stepDoneAction(planId: string, period: string, index: numb
   const p = z.enum(["days30", "days60", "days90"]).safeParse(period);
   if (!plan.success || !p.success || !Number.isInteger(index) || index < 0) return { ok: false, error: "That change isn't valid." };
   const result = await setStepDone(company, plan.data, p.data, index, Boolean(done));
+  revalidatePath("/chat", "layout");
+  return result;
+}
+
+/** Execute & Monitor: a milestone's owner and deadline. */
+export async function stepDetailsAction(planId: string, period: string, index: number, owner: string, due: string | null): Promise<ChatResult> {
+  const { company } = await founderCompany();
+  const plan = id.safeParse(planId);
+  const p = z.enum(["days30", "days60", "days90"]).safeParse(period);
+  if (!plan.success || !p.success || !Number.isInteger(index) || index < 0 || typeof owner !== "string") return { ok: false, error: "That change isn't valid." };
+  const result = await updateStep(company, plan.data, p.data, index, { owner, due: typeof due === "string" && due ? due : null });
+  revalidatePath("/chat", "layout");
+  return result;
+}
+
+/** Execute & Monitor: the plan's metric targets. */
+export async function planTargetsAction(planId: string, targets: unknown): Promise<ChatResult> {
+  const { company } = await founderCompany();
+  const plan = id.safeParse(planId);
+  if (!plan.success) return { ok: false, error: "That change isn't valid." };
+  const result = await setPlanTargets(company, plan.data, targets);
   revalidatePath("/chat", "layout");
   return result;
 }

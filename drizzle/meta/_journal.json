@@ -169,6 +169,13 @@
       "when": 1793911496692,
       "tag": "0023_payment_links",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793977304935,
+      "tag": "0024_plan_sessions",
+      "breakpoints": true
     }
   ]
 }
