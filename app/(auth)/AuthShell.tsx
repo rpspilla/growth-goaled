@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LegalLinks } from "@/components/legal/LegalLinks";
 import type { ReactNode } from "react";
 import { StagingBadge } from "@/components/shell/Shell";
 
@@ -47,7 +48,10 @@ export function AuthShell({ brand, children }: { brand: ReactNode; children: Rea
         <div className="relative flex-1 flex flex-col justify-center max-w-xl pt-6 lg:py-0">{brand}</div>
       </div>
       <div className="flex items-start lg:items-center justify-center px-6 sm:px-12 py-8 lg:py-14">
-        <div className="w-full max-w-md" style={{ animation: "fadeInUp 0.35s ease-out" }}>{children}</div>
+        <div className="w-full max-w-md" style={{ animation: "fadeInUp 0.35s ease-out" }}>
+          {children}
+          <LegalLinks className="mt-10 justify-center" />
+        </div>
       </div>
     </div>
   );

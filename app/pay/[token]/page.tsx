@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CheckCircle2, Lock } from "lucide-react";
 import { HumanPresence } from "@/components/brand/HumanPresence";
+import { LegalLinks } from "@/components/legal/LegalLinks";
 import { confirmLinkCheckout, linkByToken } from "@/lib/data/payment-links";
 import { formatPrice } from "@/lib/pricing";
 import { stripeConfigured } from "@/lib/stripe";
@@ -49,12 +50,13 @@ export default async function PayPage({ params, searchParams }: { params: Promis
               <button type="submit" className="btn btn-primary w-full inline-flex items-center justify-center gap-2">
                 <Lock size={16} aria-hidden /> Pay {amount}
               </button>
-              <p className="text-xs text-center" style={{ color: "var(--muted-foreground)" }}>Secure card payment through Stripe.</p>
+              <p className="text-xs text-center" style={{ color: "var(--muted-foreground)" }}>Secure card payment through Stripe. By paying you agree to our <a href="/terms" className="link">terms</a> and <a href="/refunds" className="link">refund policy</a>.</p>
               {error && <p role="alert" className="text-sm text-center" style={{ color: "var(--red)" }}>{error}</p>}
             </form>
           )}
         </section>
         <HumanPresence />
+        <LegalLinks />
       </div>
     </main>
   );

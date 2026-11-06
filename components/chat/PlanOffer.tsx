@@ -109,6 +109,9 @@ export function PlanOffer({ conversationId, planPrice, supportedPrice, buy, book
           {CUSTOM.cta}
         </a>
       </div>
+      <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+        Payments are processed securely by Stripe. By buying you agree to our <a href="/terms" className="link">terms</a> and <a href="/refunds" className="link">refund policy</a>. Execute &amp; Monitor renews monthly until you cancel.
+      </p>
       {error && <p role="alert" className="text-sm" style={{ color: "var(--red)" }}>{error}</p>}
     </section>
   );

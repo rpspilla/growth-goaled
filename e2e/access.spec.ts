@@ -43,6 +43,14 @@ test("signed-out visitors go to sign-in", async ({ page }) => {
   await page.goto("/data-use");
   await expect(page.getByRole("heading", { name: "How we use your data" })).toBeVisible();
   await expect(page.getByText(/anonymized, aggregated form/)).toBeVisible();
+  // So are the terms, privacy and refund policies, and the sign-in page links to them.
+  for (const [path, heading] of [["/terms", "Terms of service"], ["/privacy", "Privacy policy"], ["/refunds", "Refund policy"]]) {
+    await page.goto(path);
+    await expect(page, path).toHaveURL(new RegExp(`${path}$`));
+    await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+  }
+  await page.goto("/sign-in");
+  for (const name of ["Terms", "Privacy", "Refunds"]) await expect(page.getByRole("navigation", { name: "Legal" }).getByRole("link", { name })).toBeVisible();
 });
 
 test("founders can't open advisor pages", async ({ browser }) => {
