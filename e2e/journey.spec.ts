@@ -144,11 +144,11 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await founder.page.goto("/overview");
 
   // --- Founder: Overview → Library → questionnaire → free Snapshot → $149 purchase → Data ---
+  // Before buying, there's no step-by-step journey: just the conversation-first menu.
   const steps = founder.page.getByRole("navigation", { name: "Steps" });
-  await expect(steps.getByText("Unlocks when you buy an assessment").first()).toBeVisible();
-  await expect(steps.getByRole("link", { name: /Data/ })).toHaveCount(0);
-  await founder.page.getByRole("link", { name: "Pick a question to answer →" }).click();
-  await expect(founder.page).toHaveURL(/\/library$/);
+  await expect(steps).toHaveCount(0);
+  await expect(founder.page.getByRole("navigation", { name: "Menu" }).getByRole("link", { name: "Conversations" })).toBeVisible();
+  await founder.page.goto("/library");
   const leakCard = founder.page.locator("article", { has: founder.page.getByRole("heading", { name: "How do I fix churn?" }) });
   // No "Recommended" tag for now, and the owner's order: sales motion, hiring plan, churn.
   await expect(founder.page.getByText("Recommended for you")).toHaveCount(0);

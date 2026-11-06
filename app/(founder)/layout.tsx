@@ -16,21 +16,24 @@ export default async function FounderLayout({ children }: { children: ReactNode 
     const def = getUseCase(u.useCase);
     return def ? [{ id: def.id, label: def.shortTitle }] : [];
   });
+  const legacy = options.length > 0;
 
   return (
     <Shell
       sidebar={
         <UseCaseSidebar
-          steps={stepStates(active && { useCase: active.def.id, status: active.status }, { overview: false })}
+          // The step-by-step assessment journey is only for founders who bought the retired $149 assessment.
+          steps={legacy ? stepStates(active && { useCase: active.def.id, status: active.status }, { overview: false }) : []}
           options={options}
           activeUseCase={active?.useCase ?? null}
           select={selectUseCase}
           libraryHint="Pick a growth question"
+          extraLabel={legacy ? "Company" : "Your growth"}
           extra={[
             { href: "/overview", label: "Overview" },
             { href: "/chat", label: "Conversations" },
             { href: "/performance", label: "Performance" },
-            { href: "/assessments", label: "All assessments" },
+            ...(legacy ? [{ href: "/assessments", label: "All assessments" }] : []),
             { href: "/profile", label: "Company profile" },
           ]}
         />

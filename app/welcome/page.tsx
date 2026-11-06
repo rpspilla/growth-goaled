@@ -26,9 +26,9 @@ export default async function WelcomePage() {
         askCompany ? (
           <>
             <div className="text-sm font-semibold mb-4" style={{ color: "#3DDC97" }}>Step 2 of 3 · Your company</div>
-            <h1 className="font-display text-4xl sm:text-5xl font-normal leading-[1.08] text-white">A few basics, then your first growth question.</h1>
-            <p className="text-lg mt-5 mb-8" style={{ color: "#B7C5D4" }}>Your stage, vertical and team size let us compare you with similar companies. Everything else can wait until after your free Snapshot.</p>
-            <Points items={["Next: pick the growth question you want answered", "Then: a few questions and your free Growth Snapshot", "Nothing is charged unless you choose an action plan"]} />
+            <h1 className="font-display text-4xl sm:text-5xl font-normal leading-[1.08] text-white">A few basics, then your first conversation.</h1>
+            <p className="text-lg mt-5 mb-8" style={{ color: "#B7C5D4" }}>Your stage, vertical and team size shape every recommendation. Everything else can come up in the conversation.</p>
+            <Points items={["Next: ask the growth question on your mind", "Then: a free recommendation in about a minute", "Nothing is charged unless you choose a plan"]} />
           </>
         ) : (
           <>

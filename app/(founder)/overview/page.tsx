@@ -169,7 +169,9 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         </div>
       )}
 
-      {/* The focal point: the main finding, or the one thing to do next. */}
+      {/* The focal point for founders on the retired assessment journey: the main finding, or the next step. New
+          founders start from the conversation starters above instead. */}
+      {(view || useCases.length > 0) && (
       <section aria-label="Main finding">
         {view && active ? (
           <div className="surface p-6 sm:p-8" style={{ borderColor: "var(--green)", boxShadow: "0 0 0 1px var(--green)" }}>
@@ -204,6 +206,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
           </div>
         )}
       </section>
+      )}
 
       {(headline.length > 0 || useCases.length > 0) && (
       <Section

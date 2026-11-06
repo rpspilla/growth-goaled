@@ -10,7 +10,8 @@ export type ExtraLink = { href: string; label: string };
 /**
  * Founder sidebar: which question you're working on, the steps to answer it (with what's next and
  * what's locked), then company pages that are always available. `basePath` re-roots the steps so the
- * advisor's company view can show the same journey under /advisor/companies/[id].
+ * advisor's company view can show the same journey under /advisor/companies/[id]. With no steps
+ * (founders who haven't bought the retired $149 assessment) it's just the company pages.
  */
 export function UseCaseSidebar({
   steps,
@@ -20,6 +21,7 @@ export function UseCaseSidebar({
   select,
   libraryHint,
   extra = [],
+  extraLabel = "Company",
 }: {
   steps: StepState[];
   basePath?: string;
@@ -28,11 +30,15 @@ export function UseCaseSidebar({
   select: (formData: FormData) => Promise<void>;
   libraryHint?: string;
   extra?: ExtraLink[];
+  /** Heading over the always-available links. */
+  extraLabel?: string;
 }) {
   const hrefFor = (path: string) => (basePath ? (path === "/overview" ? basePath : `${basePath}${path}`) : path);
 
+  const journey = steps.length > 0;
   return (
     <>
+      {journey && (
       <div className="px-4 pt-4 pb-4 border-b" style={{ borderColor: "#1E3347" }}>
         <div className="text-xs font-medium mb-1.5" style={{ color: "#8FA3B8" }}>Working on</div>
         {options.length > 1 ? (
@@ -58,9 +64,12 @@ export function UseCaseSidebar({
           </div>
         )}
       </div>
+      )}
 
-      <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Steps">
+      <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label={journey ? "Steps" : "Menu"}>
         {/* Section labels look like labels (small caps, muted), not like smaller nav items. */}
+        {journey && (
+        <>
         <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#8FA3B8" }}>Your plan</div>
         <div className="space-y-0.5">
           {steps.map((step, i) => {
@@ -117,13 +126,15 @@ export function UseCaseSidebar({
             );
           })}
         </div>
+        </>
+        )}
         {extra.length > 0 && (
           <>
-            <div className="px-3 pt-6 pb-2 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#8FA3B8" }}>Company</div>
+            <div className={`px-3 ${journey ? "pt-6" : ""} pb-2 text-[11px] font-semibold uppercase tracking-wider`} style={{ color: "#8FA3B8" }}>{extraLabel}</div>
             <div className="space-y-0.5">
               {extra.map((l) => (
                 <NavLink key={l.href} href={l.href}>
-                  {(active) => <span className="font-medium pl-8" style={{ color: active ? "#fff" : undefined }}>{l.label}</span>}
+                  {(active) => <span className={`font-medium ${journey ? "pl-8" : ""}`} style={{ color: active ? "#fff" : undefined }}>{l.label}</span>}
                 </NavLink>
               ))}
             </div>
