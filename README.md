@@ -199,6 +199,12 @@ Advisor → **Payment links** (`/advisor/payment-links`, advisors and admins; `l
 - **Advisors**: the company page's People section does the same for the companies they advise (admins: any).
 - **Rules** (`lib/data/team.ts`): advisor/admin emails can't be invited (they already see their companies); someone already in another company can't join a second one unless they're in `MULTI_COMPANY_FOUNDERS`. Invites carry the role they grant (`invites.member_role`, migration `0025_invite_member_role.sql`): advisor "Invite a founder" invites create the company and grant owner; teammate invites grant member.
 
+### Documents
+
+- **Founders**: Documents (`/documents`, in the sidebar) keeps everything on file for the company: (i) **Action plans** on top (every paid plan, newest first, opening at the plan in its conversation), then (ii) **Data and input materials**: every uploaded file, whether shared in a conversation (linked) or on the data step, with type, size, date, read status and **Download**.
+- **Advisors**: the same page under each company they manage (`/advisor/companies/<id>/documents`, "Documents" in the company sidebar); plans open the advisor plan page.
+- **Downloads** (`/api/files/<id>`) stream the private blob as an attachment, only to the company's founders/members or its advisor (admins: any); anyone else gets a 404. Data: `lib/data/document-library.ts`; page: `components/documents/DocumentLibrary.tsx`.
+
 ### Pricing and the founder journey
 
 Self-service model (owner decision, Oct 2026), replacing the $1 use case selection charge:

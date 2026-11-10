@@ -25,7 +25,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
           <div className="text-sm font-semibold text-white mt-2">{company.name}</div>
           <div className="text-xs" style={{ color: "#5A7A96" }}>Founder&apos;s steps</div>
         </div>
-        <UseCaseSidebar steps={steps} basePath={`/advisor/companies/${company.id}`} options={options} activeUseCase={active?.useCase ?? null} select={selectUseCase} />
+        <UseCaseSidebar steps={steps} basePath={`/advisor/companies/${company.id}`} options={options} activeUseCase={active?.useCase ?? null} select={selectUseCase} extra={[{ href: `/advisor/companies/${company.id}/documents`, label: "Documents" }]} />
       </aside>
       <div className="flex-1 min-w-0">{children}</div>
     </div>
