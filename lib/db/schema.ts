@@ -187,6 +187,8 @@ export const invites = pgTable(
     tokenHash: text("token_hash").notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    // What the invitee joins as: the founder of a new company (owner), or a teammate (member)
+    memberRole: memberRole("member_role").notNull().default("owner"),
     ...timestamps,
   },
   (t) => [uniqueIndex("invites_token_hash_idx").on(t.tokenHash)],

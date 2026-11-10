@@ -45,6 +45,22 @@ The link works once and expires in ${p.expiresInDays} days.`;
   return { subject, text, html };
 }
 
+/** To a teammate invited into an existing company (by a founder or the company's advisor). */
+export function teammateInviteEmail(p: { inviterName: string; companyName: string; link: string; expiresInDays: number }) {
+  const subject = `${p.inviterName} invited you to ${p.companyName} on Growth Goaled`;
+  const text = `${p.inviterName} invited you to join ${p.companyName} on Growth Goaled, to see its conversations, recommendations and action plans.
+
+Join here: ${p.link}
+
+The link works once and expires in ${p.expiresInDays} days.`;
+  const html = `<div style="font-family:Inter,Arial,sans-serif;color:#0D1B2A;max-width:480px">
+<p style="font-size:15px">${escape(p.inviterName)} invited you to join <strong>${escape(p.companyName)}</strong> on Growth Goaled, to see its conversations, recommendations and action plans.</p>
+<p><a href="${escape(p.link)}" style="display:inline-block;background:#155A3C;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600">Join ${escape(p.companyName)}</a></p>
+<p style="font-size:12px;color:#64748B">The link works once and expires in ${p.expiresInDays} days.</p>
+</div>`;
+  return { subject, text, html };
+}
+
 /** To the owner: a founder didn't find their question in the library ("Don't see what you're looking for?"). */
 export function suggestionEmail(p: { companyName: string; founderName: string; email: string; decision: string }) {
   const subject = `New growth question request from ${p.companyName}`;

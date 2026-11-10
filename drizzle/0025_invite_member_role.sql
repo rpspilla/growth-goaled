@@ -1,0 +1,1 @@
+ALTER TABLE "invites" ADD COLUMN "member_role" "member_role" DEFAULT 'owner' NOT NULL;

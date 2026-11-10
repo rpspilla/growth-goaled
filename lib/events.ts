@@ -17,6 +17,8 @@ export type EventName =
   | "payment_link_paid"
   | "billing_portal_opened"
   | "plan_session_logged"
+  | "teammate_invited"
+  | "teammate_removed"
   | "advisor_message"
   | "conversation_message"
   | "recommendation_feedback"

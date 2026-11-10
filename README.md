@@ -193,6 +193,12 @@ Advisor → **Payment links** (`/advisor/payment-links`, advisors and admins; `l
 - **Live CRO time**: the advisor logs monthly progress reviews and live support on the plan page (`plan_sessions`, migration `0024_plan_sessions.sql`). The founder sees "X of 2h used this month" (live support only; reviews don't count) and the last review, with "Book your monthly review" (`ADVISORY_MONTHLY_BOOKING_URL`, else `ADVISORY_BOOKING_URL`) and "Book live support".
 - **Billing**: "Manage billing" opens Stripe's billing portal for the company's subscription (`/billing`): cancel at the end of the paid month, change card, invoices. Configure the portal in Stripe (Settings → Billing → Customer portal).
 
+### Teams: several people on one company
+
+- **Founders**: Team (`/team`) lists who has access (owner or member) and invites waiting to be accepted, and invites a teammate by email. The teammate gets a single-use link (`/invite/<token>`, 14 days), signs in with that email and joins as a **member**; they see everything the company has. Owners remove people; members can't. The last owner stays, and nobody removes themselves.
+- **Advisors**: the company page's People section does the same for the companies they advise (admins: any).
+- **Rules** (`lib/data/team.ts`): advisor/admin emails can't be invited (they already see their companies); someone already in another company can't join a second one unless they're in `MULTI_COMPANY_FOUNDERS`. Invites carry the role they grant (`invites.member_role`, migration `0025_invite_member_role.sql`): advisor "Invite a founder" invites create the company and grant owner; teammate invites grant member.
+
 ### Pricing and the founder journey
 
 Self-service model (owner decision, Oct 2026), replacing the $1 use case selection charge:

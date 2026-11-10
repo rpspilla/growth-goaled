@@ -31,11 +31,12 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
   if (!invite) return <Problem title="Invite not found." body="This link isn't valid. Check you copied the whole link from your email." />;
   if (invite.status === "accepted") return <Problem title="Invite already used." body="Sign in with your email to continue." />;
   if (invite.status === "expired") {
-    return <Problem title="This invite has expired." body="Invites last 14 days. Ask your advisor to resend it." />;
+    return <Problem title="This invite has expired." body="Invites last 14 days. Ask whoever invited you to send a new one." />;
   }
 
-  const inviter = invite.inviterName ?? "Your advisor";
-  const subtitle = `${inviter} has set up ${invite.companyName} on Growth Goaled.`;
+  const teammate = invite.memberRole === "member";
+  const inviter = invite.inviterName ?? (teammate ? "A teammate" : "Your advisor");
+  const subtitle = teammate ? `${inviter} invited you to join ${invite.companyName} on Growth Goaled.` : `${inviter} has set up ${invite.companyName} on Growth Goaled.`;
   const here = `/invite/${token}`;
 
   if (!user) {

@@ -24,13 +24,13 @@ test("sign-up basics carry through, and every growth question opens its own page
   await page.locator("#aes").fill("10");
   await page.locator("#bdrs").fill("4");
   await page.locator("#cs").fill("1");
-  await page.getByRole("button", { name: "Continue to growth questions" }).click();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
   // "Other" needs a name; what was typed is kept.
   await expect(page.getByText("Tell us your vertical.")).toBeVisible();
   await expect(page.locator("#aes")).toHaveValue("10");
   await expect(page.locator("#companyName")).toHaveValue("Deer in Headlights");
   await page.locator("#verticalOther").fill("Customer experience");
-  await page.getByRole("button", { name: "Continue to growth questions" }).click();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
   // Sign-up lands on the main entry: the conversation starters.
   await expect(page).toHaveURL(/\/overview\?welcome=1$/);
   await expect(page.getByText(/You're set up, Deer in Headlights\. Ask your first question below\./)).toBeVisible();

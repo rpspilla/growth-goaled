@@ -33,7 +33,7 @@ export function WelcomeForm({ isFounder, askCompany, defaultName }: { isFounder:
         <input id="title" name="title" defaultValue={state.values?.title} placeholder={isFounder ? "CEO & Co-founder" : "Lead Advisor"} autoComplete="organization-title" required={!isFounder} className="field" {...invalid("title")} />
       </Field>
       <button type="submit" disabled={pending} className="btn btn-primary btn-lg w-full">
-        {pending ? "Saving…" : askCompany ? "Continue to growth questions" : isFounder ? "Continue" : "Continue to Portfolio"}
+        {pending ? "Saving…" : isFounder ? "Continue" : "Continue to Portfolio"}
       </button>
     </form>
   );

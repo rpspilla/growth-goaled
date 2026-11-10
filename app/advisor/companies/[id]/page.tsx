@@ -5,7 +5,9 @@ import { latestMetrics, portfolioRows, userName } from "@/lib/data/portfolio";
 import { formatMetric, type MetricKey } from "@/lib/metrics";
 import { getUseCase, targetSummary } from "@/lib/use-cases";
 import { STEPS, journeyStage } from "@/lib/use-cases/steps";
-import { updateHealth, updateSummary } from "./actions";
+import { cancelCompanyInviteAction, inviteCompanyMemberAction, removeCompanyMemberAction, updateHealth, updateSummary } from "./actions";
+import { TeamPanel } from "@/components/team/TeamPanel";
+import { companyPeople } from "@/lib/data/team";
 import { companyContext } from "./context";
 
 const CARDS: MetricKey[] = ["arr", "arr_growth", "nrr", "acv"];
@@ -20,6 +22,7 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
     userName(company.advisorSummaryBy),
     listAdvisoryRequests([company.id]),
   ]);
+  const people = await companyPeople(company.id);
   const base = `/advisor/companies/${company.id}`;
 
   return (
@@ -127,6 +130,24 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
         meta={company.advisorSummaryAt ? `${summaryBy ?? "Advisor"} · ${company.advisorSummaryAt.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : null}
         save={updateSummary}
       />
+
+      {!company.isSample && (
+        <section aria-label="People" className="rounded-xl border p-5 space-y-3" style={card}>
+          <div>
+            <h2 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>People</h2>
+            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Who at {company.name} has access. Invite a co-founder or teammate; they join as a member and see everything the company has.</p>
+          </div>
+          <TeamPanel
+            members={people.members.map((m) => ({ ...m, since: m.since.toISOString() }))}
+            invites={people.invites}
+            meId={null}
+            canRemove
+            invite={inviteCompanyMemberAction.bind(null, company.id)}
+            cancel={cancelCompanyInviteAction.bind(null, company.id)}
+            remove={removeCompanyMemberAction.bind(null, company.id)}
+          />
+        </section>
+      )}
     </div>
   );
 }

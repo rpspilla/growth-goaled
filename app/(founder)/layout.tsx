@@ -35,6 +35,7 @@ export default async function FounderLayout({ children }: { children: ReactNode 
             { href: "/performance", label: "Performance" },
             ...(legacy ? [{ href: "/assessments", label: "All assessments" }] : []),
             { href: "/profile", label: "Company profile" },
+            { href: "/team", label: "Team" },
           ]}
         />
       }

@@ -7,6 +7,7 @@ import type { User } from "@/lib/db/schema";
 import { generateInviteToken, hashInviteToken, INVITE_TTL_DAYS, inviteStatus, sameEmail } from "@/lib/invites";
 import { inviteEmail, sendEmail } from "@/lib/email";
 import { track } from "@/lib/events";
+import { canAddCompanies } from "@/lib/multi-company";
 import { getFounderCompany } from "./companies";
 
 export type InviteResult =
@@ -148,6 +149,7 @@ export async function getInviteByToken(token: string) {
     companyName: row.company.name,
     inviterName: row.inviter?.name ?? null,
     status: inviteStatus(row.invite),
+    memberRole: row.invite.memberRole,
   };
 }
 
@@ -164,7 +166,8 @@ export async function acceptInvite(user: User, token: string): Promise<AcceptRes
   }
   if (user.role !== "founder") return { ok: false, error: "Invites are for founder accounts." };
   const existing = await getFounderCompany(user);
-  if (existing && existing.id !== invite.companyId) {
+  // A founder belongs to one company, unless they're allowed several (MULTI_COMPANY_FOUNDERS).
+  if (existing && existing.id !== invite.companyId && !canAddCompanies(user.email)) {
     return { ok: false, error: `Your account already belongs to ${existing.name}.` };
   }
 
@@ -176,10 +179,10 @@ export async function acceptInvite(user: User, token: string): Promise<AcceptRes
     .returning({ id: schema.invites.id });
   if (claimed.length === 0) return { ok: false, error: "This invite has already been used." };
 
-  if (!existing) {
+  if (!existing || existing.id !== invite.companyId) {
     await db
       .insert(schema.companyMembers)
-      .values({ companyId: invite.companyId, userId: user.id, memberRole: "owner" })
+      .values({ companyId: invite.companyId, userId: user.id, memberRole: invite.memberRole })
       .onConflictDoNothing();
   }
   await track("invite_accepted", { userId: user.id, companyId: invite.companyId });

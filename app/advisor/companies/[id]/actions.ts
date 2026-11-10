@@ -14,6 +14,7 @@ import { clearOverride, setOverride } from "@/lib/data/benchmark-library";
 import { chooseFigure, enterFigure, type FigureResult } from "@/lib/data/figures";
 import { parseFigure } from "@/lib/figures";
 import { isMetricKey } from "@/lib/metrics";
+import { cancelTeammateInvite, inviteTeammate, removeTeammate, type TeamResult } from "@/lib/data/team";
 
 async function managed(companyId: string) {
   const user = await requireRole(["advisor", "admin"]);
@@ -113,4 +114,31 @@ export async function enterFigureForCompany(companyId: string, metric: string, r
   const result = await enterFigure(ctx.user, ctx.company, metric, value);
   if (result.ok) refresh(companyId);
   return result;
+}
+
+/** Invites someone into this company as a member (they sign in with the link). */
+export async function inviteCompanyMemberAction(companyId: string, email: string): Promise<TeamResult> {
+  const ctx = await managed(companyId);
+  if (!ctx) return { ok: false, error: "Company not found." };
+  const r = await inviteTeammate(ctx.user, ctx.company.id, typeof email === "string" ? email : "");
+  refresh(ctx.company.id);
+  return r;
+}
+
+export async function cancelCompanyInviteAction(companyId: string, inviteId: string): Promise<TeamResult> {
+  const ctx = await managed(companyId);
+  const id = z.uuid().safeParse(inviteId);
+  if (!ctx || !id.success) return { ok: false, error: "Invite not found." };
+  const r = await cancelTeammateInvite(ctx.user, ctx.company.id, id.data);
+  refresh(ctx.company.id);
+  return r;
+}
+
+export async function removeCompanyMemberAction(companyId: string, userId: string): Promise<TeamResult> {
+  const ctx = await managed(companyId);
+  const id = z.uuid().safeParse(userId);
+  if (!ctx || !id.success) return { ok: false, error: "Person not found." };
+  const r = await removeTeammate(ctx.user, ctx.company.id, id.data);
+  refresh(ctx.company.id);
+  return r;
 }
