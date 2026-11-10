@@ -11,7 +11,7 @@ import { founderAssessment } from "@/lib/data/assessments";
 import { founderContext } from "@/lib/data/founder-context";
 import { dimensionViews } from "@/lib/data/dimensions";
 import { track } from "@/lib/events";
-import { advisoryHref, formatPrice, pricing } from "@/lib/pricing";
+import { advisoryHref } from "@/lib/pricing";
 import { getUseCase, targetSummary } from "@/lib/use-cases";
 import { CommitPlanButton } from "@/components/progress/CommitPlanButton";
 import { commitPlanAction } from "../progress/actions";
@@ -47,7 +47,7 @@ export default async function ResultsPage() {
         advisory={
           <div key="advisory" className="space-y-4">
             <HowWeWorkDetails approach={howWeWork({ useCase: def.id, profile: await getIntakeAnswers(company), revenueBand: company.revenueBand })} />
-            <AdvisoryOffer kind={state.view.advisor} price={formatPrice(pricing().advisoryFromCents)} href={advisoryHref(def.id, state.view.advisor)} target={targetSummary(active.objective)} />
+            <AdvisoryOffer kind={state.view.advisor} href={advisoryHref(def.id, state.view.advisor)} target={targetSummary(active.objective)} />
           </div>
         }
         reviewHref={advisoryHref(def.id, "review")}

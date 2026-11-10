@@ -2,7 +2,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { AdvisoryRequestForm } from "@/components/use-cases/AdvisoryRequestForm";
 import { founderContext } from "@/lib/data/founder-context";
-import { advisoryBookingUrl, formatPrice, pricing } from "@/lib/pricing";
+import { advisoryBookingUrl } from "@/lib/pricing";
 import { getUseCase } from "@/lib/use-cases";
 import { requestAdvisory } from "./actions";
 
@@ -15,7 +15,6 @@ export default async function AdvisoryPage({ searchParams }: { searchParams: Pro
   const useCase = getUseCase(params.use_case ?? "");
   const kind = params.kind === "monthly" ? "monthly" : "review";
   const booking = advisoryBookingUrl(kind);
-  const price = formatPrice(pricing().advisoryFromCents);
 
   return (
     <div className="p-4 sm:p-8 max-w-3xl">
@@ -23,7 +22,7 @@ export default async function AdvisoryPage({ searchParams }: { searchParams: Pro
       <PageHeader
         eyebrow="Optional"
         title={kind === "monthly" ? "Monthly executive advisor call" : "Review with an executive advisor"}
-        subtitle={`${kind === "monthly" ? "A monthly working call with an executive-level Growth Goaled advisor to keep your plan on schedule" : "A working session with an executive-level Growth Goaled advisor"}${useCase ? ` on your ${useCase.shortTitle} results` : ""}. From ${price}.`}
+        subtitle={`${kind === "monthly" ? "A monthly working call with an executive-level Growth Goaled advisor to keep your plan on schedule" : "A working session with an executive-level Growth Goaled advisor"}${useCase ? ` on your ${useCase.shortTitle} results` : ""}.`}
       />
       <div className="rounded-xl border p-5 sm:p-6 mb-6" style={card}>
         <div className="text-sm font-semibold mb-2" style={{ color: "var(--foreground)" }}>In the session we&apos;ll</div>
@@ -34,7 +33,7 @@ export default async function AdvisoryPage({ searchParams }: { searchParams: Pro
           <li>• Turn it into an execution plan for the next 90 days</li>
         </ul>
         <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-          Sessions start at {price}, depending on scope; we confirm the price before anything is booked. Your assessment stays fully available either way.
+          We&apos;ll confirm the details with you before anything is booked. Your assessment stays fully available either way.
         </p>
       </div>
       <div className="rounded-xl border p-5 sm:p-6" style={card}>

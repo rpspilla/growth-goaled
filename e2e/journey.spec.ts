@@ -412,7 +412,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
 
   // --- Complete data: a clear plan and a monthly executive advisor call, shown once ---
   await expect(founder.page.getByRole("link", { name: "Book your monthly call →" })).toHaveCount(1);
-  await expect(founder.page.getByLabel("Executive advisor")).toContainText("from $750");
+  await expect(founder.page.getByLabel("Executive advisor")).not.toContainText("$");
   await expect(founder.page.getByLabel("Executive advisor")).toContainText("monthly call with an executive-level advisor");
   await founder.page.getByRole("link", { name: "Book your monthly call →" }).click();
   await expect(founder.page).toHaveURL(/\/advisory\?use_case=growth_leak&kind=monthly/);

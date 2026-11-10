@@ -2,7 +2,7 @@
  * The advisor offer at the end of results. With gaps, a review of them with an executive-level
  * advisor; with complete data, a monthly call to keep the plan on schedule. Never gates the results.
  */
-export function AdvisoryOffer({ kind, price, href, target }: { kind: "review" | "monthly"; price: string; href: string; target: string | null }) {
+export function AdvisoryOffer({ kind, href, target }: { kind: "review" | "monthly"; href: string; target: string | null }) {
   const copy =
     kind === "review"
       ? {
@@ -17,7 +17,7 @@ export function AdvisoryOffer({ kind, price, href, target }: { kind: "review" | 
         };
   return (
     <aside className="rounded-xl p-5 sm:p-6 border-l-4" style={{ background: "var(--navy)", borderLeftColor: "var(--green)" }} aria-label="Executive advisor">
-      <div className="label mb-2" style={{ color: "var(--green)" }}>Optional · from {price}</div>
+      <div className="label mb-2" style={{ color: "var(--green)" }}>Optional</div>
       <p className="text-base font-medium mb-1" style={{ color: "#E2EAF4" }}>{copy.title}</p>
       <p className="text-sm mb-4" style={{ color: "#9BB3CA" }}>{copy.body}</p>
       <a href={href} className="inline-block px-4 py-2 rounded-lg text-sm font-semibold" style={{ background: "var(--green)", color: "#fff" }}>
