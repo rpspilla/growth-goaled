@@ -99,7 +99,7 @@ Founder (`/app/...` layout with founder sidebar + progress indicator):
 `/welcome` · `/intake/[section]` · `/upload` · `/processing` · `/dashboard` · `/benchmark` · `/baseline` · `/icp` · `/channels` · `/hiring` · `/questions` · `/deliverables`
 
 Advisor (`/advisor/...` layout with advisor sidebar):
-`/advisor/portfolio` · `/advisor/unassigned` · `/advisor/companies/[id]` · `/advisor/review` · `/advisor/review/[deliverableId]` · `/advisor/benchmarks` · `/advisor/rubrics` · `/advisor/registers` · `/advisor/settings`
+`/advisor/portfolio` · `/advisor/unassigned` · `/advisor/companies/[id]` · `/advisor/review` · `/advisor/review/[deliverableId]` · `/advisor/benchmarks` · `/advisor/registers` · `/advisor/settings`
 
 Shared: `/sign-in`, `/sign-up`, `/invite/[token]`, `/sample` (read-only Acme AI demo, no login), Source Trail as a side panel component available on every deliverable page.
 

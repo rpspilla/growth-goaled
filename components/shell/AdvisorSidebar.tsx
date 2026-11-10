@@ -23,7 +23,6 @@ const ADVISOR_NAV: { title: string; items: Item[] }[] = [
     title: "Method",
     items: [
       { href: "/advisor/benchmark-library", label: "Benchmark library" },
-      { href: "/advisor/rubrics", label: "Score rubrics" },
       { href: "/advisor/settings", label: "Settings" },
     ],
   },
