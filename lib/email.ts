@@ -7,7 +7,8 @@ type SendResult = { sent: true } | { sent: false; reason: string };
  * sent and callers fall back to showing the link to the advisor.
  */
 export async function sendEmail(msg: { to: string; subject: string; html: string; text: string }): Promise<SendResult> {
-  const key = process.env.RESEND_API_KEY;
+  // Trimmed: a key pasted into the host with a stray space or line break is otherwise rejected (401).
+  const key = process.env.RESEND_API_KEY?.trim().replace(/^["']|["']$/g, "");
   if (!key) return { sent: false, reason: "Email isn't configured yet (RESEND_API_KEY)." };
   const from = process.env.EMAIL_FROM ?? "Growth Goaled <invites@growthgoaled.com>";
 
