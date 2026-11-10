@@ -137,6 +137,8 @@ test("a founder talks a decision through and gets a recommendation card", async 
   }
   const nudge = page.getByRole("complementary", { name: "Talk to Growth Goaled" });
   await expect(nudge.getByRole("link", { name: "Book a free call" })).toHaveAttribute("href", "/advisory/book?kind=review&offer=nudge");
+  await expect(nudge.getByRole("link", { name: "Schedule time with an advisor" })).toHaveAttribute("href", "https://calendly.com/ryan-spillane-growthgoaled/30min");
+  await expect(nudge.getByText("See the plans")).toHaveCount(0);
   await expect(conversation).toContainText("talk this through with someone at Growth Goaled");
   await page.goto("/overview");
   await expect(page.getByText(/Pick up where you left off/)).toBeVisible();

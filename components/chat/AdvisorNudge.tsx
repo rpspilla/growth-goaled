@@ -1,8 +1,11 @@
 import { CalendarClock } from "lucide-react";
 import { FounderAvatar } from "@/components/brand/HumanPresence";
 
-/** After six exchanges without a plan: a gentle pointer to a call with Growth Goaled, or the plans. */
-export function AdvisorNudge({ bookHref, plansHref }: { bookHref: string; plansHref: string | null }) {
+/** Where founders pick a time with an advisor straight away. */
+export const ADVISOR_CALENDLY = "https://calendly.com/ryan-spillane-growthgoaled/30min";
+
+/** After six exchanges without a plan: a gentle pointer to a call with Growth Goaled. */
+export function AdvisorNudge({ bookHref }: { bookHref: string }) {
   return (
     <aside aria-label="Talk to Growth Goaled" className="rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap" style={{ background: "var(--green-muted)" }}>
       <FounderAvatar size={32} />
@@ -13,11 +16,9 @@ export function AdvisorNudge({ bookHref, plansHref }: { bookHref: string; plansH
         <a href={bookHref} className="btn btn-primary text-sm inline-flex items-center gap-1.5">
           <CalendarClock size={16} aria-hidden /> Book a free call
         </a>
-        {plansHref && (
-          <a href={plansHref} className="btn btn-secondary text-sm">
-            See the plans
-          </a>
-        )}
+        <a href={ADVISOR_CALENDLY} target="_blank" rel="noopener" className="btn btn-secondary text-sm">
+          Schedule time with an advisor
+        </a>
       </div>
     </aside>
   );

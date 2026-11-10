@@ -172,7 +172,7 @@ export default async function ConversationPage({ params, searchParams }: { param
         attach={attachFilesAction}
         blobPrefix={companyBlobPrefix(company.id)}
       />
-      {showNudge(view.messages.filter((m) => m.role === "user").length, Boolean(plan)) && <AdvisorNudge bookHref="/advisory/book?kind=review&offer=nudge" plansHref={offer ? "#build-plan" : null} />}
+      {showNudge(view.messages.filter((m) => m.role === "user").length, Boolean(plan)) && <AdvisorNudge bookHref="/advisory/book?kind=review&offer=nudge" />}
       {trailing && (
         <div className="space-y-4">
           <RecommendationCardView id={trailing.id} card={trailing.card} given={(view.feedback.get(trailing.id) ?? []).map((f) => f.kind)} deeper={null} feedback={feedbackAction} compact />
