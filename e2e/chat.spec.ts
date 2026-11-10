@@ -63,6 +63,20 @@ test("a founder talks a decision through and gets a recommendation card", async 
   }
   await expect(page.getByRole("complementary", { name: "How to read your recommendation" })).toHaveCount(0);
 
+  // Files can be dragged anywhere onto the page and dropped into the conversation.
+  await page.evaluate(() => {
+    const dt = new DataTransfer();
+    dt.items.add(new File(["a,b\n1,2"], "pipeline.csv", { type: "text/csv" }));
+    window.dispatchEvent(new DragEvent("dragenter", { dataTransfer: dt, bubbles: true }));
+    (window as unknown as { __dt: DataTransfer }).__dt = dt;
+  });
+  await expect(page.getByText("Drop to share in this conversation")).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new DragEvent("drop", { dataTransfer: (window as unknown as { __dt: DataTransfer }).__dt, bubbles: true })));
+  await expect(page.getByText("Drop to share in this conversation")).toHaveCount(0);
+  // The drop starts the same upload as the paperclip (test mode has no file storage, so it stops there).
+  await expect(page.getByText(/Sharing pipeline\.csv|Upload failed/).first()).toBeVisible();
+  await page.reload();
+
   // A shared file being read: it shows in the conversation with live progress, and the reply box stays
   // under the conversation and above the latest recommendation.
   const conversationId = url.split("/").at(-1)!;

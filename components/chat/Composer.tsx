@@ -1,10 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { FileProgress } from "./FileProgress";
 import { upload } from "@vercel/blob/client";
-import { Paperclip } from "lucide-react";
+import { Paperclip, Upload } from "lucide-react";
 import { contentTypeFor, INBOX_FOLDER, MAX_UPLOAD_BYTES } from "@/lib/documents";
 import { sha256 } from "@/components/readiness/hash";
 
@@ -79,6 +79,53 @@ export function Composer({
     }
   }
 
+  // Drag and drop anywhere on the page: files dropped here are shared like the paperclip.
+  const [dragging, setDragging] = useState(false);
+  const depth = useRef(0);
+  const canDrop = Boolean(attach && blobPrefix);
+  const sendRef = useRef(sendFiles);
+  useEffect(() => {
+    sendRef.current = sendFiles;
+  });
+  useEffect(() => {
+    if (!canDrop) return;
+    const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
+    const enter = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      depth.current += 1;
+      setDragging(true);
+    };
+    const over = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+    };
+    const leave = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      depth.current = Math.max(0, depth.current - 1);
+      if (depth.current === 0) setDragging(false);
+    };
+    const drop = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      depth.current = 0;
+      setDragging(false);
+      const files = Array.from(e.dataTransfer?.files ?? []);
+      if (files.length) void sendRef.current(files);
+    };
+    window.addEventListener("dragenter", enter);
+    window.addEventListener("dragover", over);
+    window.addEventListener("dragleave", leave);
+    window.addEventListener("drop", drop);
+    return () => {
+      window.removeEventListener("dragenter", enter);
+      window.removeEventListener("dragover", over);
+      window.removeEventListener("dragleave", leave);
+      window.removeEventListener("drop", drop);
+    };
+  }, [canDrop]);
+
   const submit = () => {
     const t = text.trim();
     if (t && !pending) run(() => send(conversationId, t), t);
@@ -86,6 +133,15 @@ export function Composer({
 
   return (
     <div className="space-y-3">
+      {dragging && (
+        <div role="status" aria-live="polite" className="fixed inset-0 z-50 flex items-center justify-center p-6 pointer-events-none" style={{ background: "rgba(13,27,42,0.55)" }}>
+          <div className="rounded-2xl px-8 py-7 text-center max-w-sm" style={{ background: "var(--card)", border: "2px dashed var(--green)" }}>
+            <Upload size={28} className="mx-auto mb-2" style={{ color: "var(--green)" }} aria-hidden />
+            <div className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>Drop to share in this conversation</div>
+            <div className="text-sm mt-1" style={{ color: "var(--muted-foreground)" }}>Any file, up to 25 MB each and 10 at a time. We&apos;ll read it and use what&apos;s in it.</div>
+          </div>
+        </div>
+      )}
       {sent && (
         <div className="flex justify-end">
           <p className="rounded-2xl px-4 py-3 text-base max-w-[85%] whitespace-pre-wrap" style={{ background: "var(--navy)", color: "#fff" }}>{sent}</p>
@@ -142,7 +198,7 @@ export function Composer({
               submit();
             }
           }}
-          placeholder="Reply, add detail, or ask a follow-up…"
+          placeholder={canDrop ? "Reply, ask a follow-up, or drop files here…" : "Reply, add detail, or ask a follow-up…"}
           className="field flex-1 resize-y"
           disabled={pending}
         />
