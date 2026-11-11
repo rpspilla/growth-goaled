@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateInviteToken, hashInviteToken, INVITE_TTL_DAYS, inviteStatus, safeNextPath, sameEmail } from "@/lib/invites";
+import { companyNameKey, generateInviteToken, hashInviteToken, INVITE_TTL_DAYS, inviteStatus, safeNextPath, sameEmail } from "@/lib/invites";
 
 describe("invite tokens", () => {
   it("stores only a hash that matches the emailed token", () => {
@@ -42,5 +42,13 @@ describe("safeNextPath", () => {
     expect(safeNextPath("//evil.example")).toBe("/");
     expect(safeNextPath("/\\evil.example")).toBe("/");
     expect(safeNextPath(null)).toBe("/");
+  });
+});
+
+describe("companyNameKey", () => {
+  it("treats spacing, case and punctuation as the same company", () => {
+    expect(companyNameKey("FastenHealth")).toBe(companyNameKey("Fasten Health"));
+    expect(companyNameKey("fasten-health, ")).toBe(companyNameKey("FASTEN HEALTH"));
+    expect(companyNameKey("Fasten Health")).not.toBe(companyNameKey("Fasten Wealth"));
   });
 });

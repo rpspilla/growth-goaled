@@ -35,33 +35,15 @@ test("sign-up basics carry through, and every growth question opens its own page
   await expect(page).toHaveURL(/\/overview\?welcome=1$/);
   await expect(page.getByText(/You're set up, Deer in Headlights\. Ask your first question below\./)).toBeVisible();
   await expect(page.getByRole("button", { name: "How do I build a repeatable revenue engine?" })).toBeVisible();
-  await page.goto("/library");
-
-  // --- Library: fixed order, no "Recommended" tag ---
-  await expect(page.getByText("Recommended for you")).toHaveCount(0);
-  const titles = page.locator("article h2");
-  for (const [i, title] of ["Build a repeatable sales motion", "Build a growth hiring plan", "How do I fix churn?"].entries()) await expect(titles.nth(i)).toHaveText(title);
-
-  // --- Batch 2: short cards (when to use it + the questions it answers), section labels look like labels ---
-  const hiringCard = page.locator("article", { has: page.getByRole("heading", { name: "Build a growth hiring plan" }) });
-  await expect(hiringCard).toContainText("Use it when:");
-  await expect(hiringCard.getByRole("list", { name: "Questions it answers" }).getByRole("listitem")).toHaveCount(3);
-  await expect(hiringCard.getByText("Details")).toHaveCount(0);
-
+  // The old growth-question pages still open directly.
   // --- 1.9: open another question first, come back, then the hiring plan opens its own page ---
-  await page.locator("article", { has: page.getByRole("heading", { name: "How do I fix churn?" }) }).getByRole("link").click();
-  await expect(page).toHaveURL(/\/library\/growth_leak$/);
-  await page.getByRole("link", { name: "All growth questions" }).click();
-  await expect(page).toHaveURL(/\/library$/);
-  await page.locator("article", { has: page.getByRole("heading", { name: "Build a growth hiring plan" }) }).getByRole("link").click();
-  await expect(page).toHaveURL(/\/library\/hire_or_fix$/);
+  await page.goto("/library/growth_leak");
+  await page.goto("/library/hire_or_fix");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Build a growth hiring plan");
   // Browser back and forward land on the right question too.
   await page.goBack();
-  await page.goBack();
   await expect(page).toHaveURL(/\/library\/growth_leak$/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("How do I fix churn?");
-  await page.goForward();
   await page.goForward();
   await expect(page).toHaveURL(/\/library\/hire_or_fix$/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Build a growth hiring plan");
@@ -108,7 +90,7 @@ test("sign-up basics carry through, and every growth question opens its own page
   await ctx.close();
 });
 
-test("library: FAQ, and a request for a question we don't offer yet", async ({ browser }) => {
+test("growth questions: four options, no pricing, and the current plan", async ({ browser }) => {
   const { Client } = await import("pg");
   const { E2E_DATABASE_URL } = await import("../playwright.config");
   const db = new Client({ connectionString: E2E_DATABASE_URL });
@@ -121,19 +103,31 @@ test("library: FAQ, and a request for a question we don't offer yet", async ({ b
   await ctx.addCookies([{ name: "gg_e2e_user", value: "ask@e2e.test", domain: "localhost", path: "/" }]);
   const page = await ctx.newPage();
   await page.goto("/library");
+  await expect(page.getByRole("heading", { name: "What do you need to decide?" })).toBeVisible();
+  const options = page.locator("article");
+  for (const [i, name] of ["Build a repeatable sales motion", "Revenue conversion sprint", "See my current plan", "Custom Project"].entries()) await expect(options.nth(i)).toHaveAttribute("aria-label", name);
+  await expect(options).toHaveCount(4);
+  await expect(page.locator("main, body").first()).not.toContainText("$");
+  await expect(page.getByText(/Snapshot|Assessment \$/)).toHaveCount(0);
+  // No plan yet: the advisor's calendar instead.
+  const current = page.getByRole("article", { name: "See my current plan" });
+  await expect(current.getByRole("link", { name: "Schedule time with an advisor" })).toHaveAttribute("href", "https://calendly.com/ryan-spillane-growthgoaled/30min");
+  await expect(page.getByRole("article", { name: "Custom Project" }).getByRole("link", { name: "Discuss a Project" })).toHaveAttribute("href", /calendly\.com/);
+  // The FAQ stays.
   await page.getByText("How is this different from prompting Claude or ChatGPT?").click();
   await expect(page.getByText(/same answer every time on the same data/)).toBeVisible();
 
-  const card = page.getByRole("article", { name: "Don't see what you're looking for?" });
-  await card.getByRole("button", { name: "Tell us what you need" }).click();
-  await expect(card.getByLabel("Your email")).toHaveValue("ask@e2e.test");
-  await card.getByRole("button", { name: "Send" }).click();
-  await expect(card.getByRole("alert")).toContainText("Tell us what you're trying to decide.");
-  await card.getByLabel("What are you trying to decide?").fill("Should we raise a bridge round?");
-  await card.getByRole("button", { name: "Send" }).click();
-  await expect(card.getByRole("status")).toContainText("We'll be in touch at ask@e2e.test");
-  const { rows } = await db.query("select props from events where name = 'use_case_suggested' and company_id = $1", [c.rows[0].id]);
-  expect(rows).toEqual([{ props: { decision: "Should we raise a bridge round?", email: "ask@e2e.test" } }]);
+  // A sprint opens its conversation.
+  await page.getByRole("article", { name: "Revenue conversion sprint" }).getByRole("button", { name: "Start" }).click();
+  await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/);
+  await expect(page.getByRole("heading", { name: "Why isn't our pipeline converting?" })).toBeVisible();
+  const conversationId = page.url().split("/").at(-1)!;
+
+  // With a plan underway, "See my current plan" opens it.
+  await db.query("insert into action_plans (company_id, conversation_id, topic, tier, status) values ($1, $2, 'pipeline_conversion', 'supported', 'active')", [c.rows[0].id, conversationId]);
+  await page.goto("/library");
+  await expect(current).toContainText("Why isn't our pipeline converting? · Active");
+  await expect(current.getByRole("link", { name: "Open my plan" })).toHaveAttribute("href", `/chat/${conversationId}#your-plan`);
   await db.end();
   await ctx.close();
 });

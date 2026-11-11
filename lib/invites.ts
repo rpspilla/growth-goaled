@@ -26,3 +26,6 @@ export function safeNextPath(next: string | null | undefined): string {
   if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) return "/";
   return next;
 }
+
+/** Company names compared loosely ("FastenHealth" = "Fasten Health" = "fastenhealth"), to catch duplicates. */
+export const companyNameKey = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, "");

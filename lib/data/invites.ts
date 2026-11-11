@@ -4,7 +4,7 @@ import { and, count, desc, eq, gt, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/lib/db";
 import type { User } from "@/lib/db/schema";
-import { generateInviteToken, hashInviteToken, INVITE_TTL_DAYS, inviteStatus, sameEmail } from "@/lib/invites";
+import { companyNameKey, generateInviteToken, hashInviteToken, INVITE_TTL_DAYS, inviteStatus, sameEmail } from "@/lib/invites";
 import { inviteEmail, sendEmail } from "@/lib/email";
 import { track } from "@/lib/events";
 import { canAddCompanies } from "@/lib/multi-company";
@@ -58,6 +58,16 @@ export async function createInvite(actor: User, input: z.infer<typeof inviteInpu
     .from(schema.invites)
     .where(and(sql`lower(${schema.invites.email}) = ${email}`, isNull(schema.invites.acceptedAt), gt(schema.invites.expiresAt, new Date())));
   if ((pending?.n ?? 0) > 0) return { ok: false, error: "There's already a pending invite for that email. Resend it instead." };
+
+  // Inviting someone else to a company that's already here would create a second copy of it.
+  const [duplicate] = await db
+    .select({ id: schema.companies.id, name: schema.companies.name })
+    .from(schema.companies)
+    .where(and(sql`regexp_replace(lower(${schema.companies.name}), '[^a-z0-9]', '', 'g') = ${companyNameKey(companyName)}`, eq(schema.companies.isSample, false)))
+    .limit(1);
+  if (duplicate) {
+    return { ok: false, error: `${duplicate.name} is already on Growth Goaled. To add ${email}, open the company and invite them under People.` };
+  }
 
   const companyId = randomUUID();
   const { token, hash, expiresAt } = generateInviteToken();
