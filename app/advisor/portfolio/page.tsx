@@ -3,22 +3,11 @@ import { requireRole } from "@/lib/auth/session";
 import Link from "next/link";
 import { listManagedCompanies } from "@/lib/data/companies";
 import { portfolioCounts, portfolioRows } from "@/lib/data/portfolio";
-import { STATUS_LABEL } from "@/components/deliverables/status";
 import { formatMetric } from "@/lib/metrics";
 import { listOpenInvites } from "@/lib/data/invites";
 import { revokeInviteAction } from "./actions";
 import { InviteFounderForm, ResendInviteButton } from "./InviteForms";
 
-const PHASE_LABEL: Record<string, string> = {
-  intake: "Intake",
-  upload: "Upload",
-  benchmark: "Benchmark",
-  baseline: "Baseline",
-  icp: "ICP",
-  channels: "Channel Strategy",
-  hiring: "Hiring Plan",
-  complete: "Complete",
-};
 const date = (d: Date) => new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" }).format(d);
 
 const HEALTH: Record<string, { bg: string; color: string; label: string }> = {
@@ -60,25 +49,24 @@ export default async function PortfolioPage() {
       <div className="rounded-xl border overflow-x-auto" style={card}>
         <div className="min-w-[960px]">
         <div className="grid grid-cols-12 px-5 py-3 border-b label" style={{ borderColor: "var(--border)", background: "var(--muted)", color: "var(--muted-foreground)" }}>
-          <div className="col-span-3">Company</div>
+          <div className="col-span-2">Company</div>
           <div className="col-span-1">Stage</div>
           <div className="col-span-1">ARR</div>
           <div className="col-span-1">Growth</div>
           <div className="col-span-1">Health</div>
-          <div className="col-span-1">Phase</div>
+          <div className="col-span-2">Engagement Type</div>
           <div className="col-span-1">Data</div>
           <div className="col-span-1">Questions</div>
-          <div className="col-span-2">Benchmark</div>
+          <div className="col-span-2">Action Plan Progress</div>
         </div>
         {rows.length === 0 && (
           <div className="px-5 py-6 text-sm" style={{ color: "var(--muted-foreground)" }}>No companies yet. Invite a founder or claim one from the Unassigned queue.</div>
         )}
         {rows.map((r) => {
           const h = r.health ? HEALTH[r.health] : null;
-          const b = r.benchmarkStatus ? STATUS_LABEL[r.benchmarkStatus] : null;
           return (
             <Link key={r.id} href={`/advisor/companies/${r.id}`} className="grid grid-cols-12 items-center px-5 py-4 border-b hover:opacity-80" style={{ borderColor: "var(--border)" }}>
-              <div className="col-span-3 flex items-center gap-3 min-w-0">
+              <div className="col-span-2 flex items-center gap-3 min-w-0">
                 <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0" style={{ background: "var(--secondary)", color: "var(--foreground)" }}>{r.name[0]?.toUpperCase()}</div>
                 <div className="min-w-0">
                   <div className="text-sm font-semibold truncate" style={{ color: "var(--foreground)" }}>
@@ -93,10 +81,33 @@ export default async function PortfolioPage() {
               <div className="col-span-1 font-mono text-sm font-semibold" style={{ color: "var(--foreground)" }}>{r.arr != null ? formatMetric("arr", r.arr) : "—"}</div>
               <div className="col-span-1 font-mono text-sm" style={{ color: r.growth != null ? "var(--green)" : "var(--muted-foreground)" }}>{r.growth != null ? `↑ ${formatMetric("arr_growth", r.growth)}` : "—"}</div>
               <div className="col-span-1">{h ? <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: h.bg, color: h.color }}>{h.label}</span> : <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>—</span>}</div>
-              <div className="col-span-1"><span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: "var(--secondary)", color: "var(--secondary-foreground)" }}>{PHASE_LABEL[r.phase]}</span></div>
+              <div className="col-span-2 min-w-0 pr-2">
+                {r.engagement ? (
+                  <>
+                    <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: "var(--secondary)", color: "var(--secondary-foreground)" }}>{r.engagement.type}</span>
+                    {r.engagement.name && <div className="text-xs truncate mt-0.5" style={{ color: "var(--muted-foreground)" }} title={r.engagement.name}>{r.engagement.name}</div>}
+                  </>
+                ) : (
+                  <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>No plan yet</span>
+                )}
+              </div>
               <div className="col-span-1 font-mono text-xs" style={{ color: "var(--foreground)" }}>{r.readinessPercent}%</div>
               <div className="col-span-1 font-mono text-xs" style={{ color: r.openQuestions ? "var(--amber)" : "var(--muted-foreground)" }}>{r.openQuestions}</div>
-              <div className="col-span-2 text-xs font-medium" style={{ color: b?.color ?? "var(--muted-foreground)" }}>{b?.label ?? "Not started"}</div>
+              <div className="col-span-2 text-xs">
+                {r.planProgress ? (
+                  <div aria-label={`Action plan progress: ${r.planProgress.done} of ${r.planProgress.total} done`}>
+                    <div className="flex justify-between gap-2" style={{ color: "var(--foreground)" }}>
+                      <span><span className="font-semibold">{r.planProgress.total - r.planProgress.done}</span> open</span>
+                      <span style={{ color: "var(--green)" }}><span className="font-semibold">{r.planProgress.done}</span> done</span>
+                    </div>
+                    <div className="h-1.5 rounded-full mt-1" style={{ background: "var(--muted)" }}>
+                      <div className="h-1.5 rounded-full" style={{ width: `${Math.round((r.planProgress.done / r.planProgress.total) * 100)}%`, background: "var(--green)" }} />
+                    </div>
+                  </div>
+                ) : (
+                  <span style={{ color: "var(--muted-foreground)" }}>No actions yet</span>
+                )}
+              </div>
             </Link>
           );
         })}

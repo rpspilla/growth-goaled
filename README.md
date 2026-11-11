@@ -218,7 +218,9 @@ Growth Goaled's own prospecting and relationships, at **/advisor/crm** ("CRM" in
 - **To Dos** (`/advisor/registers`, was Registers): action-oriented labels and a one-click **Mark complete** (resolution kind `complete`).
 - **Contracts and billing** (advisor company page; `contracts` table, migration `0027_contracts.sql`, `lib/data/contracts.ts`, `lib/contracts.ts`): name, status, billing cycle (monthly, quarterly, annual, one-time), amount, start/end, next billing date (worked out from the start and cycle when left empty; **Mark billed** rolls it a cycle) and the signed file (private Blob under `contracts/<companyId>/`, uploaded by staff only, downloaded at `/api/contracts/<id>`). Staff only.
 - **Profile from documents**: opening a profile section fills empty numeric answers from figures read out of uploaded files (`fillProfileFromDocuments`, saved with source `extracted`), and says which file each came from.
-- **Advisor company page** also lists the founder's **Business updates** with Remove / Clear all (readings set aside, not deleted). **Users** shows each person's company (staff: Growth Goaled).
+- **Portfolio** columns **Engagement Type** (from the plan the company works on: Execute & Monitor, Diagnose, Assessment, or Advisory when only the advisor's plan name is set, with the plan's name) and **Action Plan Progress** (open vs done actions in that plan), in place of Phase and Benchmark.
+- **Assessment plan (Progress)**: each action has **Who does it** (Founder or Growth Goaled); **Send to my advisor for review** fixes the split and gives the advisor a To Do and an email (`sendPlanAssignments`, migration `0029_plan_action_assignee.sql`).
+- **Advisor company page** also lists the founder's **Business updates** with Remove / Clear all (readings set aside, not deleted). **Users** shows each person's company (staff: Growth Goaled), and admins can delete people (optionally with a company only they belonged to). Data requests can be deleted one by one or all at once.
 
 ### Founder home, Strategic Decisions and Performance
 

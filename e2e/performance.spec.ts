@@ -47,6 +47,15 @@ test("advisor names the plan and asks for data; the founder sees progress and da
   // Test mode sends no email: the advisor is told so.
   await expect(ask.getByRole("status")).toContainText("email didn't go out");
   await expect(ask.getByRole("list", { name: "Data requests" })).toContainText("Waiting");
+  // The portfolio shows the engagement from the plan, and no plan progress until there are actions.
+  await adv.page.goto("/advisor/portfolio");
+  const row = adv.page.getByRole("link", { name: /Fasten Perf/ });
+  await expect(row).toContainText("Advisory");
+  await expect(row).toContainText("Sales Hiring");
+  await expect(row).toContainText("No actions yet");
+  await expect(adv.page.getByText("Engagement Type")).toBeVisible();
+  await expect(adv.page.getByText("Action Plan Progress")).toBeVisible();
+  await adv.page.goto(`/advisor/companies/${company}`);
   // Contracts and billing live on the company record.
   const contracts = adv.page.getByRole("region", { name: "Contracts and billing" });
   await contracts.getByRole("button", { name: "Add a contract" }).click();

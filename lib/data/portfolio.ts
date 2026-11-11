@@ -6,6 +6,7 @@ import { assessReadiness } from "@/lib/readiness-assessment";
 import { isMetricKey, type MetricKey } from "@/lib/metrics";
 import { salesCallsToCollect } from "./assessments";
 import { isStalled } from "./deliverables";
+import { allSteps, stepStatus } from "@/lib/plan-board";
 
 export type PortfolioRow = {
   id: string;
@@ -22,6 +23,10 @@ export type PortfolioRow = {
   openConflicts: number;
   benchmarkStatus: string | null;
   attention: string[];
+  /** The engagement, from the plan the company is working on: its type and name (null: no plan yet). */
+  engagement: { type: string; name: string | null } | null;
+  /** Actions in that plan: how many are done of all of them (null: no plan with actions). */
+  planProgress: { done: number; total: number } | null;
 };
 
 /** Latest accepted value per metric for each company. */
@@ -61,6 +66,16 @@ export async function portfolioRows(companies: Company[], now = new Date()): Pro
     db.select().from(schema.companyScores).where(inArray(schema.companyScores.companyId, ids)).orderBy(desc(schema.companyScores.updatedAt)),
     salesCallsToCollect(ids),
   ]);
+  // The plan each company works on: its latest live action plan, else its latest committed assessment plan.
+  const [plans, legacy] = await Promise.all([
+    db
+      .select({ companyId: schema.actionPlans.companyId, tier: schema.actionPlans.tier, content: schema.actionPlans.content, title: schema.conversations.title })
+      .from(schema.actionPlans)
+      .innerJoin(schema.conversations, eq(schema.conversations.id, schema.actionPlans.conversationId))
+      .where(and(inArray(schema.actionPlans.companyId, ids), inArray(schema.actionPlans.status, ["drafting", "in_review", "delivered", "active"])))
+      .orderBy(desc(schema.actionPlans.updatedAt)),
+    db.select({ companyId: schema.planActions.companyId, deliverableId: schema.planActions.deliverableId, status: schema.planActions.status, createdAt: schema.planActions.createdAt }).from(schema.planActions).where(inArray(schema.planActions.companyId, ids)).orderBy(desc(schema.planActions.createdAt)),
+  ]);
 
   return companies.map((c) => {
     const m = metrics.get(c.id);
@@ -86,6 +101,23 @@ export async function portfolioRows(companies: Company[], now = new Date()): Pro
     const missingCalls = calls.find((x) => x.companyId === c.id);
     if (missingCalls) attention.push(`Sales calls to collect (${missingCalls.count} of ${missingCalls.expected})`);
 
+    const plan = plans.find((p) => p.companyId === c.id);
+    const latestLegacy = legacy.find((p) => p.companyId === c.id);
+    const legacyActions = latestLegacy ? legacy.filter((p) => p.deliverableId === latestLegacy.deliverableId && p.status !== "dropped") : [];
+    const steps = plan?.content ? allSteps(plan.content) : [];
+    const engagement = plan
+      ? { type: plan.tier === "supported" ? "Execute & Monitor" : "Diagnose", name: c.currentPlan?.trim() || plan.title }
+      : latestLegacy
+        ? { type: "Assessment", name: c.currentPlan?.trim() || null }
+        : c.currentPlan?.trim()
+          ? { type: "Advisory", name: c.currentPlan.trim() }
+          : null;
+    const planProgress = steps.length
+      ? { done: steps.filter((x) => stepStatus(x.step) === "done").length, total: steps.length }
+      : legacyActions.length
+        ? { done: legacyActions.filter((a) => a.status === "done").length, total: legacyActions.length }
+        : null;
+
     return {
       id: c.id,
       name: c.name,
@@ -101,6 +133,8 @@ export async function portfolioRows(companies: Company[], now = new Date()): Pro
       openConflicts: conflicts,
       benchmarkStatus,
       attention,
+      engagement,
+      planProgress,
     };
   });
 }

@@ -39,7 +39,11 @@ test("a founder buys an action plan from the conversation; an advisor approves i
   await expect(page.getByRole("region", { name: "Build my action plan" })).toHaveCount(0);
 
   // The AI collects what the plan needs, then the founder submits it for review.
-  await page.getByLabel("Your reply").fill("Our quota is $600k per rep.");
+  // The reply box is controlled: re-type until the page has hydrated and Send is enabled.
+  await expect(async () => {
+    await page.getByLabel("Your reply").fill("Our quota is $600k per rep.");
+    await expect(page.getByRole("button", { name: "Send" })).toBeEnabled({ timeout: 1_000 });
+  }).toPass();
   await page.getByRole("button", { name: "Send" }).click();
   await expect(panel).toContainText("Closed deals export");
   await panel.getByRole("button", { name: "Submit my plan for review" }).click();
@@ -111,6 +115,9 @@ test("a founder buys an action plan from the conversation; an advisor approves i
   // The advisor sees the work handed to Growth Goaled, and a To Do to quote it.
   await cro.page.goto(cro.page.url());
   await expect(cro.page.getByRole("region", { name: "Assigned to Growth Goaled" })).toContainText("Test 30-day milestone");
+  await cro.page.goto("/advisor/portfolio");
+  await expect(cro.page.getByRole("link", { name: /Planner Co/ })).toContainText("Diagnose");
+  await expect(cro.page.getByLabel("Action plan progress: 1 of 3 done")).toBeVisible();
   await cro.page.goto("/advisor/registers");
   await expect(cro.page.getByText("Review and quote the work assigned to Growth Goaled (1 action)")).toBeVisible();
   await cro.page.getByRole("button", { name: /^Mark complete: Review and quote/ }).click();
