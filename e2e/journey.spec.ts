@@ -263,7 +263,10 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   // --- Founder: self-service results, built from their answers and data ---
   await expect(founder.page.getByRole("region", { name: "The answer" })).toBeVisible({ timeout: 90_000 });
   await expect(founder.page.getByRole("heading", { name: "How do I fix churn?" })).toBeVisible();
-  // The answer, the signature charts (or Needs data tiles), each plan area with the data behind it, then the plan.
+  // The answer and the plan lead; charts, each area, the numbers and the reasoning are folded under one link.
+  for (const stage of ["Now", "Next", "Later"]) await expect(founder.page.getByRole("heading", { name: stage, exact: true })).toBeVisible();
+  await expect(founder.page.getByRole("region", { name: /ARR bridge/ })).toBeHidden();
+  await founder.page.getByText("See the full analysis").click();
   await expect(founder.page.getByRole("region", { name: /ARR bridge/ })).toBeVisible();
   for (const dim of ["Churn and at-risk accounts", "Onboarding and adoption", "Expansion", "Sales call reviews"]) {
     const section = founder.page.getByRole("region", { name: dim, exact: true });
@@ -288,6 +291,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await expect(founder.page.getByRole("article", { name: "Retention compared with peers" })).toContainText("Fintech · founded 2017–2021");
   await founder.page.goto("/baseline");
   await expect(founder.page.getByText("Test mode brief: How do I fix churn?")).toBeVisible();
+  await founder.page.getByText("See the full analysis").click();
   // Benchmark comparison from the library: observed, benchmark, derived and interpretation, with the source.
   await founder.page.locator("summary", { hasText: "Against published benchmarks" }).click();
   const nrrCard = founder.page.getByRole("article", { name: "NRR benchmark comparison" });

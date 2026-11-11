@@ -23,11 +23,6 @@ export async function DataTopPanel() {
     <div className="grid lg:grid-cols-[minmax(0,1fr)_22rem] gap-5 items-start mb-8">
       <div className="min-w-0 space-y-4">
         {active.def.keyFile && <KeyFileCard keyFile={active.def.keyFile} files={data.readiness.files} inAlready={meter.ready} blobPrefix={data.blobPrefix} />}
-        {active.def.keyFile && (
-          <div className="label" style={{ color: "var(--muted-foreground)" }}>
-            Anything else? Drop it here and we&apos;ll sort it
-          </div>
-        )}
         <InboxDropzone blobPrefix={data.blobPrefix} />
         <SortReview docs={inbox} />
       </div>

@@ -5,7 +5,6 @@ import { useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
-  CircleDashed,
   Compass,
   Droplet,
   Filter,
@@ -109,23 +108,6 @@ function Detail({ title, count, children }: { title: string; count?: number; chi
   );
 }
 
-/** Low / Medium / High as three bars: confidence in the inputs, never a made-up percentage. */
-function ConfidenceMeter({ level }: { level: string }) {
-  const n = level === "High" ? 3 : level === "Medium" ? 2 : 1;
-  const tone: Tone = n === 3 ? "green" : n === 2 ? "amber" : "red";
-  return (
-    <div className="flex flex-col items-center gap-1.5" role="img" aria-label={`Confidence in your inputs: ${level}`}>
-      <div className="flex items-end gap-1" aria-hidden>
-        {[0, 1, 2].map((i) => (
-          <span key={i} className="w-3.5 rounded-sm" style={{ height: 14 + i * 9, background: i < n ? TONE[tone].fg : "var(--muted)" }} />
-        ))}
-      </div>
-      <span data-label className="text-xs font-semibold" style={muted}>
-        Confidence · {level}
-      </span>
-    </div>
-  );
-}
 
 /** The answer as a short badge: the recommended option when it's short, else the diagnosis certainty. */
 function verdictOf(data: ResultsView): { label: string; tone: Tone } {
@@ -349,11 +331,10 @@ export function AssessmentResults({
         <h2 id="the-answer" className="sr-only">
           The answer
         </h2>
-        <div className="grid md:grid-cols-[minmax(0,1fr)_auto] gap-5 items-start">
+        <div>
           <div className="min-w-0 space-y-3">
             <div className="flex items-center gap-2 flex-wrap">
               <VerdictBadge label={verdict.label} tone={verdict.tone} />
-              {certainty && <StatusChip status={certainty.tone === "green" ? "positive" : certainty.tone === "amber" ? "watch" : "info"} word={`Diagnosis: ${certainty.label}`} />}
             </div>
             <div className="flex gap-3 items-start">
               <p className="flex-1 font-display text-2xl sm:text-3xl leading-tight" style={fg}>
@@ -384,7 +365,6 @@ export function AssessmentResults({
               )}
             </div>
           </div>
-          <ConfidenceMeter level={confidence.level} />
         </div>
         {tileRows.length > 0 && <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5">{tileRows.map(tile)}</div>}
         <div className="mt-4">
@@ -419,13 +399,8 @@ export function AssessmentResults({
             <AlertTriangle size={13} aria-hidden />
             {data.degraded ? "Summary brief" : `${data.dataGaps.length} ${data.dataGaps.length === 1 ? "gap" : "gaps"} limit this`}
           </span>
-          {data.dataGaps.slice(0, 3).map((g) => (
-            <Link key={g} href={dataPath} data-label title={g} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full max-w-[16rem] truncate" style={{ background: "var(--muted)", color: "var(--foreground)" }}>
-              <CircleDashed size={12} className="shrink-0" aria-hidden />
-              <span className="truncate">{g}</span>
-            </Link>
-          ))}
-          <ExpandableDetail summary={data.dataGaps.length > 3 ? `All ${data.dataGaps.length}` : "Details"}>
+          <Link href={dataPath} className="text-xs link">Add data</Link>
+          <ExpandableDetail summary="What's missing">
             {data.degraded && <p>A summary brief, built straight from your figures and the rule-based diagnosis. Your advisor can take it deeper.</p>}
             <ul className="space-y-1">
               {data.dataGaps.map((g) => (
@@ -441,6 +416,44 @@ export function AssessmentResults({
         </div>
       )}
 
+      {/* 4. The plan */}
+      <Block id="plan" title="Your plan" lead="Targets and signals are our proposals; owners are your call.">
+        <div className="grid md:grid-cols-3 gap-3">
+          {STAGES.map((st) => {
+            const here = data.plan.filter((a) => a.timing === st.timing);
+            return (
+              <div key={st.timing} className="rounded-xl p-3 space-y-2.5" style={{ background: "var(--muted)" }} aria-label={`${st.label}: ${st.days}`}>
+                <div className="flex items-baseline justify-between px-0.5">
+                  <h3 className="text-sm font-semibold" style={fg}>
+                    {st.label}
+                  </h3>
+                  <span data-label className="text-[11px] font-mono" style={{ color: "var(--subtle-foreground)" }}>
+                    {st.days}
+                  </span>
+                </div>
+                {here.length ? (
+                  <ol className="space-y-2.5">{here.map(actionCard)}</ol>
+                ) : (
+                  <p data-label className="text-xs px-0.5" style={muted}>
+                    Nothing staged yet
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </Block>
+
+      {/* Everything else, one click away: charts, each area, the numbers and the detail. */}
+      <details id="full-analysis" className="group surface p-4 sm:p-5 scroll-mt-20" aria-label="The full analysis">
+        <summary className="cursor-pointer list-none flex items-center gap-3">
+          <span className="transition-transform group-open:rotate-90 text-lg" style={{ color: "var(--green)" }} aria-hidden>›</span>
+          <span className="flex-1">
+            <span className="block text-base font-semibold" style={fg}>See the full analysis</span>
+            <span className="block text-sm" style={muted}>Charts, each area with the data behind it, your numbers, and the reasoning</span>
+          </span>
+        </summary>
+        <div className="space-y-10 pt-6">
       {/* 2. Signature charts */}
       <section aria-label="Charts" className="space-y-4">
         <SignatureCharts useCase={data.useCase} charts={data.charts} baseline={data.baseline} dataPath={dataPath} />
@@ -532,34 +545,6 @@ export function AssessmentResults({
             )}
           </div>
         )}
-      </Block>
-
-      {/* 4. The plan */}
-      <Block id="plan" title="Your plan" lead="Targets and signals are our proposals; owners are your call.">
-        <div className="grid md:grid-cols-3 gap-3">
-          {STAGES.map((st) => {
-            const here = data.plan.filter((a) => a.timing === st.timing);
-            return (
-              <div key={st.timing} className="rounded-xl p-3 space-y-2.5" style={{ background: "var(--muted)" }} aria-label={`${st.label}: ${st.days}`}>
-                <div className="flex items-baseline justify-between px-0.5">
-                  <h3 className="text-sm font-semibold" style={fg}>
-                    {st.label}
-                  </h3>
-                  <span data-label className="text-[11px] font-mono" style={{ color: "var(--subtle-foreground)" }}>
-                    {st.days}
-                  </span>
-                </div>
-                {here.length ? (
-                  <ol className="space-y-2.5">{here.map(actionCard)}</ol>
-                ) : (
-                  <p data-label className="text-xs px-0.5" style={muted}>
-                    Nothing staged yet
-                  </p>
-                )}
-              </div>
-            );
-          })}
-        </div>
       </Block>
 
       {/* 5. The numbers */}
@@ -730,7 +715,11 @@ export function AssessmentResults({
         )}
       </Block>
 
+        </div>
+      </details>
+
       {advisory}
+
     </div>
   );
 }

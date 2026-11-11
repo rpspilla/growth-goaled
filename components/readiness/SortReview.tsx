@@ -116,13 +116,14 @@ export function SortReview({ docs }: { docs: DocumentView[] }) {
   useProcessingRefresh(working.length > 0);
   if (!working.length && !toConfirm.length) return null;
 
+  // Folded away: reading and sorting happen on their own; checking where a file fits is optional.
   return (
-    <section className="mb-8">
-      <h2 className="text-sm font-semibold mb-1" style={{ color: "var(--foreground)" }}>We sorted your files</h2>
-      <p className="text-xs mb-3" style={{ color: "var(--muted-foreground)" }}>
-        Check where each file fits. Confirming marks those items as available (unverified) and links the file; your advisor still reviews the data.
-      </p>
-      <div className="space-y-3">
+    <details className="surface p-4" aria-label="How your files were sorted">
+      <summary className="cursor-pointer text-sm font-semibold" style={{ color: "var(--foreground)" }}>
+        {working.length ? `Reading ${working.length} ${working.length === 1 ? "file" : "files"}…` : `We sorted ${toConfirm.length} ${toConfirm.length === 1 ? "file" : "files"}`}
+        <span className="font-normal" style={{ color: "var(--muted-foreground)" }}> · check where they fit (optional)</span>
+      </summary>
+      <div className="space-y-3 mt-3">
         {working.map((d) => (
           <div key={d.id} className="rounded-xl border p-4" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
             <div className="flex items-start justify-between gap-3">
@@ -134,6 +135,6 @@ export function SortReview({ docs }: { docs: DocumentView[] }) {
         ))}
         {toConfirm.map((d) => <FileSuggestions key={d.id} doc={d} />)}
       </div>
-    </section>
+    </details>
   );
 }

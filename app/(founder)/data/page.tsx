@@ -2,7 +2,6 @@ import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { DataTopPanel } from "@/components/readiness/DataTopPanel";
 import { ItemCard } from "@/components/readiness/ItemCard";
-import { ReadinessTabs } from "@/components/readiness/ReadinessTabs";
 import { founderContext } from "@/lib/data/founder-context";
 import { listRegisterItems } from "@/lib/data/registers";
 import { getCategory, getItem, sourcesFor } from "@/lib/readiness";
@@ -44,9 +43,8 @@ export default async function DataPage() {
 
   return (
     <div className="px-4 sm:px-8 py-8 max-w-5xl">
-      <PageHeader eyebrow="Step 2 of 4" title={`Data for ${useCase.shortTitle}`} subtitle="Only what this question needs." />
+      <PageHeader title={`Data for ${useCase.shortTitle}`} subtitle="Share what you have, then run your report. We read and sort every file for you." />
       <DataTopPanel />
-      <ReadinessTabs questions={questions.length} />
 
       {questions.length > 0 && (
         <Link href="/data/questions" className="block rounded-xl border p-4 mb-6 text-base font-semibold" style={{ background: "var(--card)", borderColor: "var(--amber)", color: "var(--foreground)" }}>
@@ -54,7 +52,8 @@ export default async function DataPage() {
         </Link>
       )}
 
-      <details className="group mb-8" open={!useCase.keyFile} data-testid="make-it-sharper">
+      {/* The item-by-item list is optional detail: dropping files above is all most founders need to do. */}
+      <details className="group mb-8" data-testid="make-it-sharper">
         <summary className="list-none cursor-pointer surface p-4 flex items-center gap-3">
           <span className="transition-transform group-open:rotate-90 text-lg" style={{ color: "var(--green)" }} aria-hidden>
             ›
@@ -64,7 +63,7 @@ export default async function DataPage() {
               {useCase.keyFile ? "Make it sharper" : "What we need"}
             </span>
             <span data-label className="block text-xs" style={{ color: "var(--muted-foreground)" }}>
-              {useCase.keyFile ? "Optional · each file adds detail to the answer" : "In priority order"}
+              {useCase.keyFile ? "Optional · each file adds detail to the answer" : "The list of what helps, item by item (optional: dropping files above is enough)"}
             </span>
           </span>
           <span data-label className="font-mono text-xs px-2 py-0.5 rounded-full" style={{ background: "var(--muted)", color: "var(--muted-foreground)" }}>
