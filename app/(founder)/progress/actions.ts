@@ -47,8 +47,9 @@ export async function planAssigneeAction(actionId: string, assignee: string): Pr
 
 /** Sends the who-does-what split to the advisor for review. */
 export async function sendPlanAssignmentsAction(): Promise<PlanResult> {
-  const { user, company, active } = await founderContext();
-  if (!company || !active) return { ok: false, error: "There's no plan to send yet." };
+  const { user, company } = await founderCompany();
+  const { active } = await founderContext();
+  if (!active) return { ok: false, error: "There's no plan to send yet." };
   const h = await headers();
   const appUrl = process.env.APP_URL?.replace(/\/$/, "") ?? `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
   const result = await sendPlanAssignments(user, company, active.def.id, appUrl);
