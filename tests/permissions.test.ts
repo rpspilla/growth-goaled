@@ -84,7 +84,8 @@ describe("pages", () => {
     const ctx = read(COMPANY_CONTEXT);
     expect(ctx).toMatch(/requireRole\(\["advisor", "admin"\]\)/);
     expect(ctx).toMatch(/getManagedCompany\(user, id\)[\s\S]*notFound\(\)/);
-    const pages = appFiles.filter((f) => f.includes(`${path.sep}companies${path.sep}[id]${path.sep}`) && /(page|layout)\.tsx$/.test(f));
+    // Client companies only (the internal CRM's prospect companies are a different record).
+    const pages = appFiles.filter((f) => f.includes(`${path.sep}advisor${path.sep}companies${path.sep}[id]${path.sep}`) && /(page|layout)\.tsx$/.test(f));
     expect(pages.length).toBeGreaterThanOrEqual(6);
     for (const p of pages) expect(read(p), rel(p)).toMatch(/companyContext\(/);
   });

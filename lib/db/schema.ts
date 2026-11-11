@@ -1253,3 +1253,220 @@ export const contracts = pgTable(
   (t) => [index("contracts_company_idx").on(t.companyId)],
 );
 export type Contract = typeof contracts.$inferSelect;
+
+// ---------------------------------------------------------------------------
+// Internal CRM: Growth Goaled's own prospecting and relationships (staff only, one shared workspace)
+// ---------------------------------------------------------------------------
+
+export const crmPriority = pgEnum("crm_priority", ["high", "medium", "low"]);
+export const crmActivityKind = pgEnum("crm_activity_kind", ["note", "status_change", "email_draft", "email_sent", "email_received", "meeting", "call", "task", "other"]);
+export const crmEmailStatus = pgEnum("crm_email_status", ["draft", "scheduled", "sent", "failed", "replied"]);
+
+export const crmPipelines = pgTable("crm_pipelines", {
+  id: id(),
+  name: text("name").notNull(),
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+  ...timestamps,
+});
+
+/** A board column. `kind` keeps its meaning for the summary when it's renamed (new … won, archived; custom). */
+export const crmStages = pgTable(
+  "crm_stages",
+  {
+    id: id(),
+    pipelineId: uuid("pipeline_id")
+      .notNull()
+      .references(() => crmPipelines.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    position: integer("position").notNull(),
+    kind: text("kind").notNull().default("custom"),
+    ...timestamps,
+  },
+  (t) => [index("crm_stages_pipeline_idx").on(t.pipelineId, t.position)],
+);
+
+export const crmCompanies = pgTable(
+  "crm_companies",
+  {
+    id: id(),
+    name: text("name").notNull(),
+    website: text("website"),
+    // Normalised host from the website (acme.com), for duplicate detection and future enrichment
+    domain: text("domain"),
+    industry: text("industry"),
+    stage: text("stage"),
+    estimatedArrCents: integer("estimated_arr_cents"),
+    employeeCount: integer("employee_count"),
+    description: text("description"),
+    keyNotes: text("key_notes"),
+    // Future enrichment (AI research, data providers): kept apart from what the team entered
+    enrichment: jsonb("enrichment").$type<Record<string, unknown>>(),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("crm_companies_domain_idx").on(t.domain), index("crm_companies_name_idx").on(t.name)],
+);
+
+export const crmContacts = pgTable(
+  "crm_contacts",
+  {
+    id: id(),
+    firstName: text("first_name").notNull(),
+    lastName: text("last_name"),
+    // Lower-cased; one contact per email address
+    email: text("email"),
+    // Never true for imported or researched addresses until someone has confirmed them
+    emailVerified: boolean("email_verified").notNull().default(false),
+    phone: text("phone"),
+    jobTitle: text("job_title"),
+    companyId: uuid("company_id").references(() => crmCompanies.id, { onDelete: "set null" }),
+    linkedinUrl: text("linkedin_url"),
+    location: text("location"),
+    category: text("category"),
+    subcategory: text("subcategory"),
+    source: text("source"),
+    ownerId: uuid("owner_id").references(() => users.id, { onDelete: "set null" }),
+    stageId: uuid("stage_id").references(() => crmStages.id, { onDelete: "set null" }),
+    position: numeric("position", { mode: "number" }).notNull().default(0),
+    priority: crmPriority("priority").notNull().default("medium"),
+    opportunity: text("opportunity"),
+    potentialMonthlyCents: integer("potential_monthly_cents"),
+    dealValueCents: integer("deal_value_cents"),
+    opportunityNotes: text("opportunity_notes"),
+    notes: text("notes"),
+    lastContactedAt: timestamp("last_contacted_at", { withTimezone: true }),
+    // Asked not to be emailed (unsubscribe/suppression): no drafts can be sent to them
+    doNotEmail: boolean("do_not_email").notNull().default(false),
+    score: integer("score"),
+    enrichment: jsonb("enrichment").$type<Record<string, unknown>>(),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("crm_contacts_email_idx").on(t.email), index("crm_contacts_stage_idx").on(t.stageId, t.position), index("crm_contacts_company_idx").on(t.companyId), index("crm_contacts_owner_idx").on(t.ownerId)],
+);
+
+export const crmTags = pgTable("crm_tags", { id: id(), name: text("name").notNull(), ...timestamps }, (t) => [uniqueIndex("crm_tags_name_idx").on(t.name)]);
+
+export const crmContactTags = pgTable(
+  "crm_contact_tags",
+  {
+    contactId: uuid("contact_id")
+      .notNull()
+      .references(() => crmContacts.id, { onDelete: "cascade" }),
+    tagId: uuid("tag_id")
+      .notNull()
+      .references(() => crmTags.id, { onDelete: "cascade" }),
+  },
+  (t) => [uniqueIndex("crm_contact_tags_pk").on(t.contactId, t.tagId)],
+);
+
+/** The relationship timeline: notes, interactions, stage moves, emails, tasks. */
+export const crmActivities = pgTable(
+  "crm_activities",
+  {
+    id: id(),
+    contactId: uuid("contact_id")
+      .notNull()
+      .references(() => crmContacts.id, { onDelete: "cascade" }),
+    kind: crmActivityKind("kind").notNull(),
+    body: text("body"),
+    meta: jsonb("meta").$type<Record<string, unknown>>(),
+    actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+    ...timestamps,
+  },
+  (t) => [index("crm_activities_contact_idx").on(t.contactId, t.occurredAt)],
+);
+
+/** Follow-ups: the next thing to do for a contact. Future: created by email events and sequences. */
+export const crmTasks = pgTable(
+  "crm_tasks",
+  {
+    id: id(),
+    contactId: uuid("contact_id")
+      .notNull()
+      .references(() => crmContacts.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    dueDate: date("due_date", { mode: "string" }),
+    remindAt: timestamp("remind_at", { withTimezone: true }),
+    priority: crmPriority("priority").notNull().default("medium"),
+    notes: text("notes"),
+    ownerId: uuid("owner_id").references(() => users.id, { onDelete: "set null" }),
+    doneAt: timestamp("done_at", { withTimezone: true }),
+    // Where it came from: "manual" now; later "email_reply", "sequence", …
+    origin: text("origin").notNull().default("manual"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [index("crm_tasks_open_idx").on(t.doneAt, t.dueDate), index("crm_tasks_contact_idx").on(t.contactId)],
+);
+
+/**
+ * Future (phase 2): a team member's connected Gmail / Google Workspace account. Tokens are stored
+ * encrypted (never plain text) and only once OAuth exists; nothing writes here yet.
+ */
+export const crmEmailAccounts = pgTable("crm_email_accounts", {
+  id: id(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  provider: text("provider").notNull().default("google"),
+  email: text("email").notNull(),
+  status: text("status").notNull().default("disconnected"),
+  scopes: text("scopes").array(),
+  tokenCiphertext: text("token_ciphertext"),
+  connectedAt: timestamp("connected_at", { withTimezone: true }),
+  ...timestamps,
+});
+
+export const crmEmailTemplates = pgTable("crm_email_templates", {
+  id: id(),
+  name: text("name").notNull(),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+  ...timestamps,
+});
+
+/** Future (phase 3): multi-step sequences. Contacts are never enrolled in bulk automatically. */
+export const crmSequences = pgTable("crm_sequences", {
+  id: id(),
+  name: text("name").notNull(),
+  steps: jsonb("steps").$type<{ delayDays: number; templateId: string | null }[]>().notNull().default([]),
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+  ...timestamps,
+});
+
+/** Drafts now; sent, scheduled, failed and replied once an email account is connected. */
+export const crmEmails = pgTable(
+  "crm_emails",
+  {
+    id: id(),
+    contactId: uuid("contact_id")
+      .notNull()
+      .references(() => crmContacts.id, { onDelete: "cascade" }),
+    companyId: uuid("company_id").references(() => crmCompanies.id, { onDelete: "set null" }),
+    accountId: uuid("account_id").references(() => crmEmailAccounts.id, { onDelete: "set null" }),
+    toEmail: text("to_email").notNull(),
+    subject: text("subject").notNull().default(""),
+    body: text("body").notNull().default(""),
+    status: crmEmailStatus("status").notNull().default("draft"),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    providerMessageId: text("provider_message_id"),
+    threadId: text("thread_id"),
+    templateId: uuid("template_id").references(() => crmEmailTemplates.id, { onDelete: "set null" }),
+    sequenceId: uuid("sequence_id").references(() => crmSequences.id, { onDelete: "set null" }),
+    error: text("error"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [index("crm_emails_contact_idx").on(t.contactId, t.createdAt)],
+);
+
+/** Addresses that must never be emailed (unsubscribed, bounced, asked not to be contacted). */
+export const crmSuppressions = pgTable("crm_suppressions", { id: id(), email: text("email").notNull(), reason: text("reason").notNull(), ...timestamps }, (t) => [uniqueIndex("crm_suppressions_email_idx").on(t.email)]);
+
+export type CrmContact = typeof crmContacts.$inferSelect;
+export type CrmCompany = typeof crmCompanies.$inferSelect;
+export type CrmStage = typeof crmStages.$inferSelect;

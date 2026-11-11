@@ -20,6 +20,10 @@ const ADVISOR_NAV: { title: string; items: Item[] }[] = [
     ],
   },
   {
+    title: "Growth Goaled",
+    items: [{ href: "/advisor/crm", label: "CRM" }],
+  },
+  {
     // Reference data and settings; no heading.
     title: "",
     items: [
