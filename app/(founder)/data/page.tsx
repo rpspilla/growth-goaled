@@ -48,7 +48,7 @@ export default async function DataPage() {
 
       {questions.length > 0 && (
         <Link href="/data/questions" className="block rounded-xl border p-4 mb-6 text-base font-semibold" style={{ background: "var(--card)", borderColor: "var(--amber)", color: "var(--foreground)" }}>
-          {questions.length} {questions.length === 1 ? "question needs" : "questions need"} your answer →
+          {questions.length} {questions.length === 1 ? "item" : "items"} to review with your advisor →
         </Link>
       )}
 

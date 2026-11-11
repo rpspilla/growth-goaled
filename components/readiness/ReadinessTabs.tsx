@@ -9,7 +9,7 @@ export function ReadinessTabs({ questions = 0 }: { questions?: number }) {
   const tabs = [
     { href: "/data", label: "What we need", badge: 0 },
     { href: "/data/files", label: "Files", badge: 0 },
-    { href: "/data/questions", label: "Needs your answer", badge: questions },
+    { href: "/data/questions", label: "Review with your advisor", badge: questions },
   ];
   return (
     <nav className="flex gap-1 overflow-x-auto border-b mb-8" style={{ borderColor: "var(--border)" }}>
