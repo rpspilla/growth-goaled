@@ -1,5 +1,6 @@
 "use server";
 
+import { answerDataRequests } from "@/lib/data/data-requests";
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -26,6 +27,8 @@ import { founderContext } from "@/lib/data/founder-context";
 import { track } from "@/lib/events";
 
 /** Every action works on the signed-in founder's own company; the client never supplies a company id. */
+const appUrl = () => (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+
 async function founderCompany() {
   const user = await requireRole(["founder"]);
   const company = await getFounderCompany(user);
@@ -82,6 +85,8 @@ export async function registerInboxUpload(input: z.infer<typeof inboxInput>): Pr
     const { doc, duplicate } = await registerDocument(user, company, { ...parsed.data, docType: "other" });
     if (!duplicate) after(() => processInboxDocument(doc.id));
     else if (!doc.suggestions) after(() => sortDocument(doc.id));
+    // Files shared while the advisor is waiting on an update answer their request.
+    after(() => answerDataRequests(user, company, doc.filename, appUrl()));
     refresh();
     return { ok: true, duplicate };
   } catch (err) {
@@ -97,6 +102,7 @@ export async function importFromLink(url: string): Promise<{ ok: true; duplicate
   const result = await importGoogleLink(user, company, raw.data);
   if (!result.ok) return result;
   if (!result.duplicate) after(() => processInboxDocument(result.documentId));
+  after(() => answerDataRequests(user, company, result.filename, appUrl()));
   refresh();
   return { ok: true, duplicate: result.duplicate, filename: result.filename };
 }

@@ -22,7 +22,7 @@ test("a founder buys an action plan from the conversation; an advisor approves i
   const page = founder.page;
 
   // --- $499: talk it through, see the card, buy the plan ---
-  await page.goto("/overview");
+  await page.goto("/chat");
   await page.getByRole("button", { name: "Should we hire more salespeople?" }).click();
   await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/);
   await expect(page.getByRole("region", { name: "Build my action plan" })).toHaveCount(0);
@@ -93,7 +93,7 @@ test("a founder buys an action plan from the conversation; an advisor approves i
   await expect(panel).toContainText("1 of 3 milestones done");
 
   // --- Execute & Monitor (monthly): the advisor is in the conversation ---
-  await page.goto("/overview");
+  await page.goto("/chat");
   await page.getByRole("button", { name: "Who should my first GTM hire be?" }).click();
   await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/);
   await page.getByLabel("Your reply").fill("We have 2 AEs.");

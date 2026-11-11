@@ -79,3 +79,33 @@ Reply to this founder at ${p.email}.`;
 </div>`;
   return { subject, text, html };
 }
+
+/** To the founder: their advisor needs files or figures; the button opens the upload page. */
+export function dataRequestEmail(p: { advisorName: string; companyName: string; items: string[]; message: string | null; link: string }) {
+  const subject = `${p.advisorName} asked ${p.companyName} for an update`;
+  const list = p.items.map((i) => `- ${i}`).join("\n");
+  const text = `${p.advisorName} asked for an update from ${p.companyName}${p.items.length ? ":\n\n" + list : "."}${p.message ? `\n\n"${p.message}"` : ""}
+
+Upload it here (drag and drop, any format): ${p.link}`;
+  const html = `<div style="font-family:Inter,Arial,sans-serif;color:#0D1B2A;max-width:520px">
+<p style="font-size:15px">${escape(p.advisorName)} asked for an update from <strong>${escape(p.companyName)}</strong>${p.items.length ? ":" : "."}</p>
+${p.items.length ? `<ul style="font-size:15px;padding-left:20px">${p.items.map((i) => `<li>${escape(i)}</li>`).join("")}</ul>` : ""}
+${p.message ? `<blockquote style="margin:0 0 16px;padding:12px 16px;background:#F1F5F9;border-radius:8px;font-size:15px;white-space:pre-wrap">${escape(p.message)}</blockquote>` : ""}
+<p><a href="${escape(p.link)}" style="display:inline-block;background:#155A3C;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600">Upload the update</a></p>
+<p style="font-size:12px;color:#64748B">Drag and drop any files: spreadsheets, PDFs, exports. They're kept in your Documents.</p>
+</div>`;
+  return { subject, text, html };
+}
+
+/** To the advisor: the founder answered a data request. */
+export function dataReceivedEmail(p: { companyName: string; founderName: string; filename: string; link: string }) {
+  const subject = `${p.companyName} shared an update`;
+  const text = `${p.founderName} at ${p.companyName} shared ${p.filename} in answer to your request.
+
+See it: ${p.link}`;
+  const html = `<div style="font-family:Inter,Arial,sans-serif;color:#0D1B2A;max-width:480px">
+<p style="font-size:15px">${escape(p.founderName)} at <strong>${escape(p.companyName)}</strong> shared <strong>${escape(p.filename)}</strong> in answer to your request.</p>
+<p><a href="${escape(p.link)}" style="display:inline-block;background:#155A3C;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600">See their documents</a></p>
+</div>`;
+  return { subject, text, html };
+}

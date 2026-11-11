@@ -8,10 +8,11 @@ import { assessmentCompletions, founderAssessment } from "@/lib/data/assessments
 import { founderContext } from "@/lib/data/founder-context";
 import { listConversations } from "@/lib/data/chat";
 import { founderPlans, REVIEW_HOURS } from "@/lib/data/action-plans";
-import { CHAT_TOPICS } from "@/lib/chat/topics";
-import { ChatStart } from "@/components/chat/ChatStart";
 import { HumanPresence } from "@/components/brand/HumanPresence";
-import { startChatAction } from "../chat/actions";
+import { CompanyLogo } from "@/components/brand/CompanyLogo";
+import { CurrentPlanCard } from "@/components/plan/CurrentPlanCard";
+import { companySite } from "@/lib/data/company-site";
+import { currentPlan } from "@/lib/data/current-plan";
 import { getIntakeAnswers } from "@/lib/data/intake";
 import { snapshotPeers } from "@/lib/data/peers";
 import { PeerComparisons } from "@/components/use-cases/PeerComparisons";
@@ -72,9 +73,9 @@ function benchmarkLead(peers: PeerComparison[]): string {
   return `${base} ${ahead.length ? `At or above the median on ${ahead.map((p) => p.title.toLowerCase()).join(" and ")}.` : "None is at or above the median yet."}`;
 }
 
-/** Growth Command Center: the main finding, the numbers that matter, the next three actions, and where each question stands. */
-// A starter is answered before the conversation opens.
-export const maxDuration = 300;
+const approvedThisWeek = (d: Date | null) => Boolean(d && d.getTime() > Date.now() - 7 * 86_400_000);
+
+/** Growth Command Center: who the company is, the plan it's working on with its advisor, its numbers and benchmarks. */
 
 export default async function OverviewPage({ searchParams }: { searchParams: Promise<{ welcome?: string }> }) {
   const { welcome } = await searchParams;
@@ -82,7 +83,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   const state = active && { useCase: active.def.id, status: active.status };
   const started = useCases.find((u) => !u.activatedAt);
   const action = nextAction(state, started ? (getUseCase(started.useCase)?.id ?? null) : null);
-  const [brief, plan, perf, completed, peers, conversations, actionPlans] = await Promise.all([
+  const [brief, plan, perf, completed, peers, conversations, actionPlans, site, current] = await Promise.all([
     company && active ? founderAssessment(company.id, active.def.id) : null,
     company && active ? progressView(company, active.def.id) : null,
     company ? companyPerformance(company) : null,
@@ -90,12 +91,16 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
     company ? getIntakeAnswers(company).then((a) => snapshotPeers(company, a)) : null,
     company ? listConversations(company, 3) : [],
     company ? founderPlans(company) : [],
+    company ? companySite(company) : null,
+    company ? currentPlan(company) : null,
   ]);
   const view = brief?.state === "ready" ? brief.view : null;
   // AE ramp time always has a place on the Overview (James's feedback): the figure, or what would give it.
   const ramp = perf?.metrics.get("ramp_months") ?? null;
   const headline = HEADLINE_METRICS.filter((m) => perf?.metrics.has(m)).slice(0, 4).map((m) => perf!.metrics.get(m)!);
   const firstName = user.name?.split(" ")[0];
+  // Plan news: other plans, ones still with the advisor, and the current one for a week after it's approved.
+  const notices = actionPlans.filter((p) => p.id !== current?.plan?.id || p.status === "drafting" || p.status === "in_review" || approvedThisWeek(p.approvedAt));
   const stage = journeyStage(state);
   const startWith = firstUseCase();
 
@@ -110,21 +115,40 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="px-4 sm:px-8 py-8 max-w-6xl space-y-12">
-      <PageHeader eyebrow={company?.name} title={firstName ? `Welcome back, ${firstName}` : "Your growth command center"} />
+      {company ? (
+        <header className="flex gap-5 items-start flex-wrap">
+          <CompanyLogo name={company.name} src={site?.logoUrl ?? null} size={72} />
+          <div className="flex-1 min-w-[16rem]">
+            <div className="text-sm" style={{ color: "var(--muted-foreground)" }}>{firstName ? `Welcome back, ${firstName}` : "Welcome back"}</div>
+            <h1 className="font-display text-3xl sm:text-4xl leading-tight" style={{ color: "var(--foreground)" }}>{company.name}</h1>
+            {site?.about ? (
+              <p aria-label="What the company does" className="text-lg mt-1 max-w-3xl" style={{ color: "var(--muted-foreground)" }}>{site.about}</p>
+            ) : (
+              <p className="text-base mt-1" style={{ color: "var(--muted-foreground)" }}>
+                {site?.website ? "We couldn't read a description from your website." : "Add your website to your company profile to show your logo and what you do."}{" "}
+                <Link href="/profile" className="link">Company profile</Link>
+              </p>
+            )}
+            {site?.website && <a href={`https://${site.website}`} target="_blank" rel="noopener" className="link text-sm">{site.website}</a>}
+          </div>
+        </header>
+      ) : (
+        <PageHeader title={firstName ? `Welcome back, ${firstName}` : "Your growth command center"} />
+      )}
 
       {welcome !== undefined && company && (
-        <div className="surface p-5 -mt-6 flex gap-4 items-start" style={{ background: "var(--green-muted)", borderColor: "transparent" }} role="status">
-          <div>
-            <div className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>You&apos;re set up, {company.name}. Ask your first question below.</div>
-            <p className="text-base mt-0.5" style={{ color: "var(--muted-foreground)" }}>Conversations are free. When you&apos;re ready, turn one into a 30/60/90-day action plan, from {formatPrice(pricing().actionPlanCents)}.</p>
-          </div>
+        <div className="surface p-5 -mt-6" style={{ background: "var(--green-muted)", borderColor: "transparent" }} role="status">
+          <div className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>You&apos;re set up, {company.name}.</div>
+          <p className="text-base mt-0.5" style={{ color: "var(--muted-foreground)" }}>Your plan with your advisor, your numbers and how you compare all live here.</p>
         </div>
       )}
 
+      {company && <CurrentPlanCard current={current} />}
+
       {/* Action plans: ready ones first and loud, so an advisor's approval is the first thing they see. */}
-      {actionPlans.length > 0 && (
+      {notices.length > 0 && (
         <section aria-label="Your action plans" className="space-y-3 -mt-4">
-          {actionPlans.map((p) => {
+          {notices.map((p) => {
             const ready = p.status === "delivered" || p.status === "active";
             const day = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
             return (
@@ -152,18 +176,16 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         </section>
       )}
 
-      {/* The main entry: talk a decision through. */}
       {company && (
-        <div className="space-y-4">
+        <div className="space-y-3">
           <HumanPresence />
-          <ChatStart starters={CHAT_TOPICS.map((t) => ({ id: t.id, starter: t.starter }))} start={startChatAction} />
           {conversations.length > 0 && (
             <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-base">
-              <span style={{ color: "var(--muted-foreground)" }}>Pick up where you left off:</span>
+              <span style={{ color: "var(--muted-foreground)" }}>Recent strategic decisions:</span>
               {conversations.map((c) => (
                 <Link key={c.id} href={`/chat/${c.id}`} className="link">{c.title}</Link>
               ))}
-              <Link href="/chat" className="link text-sm">All conversations →</Link>
+              <Link href="/chat" className="link text-sm">All strategic decisions →</Link>
             </div>
           )}
         </div>

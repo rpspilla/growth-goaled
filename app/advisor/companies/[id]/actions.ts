@@ -14,6 +14,7 @@ import { clearOverride, setOverride } from "@/lib/data/benchmark-library";
 import { chooseFigure, enterFigure, type FigureResult } from "@/lib/data/figures";
 import { parseFigure } from "@/lib/figures";
 import { isMetricKey } from "@/lib/metrics";
+import { createDataRequest, setCurrentPlan } from "@/lib/data/data-requests";
 import { cancelTeammateInvite, inviteTeammate, removeTeammate, type TeamResult } from "@/lib/data/team";
 
 async function managed(companyId: string) {
@@ -141,4 +142,32 @@ export async function removeCompanyMemberAction(companyId: string, userId: strin
   const r = await removeTeammate(ctx.user, ctx.company.id, id.data);
   refresh(ctx.company.id);
   return r;
+}
+
+const appUrl = () => (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+
+/** The advisor names the plan the company is working on (shown on the founder's Overview and Performance). */
+export async function setCurrentPlanAction(companyId: string, formData: FormData): Promise<void> {
+  const ctx = await managed(companyId);
+  if (!ctx) return;
+  await setCurrentPlan(ctx.company, z.string().max(200).catch("").parse(formData.get("plan") ?? ""));
+  refresh(companyId);
+  revalidatePath("/overview");
+  revalidatePath("/performance");
+}
+
+export type DataRequestState = { ok?: boolean; error?: string; note?: string };
+
+/** Ask the founder for files or figures: recorded and emailed with a link straight to the upload page. */
+export async function requestDataAction(companyId: string, _prev: DataRequestState, formData: FormData): Promise<DataRequestState> {
+  const ctx = await managed(companyId);
+  if (!ctx) return { error: "Company not found." };
+  const items = formData.getAll("items").filter((v): v is string => typeof v === "string").map((v) => v.slice(0, 200));
+  const other = formData.get("other");
+  if (typeof other === "string" && other.trim()) items.push(other.trim().slice(0, 200));
+  const message = formData.get("message");
+  const r = await createDataRequest(ctx.user, ctx.company, { items, message: typeof message === "string" ? message.slice(0, 2000) : null }, appUrl());
+  refresh(companyId);
+  if (!r.ok) return { error: r.error };
+  return { ok: true, note: r.recipients === 0 ? "Saved. Nobody at the company has an account yet, so no email went out." : r.emailed === r.recipients ? `Emailed ${r.recipients === 1 ? "the founder" : `${r.recipients} people`} with a link to upload.` : `Saved, but the email didn't go out (${r.emailed} of ${r.recipients} sent). Share the Performance page link with them.` };
 }

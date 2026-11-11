@@ -30,13 +30,13 @@ export default async function FounderLayout({ children }: { children: ReactNode 
           libraryHint="Pick a growth question"
           extraLabel={legacy ? "Company" : "Your growth"}
           extra={[
+            { href: "/profile", label: "Company profile" },
+            { href: "/team", label: "Team" },
             { href: "/overview", label: "Overview" },
-            { href: "/chat", label: "Conversations" },
+            { href: "/chat", label: "Strategic Decisions" },
             { href: "/performance", label: "Performance" },
             ...(legacy ? [{ href: "/assessments", label: "All assessments" }] : []),
             { href: "/documents", label: "Documents" },
-            { href: "/profile", label: "Company profile" },
-            { href: "/team", label: "Team" },
           ]}
         />
       }

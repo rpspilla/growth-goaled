@@ -152,9 +152,34 @@ export const companies = pgTable(
     advisorSummaryAt: timestamp("advisor_summary_at", { withTimezone: true }),
     advisorSummaryBy: uuid("advisor_summary_by").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
     isSample: boolean("is_sample").notNull().default(false),
+    // From the company's website (lib/site-profile.ts): its logo and what the business does
+    siteUrl: text("site_url"),
+    logoUrl: text("logo_url"),
+    about: text("about"),
+    siteCheckedAt: timestamp("site_checked_at", { withTimezone: true }),
+    // The plan the company is working on with its advisor, as the advisor names it (e.g. "Sales Hiring")
+    currentPlan: text("current_plan"),
     ...timestamps,
   },
   (t) => [index("companies_advisor_id_idx").on(t.advisorId)],
+);
+
+/** An advisor asking the founder for files or figures; the email links straight to the upload page. */
+export const dataRequests = pgTable(
+  "data_requests",
+  {
+    id: id(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    requestedBy: uuid("requested_by").references(() => users.id, { onDelete: "set null" }),
+    items: jsonb("items").$type<string[]>().notNull().default([]),
+    message: text("message"),
+    fulfilledAt: timestamp("fulfilled_at", { withTimezone: true }),
+    fulfilledBy: uuid("fulfilled_by").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [index("data_requests_company_idx").on(t.companyId, t.createdAt)],
 );
 
 export const companyMembers = pgTable(

@@ -5,7 +5,9 @@ import { latestMetrics, portfolioRows, userName } from "@/lib/data/portfolio";
 import { formatMetric, type MetricKey } from "@/lib/metrics";
 import { getUseCase, targetSummary } from "@/lib/use-cases";
 import { STEPS, journeyStage } from "@/lib/use-cases/steps";
-import { cancelCompanyInviteAction, inviteCompanyMemberAction, removeCompanyMemberAction, updateHealth, updateSummary } from "./actions";
+import { cancelCompanyInviteAction, inviteCompanyMemberAction, removeCompanyMemberAction, requestDataAction, setCurrentPlanAction, updateHealth, updateSummary } from "./actions";
+import { DataRequestForm } from "@/components/advisor/DataRequestForm";
+import { listDataRequests, REQUEST_ITEMS } from "@/lib/data/data-requests";
 import { TeamPanel } from "@/components/team/TeamPanel";
 import { companyPeople } from "@/lib/data/team";
 import { companyContext } from "./context";
@@ -22,7 +24,8 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
     userName(company.advisorSummaryBy),
     listAdvisoryRequests([company.id]),
   ]);
-  const people = await companyPeople(company.id);
+  const [people, requests] = await Promise.all([companyPeople(company.id), listDataRequests(company.id)]);
+  const day = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   const base = `/advisor/companies/${company.id}`;
 
   return (
@@ -130,6 +133,39 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
         meta={company.advisorSummaryAt ? `${summaryBy ?? "Advisor"} · ${company.advisorSummaryAt.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : null}
         save={updateSummary}
       />
+
+      {!company.isSample && (
+        <div className="grid lg:grid-cols-2 gap-6">
+          <section aria-label="Current plan" className="rounded-xl border p-5 space-y-3" style={card}>
+            <div>
+              <h2 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>Current plan</h2>
+              <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>What {company.name} is working on with you. It leads their Overview and Performance pages; leave it empty to show their latest action plan instead.</p>
+            </div>
+            <form action={setCurrentPlanAction.bind(null, company.id)} className="flex gap-2 flex-wrap">
+              <input name="plan" defaultValue={company.currentPlan ?? ""} placeholder="e.g. Sales Hiring" aria-label="Current plan name" className="field flex-1 min-w-[12rem]" maxLength={120} />
+              <button type="submit" className="btn btn-secondary">Save</button>
+            </form>
+          </section>
+          <section aria-label="Request data" className="rounded-xl border p-5 space-y-3" style={card}>
+            <div>
+              <h2 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>Request data</h2>
+              <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Everyone at {company.name} gets an email with a button that opens their upload page. You&apos;re emailed when they share files.</p>
+            </div>
+            <DataRequestForm items={REQUEST_ITEMS} send={requestDataAction.bind(null, company.id)} />
+            {requests.length > 0 && (
+              <ul aria-label="Data requests" className="text-sm divide-y border-t pt-1" style={{ borderColor: "var(--border)" }}>
+                {requests.slice(0, 5).map((r) => (
+                  <li key={r.id} className="py-2 flex gap-3 items-baseline" style={{ borderColor: "var(--border)" }}>
+                    <span className="font-semibold shrink-0" style={{ color: r.fulfilledAt ? "var(--green)" : "var(--amber)" }}>{r.fulfilledAt ? `Received ${day(r.fulfilledAt)}` : "Waiting"}</span>
+                    <span className="flex-1 min-w-0" style={{ color: "var(--foreground)" }}>{[...r.items, r.message].filter(Boolean).join(" · ")}</span>
+                    <span className="shrink-0" style={{ color: "var(--muted-foreground)" }}>{day(r.createdAt)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+      )}
 
       {!company.isSample && (
         <section aria-label="People" className="rounded-xl border p-5 space-y-3" style={card}>

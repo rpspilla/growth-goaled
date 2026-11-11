@@ -11,17 +11,17 @@ import { removeFactAction, startChatAction, updateFactAction } from "./actions";
 
 export const maxDuration = 300;
 
-/** All conversations, a new one, and what Growth Goaled remembers about the company. */
+/** Strategic Decisions: past ones, the next one, and the history Growth Goaled keeps about the company. */
 export default async function ChatIndexPage() {
   const { company } = await founderContext();
   if (!company) redirect("/welcome");
   const [conversations, facts] = await Promise.all([listConversations(company, 50), listFacts(company)]);
   return (
     <div className="px-4 sm:px-8 py-8 max-w-5xl space-y-12">
-      <PageHeader eyebrow={company.name} title="Conversations" subtitle="Ask about any commercial decision. Answers use what you've already shared." />
+      <PageHeader eyebrow={company.name} title="Strategic Decisions" subtitle="Ask about any commercial decision. Answers use what you've already shared." />
 
       {conversations.length > 0 && (
-        <Section id="recent" title="Your conversations">
+        <Section id="recent" title="Strategic Decisions">
           <ul className="surface divide-y" style={{ borderColor: "var(--border)" }}>
             {conversations.map((c) => (
               <li key={c.id} style={{ borderColor: "var(--border)" }}>
@@ -36,12 +36,12 @@ export default async function ChatIndexPage() {
         </Section>
       )}
 
-      <Section id="new" title="Start a new conversation">
+      <Section id="new" title="What strategic decision is next?">
         <ChatStart starters={CHAT_TOPICS.map((t) => ({ id: t.id, starter: t.starter }))} start={startChatAction} heading={false} />
       </Section>
 
       <div id="facts" className="scroll-mt-24">
-        <Section id="facts-title" title="What we remember about your company" lead="From your conversations. Correct anything that's wrong; corrected facts are marked confirmed and won't be overwritten.">
+        <Section id="facts-title" title="History" lead="From your conversations. Correct anything that's wrong; corrected facts are marked confirmed and won't be overwritten.">
           <FactsEditor facts={facts.map((f) => ({ id: f.id, label: f.label, value: f.value, status: f.status }))} update={updateFactAction} remove={removeFactAction} />
         </Section>
       </div>

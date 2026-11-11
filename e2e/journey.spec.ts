@@ -139,7 +139,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await founder.page.getByRole("button", { name: "Continue", exact: true }).click();
   // Straight to the main entry: the conversation starters.
   await expect(founder.page).toHaveURL(/\/overview\?welcome=1$/);
-  await expect(founder.page.getByText(/You're set up, E2E Analytics\. Ask your first question below\./)).toBeVisible();
+  await expect(founder.page.getByText(/You're set up, E2E Analytics\./)).toBeVisible();
   // The Command Center points to the same first step.
   await founder.page.goto("/overview");
 
@@ -147,7 +147,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   // Before buying, there's no step-by-step journey: just the conversation-first menu.
   const steps = founder.page.getByRole("navigation", { name: "Steps" });
   await expect(steps).toHaveCount(0);
-  await expect(founder.page.getByRole("navigation", { name: "Menu" }).getByRole("link", { name: "Conversations" })).toBeVisible();
+  await expect(founder.page.getByRole("navigation", { name: "Menu" }).getByRole("link", { name: "Strategic Decisions" })).toBeVisible();
   await founder.page.goto("/library/series_b_ready/snapshot");
   await expect(founder.page).toHaveURL(/\/library\/series_b_ready$/);
   await expect(founder.page.getByRole("heading", { name: "Coming soon", exact: true })).toBeVisible();

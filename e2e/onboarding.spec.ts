@@ -33,8 +33,8 @@ test("sign-up basics carry through, and every growth question opens its own page
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   // Sign-up lands on the main entry: the conversation starters.
   await expect(page).toHaveURL(/\/overview\?welcome=1$/);
-  await expect(page.getByText(/You're set up, Deer in Headlights\. Ask your first question below\./)).toBeVisible();
-  await expect(page.getByRole("button", { name: "How do I build a repeatable revenue engine?" })).toBeVisible();
+  await expect(page.getByText(/You're set up, Deer in Headlights\./)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Start a new plan with your advisor here" })).toBeVisible();
   // The old growth-question pages still open directly.
   // --- 1.9: open another question first, come back, then the hiring plan opens its own page ---
   await page.goto("/library/growth_leak");
