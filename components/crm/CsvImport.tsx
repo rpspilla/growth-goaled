@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import { FileSpreadsheet, UploadCloud } from "lucide-react";
 import { CATEGORY_NAMES, SOURCES } from "@/lib/crm";
 
 type Result = { ok: true; added: number; duplicates: string[]; skipped: number; failed: number } | { ok: false; error: string };
@@ -13,6 +14,16 @@ export function CsvImport({ run: importCsv }: { run: (text: string, defaults: { 
   const [category, setCategory] = useState("");
   const [result, setResult] = useState<Result | null>(null);
   const [pending, start] = useTransition();
+  const [over, setOver] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const picker = useRef<HTMLInputElement>(null);
+  const choose = (f: File | null | undefined) => {
+    setResult(null);
+    if (!f) return;
+    if (!/\.csv$/i.test(f.name) && f.type !== "text/csv") return setError("That isn't a CSV file. Export your list as CSV (comma-separated) and drop it again.");
+    setError(null);
+    setFile(f);
+  };
   return (
     <form
       aria-label="Import contacts"
@@ -27,9 +38,41 @@ export function CsvImport({ run: importCsv }: { run: (text: string, defaults: { 
         });
       }}
     >
-      <label className="block text-sm">CSV file
-        <input type="file" accept=".csv,text/csv" aria-label="CSV file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="block mt-1 text-sm" />
-      </label>
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label="Drop a CSV file here, or choose one"
+        onClick={() => picker.current?.click()}
+        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), picker.current?.click())}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setOver(true);
+        }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setOver(false);
+          choose(e.dataTransfer.files?.[0]);
+        }}
+        className="rounded-xl p-8 flex flex-col items-center justify-center gap-2 text-center cursor-pointer transition-colors"
+        style={{ border: `2px dashed ${over ? "var(--green)" : "var(--border)"}`, background: over ? "var(--green-muted)" : "var(--muted)" }}
+      >
+        {file ? (
+          <>
+            <FileSpreadsheet size={28} aria-hidden style={{ color: "var(--green)" }} />
+            <div className="font-semibold" style={{ color: "var(--foreground)" }}>{file.name}</div>
+            <div className="text-sm" style={{ color: "var(--muted-foreground)" }}>{Math.max(1, Math.round(file.size / 1024))} KB · drop another file or click to change</div>
+          </>
+        ) : (
+          <>
+            <UploadCloud size={28} aria-hidden style={{ color: over ? "var(--green)" : "var(--muted-foreground)" }} />
+            <div className="font-semibold" style={{ color: "var(--foreground)" }}>{over ? "Drop to import" : "Drag and drop your CSV here"}</div>
+            <div className="text-sm" style={{ color: "var(--muted-foreground)" }}>or click to choose a file</div>
+          </>
+        )}
+        <input ref={picker} type="file" accept=".csv,text/csv" aria-label="CSV file" onClick={(e) => e.stopPropagation()} onChange={(e) => choose(e.target.files?.[0])} className="sr-only" tabIndex={-1} />
+      </div>
+      {error && <p role="alert" className="text-sm" style={{ color: "var(--red)" }}>{error}</p>}
       <div className="grid sm:grid-cols-2 gap-3">
         <label className="text-sm">Source for rows that don&apos;t say
           <select value={source} onChange={(e) => setSource(e.target.value)} className="field w-full mt-1"><option value="">Other</option>{SOURCES.map((s) => <option key={s}>{s}</option>)}</select>

@@ -142,13 +142,28 @@ test("Growth Goaled staff run prospects through the CRM; founders can't reach it
 
   // CSV import: new prospects in, existing emails skipped.
   await page.goto("/advisor/crm/import");
-  await page.getByLabel("CSV file").setInputFiles({ name: "prospects.csv", mimeType: "text/csv", buffer: Buffer.from("First name,Last name,Email,Company,Category,Source\nGrace,Hopper,grace@navy.mil,Navy,Investor,Event\nAlan,Turing,alan@bletchley.uk,Bletchley,Advisor,LinkedIn\nAda,Lovelace,ada@calc.io,Calc,,\n") });
-  await page.getByRole("button", { name: "Import" }).click();
+  await page.getByLabel("CSV file", { exact: true }).setInputFiles({ name: "prospects.csv", mimeType: "text/csv", buffer: Buffer.from("First name,Last name,Email,Company,Category,Source\nGrace,Hopper,grace@navy.mil,Navy,Investor,Event\nAlan,Turing,alan@bletchley.uk,Bletchley,Advisor,LinkedIn\nAda,Lovelace,ada@calc.io,Calc,,\n") });
+  await page.getByRole("button", { name: "Import", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Imported 2 contacts into New Prospects.");
   await expect(page.getByRole("status")).toContainText("Skipped 1 already in the CRM");
+  // Or dragged and dropped onto the import area.
+  await page.goto("/advisor/crm/import");
+  const zone = page.getByRole("button", { name: "Drop a CSV file here, or choose one" });
+  await expect(zone).toContainText("Drag and drop your CSV here");
+  await page.evaluate(() => {
+    const dt = new DataTransfer();
+    dt.items.add(new File(["Name,Email\nKatherine Johnson,kj@nasa.gov\n"], "dropped.csv", { type: "text/csv" }));
+    const el = document.querySelector("[aria-label='Drop a CSV file here, or choose one']")!;
+    el.dispatchEvent(new DragEvent("dragover", { dataTransfer: dt, bubbles: true, cancelable: true }));
+    el.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true }));
+  });
+  await expect(zone).toContainText("dropped.csv");
+  await page.getByRole("button", { name: "Import", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("Imported 1 contact into New Prospects.");
   await page.goto("/advisor/crm");
   await expect(board.getByRole("region", { name: "New Prospects" }).getByRole("listitem", { name: "Grace Hopper" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Summary" })).toContainText("4");
+  await expect(board.getByRole("region", { name: "New Prospects" }).getByRole("listitem", { name: "Katherine Johnson" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Summary" })).toContainText("5");
 
   // Columns can be renamed and added.
   await page.getByRole("link", { name: "Columns" }).click();
