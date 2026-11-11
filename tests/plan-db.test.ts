@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 const h = vi.hoisted(() => ({ db: null as unknown as Record<string | symbol, unknown> }));
 vi.mock("server-only", () => ({}));
 const sent = vi.hoisted(() => [] as { to: string; subject: string; text: string }[]);
-vi.mock("@/lib/email", () => ({ sendEmail: async (m: { to: string; subject: string; text: string }) => (sent.push(m), { sent: true }) }));
+vi.mock("@/lib/email", async (original) => ({ ...(await original<typeof import("@/lib/email")>()), sendEmail: async (m: { to: string; subject: string; text: string }) => (sent.push(m), { sent: true }) }));
 vi.mock("@/lib/db", async () => {
   const schema = await import("@/lib/db/schema");
   return { db: new Proxy({}, { get: (_t, p) => Reflect.get(h.db, p) }), schema };
@@ -15,7 +15,7 @@ import { schema } from "@/lib/db";
 import type { Company, User } from "@/lib/db/schema";
 import type { AssessmentInput, AssessmentOutput } from "@/lib/ai/assessment";
 import { assembleAssessmentInputs, createAssessmentVersion, founderAssessment, runAssessmentPipeline } from "@/lib/data/assessments";
-import { commitPlan, progressView, updatePlanAction } from "@/lib/data/plan";
+import { commitPlan, progressView, sendPlanAssignments, setPlanActionAssignee, updatePlanAction } from "@/lib/data/plan";
 import { dueReminders, sendMonthlyReminders, unsubscribeToken, validUnsubscribe } from "@/lib/data/reminders";
 import { activateUseCase, getCompanyUseCase } from "@/lib/data/use-cases";
 import { analyzeSheets } from "@/lib/metrics-engine";
@@ -152,6 +152,23 @@ describe("decision briefs from calculated evidence", () => {
     expect(await updatePlanAction(founder, co, actionId, "in_progress", "Calls booked")).toEqual({ ok: true });
     expect((await progressView(co, "growth_leak"))!.actions[0]).toMatchObject({ status: "in_progress", note: "Calls booked" });
     expect(await commitPlan(founder, other, first.deliverableId)).toEqual({ ok: false, error: "That brief isn't available." });
+
+    // Who does each action: Founder by default; Growth Goaled can be chosen until the plan goes to the advisor.
+    expect((await progressView(co, "growth_leak"))!).toMatchObject({ assignmentSentAt: null, actions: [{ assignee: "founder" }] });
+    expect(await setPlanActionAssignee(founder, other, actionId, "growth_goaled")).toEqual({ ok: false, error: "That action wasn't found." });
+    expect(await setPlanActionAssignee(founder, co, actionId, "growth_goaled")).toEqual({ ok: true });
+    const [advisor] = await db().insert(schema.users).values({ email: "adv@gg.test", authUserId: "adv", role: "advisor" }).returning();
+    sent.length = 0;
+    expect(await sendPlanAssignments(founder, { ...co, advisorId: advisor!.id }, "growth_leak", "https://dev.test")).toEqual({ ok: true, growthGoaled: 1 });
+    const sentView = (await progressView(co, "growth_leak"))!;
+    expect(sentView.assignmentSentAt).not.toBeNull();
+    expect(sentView.actions[0]!.assignee).toBe("growth_goaled");
+    const [todo] = await db().select().from(schema.registerItems).where(eq(schema.registerItems.companyId, co.id));
+    expect(todo).toMatchObject({ owner: "advisor", status: "open", title: "Review the action plan and quote Growth Goaled's share (1 of 1 actions)" });
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!).toMatchObject({ to: "adv@gg.test", subject: "Leak Co sent their action plan for review (1 for Growth Goaled)" });
+    // Once sent, the split is fixed.
+    expect(await setPlanActionAssignee(founder, co, actionId, "founder")).toMatchObject({ ok: false });
 
     // Reassessing keeps Progress open, and the new brief shows what changed.
     const second = await brief();

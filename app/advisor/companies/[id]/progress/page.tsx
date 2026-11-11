@@ -43,10 +43,19 @@ export default async function CompanyProgressPage({ params }: { params: Promise<
           )}
           <div className="rounded-xl border p-5 text-sm" style={card}>
             <div className="label mb-2" style={{ color: "var(--muted-foreground)" }}>Plan</div>
-            <ol className="space-y-2">
+            <p className="mb-2" style={{ color: view.assignmentSentAt ? "var(--green)" : "var(--muted-foreground)" }}>
+              {view.assignmentSentAt
+                ? `Who does what, sent for your review on ${date(view.assignmentSentAt)}: ${view.actions.filter((a) => a.assignee === "growth_goaled").length} with Growth Goaled.`
+                : "The founder hasn't sent who-does-what for review yet."}
+            </p>
+            <ol className="space-y-2" aria-label="Plan actions">
               {view.actions.map((a) => (
                 <li key={a.id} style={{ color: "var(--foreground)" }}>
-                  {a.priority}. {a.action} <span style={{ color: "var(--muted-foreground)" }}>· {STATUS[a.status]}{a.note ? ` · “${a.note}”` : ""}</span>
+                  {a.priority}. {a.action}{" "}
+                  <span className="text-xs font-semibold px-1.5 py-0.5 rounded" style={a.assignee === "growth_goaled" ? { background: "var(--green-muted)", color: "var(--green)" } : { background: "var(--blue-muted)", color: "var(--blue)" }}>
+                    {a.assignee === "growth_goaled" ? "Growth Goaled" : "Founder"}
+                  </span>{" "}
+                  <span style={{ color: "var(--muted-foreground)" }}>· {STATUS[a.status]}{a.note ? ` · “${a.note}”` : ""}</span>
                 </li>
               ))}
             </ol>

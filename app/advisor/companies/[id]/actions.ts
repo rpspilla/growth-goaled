@@ -14,7 +14,7 @@ import { clearOverride, setOverride } from "@/lib/data/benchmark-library";
 import { chooseFigure, enterFigure, type FigureResult } from "@/lib/data/figures";
 import { parseFigure } from "@/lib/figures";
 import { isMetricKey } from "@/lib/metrics";
-import { createDataRequest, setCurrentPlan } from "@/lib/data/data-requests";
+import { createDataRequest, deleteDataRequest, setCurrentPlan } from "@/lib/data/data-requests";
 import { clearBusinessUpdate } from "@/lib/data/business-metrics";
 import { createContract, removeContract, updateContract } from "@/lib/data/contracts";
 import { cancelTeammateInvite, inviteTeammate, removeTeammate, type TeamResult } from "@/lib/data/team";
@@ -233,4 +233,13 @@ export async function removeContractAction(companyId: string, contractId: string
   if (!ctx || !z.uuid().safeParse(contractId).success) return;
   await removeContract(ctx.company, contractId);
   refresh(companyId);
+}
+
+/** Removes a data request (or "all" of them) from the advisor's list and the founder's Performance page. */
+export async function deleteDataRequestAction(companyId: string, requestId: string): Promise<void> {
+  const ctx = await managed(companyId);
+  if (!ctx || (requestId !== "all" && !z.uuid().safeParse(requestId).success)) return;
+  await deleteDataRequest(ctx.company, requestId);
+  refresh(companyId);
+  revalidatePath("/performance");
 }

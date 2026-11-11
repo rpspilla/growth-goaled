@@ -68,3 +68,9 @@ export async function answerDataRequests(user: Pick<User, "id" | "name" | "email
 export async function setCurrentPlan(company: Pick<Company, "id">, name: string): Promise<void> {
   await db.update(schema.companies).set({ currentPlan: name.trim().slice(0, 120) || null, updatedAt: new Date() }).where(eq(schema.companies.id, company.id));
 }
+
+/** Removes one data request (or every one for the company, "all"); the founder no longer sees it. */
+export async function deleteDataRequest(company: Pick<Company, "id">, requestId: string): Promise<number> {
+  const scope = requestId === "all" ? eq(schema.dataRequests.companyId, company.id) : and(eq(schema.dataRequests.companyId, company.id), eq(schema.dataRequests.id, requestId));
+  return (await db.delete(schema.dataRequests).where(scope).returning({ id: schema.dataRequests.id })).length;
+}

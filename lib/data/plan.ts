@@ -4,6 +4,7 @@ import { db, schema } from "@/lib/db";
 import type { Company, User } from "@/lib/db/schema";
 import { parseBrief } from "@/lib/deliverables/assessment";
 import { track } from "@/lib/events";
+import { planSplitEmail, sendEmail } from "@/lib/email";
 import { formatMetric, isMetricKey, METRICS, type MetricKey } from "@/lib/metrics";
 import type { UseCaseId } from "@/lib/use-cases";
 import { getCompanyUseCase, setUseCaseStatus } from "./use-cases";
@@ -15,6 +16,7 @@ import { getCompanyUseCase, setUseCaseStatus } from "./use-cases";
  */
 
 type PlanStatus = (typeof schema.planActionStatus.enumValues)[number];
+export type PlanAssignee = (typeof schema.planAssignee.enumValues)[number];
 export const PLAN_STATUSES = schema.planActionStatus.enumValues;
 
 export type PlanResult = { ok: true } | { ok: false; error: string };
@@ -118,7 +120,9 @@ export type ProgressView = {
   revisitDue: boolean;
   revisitTrigger: string;
   decision: string;
-  actions: { id: string; priority: number; action: string; rationale: string | null; timing: string | null; role: string | null; successMetric: string | null; expectedSignal: string | null; status: PlanStatus; note: string | null; metric: MetricProgress | null }[];
+  actions: { id: string; priority: number; action: string; rationale: string | null; timing: string | null; role: string | null; successMetric: string | null; expectedSignal: string | null; status: PlanStatus; note: string | null; metric: MetricProgress | null; assignee: PlanAssignee }[];
+  /** When the who-does-what split went to the advisor for review (null: not yet; choices still open). */
+  assignmentSentAt: string | null;
   metrics: MetricProgress[];
   /** Figures recorded since the brief was built: a reason to reassess. */
   newSince: { label: string; value: string; at: string }[];
@@ -225,9 +229,48 @@ export async function progressView(company: Pick<Company, "id">, useCase: UseCas
       status: a.status,
       note: a.note,
       metric: a.metric && isMetricKey(a.metric) ? (metrics.find((m) => m.metric === a.metric) ?? null) : null,
+      assignee: a.assignee,
     })),
+    assignmentSentAt: actions.find((a) => a.assignmentSentAt)?.assignmentSentAt?.toISOString() ?? null,
     metrics,
     newSince: [...latest.entries()].slice(0, 8).map(([m, p]) => ({ label: METRICS[m].label, value: formatMetric(m, p.value), at: p.updatedAt.toISOString() })),
     newerBrief: newer[0]?.version ?? null,
   };
+}
+
+/** Who does one action: the founder's team or Growth Goaled (until the split has gone to the advisor). */
+export async function setPlanActionAssignee(user: User, company: Pick<Company, "id">, actionId: string, assignee: PlanAssignee): Promise<PlanResult> {
+  const [a] = await db.select().from(schema.planActions).where(and(eq(schema.planActions.id, actionId), eq(schema.planActions.companyId, company.id))).limit(1);
+  if (!a) return { ok: false, error: "That action wasn't found." };
+  if (a.assignmentSentAt) return { ok: false, error: "This plan is with your advisor for review; ask them to change who does what." };
+  await db.update(schema.planActions).set({ assignee, updatedBy: user.id, updatedAt: new Date() }).where(eq(schema.planActions.id, a.id));
+  return { ok: true };
+}
+
+/**
+ * The founder sends the plan's who-does-what to their advisor: the choices are fixed, and the advisor
+ * gets a To Do to review the split (and quote Growth Goaled's share) plus an email.
+ */
+export async function sendPlanAssignments(user: User, company: Pick<Company, "id" | "name" | "advisorId">, useCase: UseCaseId, appUrl: string): Promise<PlanResult & { growthGoaled?: number }> {
+  const view = await progressView(company, useCase);
+  if (!view) return { ok: false, error: "There's no plan to send yet." };
+  if (view.assignmentSentAt) return { ok: true, growthGoaled: view.actions.filter((a) => a.assignee === "growth_goaled").length };
+  const live = view.actions.filter((a) => a.status !== "dropped");
+  const gg = live.filter((a) => a.assignee === "growth_goaled").map((a) => a.action);
+  const ours = live.filter((a) => a.assignee === "founder").map((a) => a.action);
+  await db.update(schema.planActions).set({ assignmentSentAt: new Date() }).where(and(eq(schema.planActions.companyId, company.id), eq(schema.planActions.deliverableId, view.deliverableId)));
+  const link = `${appUrl}/advisor/companies/${company.id}/progress`;
+  await db.insert(schema.registerItems).values({
+    companyId: company.id,
+    type: "follow_up",
+    owner: "advisor",
+    title: gg.length ? `Review the action plan and quote Growth Goaled's share (${gg.length} of ${live.length} actions)` : `Review the action plan: the founder's team takes all ${live.length} actions`,
+    description: [`${user.name || user.email} chose who does what.`, gg.length ? `Growth Goaled:\n${gg.map((x) => `- ${x}`).join("\n")}` : null, ours.length ? `Founder:\n${ours.map((x) => `- ${x}`).join("\n")}` : null, `Plan: ${link}`].filter(Boolean).join("\n").slice(0, 2000),
+  });
+  if (company.advisorId) {
+    const [advisor] = await db.select({ email: schema.users.email }).from(schema.users).where(eq(schema.users.id, company.advisorId)).limit(1);
+    if (advisor) await sendEmail({ to: advisor.email, ...planSplitEmail({ companyName: company.name, founderName: user.name || user.email, growthGoaled: gg, founder: ours, link }) }).catch(() => null);
+  }
+  await track("plan_assignments_sent", { userId: user.id, companyId: company.id, props: { growth_goaled: gg.length, founder: ours.length } });
+  return { ok: true, growthGoaled: gg.length };
 }

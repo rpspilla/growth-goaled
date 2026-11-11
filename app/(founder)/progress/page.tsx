@@ -9,7 +9,8 @@ import { AlertTriangle, ArrowDownRight, ArrowUpRight, CalendarClock, RefreshCw }
 import { RunAssessmentButton } from "@/components/use-cases/RunAssessmentButton";
 import { founderContext } from "@/lib/data/founder-context";
 import { progressView } from "@/lib/data/plan";
-import { updatePlanActionAction } from "./actions";
+import { planAssigneeAction, sendPlanAssignmentsAction, updatePlanActionAction } from "./actions";
+import { SendToAdvisor } from "@/components/progress/SendToAdvisor";
 
 const date = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 const muted = { color: "var(--muted-foreground)" };
@@ -125,7 +126,14 @@ export default async function ProgressPage() {
         <h2 id="progress-plan" className="text-xl font-semibold" style={{ color: "var(--foreground)" }}>
           Plan · {done} of {live} done
         </h2>
-        <PlanTracker actions={view.actions} update={updatePlanActionAction} />
+        {view.assignmentSentAt ? (
+          <p role="status" className="text-sm" style={muted}>
+            Sent to your advisor for review on {date(view.assignmentSentAt)}: {view.actions.filter((a) => a.assignee === "growth_goaled" && a.status !== "dropped").length} with Growth Goaled, the rest with you.
+          </p>
+        ) : (
+          <SendToAdvisor growthGoaled={view.actions.filter((a) => a.assignee === "growth_goaled" && a.status !== "dropped").length} total={live} send={sendPlanAssignmentsAction} />
+        )}
+        <PlanTracker actions={view.actions} update={updatePlanActionAction} assign={view.assignmentSentAt ? undefined : planAssigneeAction} />
       </section>
 
       {view.metrics.length > 0 && (

@@ -314,6 +314,15 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await expect(planHeading).toBeVisible();
   const total = Number((await planHeading.textContent())!.match(/of (\d+) done/)![1]);
   expect(total).toBeGreaterThanOrEqual(4);
+  // Before starting: who does each action, sent to the advisor for review (then it's fixed).
+  const firstWho = founder.page.getByRole("combobox", { name: /^Who does it:/ }).first();
+  await expect(firstWho).toHaveValue("founder");
+  await expect(firstWho.locator("option")).toHaveText(["Founder", "Growth Goaled"]);
+  await firstWho.selectOption("growth_goaled");
+  await expect(founder.page.getByRole("region", { name: "Who does what" })).toContainText(`1 of ${total} with Growth Goaled.`);
+  await founder.page.getByRole("button", { name: "Send to my advisor for review" }).click();
+  await expect(founder.page.getByRole("status").filter({ hasText: "Sent to your advisor for review" })).toContainText("1 with Growth Goaled");
+  await expect(founder.page.getByRole("combobox", { name: /^Who does it:/ })).toHaveCount(0);
   await founder.page.getByLabel("Status").first().selectOption("done");
   await expect(founder.page.getByRole("heading", { name: new RegExp(`Plan · 1 of ${total} done`) })).toBeVisible();
   await expect(founder.page.getByRole("button", { name: "Reassess now" })).toBeVisible();

@@ -2,7 +2,8 @@ import { desc, eq, isNull } from "drizzle-orm";
 import { PageHeader } from "@/components/PageHeader";
 import { requireRole } from "@/lib/auth/session";
 import { db, schema } from "@/lib/db";
-import { setUserRole } from "./actions";
+import { deleteUserAction, setUserRole } from "./actions";
+import { DeleteUser } from "@/components/advisor/DeleteUser";
 
 const ROLE_LABEL = { founder: "Founder", advisor: "Advisor", admin: "Admin" } as const;
 
@@ -10,9 +11,11 @@ export default async function UsersPage() {
   const admin = await requireRole(["admin"]);
   const [users, memberships, invited] = await Promise.all([
     db.select().from(schema.users).orderBy(desc(schema.users.createdAt)),
-    db.select({ userId: schema.companyMembers.userId, name: schema.companies.name }).from(schema.companyMembers).innerJoin(schema.companies, eq(schema.companies.id, schema.companyMembers.companyId)),
+    db.select({ userId: schema.companyMembers.userId, companyId: schema.companyMembers.companyId, name: schema.companies.name }).from(schema.companyMembers).innerJoin(schema.companies, eq(schema.companies.id, schema.companyMembers.companyId)),
     db.select({ email: schema.invites.email, name: schema.companies.name }).from(schema.invites).innerJoin(schema.companies, eq(schema.companies.id, schema.invites.companyId)).where(isNull(schema.invites.acceptedAt)),
   ]);
+  // Companies each person is the only member of (offered for deletion with them).
+  const soleOf = (userId: string) => memberships.filter((m) => m.userId === userId && !memberships.some((o) => o.companyId === m.companyId && o.userId !== userId)).map((m) => m.name);
   // Every person with the company they belong to: their companies as founders, Growth Goaled for staff,
   // the company they were invited to while the invite is open.
   const companyOf = (u: (typeof users)[number]): { name: string; note?: string } => {
@@ -27,7 +30,7 @@ export default async function UsersPage() {
     <div className="px-4 sm:px-8 py-8 max-w-6xl">
       <PageHeader
         title="Users"
-        subtitle="Make someone an advisor or admin here. People appear after their first sign-in; everyone starts as a founder."
+        subtitle="Make someone an advisor or admin, or delete them. People appear after their first sign-in; everyone starts as a founder."
       />
       <div className="rounded-xl border overflow-hidden" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
         <div
@@ -63,7 +66,7 @@ export default async function UsersPage() {
                 {u.onboardedAt ? "Done" : "Not yet"}
               </span>
             </div>
-            <div className="col-span-3">
+            <div className="col-span-3 flex items-center gap-1 flex-wrap">
               {u.id === admin.id ? (
                 <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>{ROLE_LABEL[u.role]} (you)</span>
               ) : (
@@ -88,6 +91,7 @@ export default async function UsersPage() {
                   </button>
                 </form>
               )}
+              {u.id !== admin.id && <DeleteUser name={u.name || u.email} soleCompanies={soleOf(u.id)} remove={deleteUserAction.bind(null, u.id)} />}
             </div>
           </div>
         ))}

@@ -107,9 +107,15 @@ test("advisor names the plan and asks for data; the founder sees progress and da
   await expect(updates.getByRole("listitem")).toHaveCount(2);
   await updates.getByRole("button", { name: /^Remove the update from/ }).first().click();
   await expect(updates.getByRole("listitem")).toHaveCount(1);
+  // And deletes the data request; it leaves the founder's page too.
+  const sentRequests = adv2.page.getByRole("list", { name: "Data requests" });
+  await expect(sentRequests.getByRole("listitem")).toHaveCount(1);
+  await sentRequests.getByRole("button", { name: /^Delete the request from/ }).click();
+  await expect(adv2.page.getByRole("list", { name: "Data requests" })).toHaveCount(0);
   await adv2.ctx.close();
   await f.page.reload();
   await expect(f.page.getByLabel("Revenue", { exact: true })).toContainText("about $80K a month");
+  await expect(f.page.getByRole("region", { name: "Your advisor asked for an update" })).toHaveCount(0);
   await expect(f.page.getByLabel("Retention", { exact: true })).toContainText("No figure yet");
   await db.end();
   await f.ctx.close();

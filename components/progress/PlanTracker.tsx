@@ -18,7 +18,9 @@ const COLUMNS: { status: Status; icon: LucideIcon; color: string }[] = [
   { status: "done", icon: CheckCircle2, color: "var(--green)" },
 ];
 
-function ActionCard({ a, update }: { a: Action; update: (id: string, status: string, note: string | null) => Promise<Result> }) {
+const WHO: Record<Action["assignee"], string> = { founder: "Founder", growth_goaled: "Growth Goaled" };
+
+function ActionCard({ a, update, assign }: { a: Action; update: (id: string, status: string, note: string | null) => Promise<Result>; assign?: (id: string, assignee: string) => Promise<Result> }) {
   const [note, setNote] = useState(a.note ?? "");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -44,9 +46,11 @@ function ActionCard({ a, update }: { a: Action; update: (id: string, status: str
             KPI · {m?.label ?? (a.successMetric!.length > 26 ? `${a.successMetric!.slice(0, 24)}…` : a.successMetric)}
           </span>
         )}
-        <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ background: "var(--muted)", color: "var(--muted-foreground)" }}>
-          {a.role ?? "Owner: your call"}
-        </span>
+        {!assign && (
+          <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={a.assignee === "growth_goaled" ? { background: "var(--green-muted)", color: "var(--green)" } : { background: "var(--blue-muted)", color: "var(--blue)" }}>
+            {WHO[a.assignee]}
+          </span>
+        )}
         {a.timing && (
           <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ background: "var(--muted)", color: "var(--muted-foreground)" }}>
             {TIMING[a.timing] ?? a.timing}
@@ -59,6 +63,29 @@ function ActionCard({ a, update }: { a: Action; update: (id: string, status: str
           <span aria-hidden style={{ color: "var(--muted-foreground)" }}>→</span>
           <span className="font-semibold" style={{ color: tone }}>{m.latest ?? "no new figure"}</span>
         </div>
+      )}
+      {assign && (
+        <label className="block text-xs" style={{ color: "var(--muted-foreground)" }}>
+          Who does it
+          <select
+            aria-label={`Who does it: ${a.action}`}
+            value={a.assignee}
+            disabled={pending}
+            onChange={(e) =>
+              start(async () => {
+                setError(null);
+                const r = await assign(a.id, e.target.value);
+                if (r.ok) router.refresh();
+                else setError(r.error);
+              })
+            }
+            className="w-full mt-0.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold"
+            style={{ ...control, ...(a.assignee === "growth_goaled" ? { borderColor: "var(--green)", color: "var(--green)" } : {}) }}
+          >
+            <option value="founder">Founder</option>
+            <option value="growth_goaled">Growth Goaled</option>
+          </select>
+        </label>
       )}
       <div className="flex items-center gap-2">
         <label className="sr-only" htmlFor={`status-${a.id}`}>
@@ -114,7 +141,7 @@ function ActionCard({ a, update }: { a: Action; update: (id: string, status: str
 }
 
 /** The committed plan as a board: Not started / In progress / Done, with dropped actions behind a toggle. */
-export function PlanTracker({ actions, update }: { actions: Action[]; update: (id: string, status: string, note: string | null) => Promise<Result> }) {
+export function PlanTracker({ actions, update, assign }: { actions: Action[]; update: (id: string, status: string, note: string | null) => Promise<Result>; /** Before the plan goes to the advisor: choose who does each action. */ assign?: (id: string, assignee: string) => Promise<Result> }) {
   const dropped = actions.filter((a) => a.status === "dropped");
   return (
     <div className="space-y-3">
@@ -136,7 +163,7 @@ export function PlanTracker({ actions, update }: { actions: Action[]; update: (i
               {here.length ? (
                 <ul className="space-y-2.5">
                   {here.map((a) => (
-                    <ActionCard key={a.id} a={a} update={update} />
+                    <ActionCard key={a.id} a={a} update={update} assign={assign} />
                   ))}
                 </ul>
               ) : (
@@ -152,7 +179,7 @@ export function PlanTracker({ actions, update }: { actions: Action[]; update: (i
         <ExpandableDetail summary={`Dropped · ${dropped.length}`}>
           <ul className="grid md:grid-cols-3 gap-3">
             {dropped.map((a) => (
-              <ActionCard key={a.id} a={a} update={update} />
+              <ActionCard key={a.id} a={a} update={update} assign={assign} />
             ))}
           </ul>
         </ExpandableDetail>

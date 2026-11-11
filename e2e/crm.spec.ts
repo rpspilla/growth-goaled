@@ -172,5 +172,14 @@ test("Growth Goaled staff run prospects through the CRM; founders can't reach it
   await expect(page.getByRole("list", { name: "Columns" }).getByRole("textbox", { name: "Rename Pilot" })).toBeVisible();
   await page.goto("/advisor/crm");
   await expect(board.getByRole("region", { name: "Pilot" })).toBeVisible();
+
+  // Admins can delete people from Users (here with the company only they belonged to).
+  await page.goto("/advisor/users");
+  await page.getByRole("button", { name: "Delete Fay" }).click();
+  const confirm = page.getByRole("dialog", { name: "Delete Fay?" });
+  await confirm.getByLabel(/Also delete Fay Co/).check();
+  await confirm.getByRole("button", { name: "Delete permanently" }).click();
+  await expect(page.getByText("crm-founder@e2e.test")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Delete Ryan Admin" })).toHaveCount(0);
   await ctx.close();
 });

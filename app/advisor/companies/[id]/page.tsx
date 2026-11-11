@@ -5,7 +5,7 @@ import { latestMetrics, portfolioRows, userName } from "@/lib/data/portfolio";
 import { formatMetric, type MetricKey } from "@/lib/metrics";
 import { getUseCase, targetSummary } from "@/lib/use-cases";
 import { STEPS, journeyStage } from "@/lib/use-cases/steps";
-import { clearBusinessUpdateAction, createContractAction, removeContractAction, updateContractAction, cancelCompanyInviteAction, inviteCompanyMemberAction, removeCompanyMemberAction, requestDataAction, setCurrentPlanAction, updateHealth, updateSummary } from "./actions";
+import { clearBusinessUpdateAction, deleteDataRequestAction, createContractAction, removeContractAction, updateContractAction, cancelCompanyInviteAction, inviteCompanyMemberAction, removeCompanyMemberAction, requestDataAction, setCurrentPlanAction, updateHealth, updateSummary } from "./actions";
 import { DataRequestForm } from "@/components/advisor/DataRequestForm";
 import { ContractsPanel } from "@/components/advisor/ContractsPanel";
 import { listContracts } from "@/lib/data/contracts";
@@ -160,15 +160,28 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
             </div>
             <DataRequestForm items={REQUEST_ITEMS} send={requestDataAction.bind(null, company.id)} />
             {requests.length > 0 && (
-              <ul aria-label="Data requests" className="text-sm divide-y border-t pt-1" style={{ borderColor: "var(--border)" }}>
-                {requests.slice(0, 5).map((r) => (
-                  <li key={r.id} className="py-2 flex gap-3 items-baseline" style={{ borderColor: "var(--border)" }}>
-                    <span className="font-semibold shrink-0" style={{ color: r.fulfilledAt ? "var(--green)" : "var(--amber)" }}>{r.fulfilledAt ? `Received ${day(r.fulfilledAt)}` : "Waiting"}</span>
-                    <span className="flex-1 min-w-0" style={{ color: "var(--foreground)" }}>{[...r.items, r.message].filter(Boolean).join(" · ")}</span>
-                    <span className="shrink-0" style={{ color: "var(--muted-foreground)" }}>{day(r.createdAt)}</span>
-                  </li>
-                ))}
-              </ul>
+              <div className="border-t pt-2 space-y-1" style={{ borderColor: "var(--border)" }}>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>Sent requests</span>
+                  {requests.length > 1 && (
+                    <form action={deleteDataRequestAction.bind(null, company.id, "all")}>
+                      <button type="submit" className="text-sm" style={{ color: "var(--red)" }}>Clear all</button>
+                    </form>
+                  )}
+                </div>
+                <ul aria-label="Data requests" className="text-sm divide-y" style={{ borderColor: "var(--border)" }}>
+                  {requests.map((r) => (
+                    <li key={r.id} className="py-2 flex gap-3 items-baseline" style={{ borderColor: "var(--border)" }}>
+                      <span className="font-semibold shrink-0" style={{ color: r.fulfilledAt ? "var(--green)" : "var(--amber)" }}>{r.fulfilledAt ? `Received ${day(r.fulfilledAt)}` : "Waiting"}</span>
+                      <span className="flex-1 min-w-0" style={{ color: "var(--foreground)" }}>{[...r.items, r.message].filter(Boolean).join(" · ")}</span>
+                      <span className="shrink-0" style={{ color: "var(--muted-foreground)" }}>{day(r.createdAt)}</span>
+                      <form action={deleteDataRequestAction.bind(null, company.id, r.id)} className="shrink-0">
+                        <button type="submit" className="text-sm" style={{ color: "var(--red)" }} aria-label={`Delete the request from ${day(r.createdAt)}`}>Delete</button>
+                      </form>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </section>
         </div>

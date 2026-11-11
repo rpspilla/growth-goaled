@@ -15,7 +15,7 @@ vi.mock("@/lib/email", async (original) => {
 
 import { schema } from "@/lib/db";
 import type { Company, User } from "@/lib/db/schema";
-import { answerDataRequests, createDataRequest, listDataRequests, setCurrentPlan } from "@/lib/data/data-requests";
+import { answerDataRequests, createDataRequest, deleteDataRequest, listDataRequests, setCurrentPlan } from "@/lib/data/data-requests";
 import { addBusinessUpdate, businessMetrics, clearBusinessUpdate } from "@/lib/data/business-metrics";
 import { currentPlan } from "@/lib/data/current-plan";
 
@@ -35,7 +35,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   h.emails.length = 0;
-  for (const t of [schema.dataRequests, schema.dataPoints, schema.companyMembers, schema.events, schema.companies, schema.users]) await db().delete(t);
+  for (const t of [schema.dataRequests, schema.dataPoints, schema.companyMembers, schema.events, schema.companies, schema.invites, schema.users]) await db().delete(t);
   [founder, teammate, advisor] = (await db()
     .insert(schema.users)
     .values([
@@ -60,6 +60,18 @@ describe("data requests", () => {
     const [req] = await listDataRequests(co.id, { open: true });
     expect(h.emails[0]!.text).toContain(`https://app.test/sign-in?next=${encodeURIComponent(`/performance?request=${req!.id}#upload`)}`);
     expect(h.emails[0]!.text).toContain("Retention or churn figures");
+  });
+
+  it("can be deleted one at a time or all at once, only within the company", async () => {
+    await createDataRequest(advisor, co, { items: ["Pipeline or CRM export"], message: null }, "https://app.test");
+    await createDataRequest(advisor, co, { items: ["Updated financial model"], message: null }, "https://app.test");
+    const [first] = await listDataRequests(co.id);
+    const [stranger] = (await db().insert(schema.companies).values({ name: "Stranger" }).returning()) as [Company];
+    expect(await deleteDataRequest(stranger, first!.id)).toBe(0);
+    expect(await deleteDataRequest(co, first!.id)).toBe(1);
+    expect(await listDataRequests(co.id)).toHaveLength(1);
+    expect(await deleteDataRequest(co, "all")).toBe(1);
+    expect(await listDataRequests(co.id)).toEqual([]);
   });
 
   it("needs something to ask for", async () => {

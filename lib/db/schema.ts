@@ -69,6 +69,7 @@ export const dataPointStatus = pgEnum("data_point_status", ["proposed", "accepte
 /** manual: the founder entered it; extracted: read from a document by the model; calculated: computed in code from the founder's rows. */
 export const dataPointOrigin = pgEnum("data_point_origin", ["manual", "extracted", "calculated"]);
 export const planActionStatus = pgEnum("plan_action_status", ["not_started", "in_progress", "done", "dropped"]);
+export const planAssignee = pgEnum("plan_assignee", ["founder", "growth_goaled"]);
 export const registerType = pgEnum("register_type", ["missing", "question", "conflict", "assumption", "follow_up"]);
 export const registerStatus = pgEnum("register_status", ["open", "resolved", "unknown"]);
 export const registerOwner = pgEnum("register_owner", ["founder", "advisor"]);
@@ -844,6 +845,10 @@ export const planActions = pgTable(
     expectedSignal: text("expected_signal"),
     risks: text("risks"),
     status: planActionStatus("status").notNull().default("not_started"),
+    // Who does it: the founder's team or Growth Goaled, chosen before the plan goes to the advisor
+    assignee: planAssignee("assignee").notNull().default("founder"),
+    // When the founder sent the who-does-what split to their advisor for review (then it's fixed)
+    assignmentSentAt: timestamp("assignment_sent_at", { withTimezone: true }),
     note: text("note"),
     updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
     ...timestamps,

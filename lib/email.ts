@@ -126,3 +126,20 @@ Review the work and quote anything beyond the plan: ${p.link}`;
 </div>`;
   return { subject, text, html };
 }
+
+/** To the advisor: the founder chose who does each action on their plan, for review. */
+export function planSplitEmail(p: { companyName: string; founderName: string; growthGoaled: string[]; founder: string[]; link: string }) {
+  const subject = `${p.companyName} sent their action plan for review${p.growthGoaled.length ? ` (${p.growthGoaled.length} for Growth Goaled)` : ""}`;
+  const list = (xs: string[]) => xs.map((x) => `- ${x}`).join("\n");
+  const text = `${p.founderName} chose who does each action on ${p.companyName}'s plan.
+${p.growthGoaled.length ? `\nAssigned to Growth Goaled:\n${list(p.growthGoaled)}\n` : ""}${p.founder.length ? `\nThe founder's team:\n${list(p.founder)}\n` : ""}
+Review it${p.growthGoaled.length ? " and quote Growth Goaled's share" : ""}: ${p.link}`;
+  const ul = (xs: string[]) => `<ul style="font-size:15px;padding-left:20px">${xs.map((x) => `<li>${escape(x)}</li>`).join("")}</ul>`;
+  const html = `<div style="font-family:Inter,Arial,sans-serif;color:#0D1B2A;max-width:520px">
+<p style="font-size:15px">${escape(p.founderName)} chose who does each action on <strong>${escape(p.companyName)}</strong>'s plan.</p>
+${p.growthGoaled.length ? `<p style="font-size:13px;color:#64748B;margin-bottom:0">Assigned to Growth Goaled</p>${ul(p.growthGoaled)}` : ""}
+${p.founder.length ? `<p style="font-size:13px;color:#64748B;margin-bottom:0">The founder's team</p>${ul(p.founder)}` : ""}
+<p><a href="${escape(p.link)}" style="display:inline-block;background:#155A3C;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600">Review the plan</a></p>
+</div>`;
+  return { subject, text, html };
+}

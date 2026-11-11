@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { founderContext } from "@/lib/data/founder-context";
-import { commitPlan, PLAN_STATUSES, updatePlanAction, type PlanResult } from "@/lib/data/plan";
+import { headers } from "next/headers";
+import { commitPlan, PLAN_STATUSES, sendPlanAssignments, setPlanActionAssignee, updatePlanAction, type PlanResult } from "@/lib/data/plan";
 
 /** The signed-in founder and their company (plans are only ever read or changed within it). */
 async function founderCompany() {
@@ -31,4 +32,26 @@ export async function updatePlanActionAction(actionId: string, status: string, n
   const result = await updatePlanAction(user, company, id.data, s.data, typeof note === "string" ? note : null);
   if (result.ok) revalidatePath("/progress");
   return result;
+}
+
+/** Who does one action: "founder" (the founder's team) or "growth_goaled". */
+export async function planAssigneeAction(actionId: string, assignee: string): Promise<PlanResult> {
+  const { user, company } = await founderCompany();
+  const id = z.uuid().safeParse(actionId);
+  const a = z.enum(["founder", "growth_goaled"]).safeParse(assignee);
+  if (!id.success || !a.success) return { ok: false, error: "That choice isn't valid." };
+  const result = await setPlanActionAssignee(user, company, id.data, a.data);
+  if (result.ok) revalidatePath("/progress");
+  return result;
+}
+
+/** Sends the who-does-what split to the advisor for review. */
+export async function sendPlanAssignmentsAction(): Promise<PlanResult> {
+  const { user, company, active } = await founderContext();
+  if (!company || !active) return { ok: false, error: "There's no plan to send yet." };
+  const h = await headers();
+  const appUrl = process.env.APP_URL?.replace(/\/$/, "") ?? `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
+  const result = await sendPlanAssignments(user, company, active.def.id, appUrl);
+  if (result.ok) revalidatePath("/progress");
+  return result.ok ? { ok: true } : result;
 }
