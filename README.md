@@ -200,6 +200,14 @@ Advisor → **Payment links** (`/advisor/payment-links`, advisors and admins; `l
 - **Advisors**: the company page's People section does the same for the companies they advise (admins: any).
 - **Rules** (`lib/data/team.ts`): advisor/admin emails can't be invited (they already see their companies); someone already in another company can't join a second one unless they're in `MULTI_COMPANY_FOUNDERS`. Invites carry the role they grant (`invites.member_role`, migration `0025_invite_member_role.sql`): advisor "Invite a founder" invites create the company and grant owner; teammate invites grant member.
 
+### Action plan board, To Dos, contracts
+
+- **Board** (`components/chat/ActionPlanView.tsx`, `lib/plan-board.ts`): milestones sit in To do, In progress or Complete (`PlanStep.status`; `done` mirrors Complete) and move by drag-and-drop or the arrows. Before starting, the founder marks each action **We do** or **Assign to Growth Goaled** (`PlanStep.assignee`); **Start the plan** (`startPlan`) fixes that, and the Growth Goaled share becomes an advisor To Do ("Review and quote the work assigned to Growth Goaled") plus an email, and shows on the advisor plan page with a link to Payment links. Founders move cards once started; advisors any time. Redrafts keep status, assignee and the start. Tools to evaluate, risks and assumptions are no longer shown or edited.
+- **To Dos** (`/advisor/registers`, was Registers): action-oriented labels and a one-click **Mark complete** (resolution kind `complete`).
+- **Contracts and billing** (advisor company page; `contracts` table, migration `0027_contracts.sql`, `lib/data/contracts.ts`, `lib/contracts.ts`): name, status, billing cycle (monthly, quarterly, annual, one-time), amount, start/end, next billing date (worked out from the start and cycle when left empty; **Mark billed** rolls it a cycle) and the signed file (private Blob under `contracts/<companyId>/`, uploaded by staff only, downloaded at `/api/contracts/<id>`). Staff only.
+- **Profile from documents**: opening a profile section fills empty numeric answers from figures read out of uploaded files (`fillProfileFromDocuments`, saved with source `extracted`), and says which file each came from.
+- **Advisor company page** also lists the founder's **Business updates** with Remove / Clear all (readings set aside, not deleted). **Users** shows each person's company (staff: Growth Goaled).
+
 ### Founder home, Strategic Decisions and Performance
 
 - **Menu order**: Company profile, Team, Overview, Strategic Decisions (`/chat`), Performance, Documents.

@@ -5,8 +5,12 @@ import { latestMetrics, portfolioRows, userName } from "@/lib/data/portfolio";
 import { formatMetric, type MetricKey } from "@/lib/metrics";
 import { getUseCase, targetSummary } from "@/lib/use-cases";
 import { STEPS, journeyStage } from "@/lib/use-cases/steps";
-import { clearBusinessUpdateAction, cancelCompanyInviteAction, inviteCompanyMemberAction, removeCompanyMemberAction, requestDataAction, setCurrentPlanAction, updateHealth, updateSummary } from "./actions";
+import { clearBusinessUpdateAction, createContractAction, removeContractAction, updateContractAction, cancelCompanyInviteAction, inviteCompanyMemberAction, removeCompanyMemberAction, requestDataAction, setCurrentPlanAction, updateHealth, updateSummary } from "./actions";
 import { DataRequestForm } from "@/components/advisor/DataRequestForm";
+import { ContractsPanel } from "@/components/advisor/ContractsPanel";
+import { listContracts } from "@/lib/data/contracts";
+import { BILLING_CYCLES } from "@/lib/contracts";
+import { formatPrice } from "@/lib/pricing";
 import { listDataRequests, REQUEST_ITEMS } from "@/lib/data/data-requests";
 import { BUSINESS_METRICS, businessMetrics, type BusinessKey } from "@/lib/data/business-metrics";
 import { TeamPanel } from "@/components/team/TeamPanel";
@@ -25,7 +29,8 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
     userName(company.advisorSummaryBy),
     listAdvisoryRequests([company.id]),
   ]);
-  const [people, requests, biz] = await Promise.all([companyPeople(company.id), listDataRequests(company.id), businessMetrics(company)]);
+  const [people, requests, biz, contracts] = await Promise.all([companyPeople(company.id), listDataRequests(company.id), businessMetrics(company), listContracts(company.id)]);
+  const todayIso = new Date().toISOString().slice(0, 10);
   const bizKeys = Object.keys(BUSINESS_METRICS) as BusinessKey[];
   const day = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   const base = `/advisor/companies/${company.id}`;
@@ -167,6 +172,34 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
             )}
           </section>
         </div>
+      )}
+
+      {!company.isSample && (
+        <section aria-label="Contracts and billing" className="rounded-xl border p-5 space-y-3" style={card}>
+          <div>
+            <h2 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>Contracts and billing</h2>
+            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>What {company.name} has signed with Growth Goaled, how often it bills and when next. Only Growth Goaled staff see this.</p>
+          </div>
+          <ContractsPanel
+            companyId={company.id}
+            contracts={contracts.map((c) => ({
+              id: c.id,
+              title: c.title,
+              status: c.status,
+              cycle: BILLING_CYCLES.find((b) => b.id === c.billingCycle)!.label,
+              amount: c.amountCents === null ? null : formatPrice(c.amountCents),
+              start: c.startDate,
+              end: c.endDate,
+              next: c.nextBillingDate,
+              overdue: Boolean(c.status === "active" && c.nextBillingDate && c.nextBillingDate < todayIso),
+              filename: c.filename,
+              notes: c.notes,
+            }))}
+            create={createContractAction.bind(null, company.id)}
+            update={updateContractAction.bind(null, company.id)}
+            remove={removeContractAction.bind(null, company.id)}
+          />
+        </section>
       )}
 
       {!company.isSample && (

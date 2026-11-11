@@ -16,6 +16,7 @@ import { parseFigure } from "@/lib/figures";
 import { isMetricKey } from "@/lib/metrics";
 import { createDataRequest, setCurrentPlan } from "@/lib/data/data-requests";
 import { clearBusinessUpdate } from "@/lib/data/business-metrics";
+import { createContract, removeContract, updateContract } from "@/lib/data/contracts";
 import { cancelTeammateInvite, inviteTeammate, removeTeammate, type TeamResult } from "@/lib/data/team";
 
 async function managed(companyId: string) {
@@ -181,4 +182,55 @@ export async function clearBusinessUpdateAction(companyId: string, key: string):
   refresh(companyId);
   revalidatePath("/performance");
   revalidatePath("/overview");
+}
+
+const contractInput = z.object({
+  title: z.string().max(200),
+  status: z.enum(["draft", "active", "ended"]),
+  billingCycle: z.enum(["one_time", "monthly", "quarterly", "annual"]),
+  amount: z.string().max(20),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")),
+  nextBillingDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")),
+  notes: z.string().max(2000),
+  pathname: z.string().max(500).nullable(),
+  filename: z.string().max(200).nullable(),
+});
+
+/** Adds a contract (and its signed file, uploaded first) to the company's record. */
+export async function createContractAction(companyId: string, raw: unknown): Promise<{ ok: true } | { ok: false; error: string }> {
+  const ctx = await managed(companyId);
+  if (!ctx) return { ok: false, error: "Company not found." };
+  const p = contractInput.safeParse(raw);
+  if (!p.success) return { ok: false, error: "Check the contract details." };
+  const amount = p.data.amount.replace(/[$,\s]/g, "");
+  if (amount && !(Number(amount) >= 0)) return { ok: false, error: "The amount doesn't look right." };
+  const r = await createContract(ctx.user, ctx.company, {
+    title: p.data.title,
+    status: p.data.status,
+    billingCycle: p.data.billingCycle,
+    amountCents: amount ? Math.round(Number(amount) * 100) : null,
+    startDate: p.data.startDate || null,
+    endDate: p.data.endDate || null,
+    nextBillingDate: p.data.nextBillingDate || null,
+    notes: p.data.notes || null,
+    pathname: p.data.pathname,
+    filename: p.data.filename,
+  });
+  refresh(companyId);
+  return r.ok ? { ok: true } : r;
+}
+
+export async function updateContractAction(companyId: string, contractId: string, change: "billed" | "active" | "ended"): Promise<void> {
+  const ctx = await managed(companyId);
+  if (!ctx || !z.uuid().safeParse(contractId).success) return;
+  await updateContract(ctx.company, contractId, change === "billed" ? { billed: true } : { status: change });
+  refresh(companyId);
+}
+
+export async function removeContractAction(companyId: string, contractId: string): Promise<void> {
+  const ctx = await managed(companyId);
+  if (!ctx || !z.uuid().safeParse(contractId).success) return;
+  await removeContract(ctx.company, contractId);
+  refresh(companyId);
 }

@@ -190,6 +190,13 @@
       "when": 1794410507710,
       "tag": "0026_company_site_and_data_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1794422842090,
+      "tag": "0027_contracts",
+      "breakpoints": true
     }
   ]
 }

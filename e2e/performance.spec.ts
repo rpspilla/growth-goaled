@@ -47,6 +47,21 @@ test("advisor names the plan and asks for data; the founder sees progress and da
   // Test mode sends no email: the advisor is told so.
   await expect(ask.getByRole("status")).toContainText("email didn't go out");
   await expect(ask.getByRole("list", { name: "Data requests" })).toContainText("Waiting");
+  // Contracts and billing live on the company record.
+  const contracts = adv.page.getByRole("region", { name: "Contracts and billing" });
+  await contracts.getByRole("button", { name: "Add a contract" }).click();
+  const add = contracts.getByRole("form", { name: "Add a contract" });
+  await add.getByLabel("Name").fill("Execute & Monitor agreement");
+  await add.getByLabel("Amount per bill ($)").fill("1,199");
+  await add.getByLabel("Start date", { exact: true }).fill("2026-01-15");
+  await add.getByRole("button", { name: "Save contract" }).click();
+  const list = contracts.getByRole("list", { name: "Contracts" });
+  await expect(list).toContainText("Execute & Monitor agreement");
+  await expect(list).toContainText("$1,199 · monthly");
+  await expect(list).toContainText("Next billing:");
+  const before = await list.getByText(/Next billing:/).textContent();
+  await list.getByRole("button", { name: "Mark billed: Execute & Monitor agreement" }).click();
+  await expect(list.getByText(/Next billing:/)).not.toHaveText(before!);
   await adv.ctx.close();
   const req = await db.query("select id from data_requests where company_id = $1", [company]);
 

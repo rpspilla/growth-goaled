@@ -1221,3 +1221,35 @@ export type CompanyFact = typeof companyFacts.$inferSelect;
 export type Recommendation = typeof recommendations.$inferSelect;
 export type ActionPlan = typeof actionPlans.$inferSelect;
 export type GuestSession = typeof guestSessions.$inferSelect;
+
+// ---------------------------------------------------------------------------
+// Contracts: what each company has signed with Growth Goaled, and how it's billed (staff only)
+// ---------------------------------------------------------------------------
+
+export const billingCycle = pgEnum("billing_cycle", ["one_time", "monthly", "quarterly", "annual"]);
+export const contractStatus = pgEnum("contract_status", ["draft", "active", "ended"]);
+
+export const contracts = pgTable(
+  "contracts",
+  {
+    id: id(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    status: contractStatus("status").notNull().default("active"),
+    billingCycle: billingCycle("billing_cycle").notNull().default("monthly"),
+    amountCents: integer("amount_cents"),
+    startDate: date("start_date", { mode: "string" }),
+    endDate: date("end_date", { mode: "string" }),
+    nextBillingDate: date("next_billing_date", { mode: "string" }),
+    // The signed document, private in Blob (contracts/<companyId>/...)
+    blobUrl: text("blob_url"),
+    filename: text("filename"),
+    notes: text("notes"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [index("contracts_company_idx").on(t.companyId)],
+);
+export type Contract = typeof contracts.$inferSelect;

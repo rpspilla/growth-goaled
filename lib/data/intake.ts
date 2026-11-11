@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { Company, User } from "@/lib/db/schema";
 import { track } from "@/lib/events";
@@ -44,7 +44,8 @@ const completeSections = (answers: IntakeAnswers) => INTAKE_SECTIONS.filter((s) 
  * to a metric are mirrored into an accepted, company-provided data point so
  * every figure later shown traces back to this answer.
  */
-export async function saveIntakeAnswer(user: User, company: Company, sectionId: string, fieldId: string, raw: string): Promise<SaveResult> {
+export async function saveIntakeAnswer(user: User, company: Company, sectionId: string, fieldId: string, raw: string, opts: { source?: "manual" | "extracted"; note?: string } = {}): Promise<SaveResult> {
+  const source = opts.source ?? "manual";
   const section = getSection(sectionId);
   const field = getField(sectionId, fieldId);
   if (!section || !field) return { ok: false, error: "Unknown field." };
@@ -84,7 +85,7 @@ export async function saveIntakeAnswer(user: User, company: Company, sectionId: 
           metric: field.metric,
           value,
           unit: METRICS[field.metric].unit,
-          rawText: `Intake: ${field.label}`,
+          rawText: opts.note ?? `Intake: ${field.label}`,
           period: "Current",
           confidence: "high",
           status: "accepted",
@@ -100,10 +101,10 @@ export async function saveIntakeAnswer(user: User, company: Company, sectionId: 
   } else {
     await db
       .insert(schema.intakeResponses)
-      .values({ companyId: company.id, section: section.id, field: field.id, value, source: "manual", dataPointId })
+      .values({ companyId: company.id, section: section.id, field: field.id, value, source, dataPointId })
       .onConflictDoUpdate({
         target: [schema.intakeResponses.companyId, schema.intakeResponses.section, schema.intakeResponses.field],
-        set: { value, source: "manual", dataPointId },
+        set: { value, source, dataPointId },
       });
   }
 
@@ -151,4 +152,45 @@ export async function saveCompanyBasics(user: User, companyId: string, basics: C
     const result = await saveIntakeAnswer(user, company, section, field, String(value));
     if (!result.ok) throw new Error(`Couldn't save ${section}.${field}: ${result.error}`);
   }
+}
+
+/**
+ * Fills empty profile answers from figures read out of the founder's uploaded documents (newest
+ * file first, checked figures before unchecked ones). Each is saved as "extracted" with the file it
+ * came from, so the profile says where it came from and the founder can change it.
+ */
+export async function fillProfileFromDocuments(user: User, company: Company): Promise<number> {
+  const answers = await getIntakeAnswers(company);
+  const wanted = INTAKE_SECTIONS.flatMap((section) =>
+    section.fields
+      .filter((f) => f.metric && !f.askAsRange && !f.asChurn && !f.rangeOf && (answers[answerKey(section.id, f.id)] ?? "") === "")
+      .map((field) => ({ section, field })),
+  );
+  if (!wanted.length) return 0;
+  const points = await db
+    .select({ metric: schema.dataPoints.metric, value: schema.dataPoints.value, status: schema.dataPoints.status, createdAt: schema.dataPoints.createdAt, filename: schema.documents.filename })
+    .from(schema.dataPoints)
+    .innerJoin(schema.documents, eq(schema.documents.id, schema.dataPoints.documentId))
+    .where(and(eq(schema.dataPoints.companyId, company.id), ne(schema.dataPoints.status, "rejected"), inArray(schema.dataPoints.metric, wanted.map((w) => w.field.metric!))))
+    .orderBy(desc(schema.dataPoints.createdAt));
+  const best = (metric: string) => points.find((p) => p.metric === metric && p.status === "accepted") ?? points.find((p) => p.metric === metric);
+  let filled = 0;
+  for (const { section, field } of wanted) {
+    const p = best(field.metric!);
+    if (!p) continue;
+    const value = field.kind === "integer" ? Math.round(p.value) : p.value;
+    const r = await saveIntakeAnswer(user, company, section.id, field.id, String(value), { source: "extracted", note: `From ${p.filename}` });
+    if (r.ok) filled++;
+  }
+  return filled;
+}
+
+/** Profile answers filled from documents, with the file each came from (answer key → filename). */
+export async function documentFilledAnswers(company: Pick<Company, "id">): Promise<Record<string, string>> {
+  const rows = await db
+    .select({ section: schema.intakeResponses.section, field: schema.intakeResponses.field, note: schema.dataPoints.rawText })
+    .from(schema.intakeResponses)
+    .leftJoin(schema.dataPoints, eq(schema.dataPoints.id, schema.intakeResponses.dataPointId))
+    .where(and(eq(schema.intakeResponses.companyId, company.id), eq(schema.intakeResponses.source, "extracted")));
+  return Object.fromEntries(rows.map((r) => [answerKey(r.section, r.field), r.note?.replace(/^From /, "") ?? "your documents"]));
 }

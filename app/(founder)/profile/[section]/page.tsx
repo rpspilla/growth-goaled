@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { requireRole } from "@/lib/auth/session";
 import { getFounderCompany } from "@/lib/data/companies";
-import { getIntakeAnswers } from "@/lib/data/intake";
+import { documentFilledAnswers, fillProfileFromDocuments, getIntakeAnswers } from "@/lib/data/intake";
 import { displayValue, getSection, INTAKE_SECTIONS, percentComplete, sectionComplete, type IntakeAnswers } from "@/lib/intake";
 import { REVENUE_BANDS } from "@/lib/onboarding";
 import { IntakeForm } from "./IntakeForm";
@@ -22,12 +22,19 @@ export default async function IntakeSectionPage({ params }: { params: Promise<{ 
     );
   }
 
-  const answers = await getIntakeAnswers(company);
+  // Anything the founder's uploaded files already say fills the empty answers first.
+  const filled = await fillProfileFromDocuments(user, company);
+  const fresh = filled ? ((await getFounderCompany(user)) ?? company) : company;
+  const [answers, fromDocs] = await Promise.all([getIntakeAnswers(fresh), documentFilledAnswers(fresh)]);
   const values = Object.fromEntries(section.fields.map((f) => [f.id, displayValue(f, answers[`${section.id}.${f.id}`])]));
   // What the founder already told us elsewhere, shown under the field so nothing is asked twice.
   const hints: Record<string, string> = {};
   const band = REVENUE_BANDS.find((b) => b.value === company.revenueBand);
   if (section.id === "company" && band && !values.arr && !answers["company.arr_range"]) hints.arr = `You told us ${band.label} at sign-up. Add the exact figure if you know it.`;
+  for (const f of section.fields) {
+    const file = fromDocs[`${section.id}.${f.id}`];
+    if (file) hints[f.id] = `Filled in from ${file}. Change it if it's wrong.`;
+  }
 
   return (
     <IntakeForm
