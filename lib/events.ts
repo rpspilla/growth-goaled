@@ -33,6 +33,7 @@ export type EventName =
   | "review_decision"
   | "invite_sent"
   | "data_requested"
+  | "plan_started"
   | "data_request_answered"
   | "business_update_added"
   | "invite_accepted"

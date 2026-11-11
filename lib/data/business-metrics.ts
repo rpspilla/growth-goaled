@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lt, ne } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { Company, User } from "@/lib/db/schema";
 import { track } from "@/lib/events";
@@ -42,8 +42,8 @@ export function summarize(rows: Row[]): BusinessMetrics {
   }
   const groups = new Map<string, BusinessUpdate>();
   for (const r of sorted) {
-    // One update per file; typed-in figures group by the minute they were saved.
-    const key = r.documentId ?? `manual-${Math.floor(r.createdAt.getTime() / 60_000)}`;
+    // One update per file; typed-in figures group by the save they came from (one insert, one timestamp).
+    const key = r.documentId ?? `manual-${r.createdAt.getTime()}`;
     const g = groups.get(key) ?? { key, at: r.createdAt, source: sourceOf(r), values: {} };
     const k = keyFor(r.metric);
     if (!g.values[k]) g.values[k] = reading(r);
@@ -96,4 +96,24 @@ export async function addBusinessUpdate(user: Pick<User, "id">, company: Pick<Co
   await db.insert(schema.dataPoints).values(values);
   await track("business_update_added", { userId: user.id, companyId: company.id, props: { revenue: input.mrr !== null, retention: input.retention !== null } });
   return { ok: true };
+}
+
+/**
+ * An advisor clears an update from the founder's Performance page: its revenue, growth and
+ * retention readings are set aside (kept for the record, no longer shown). `key` is an update's key
+ * from `summarize` (a file's id, or "manual-<save time>"), or "all".
+ */
+export async function clearBusinessUpdate(actor: Pick<User, "id">, company: Pick<Company, "id">, key: string): Promise<number> {
+  const scope = [eq(schema.dataPoints.companyId, company.id), inArray(schema.dataPoints.metric, ALL), ne(schema.dataPoints.status, "rejected")];
+  if (key.startsWith("manual-")) {
+    const ms = Number(key.slice(7));
+    if (!Number.isFinite(ms)) return 0;
+    // Stored times carry microseconds; the key has milliseconds.
+    scope.push(isNull(schema.dataPoints.documentId), gte(schema.dataPoints.createdAt, new Date(ms)), lt(schema.dataPoints.createdAt, new Date(ms + 1)));
+  } else if (key !== "all") {
+    if (!/^[0-9a-f-]{36}$/.test(key)) return 0;
+    scope.push(eq(schema.dataPoints.documentId, key));
+  }
+  const cleared = await db.update(schema.dataPoints).set({ status: "rejected", acceptedBy: actor.id, updatedAt: new Date() }).where(and(...scope)).returning({ id: schema.dataPoints.id });
+  return cleared.length;
 }

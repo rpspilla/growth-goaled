@@ -2,44 +2,161 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Wrench } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { HumanPresence } from "@/components/brand/HumanPresence";
-import type { ActionPlanContent, PlanTarget } from "@/lib/db/schema";
+import type { ActionPlanContent, PlanStep, PlanTarget } from "@/lib/db/schema";
+import { allSteps, BOARD, PERIOD_LABEL, stepStatus, type Period, type StepStatus } from "@/lib/plan-board";
 import { PlanTargets } from "./PlanTargets";
 import { StepMeta } from "./StepMeta";
 
-const PERIODS = [
-  ["days30", "Days 1–30"],
-  ["days60", "Days 31–60"],
-  ["days90", "Days 61–90"],
-] as const;
+type Result = { ok: boolean; error?: string };
 
-/** The plan: goal, approach, milestones by period (tickable when allowed), risks and assumptions, tools to evaluate. */
+/**
+ * The plan as a board: every milestone moves left to right across To do, In progress and Complete
+ * (drag it, or use the arrows). Before the plan starts, the founder picks who does each action:
+ * their own team, or Growth Goaled; starting sends Growth Goaled's share to the advisor.
+ */
 export function ActionPlanView({
   content,
-  toggle,
   today = null,
   editStep,
   targets,
+  move,
+  assign,
+  start,
 }: {
   content: ActionPlanContent;
   /** YYYY-MM-DD from the server, for "Overdue" (null: don't flag). */
   today?: string | null;
   /** Execute & Monitor: change a milestone's owner and deadline. */
-  editStep?: (period: string, index: number, owner: string, due: string | null) => Promise<{ ok: boolean; error?: string }>;
+  editStep?: (period: string, index: number, owner: string, due: string | null) => Promise<Result>;
   /** The plan's targets with the company's current figures; `save` when they can be edited. */
-  targets?: { current: Record<string, number | null>; save?: (targets: PlanTarget[]) => Promise<{ ok: boolean; error?: string }> };
-  /** When set, milestones can be ticked off. */
-  toggle?: (period: string, index: number, done: boolean) => Promise<{ ok: boolean; error?: string }>;
+  targets?: { current: Record<string, number | null>; save?: (targets: PlanTarget[]) => Promise<Result> };
+  /** When set, milestones can be moved across the board. */
+  move?: (period: string, index: number, status: StepStatus) => Promise<Result>;
+  /** Founder, before the plan starts: who does each action. */
+  assign?: (period: string, index: number, assignee: "us" | "gg") => Promise<Result>;
+  /** Founder, before the plan starts: start it. */
+  start?: () => Promise<Result>;
 }) {
-  const [pending, start] = useTransition();
+  const [pending, run] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  // Ticks show straight away; the server confirms (or the box reverts with an error).
-  const [ticked, setTicked] = useState<Record<string, boolean>>({});
+  const [dragging, setDragging] = useState<string | null>(null);
+  const [over, setOver] = useState<StepStatus | null>(null);
+  // Moves and choices show straight away; the server confirms (or they revert with an error).
+  const [moved, setMoved] = useState<Record<string, StepStatus>>({});
+  const [chosen, setChosen] = useState<Record<string, "us" | "gg">>({});
   const router = useRouter();
-  const isDone = (key: string, i: number, s: { done?: boolean }) => ticked[`${key}:${i}`] ?? Boolean(s.done);
-  const all = PERIODS.flatMap(([key]) => content[key].map((s, i) => isDone(key, i, s)));
-  const done = all.filter(Boolean).length;
+  const started = Boolean(content.startedAt);
+  const choosing = Boolean(assign && start && !started);
+  const canMove = Boolean(move && (started || !start));
+
+  const steps = allSteps(content).map((s) => {
+    const key = `${s.period}:${s.index}`;
+    return { ...s, key, status: moved[key] ?? stepStatus(s.step), assignee: chosen[key] ?? s.step.assignee };
+  });
+  const done = steps.filter((s) => s.status === "done").length;
+  const gg = steps.filter((s) => s.assignee === "gg").length;
+
+  const call = (fn: () => Promise<Result>, undo: () => void) =>
+    run(async () => {
+      setError(null);
+      const r = await fn();
+      if (!r.ok) {
+        setError(r.error ?? "Couldn't save that.");
+        undo();
+      }
+      router.refresh();
+    });
+  const moveTo = (s: (typeof steps)[number], status: StepStatus) => {
+    if (!move || status === s.status) return;
+    const before = s.status;
+    setMoved((m) => ({ ...m, [s.key]: status }));
+    call(() => move(s.period, s.index, status), () => setMoved((m) => ({ ...m, [s.key]: before })));
+  };
+  const choose = (s: (typeof steps)[number], who: "us" | "gg") => {
+    if (!assign) return;
+    const before = s.assignee;
+    setChosen((c) => ({ ...c, [s.key]: who }));
+    call(() => assign(s.period, s.index, who), () => setChosen((c) => ({ ...c, [s.key]: before ?? "us" })));
+  };
+  const order: StepStatus[] = BOARD.map((b) => b.id);
+
+  const card = (s: (typeof steps)[number]) => {
+    const i = order.indexOf(s.status);
+    return (
+      <li
+        key={s.key}
+        draggable={canMove}
+        onDragStart={(e) => {
+          setDragging(s.key);
+          e.dataTransfer.setData("text/plain", s.key);
+          e.dataTransfer.effectAllowed = "move";
+        }}
+        onDragEnd={() => {
+          setDragging(null);
+          setOver(null);
+        }}
+        aria-label={s.step.action}
+        className={`rounded-lg p-3 space-y-1.5 ${canMove ? "cursor-grab active:cursor-grabbing" : ""}`}
+        style={{ background: "var(--card)", border: "1px solid var(--border)", boxShadow: "0 1px 2px rgba(13,27,42,0.06)", opacity: dragging === s.key ? 0.5 : 1 }}
+      >
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded" style={{ background: "var(--muted)", color: "var(--muted-foreground)" }}>{PERIOD_LABEL[s.period as Period]}</span>
+          {s.assignee && !choosing && (
+            <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded" style={s.assignee === "gg" ? { background: "var(--green-muted)", color: "var(--green)" } : { background: "var(--blue-muted)", color: "var(--blue)" }}>
+              {s.assignee === "gg" ? "Growth Goaled" : "We do"}
+            </span>
+          )}
+        </div>
+        <div className="text-sm font-medium" style={{ color: "var(--foreground)", textDecoration: s.status === "done" ? "line-through" : undefined }}>{s.step.action}</div>
+        <StepMeta step={s.step as PlanStep} today={today} save={editStep ? (owner, due) => editStep(s.period, s.index, owner, due) : undefined} />
+        {choosing && (
+          <div role="radiogroup" aria-label={`Who does: ${s.step.action}`} className="flex gap-1 pt-1">
+            {(
+              [
+                ["us", "We do"],
+                ["gg", "Assign to Growth Goaled"],
+              ] as const
+            ).map(([who, label]) => {
+              const on = (s.assignee ?? "us") === who;
+              return (
+                <button
+                  key={who}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  disabled={pending}
+                  onClick={() => choose(s, who)}
+                  className="text-xs font-semibold px-2 py-1 rounded-md"
+                  style={on ? { background: who === "gg" ? "var(--green)" : "var(--navy)", color: "#fff" } : { background: "var(--muted)", color: "var(--muted-foreground)" }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {canMove && (
+          <div className="flex justify-between pt-1">
+            {i > 0 ? (
+              <button type="button" disabled={pending} onClick={() => moveTo(s, order[i - 1]!)} className="text-xs inline-flex items-center gap-1" style={{ color: "var(--muted-foreground)" }} aria-label={`Move back to ${BOARD[i - 1]!.label}: ${s.step.action}`}>
+                <ArrowLeft size={12} aria-hidden /> {BOARD[i - 1]!.label}
+              </button>
+            ) : (
+              <span />
+            )}
+            {i < order.length - 1 && (
+              <button type="button" disabled={pending} onClick={() => moveTo(s, order[i + 1]!)} className="text-xs font-semibold inline-flex items-center gap-1" style={{ color: "var(--green)" }} aria-label={`Move to ${BOARD[i + 1]!.label}: ${s.step.action}`}>
+                {BOARD[i + 1]!.label} <ArrowRight size={12} aria-hidden />
+              </button>
+            )}
+          </div>
+        )}
+      </li>
+    );
+  };
+
   return (
     <div className="space-y-4">
       <HumanPresence variant="plan" />
@@ -47,82 +164,56 @@ export function ActionPlanView({
         <div className="label mb-1" style={{ color: "var(--green)" }}>Goal</div>
         <p className="font-display text-2xl leading-tight" style={{ color: "var(--foreground)" }}>{content.goal}</p>
         <p className="text-base mt-2" style={{ color: "var(--muted-foreground)" }}>{content.summary}</p>
-        {toggle && all.length > 0 && <p className="text-sm mt-1" style={{ color: "var(--muted-foreground)" }}>{done} of {all.length} milestones done</p>}
+        {steps.length > 0 && <p className="text-sm mt-1" style={{ color: "var(--muted-foreground)" }}>{done} of {steps.length} milestones done</p>}
       </div>
-      <div className="grid md:grid-cols-3 gap-3">
-        {PERIODS.map(([key, label]) => (
-          <div key={key} className="rounded-xl p-3" style={{ border: "1px solid var(--border)", background: "var(--card)" }}>
-            <h4 className="text-sm font-semibold mb-2" style={{ color: "var(--foreground)" }}>{label}</h4>
-            <ol className="space-y-3">
-              {content[key].map((s, i) => (
-                <li key={i} className="flex gap-2 items-start">
-                  {toggle && (
-                    <input
-                      type="checkbox"
-                      className="mt-1"
-                      checked={isDone(key, i, s)}
-                      disabled={pending}
-                      aria-label={`Done: ${s.action}`}
-                      onChange={(e) => {
-                        const value = e.target.checked;
-                        setTicked((t) => ({ ...t, [`${key}:${i}`]: value }));
-                        start(async () => {
-                          setError(null);
-                          const r = await toggle(key, i, value);
-                          if (!r.ok) {
-                            setError(r.error ?? "Couldn't save that.");
-                            setTicked((t) => ({ ...t, [`${key}:${i}`]: !value }));
-                          }
-                          router.refresh();
-                        });
-                      }}
-                    />
-                  )}
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium" style={{ color: "var(--foreground)", textDecoration: isDone(key, i, s) ? "line-through" : undefined }}>{s.action}</div>
-                    <StepMeta step={s} today={today} save={editStep ? (owner, due) => editStep(key, i, owner, due) : undefined} />
-                  </div>
-                </li>
-              ))}
-            </ol>
+
+      {choosing && (
+        <div role="region" aria-label="Before you start" className="rounded-xl p-4 flex gap-4 items-center flex-wrap" style={{ background: "var(--green-muted)" }}>
+          <div className="flex-1 min-w-[16rem]">
+            <div className="font-semibold" style={{ color: "var(--foreground)" }}>Before you start: who does each action?</div>
+            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+              Choose &ldquo;We do&rdquo; or &ldquo;Assign to Growth Goaled&rdquo; on each card. Growth Goaled&apos;s share goes to your advisor to review and quote any extra work.
+              {gg > 0 && <strong style={{ color: "var(--foreground)" }}> {gg} assigned to Growth Goaled.</strong>}
+            </p>
           </div>
-        ))}
-      </div>
-      {targets && (targets.save || (content.targets?.length ?? 0) > 0) && <PlanTargets targets={content.targets ?? []} current={targets.current} save={targets.save} />}
-      {(content.risks.length > 0 || content.assumptions.length > 0) && (
-        <div className="grid sm:grid-cols-2 gap-3 text-sm" style={{ color: "var(--foreground)" }}>
-          {content.risks.length > 0 && (
-            <div>
-              <div className="label mb-1">Risks</div>
-              <ul className="list-disc pl-4 space-y-0.5">{content.risks.map((r) => <li key={r}>{r}</li>)}</ul>
-            </div>
-          )}
-          {content.assumptions.length > 0 && (
-            <div>
-              <div className="label mb-1">Assumptions</div>
-              <ul className="list-disc pl-4 space-y-0.5">{content.assumptions.map((r) => <li key={r}>{r}</li>)}</ul>
-            </div>
-          )}
+          <button type="button" className="btn btn-primary" disabled={pending} onClick={() => call(start!, () => {})}>
+            Start the plan
+          </button>
         </div>
       )}
-      {content.tools && content.tools.length > 0 && (
-        <section aria-label="Tools to evaluate" className="rounded-xl p-4" style={{ border: "1px solid var(--border)", background: "var(--card)" }}>
-          <h4 className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>Tools to evaluate</h4>
-          <p className="text-sm mb-2" style={{ color: "var(--muted-foreground)" }}>Worth a look to get better results from this plan or save time on it.</p>
-          <ul className="space-y-2">
-            {content.tools.map((t) => (
-              <li key={t.name} className="text-sm flex gap-2 items-start" style={{ color: "var(--foreground)" }}>
-                <Wrench size={14} className="shrink-0 mt-1" style={{ color: "var(--green)" }} aria-hidden />
-                <span>
-                  <strong>{t.name}</strong>
-                  {t.category && <span style={{ color: "var(--muted-foreground)" }}> · {t.category}</span>}
-                  {t.why && <span className="block" style={{ color: "var(--muted-foreground)" }}>{t.why}</span>}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+
+      <div className="grid md:grid-cols-3 gap-3" role="group" aria-label="Plan board">
+        {BOARD.map((col) => {
+          const cards = steps.filter((s) => s.status === col.id);
+          return (
+            <section
+              key={col.id}
+              aria-label={col.label}
+              onDragOver={(e) => {
+                if (!canMove) return;
+                e.preventDefault();
+                setOver(col.id);
+              }}
+              onDragLeave={() => setOver((o) => (o === col.id ? null : o))}
+              onDrop={(e) => {
+                e.preventDefault();
+                const key = e.dataTransfer.getData("text/plain");
+                const s = steps.find((x) => x.key === key);
+                setOver(null);
+                if (s) moveTo(s, col.id);
+              }}
+              className="rounded-xl p-3 min-h-[8rem] transition-colors"
+              style={{ background: over === col.id ? "var(--green-muted)" : "var(--muted)", outline: over === col.id ? "2px dashed var(--green)" : undefined }}
+            >
+              <h4 className="text-sm font-semibold mb-2 flex items-center justify-between" style={{ color: "var(--foreground)" }}>
+                {col.label} <span className="text-xs font-normal" style={{ color: "var(--muted-foreground)" }}>{cards.length}</span>
+              </h4>
+              <ol className="space-y-2">{cards.map(card)}</ol>
+            </section>
+          );
+        })}
+      </div>
+      {targets && (targets.save || (content.targets?.length ?? 0) > 0) && <PlanTargets targets={content.targets ?? []} current={targets.current} save={targets.save} />}
       {error && <p role="alert" className="text-sm" style={{ color: "var(--red)" }}>{error}</p>}
     </div>
   );

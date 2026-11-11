@@ -15,6 +15,7 @@ import { chooseFigure, enterFigure, type FigureResult } from "@/lib/data/figures
 import { parseFigure } from "@/lib/figures";
 import { isMetricKey } from "@/lib/metrics";
 import { createDataRequest, setCurrentPlan } from "@/lib/data/data-requests";
+import { clearBusinessUpdate } from "@/lib/data/business-metrics";
 import { cancelTeammateInvite, inviteTeammate, removeTeammate, type TeamResult } from "@/lib/data/team";
 
 async function managed(companyId: string) {
@@ -170,4 +171,14 @@ export async function requestDataAction(companyId: string, _prev: DataRequestSta
   refresh(companyId);
   if (!r.ok) return { error: r.error };
   return { ok: true, note: r.recipients === 0 ? "Saved. Nobody at the company has an account yet, so no email went out." : r.emailed === r.recipients ? `Emailed ${r.recipients === 1 ? "the founder" : `${r.recipients} people`} with a link to upload.` : `Saved, but the email didn't go out (${r.emailed} of ${r.recipients} sent). Share the Performance page link with them.` };
+}
+
+/** Clears one update (or "all") from the founder's business metrics. */
+export async function clearBusinessUpdateAction(companyId: string, key: string): Promise<void> {
+  const ctx = await managed(companyId);
+  if (!ctx || typeof key !== "string" || key.length > 60) return;
+  await clearBusinessUpdate(ctx.user, ctx.company, key);
+  refresh(companyId);
+  revalidatePath("/performance");
+  revalidatePath("/overview");
 }

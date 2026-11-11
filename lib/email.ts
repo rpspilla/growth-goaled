@@ -109,3 +109,20 @@ See it: ${p.link}`;
 </div>`;
   return { subject, text, html };
 }
+
+/** To the advisor: the founder started their plan and handed some actions to Growth Goaled. */
+export function growthGoaledWorkEmail(p: { companyName: string; founderName: string; planTitle: string; actions: string[]; link: string }) {
+  const n = p.actions.length;
+  const subject = `${p.companyName} assigned ${n} ${n === 1 ? "action" : "actions"} to Growth Goaled`;
+  const text = `${p.founderName} started ${p.planTitle} and handed ${n} ${n === 1 ? "action" : "actions"} to Growth Goaled:
+
+${p.actions.map((a) => `- ${a}`).join("\n")}
+
+Review the work and quote anything beyond the plan: ${p.link}`;
+  const html = `<div style="font-family:Inter,Arial,sans-serif;color:#0D1B2A;max-width:520px">
+<p style="font-size:15px">${escape(p.founderName)} started <strong>${escape(p.planTitle)}</strong> and handed ${n} ${n === 1 ? "action" : "actions"} to Growth Goaled:</p>
+<ul style="font-size:15px;padding-left:20px">${p.actions.map((a) => `<li>${escape(a)}</li>`).join("")}</ul>
+<p><a href="${escape(p.link)}" style="display:inline-block;background:#155A3C;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600">Review and quote the work</a></p>
+</div>`;
+  return { subject, text, html };
+}

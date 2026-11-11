@@ -2,12 +2,13 @@ import "server-only";
 import { and, asc, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
 import type Stripe from "stripe";
 import { db, schema } from "@/lib/db";
-import type { ActionPlan, ActionPlanContent, Company, User } from "@/lib/db/schema";
+import type { ActionPlan, ActionPlanContent, Company, PlanStep, User } from "@/lib/db/schema";
+import { growthGoaledSteps, PERIOD_LABEL, withAssignee, withStatus, type StepStatus } from "@/lib/plan-board";
 import { carryDues, cleanTargets, isDay, MAX_TARGETS, withDefaultDues } from "@/lib/plan-tracking";
 import { draftPlan } from "@/lib/ai/plan";
 import { chatContext } from "@/lib/chat/context";
 import { getChatTopic } from "@/lib/chat/topics";
-import { sendEmail } from "@/lib/email";
+import { growthGoaledWorkEmail, sendEmail } from "@/lib/email";
 import { track } from "@/lib/events";
 import { CURRENCY, pricing } from "@/lib/pricing";
 import { stripe } from "@/lib/stripe";
@@ -236,12 +237,73 @@ export async function setStepDone(company: Pick<Company, "id">, planId: string, 
   if (!plan?.content || !["active", "delivered"].includes(plan.status)) return { ok: false, error: "This plan can't be changed now." };
   const steps = plan.content[period];
   if (!steps[index]) return { ok: false, error: "Unknown milestone." };
-  const content: ActionPlanContent = { ...plan.content, [period]: steps.map((s, i) => (i === index ? { ...s, done } : s)) };
+  const content: ActionPlanContent = { ...plan.content, [period]: steps.map((s, i) => (i === index ? { ...s, done, status: done ? ("done" as const) : ("todo" as const) } : s)) };
   await db.update(schema.actionPlans).set({ content, updatedAt: new Date() }).where(eq(schema.actionPlans.id, plan.id));
   return { ok: true };
 }
 
 export type Period = "days30" | "days60" | "days90";
+
+const boardPlan = async (company: Pick<Company, "id">, planId: string) => {
+  const [plan] = await db.select().from(schema.actionPlans).where(and(eq(schema.actionPlans.id, planId), eq(schema.actionPlans.companyId, company.id))).limit(1);
+  return plan?.content && ["active", "delivered"].includes(plan.status) ? (plan as ActionPlan & { content: ActionPlanContent }) : null;
+};
+
+/**
+ * Moves a milestone across the board (To do → In progress → Complete, or back). Founders can once
+ * they've started the plan; advisors any time.
+ */
+export async function setStepStatus(company: Pick<Company, "id">, planId: string, period: Period, index: number, status: StepStatus, opts: { staff?: boolean } = {}): Promise<PlanResult> {
+  const plan = await boardPlan(company, planId);
+  if (!plan) return { ok: false, error: "This plan can't be changed now." };
+  if (!opts.staff && !plan.content.startedAt) return { ok: false, error: "Start the plan first: choose who does each action, then press Start the plan." };
+  const content = withStatus(plan.content, period, index, status);
+  if (!content) return { ok: false, error: "Unknown milestone." };
+  await db.update(schema.actionPlans).set({ content, updatedAt: new Date() }).where(eq(schema.actionPlans.id, plan.id));
+  return { ok: true };
+}
+
+/** Before the plan starts: does the founder's team do this action, or Growth Goaled? */
+export async function setStepAssignee(company: Pick<Company, "id">, planId: string, period: Period, index: number, assignee: "us" | "gg"): Promise<PlanResult> {
+  const plan = await boardPlan(company, planId);
+  if (!plan) return { ok: false, error: "This plan can't be changed now." };
+  if (plan.content.startedAt) return { ok: false, error: "The plan has started; ask your advisor to change who does what." };
+  const content = withAssignee(plan.content, period, index, assignee);
+  if (!content) return { ok: false, error: "Unknown milestone." };
+  await db.update(schema.actionPlans).set({ content, updatedAt: new Date() }).where(eq(schema.actionPlans.id, plan.id));
+  return { ok: true };
+}
+
+/**
+ * The founder starts the plan. Who-does-what is fixed, and the actions handed to Growth Goaled are
+ * tallied for the advisor: a To Do to review and quote the work, and an email.
+ */
+export async function startPlan(user: Pick<User, "id" | "name" | "email">, company: Pick<Company, "id" | "name" | "advisorId">, planId: string, appUrl: string): Promise<PlanResult<{ assigned: number }>> {
+  const plan = await boardPlan(company, planId);
+  if (!plan) return { ok: false, error: "This plan can't be started now." };
+  if (plan.content.startedAt) return { ok: true, assigned: growthGoaledSteps(plan.content).length };
+  const content: ActionPlanContent = { ...plan.content, startedAt: new Date().toISOString() };
+  await db.update(schema.actionPlans).set({ content, updatedAt: new Date() }).where(eq(schema.actionPlans.id, plan.id));
+  const gg = growthGoaledSteps(content);
+  if (gg.length) {
+    const [conversation] = await db.select({ title: schema.conversations.title }).from(schema.conversations).where(eq(schema.conversations.id, plan.conversationId)).limit(1);
+    const lines = gg.map((g) => `${PERIOD_LABEL[g.period]}: ${g.step.action}`);
+    await db.insert(schema.registerItems).values({
+      companyId: company.id,
+      type: "follow_up",
+      owner: "advisor",
+      title: `Review and quote the work assigned to Growth Goaled (${gg.length} ${gg.length === 1 ? "action" : "actions"})`,
+      description: `${conversation?.title ?? "Action plan"}. ${user.name || user.email} handed these to Growth Goaled:\n${lines.map((l) => `- ${l}`).join("\n")}\nPlan: ${appUrl}/advisor/plans/${plan.id}`.slice(0, 2000),
+    });
+    if (company.advisorId) {
+      const [advisor] = await db.select({ email: schema.users.email }).from(schema.users).where(eq(schema.users.id, company.advisorId)).limit(1);
+      if (advisor) await sendEmail({ to: advisor.email, ...growthGoaledWorkEmail({ companyName: company.name, founderName: user.name || user.email, planTitle: conversation?.title ?? "their action plan", actions: lines, link: `${appUrl}/advisor/plans/${plan.id}` }) }).catch(() => null);
+    }
+  }
+  await track("plan_started", { userId: user.id, companyId: company.id, props: { assigned_to_growth_goaled: gg.length } });
+  return { ok: true, assigned: gg.length };
+}
+
 /** Owners, deadlines and targets are edited on live (Execute & Monitor) plans. */
 const LIVE = ["active"] as const;
 
@@ -319,8 +381,18 @@ export async function supportedPlans(advisor: Pick<User, "id" | "role">) {
   return rows.filter((r) => advisor.role === "admin" || r.advisorId === advisor.id || r.advisorId === null);
 }
 
-const cleanSteps = (steps: { action: string; owner: string; measure: string; done?: boolean; due?: string }[]) =>
-  steps.map((s) => ({ action: s.action.trim(), owner: s.owner.trim(), measure: s.measure.trim(), ...(s.done ? { done: true } : {}), ...(isDay(s.due) ? { due: s.due } : {}) })).filter((s) => s.action);
+const cleanSteps = (steps: PlanStep[]): PlanStep[] =>
+  steps
+    .map((s) => ({
+      action: s.action.trim(),
+      owner: s.owner.trim(),
+      measure: s.measure.trim(),
+      ...(s.done ? { done: true } : {}),
+      ...(isDay(s.due) ? { due: s.due } : {}),
+      ...(s.status && ["todo", "doing", "done"].includes(s.status) ? { status: s.status } : {}),
+      ...(s.assignee === "us" || s.assignee === "gg" ? { assignee: s.assignee } : {}),
+    }))
+    .filter((s) => s.action);
 
 /** Tools to evaluate, trimmed and without blanks or repeats (at most eight). */
 export const cleanTools = (tools: ActionPlanContent["tools"]) => {

@@ -28,7 +28,7 @@ export function QuestionsView({ items, files, resolve }: { items: RegisterView[]
               boxShadow: tab === t ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
             }}
           >
-            {t === "questions" ? `Questions (${open.length})` : "Registers"}
+            {t === "questions" ? `Questions (${open.length})` : "History"}
           </button>
         ))}
       </div>

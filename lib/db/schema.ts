@@ -1094,10 +1094,17 @@ export const actionPlanStatus = pgEnum("action_plan_status", [
 ]);
 
 /** due: YYYY-MM-DD (Execute & Monitor tracks deadlines; older plans have none). */
-export type PlanStep = { action: string; owner: string; measure: string; done?: boolean; due?: string };
+/**
+ * A milestone. `status` places it on the board (To do → In progress → Complete; `done` mirrors
+ * Complete for plans written before the board). `assignee`: the founder's team ("us") or Growth
+ * Goaled ("gg"), chosen before the plan starts.
+ */
+export type PlanStep = { action: string; owner: string; measure: string; done?: boolean; due?: string; status?: "todo" | "doing" | "done"; assignee?: "us" | "gg" };
 /** A metric the plan should move, tracked against the company's current figure (MetricKey from lib/metrics). */
 export type PlanTarget = { metric: string; target: number; by?: string | null };
 export type ActionPlanContent = {
+  /** When the founder started the plan (who-does-what is fixed from then; ISO time). */
+  startedAt?: string;
   goal: string;
   summary: string;
   days30: PlanStep[];

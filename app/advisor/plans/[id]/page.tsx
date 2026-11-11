@@ -17,6 +17,7 @@ import { formatPrice, pricing } from "@/lib/pricing";
 import { getConversation } from "@/lib/data/chat";
 import { advisorMessageAction, advisorStepAction, advisorStepDetailsAction, advisorTargetsAction, approvePlanAction, logSessionAction, redraftPlanAction, resendPlanEmailAction } from "../actions";
 import { ResendPlanEmail } from "@/components/chat/ResendPlanEmail";
+import { growthGoaledSteps, PERIOD_LABEL } from "@/lib/plan-board";
 
 export const maxDuration = 300;
 
@@ -43,6 +44,7 @@ export default async function AdvisorPlanPage({ params }: { params: Promise<{ id
   const today = now.toISOString().slice(0, 10);
   const [perf, sessions] = await Promise.all([companyPerformance(company), plan.tier === "supported" ? planSessionsFor(plan.id) : Promise.resolve([])]);
   const current = Object.fromEntries([...perf.metrics.values()].map((m) => [m.metric, m.value]));
+  const gg = plan.content ? growthGoaledSteps(plan.content) : [];
 
   return (
     <div className="px-4 sm:px-8 py-8 w-full space-y-6">
@@ -82,10 +84,24 @@ export default async function AdvisorPlanPage({ params }: { params: Promise<{ id
             <div className="surface p-5 space-y-4">
               {plan.status === "delivered" && <p className="text-sm" style={muted}>Approved {plan.approvedAt?.toLocaleDateString("en-US", { month: "short", day: "numeric" })}{plan.reviewNote ? ` · Note: ${plan.reviewNote}` : ""}</p>}
               {plan.status === "delivered" && <ResendPlanEmail planId={plan.id} resend={resendPlanEmailAction} />}
+              {gg.length > 0 && (
+                <div role="region" aria-label="Assigned to Growth Goaled" className="rounded-xl p-4 space-y-2" style={{ background: "var(--green-muted)" }}>
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="font-semibold" style={fg}>
+                      Assigned to Growth Goaled: {gg.length} {gg.length === 1 ? "action" : "actions"}
+                      {!plan.content?.startedAt && <span className="text-sm font-normal" style={muted}> · the founder hasn&apos;t started the plan yet</span>}
+                    </div>
+                    <Link href={`/advisor/payment-links?company=${company.id}`} className="btn btn-primary text-sm">Quote the extra work</Link>
+                  </div>
+                  <ul className="text-sm list-disc pl-5" style={fg}>
+                    {gg.map((g) => <li key={`${g.period}:${g.index}`}><span style={muted}>{PERIOD_LABEL[g.period]}:</span> {g.step.action}</li>)}
+                  </ul>
+                </div>
+              )}
               <ActionPlanView
                 content={plan.content}
                 today={plan.status === "cancelled" ? null : today}
-                toggle={plan.status === "active" ? advisorStepAction.bind(null, plan.id) : undefined}
+                move={plan.status === "active" || plan.status === "delivered" ? advisorStepAction.bind(null, plan.id) : undefined}
                 editStep={plan.status === "active" ? advisorStepDetailsAction.bind(null, plan.id) : undefined}
                 targets={{ current, save: plan.status === "active" ? advisorTargetsAction.bind(null, plan.id) : undefined }}
               />

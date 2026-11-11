@@ -4,13 +4,15 @@ import { Faq } from "@/components/Faq";
 import { PageHeader } from "@/components/PageHeader";
 import { ADVISOR_CALENDLY } from "@/components/chat/AdvisorNudge";
 import { StartOptionButton } from "@/components/use-cases/StartOption";
-import { founderPlans } from "@/lib/data/action-plans";
+import { currentPlan } from "@/lib/data/current-plan";
 import { founderContext } from "@/lib/data/founder-context";
 import { track } from "@/lib/events";
 import { CUSTOM } from "@/lib/plan-offer";
 import { startTopicAction } from "../chat/actions";
 
 const PLAN_STATUS: Record<string, string> = { drafting: "Being drafted", in_review: "With your advisor for review", delivered: "Delivered", active: "Active" };
+const progressLine = (p: NonNullable<Awaited<ReturnType<typeof currentPlan>>>) =>
+  [p.plan ? PLAN_STATUS[p.plan.status] : null, p.progress ? `${p.progress.done} of ${p.progress.total} milestones done` : null].filter(Boolean).join(" · ") || "With your advisor";
 
 function Option({ icon, title, when, points, children, muted = false }: { icon: ReactNode; title: string; when: string; points?: string[]; children: ReactNode; muted?: boolean }) {
   return (
@@ -41,7 +43,7 @@ function Option({ icon, title, when, points, children, muted = false }: { icon: 
 export default async function LibraryPage({ searchParams }: { searchParams: Promise<{ welcome?: string }> }) {
   const [{ user, company }, { welcome }] = await Promise.all([founderContext(), searchParams]);
   if (company) await track("library_viewed", { userId: user.id, companyId: company.id });
-  const [plan] = company ? await founderPlans(company) : [];
+  const plan = company ? await currentPlan(company) : null;
 
   return (
     <div className="px-4 sm:px-8 py-8 max-w-5xl">
@@ -64,12 +66,10 @@ export default async function LibraryPage({ searchParams }: { searchParams: Prom
             <StartOptionButton label="Start" />
           </form>
         </Option>
-        <Option icon={<ClipboardList size={22} />} title="See my current plan" when={plan ? `${plan.title} · ${PLAN_STATUS[plan.status] ?? plan.status}` : "Your plan will show here once you start one with your advisor."} muted={!plan}>
-          {plan ? (
-            <a href={`/chat/${plan.conversationId}#your-plan`} className="btn btn-primary">Open my plan</a>
-          ) : (
-            <a href={ADVISOR_CALENDLY} target="_blank" rel="noopener" className="btn btn-secondary">Schedule time with an advisor</a>
-          )}
+        <Option icon={<ClipboardList size={22} />} title="See my current plan" when={plan ? `${plan.name} · ${progressLine(plan)}` : "No plan yet. Your plan page shows it as soon as you start one with your advisor."} muted={!plan}>
+          {/* Always a way to the plan (its board, or the plan page that will hold it), and to the advisor. */}
+          <a href={plan?.plan?.href ?? "/performance#plan-progress"} className="btn btn-primary">Open my plan</a>
+          <a href={ADVISOR_CALENDLY} target="_blank" rel="noopener" className="btn btn-secondary">Schedule time with an advisor</a>
         </Option>
         <Option icon={<Handshake size={22} />} title="Custom Project" when={CUSTOM.tagline} points={CUSTOM.points}>
           <a href={CUSTOM.href} target="_blank" rel="noopener" className="btn btn-secondary">{CUSTOM.cta}</a>

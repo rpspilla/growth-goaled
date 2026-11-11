@@ -5,9 +5,10 @@ import { latestMetrics, portfolioRows, userName } from "@/lib/data/portfolio";
 import { formatMetric, type MetricKey } from "@/lib/metrics";
 import { getUseCase, targetSummary } from "@/lib/use-cases";
 import { STEPS, journeyStage } from "@/lib/use-cases/steps";
-import { cancelCompanyInviteAction, inviteCompanyMemberAction, removeCompanyMemberAction, requestDataAction, setCurrentPlanAction, updateHealth, updateSummary } from "./actions";
+import { clearBusinessUpdateAction, cancelCompanyInviteAction, inviteCompanyMemberAction, removeCompanyMemberAction, requestDataAction, setCurrentPlanAction, updateHealth, updateSummary } from "./actions";
 import { DataRequestForm } from "@/components/advisor/DataRequestForm";
 import { listDataRequests, REQUEST_ITEMS } from "@/lib/data/data-requests";
+import { BUSINESS_METRICS, businessMetrics, type BusinessKey } from "@/lib/data/business-metrics";
 import { TeamPanel } from "@/components/team/TeamPanel";
 import { companyPeople } from "@/lib/data/team";
 import { companyContext } from "./context";
@@ -24,7 +25,8 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
     userName(company.advisorSummaryBy),
     listAdvisoryRequests([company.id]),
   ]);
-  const [people, requests] = await Promise.all([companyPeople(company.id), listDataRequests(company.id)]);
+  const [people, requests, biz] = await Promise.all([companyPeople(company.id), listDataRequests(company.id), businessMetrics(company)]);
+  const bizKeys = Object.keys(BUSINESS_METRICS) as BusinessKey[];
   const day = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   const base = `/advisor/companies/${company.id}`;
 
@@ -165,6 +167,40 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
             )}
           </section>
         </div>
+      )}
+
+      {!company.isSample && (
+        <section aria-label="Business updates" className="rounded-xl border p-5 space-y-3" style={card}>
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h2 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>Business updates</h2>
+              <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>What {company.name} sees under Business metrics on Performance. Remove an update that&apos;s wrong; the one before it shows again.</p>
+            </div>
+            {biz.updates.length > 1 && (
+              <form action={clearBusinessUpdateAction.bind(null, company.id, "all")}>
+                <button type="submit" className="btn btn-secondary text-sm">Clear all</button>
+              </form>
+            )}
+          </div>
+          {biz.updates.length ? (
+            <ul aria-label="Business updates" className="divide-y text-sm" style={{ borderColor: "var(--border)" }}>
+              {biz.updates.map((u) => (
+                <li key={u.key} className="py-2.5 flex items-center gap-4 flex-wrap" style={{ borderColor: "var(--border)" }}>
+                  <span className="font-semibold w-28 shrink-0" style={{ color: "var(--foreground)" }}>{day(u.at)}</span>
+                  <span className="flex-1 min-w-[10rem]" style={{ color: "var(--muted-foreground)" }}>{u.source}</span>
+                  <span className="flex gap-3 flex-wrap" style={{ color: "var(--foreground)" }}>
+                    {bizKeys.filter((k) => u.values[k]).map((k) => <span key={k}>{BUSINESS_METRICS[k].label}: <span className="font-mono">{formatMetric(u.values[k]!.metric as MetricKey, u.values[k]!.value)}</span></span>)}
+                  </span>
+                  <form action={clearBusinessUpdateAction.bind(null, company.id, u.key)}>
+                    <button type="submit" className="text-sm font-medium" style={{ color: "var(--red)" }} aria-label={`Remove the update from ${day(u.at)}`}>Remove</button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>No updates yet.</p>
+          )}
+        </section>
       )}
 
       {!company.isSample && (

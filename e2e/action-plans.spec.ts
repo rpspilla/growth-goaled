@@ -85,12 +85,33 @@ test("a founder buys an action plan from the conversation; an advisor approves i
   await expect(panel).toContainText("Approved by your advisor");
   await expect(panel).toContainText("Hire one more AE once payers convert");
   await expect(panel).toContainText("Start with the payer ICP.");
-  // Every plan carries tools worth evaluating, and Ryan's name as the person behind it.
-  await expect(panel.getByRole("region", { name: "Tools to evaluate" })).toContainText("Test CRM");
+  // No tools, risks or assumptions on the plan any more; Ryan's name is the person behind it.
+  await expect(panel.getByRole("region", { name: "Tools to evaluate" })).toHaveCount(0);
+  await expect(panel.getByText("Risks", { exact: true })).toHaveCount(0);
   await expect(panel.getByTestId("human-presence-plan")).toContainText("Ryan Spillane, CEO & Founder");
   await expect(panel.getByTestId("human-presence-plan")).toContainText("2 IPOs");
-  await panel.getByRole("checkbox", { name: /Done: Test 30-day milestone/ }).check();
+  // A board: before starting, choose who does each action; Growth Goaled's share goes to the advisor.
+  const board = panel.getByRole("group", { name: "Plan board" });
+  await expect(board.getByRole("region", { name: "To do" }).getByRole("listitem")).toHaveCount(3);
+  await expect(board.getByRole("button", { name: /^Move to In progress/ })).toHaveCount(0);
+  await board.getByRole("radiogroup", { name: "Who does: Test 30-day milestone" }).getByRole("radio", { name: "Assign to Growth Goaled" }).click();
+  await expect(panel.getByRole("region", { name: "Before you start" })).toContainText("1 assigned to Growth Goaled");
+  await panel.getByRole("button", { name: "Start the plan" }).click();
+  await expect(panel.getByRole("region", { name: "Before you start" })).toHaveCount(0);
+  await expect(board.getByRole("listitem", { name: "Test 30-day milestone" })).toContainText("Growth Goaled");
+  // Left to right: To do → In progress → Complete.
+  await board.getByRole("button", { name: "Move to In progress: Test 30-day milestone" }).click();
+  await expect(board.getByRole("region", { name: "In progress" }).getByRole("listitem")).toHaveCount(1);
+  await board.getByRole("button", { name: "Move to Complete: Test 30-day milestone" }).click();
+  await expect(board.getByRole("region", { name: "Complete" }).getByRole("listitem")).toHaveCount(1);
   await expect(panel).toContainText("1 of 3 milestones done");
+  // The advisor sees the work handed to Growth Goaled, and a To Do to quote it.
+  await cro.page.goto(cro.page.url());
+  await expect(cro.page.getByRole("region", { name: "Assigned to Growth Goaled" })).toContainText("Test 30-day milestone");
+  await cro.page.goto("/advisor/registers");
+  await expect(cro.page.getByText("Review and quote the work assigned to Growth Goaled (1 action)")).toBeVisible();
+  await cro.page.getByRole("button", { name: /^Mark complete: Review and quote/ }).click();
+  await expect(cro.page.getByText("Review and quote the work assigned to Growth Goaled (1 action)")).toHaveCount(0);
 
   // --- Execute & Monitor (monthly): the advisor is in the conversation ---
   await page.goto("/chat");

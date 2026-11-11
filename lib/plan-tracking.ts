@@ -20,15 +20,19 @@ export function withDefaultDues(content: ActionPlanContent, start: Date): Action
   return { ...content, days30: fill(content.days30, 30), days60: fill(content.days60, 60), days90: fill(content.days90, 90) };
 }
 
-/** Deadlines and owners carry over when a plan is rewritten, matched by the milestone's action. */
+/**
+ * Deadlines, board position and who does it carry over when a plan is rewritten, matched by the
+ * milestone's action; so does the plan's start.
+ */
 export function carryDues(next: ActionPlanContent, current: ActionPlanContent | null): ActionPlanContent {
   if (!current) return next;
   const before = new Map(PERIODS.flatMap((p) => current[p]).map((s) => [s.action.trim().toLowerCase(), s]));
   const carry = (steps: PlanStep[]) => steps.map((s) => {
     const old = before.get(s.action.trim().toLowerCase());
-    return old?.due && !s.due ? { ...s, due: old.due } : s;
+    if (!old) return s;
+    return { ...s, ...(old.due && !s.due ? { due: old.due } : {}), ...(old.status && !s.status ? { status: old.status, done: old.status === "done" } : {}), ...(old.assignee && !s.assignee ? { assignee: old.assignee } : {}) };
   });
-  return { ...next, days30: carry(next.days30), days60: carry(next.days60), days90: carry(next.days90), targets: next.targets ?? current.targets };
+  return { ...next, days30: carry(next.days30), days60: carry(next.days60), days90: carry(next.days90), targets: next.targets ?? current.targets, ...(current.startedAt ? { startedAt: current.startedAt } : {}) };
 }
 
 export const isOverdue = (step: Pick<PlanStep, "due" | "done">, today: string) => Boolean(step.due && !step.done && step.due < today);

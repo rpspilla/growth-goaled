@@ -3,6 +3,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { Company } from "@/lib/db/schema";
 import { isOverdue } from "@/lib/plan-tracking";
+import { stepStatus } from "@/lib/plan-board";
 
 export type PlanProgress = { done: number; total: number; overdue: number; next: string | null };
 export type CurrentPlan = {
@@ -16,11 +17,14 @@ export type CurrentPlan = {
 const today = () => new Date().toISOString().slice(0, 10);
 
 /** Milestones done out of all of them, how many are late, and the next one to do. */
-export function planProgress(content: { days30: { action: string; done?: boolean; due?: string }[]; days60: { action: string; done?: boolean; due?: string }[]; days90: { action: string; done?: boolean; due?: string }[] } | null, on = today()): PlanProgress | null {
+type Step = { action: string; done?: boolean; due?: string; status?: "todo" | "doing" | "done" };
+export function planProgress(content: { days30: Step[]; days60: Step[]; days90: Step[] } | null, on = today()): PlanProgress | null {
   if (!content) return null;
-  const steps = [...content.days30, ...content.days60, ...content.days90];
+  const steps = [...content.days30, ...content.days60, ...content.days90].map((s) => ({ ...s, done: stepStatus(s) === "done" }));
   if (!steps.length) return null;
-  return { done: steps.filter((s) => s.done).length, total: steps.length, overdue: steps.filter((s) => isOverdue(s, on)).length, next: steps.find((s) => !s.done)?.action ?? null };
+  // The next thing to do: something already under way, else the first not started.
+  const next = steps.find((s) => stepStatus(s) === "doing") ?? steps.find((s) => !s.done);
+  return { done: steps.filter((s) => s.done).length, total: steps.length, overdue: steps.filter((s) => isOverdue(s, on)).length, next: next?.action ?? null };
 }
 
 /** The plan the company is working on with its advisor, or null when there isn't one yet. */

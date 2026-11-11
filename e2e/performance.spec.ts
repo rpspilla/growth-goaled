@@ -84,6 +84,18 @@ test("advisor names the plan and asks for data; the founder sees progress and da
   await expect(f.page.getByLabel("Month-over-month growth", { exact: true })).toContainText("7.5%");
   await expect(f.page.getByLabel("Retention", { exact: true })).toContainText("104%");
   await expect(f.page.getByRole("list", { name: "Update history" }).getByRole("listitem").first()).toContainText("Entered by hand");
+
+  // The advisor clears the latest update; the founder sees the one before it again.
+  const adv2 = await as("perf-cro@e2e.test");
+  await adv2.page.goto(`/advisor/companies/${company}`);
+  const updates = adv2.page.getByRole("list", { name: "Business updates" });
+  await expect(updates.getByRole("listitem")).toHaveCount(2);
+  await updates.getByRole("button", { name: /^Remove the update from/ }).first().click();
+  await expect(updates.getByRole("listitem")).toHaveCount(1);
+  await adv2.ctx.close();
+  await f.page.reload();
+  await expect(f.page.getByLabel("Revenue", { exact: true })).toContainText("about $80K a month");
+  await expect(f.page.getByLabel("Retention", { exact: true })).toContainText("No figure yet");
   await db.end();
   await f.ctx.close();
 });

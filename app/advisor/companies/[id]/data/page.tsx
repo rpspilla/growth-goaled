@@ -94,7 +94,7 @@ export default async function CompanyDataPage({ params }: { params: Promise<{ id
           <section>
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>Open questions · {questions.length}</h2>
-              <Link href={`/advisor/registers?company=${company.id}`} className="text-xs" style={{ color: "var(--green)" }}>Registers →</Link>
+              <Link href={`/advisor/registers?company=${company.id}`} className="text-xs" style={{ color: "var(--green)" }}>To Dos →</Link>
             </div>
             <div className="rounded-xl border" style={card}>
               {questions.length === 0 && <div className="p-4 text-sm" style={{ color: "var(--muted-foreground)" }}>None open.</div>}

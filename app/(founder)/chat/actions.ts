@@ -7,7 +7,7 @@ import { after } from "next/server";
 import { z } from "zod";
 import { founderContext } from "@/lib/data/founder-context";
 import { attachFiles, FEEDBACK_KINDS, giveFeedback, removeFact, retryLastMessage, sendMessage, startConversation, updateFact, type ChatResult } from "@/lib/data/chat";
-import { createPlanCheckout, PlanCheckoutError, requestPlanUpdate, setPlanTargets, setStepDone, submitPlan, updateStep, writePlan } from "@/lib/data/action-plans";
+import { createPlanCheckout, PlanCheckoutError, requestPlanUpdate, setPlanTargets, setStepAssignee, setStepStatus, startPlan, submitPlan, updateStep, writePlan } from "@/lib/data/action-plans";
 import { processInboxDocument } from "@/lib/data/documents";
 import { stripeConfigured } from "@/lib/stripe";
 
@@ -130,14 +130,43 @@ export async function updatePlanAction(planId: string): Promise<ChatResult> {
   return result;
 }
 
-export async function stepDoneAction(planId: string, period: string, index: number, done: boolean): Promise<ChatResult> {
+const periodSchema = z.enum(["days30", "days60", "days90"]);
+
+/** Moves a milestone across the board: To do, In progress, Complete. */
+export async function stepStatusAction(planId: string, period: string, index: number, status: string): Promise<ChatResult> {
   const { company } = await founderCompany();
   const plan = id.safeParse(planId);
-  const p = z.enum(["days30", "days60", "days90"]).safeParse(period);
-  if (!plan.success || !p.success || !Number.isInteger(index) || index < 0) return { ok: false, error: "That change isn't valid." };
-  const result = await setStepDone(company, plan.data, p.data, index, Boolean(done));
+  const p = periodSchema.safeParse(period);
+  const st = z.enum(["todo", "doing", "done"]).safeParse(status);
+  if (!plan.success || !p.success || !st.success || !Number.isInteger(index) || index < 0) return { ok: false, error: "That change isn't valid." };
+  const result = await setStepStatus(company, plan.data, p.data, index, st.data);
   revalidatePath("/chat", "layout");
   return result;
+}
+
+/** Before the plan starts: "We do" or "Assign to Growth Goaled". */
+export async function stepAssigneeAction(planId: string, period: string, index: number, assignee: string): Promise<ChatResult> {
+  const { company } = await founderCompany();
+  const plan = id.safeParse(planId);
+  const p = periodSchema.safeParse(period);
+  const a = z.enum(["us", "gg"]).safeParse(assignee);
+  if (!plan.success || !p.success || !a.success || !Number.isInteger(index) || index < 0) return { ok: false, error: "That change isn't valid." };
+  const result = await setStepAssignee(company, plan.data, p.data, index, a.data);
+  revalidatePath("/chat", "layout");
+  return result;
+}
+
+/** Starts the plan; Growth Goaled's share goes to the advisor to review and quote. */
+export async function startPlanAction(planId: string): Promise<ChatResult> {
+  const { user, company } = await founderCompany();
+  const plan = id.safeParse(planId);
+  if (!plan.success) return { ok: false, error: "That plan isn't available." };
+  const h = await headers();
+  const appUrl = process.env.APP_URL?.replace(/\/$/, "") ?? `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
+  const result = await startPlan(user, company, plan.data, appUrl);
+  revalidatePath("/chat", "layout");
+  revalidatePath("/overview");
+  return result.ok ? { ok: true } : result;
 }
 
 /** Execute & Monitor: a milestone's owner and deadline. */

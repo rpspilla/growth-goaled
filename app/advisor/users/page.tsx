@@ -1,4 +1,4 @@
-import { desc } from "drizzle-orm";
+import { desc, eq, isNull } from "drizzle-orm";
 import { PageHeader } from "@/components/PageHeader";
 import { requireRole } from "@/lib/auth/session";
 import { db, schema } from "@/lib/db";
@@ -8,7 +8,20 @@ const ROLE_LABEL = { founder: "Founder", advisor: "Advisor", admin: "Admin" } as
 
 export default async function UsersPage() {
   const admin = await requireRole(["admin"]);
-  const users = await db.select().from(schema.users).orderBy(desc(schema.users.createdAt));
+  const [users, memberships, invited] = await Promise.all([
+    db.select().from(schema.users).orderBy(desc(schema.users.createdAt)),
+    db.select({ userId: schema.companyMembers.userId, name: schema.companies.name }).from(schema.companyMembers).innerJoin(schema.companies, eq(schema.companies.id, schema.companyMembers.companyId)),
+    db.select({ email: schema.invites.email, name: schema.companies.name }).from(schema.invites).innerJoin(schema.companies, eq(schema.companies.id, schema.invites.companyId)).where(isNull(schema.invites.acceptedAt)),
+  ]);
+  // Every person with the company they belong to: their companies as founders, Growth Goaled for staff,
+  // the company they were invited to while the invite is open.
+  const companyOf = (u: (typeof users)[number]): { name: string; note?: string } => {
+    if (u.role !== "founder") return { name: "Growth Goaled" };
+    const names = memberships.filter((m) => m.userId === u.id).map((m) => m.name);
+    if (names.length) return { name: names.join(", ") };
+    const invite = invited.find((i) => i.email.toLowerCase() === u.email.toLowerCase());
+    return invite ? { name: invite.name, note: "invited" } : { name: "No company yet", note: "missing" };
+  };
 
   return (
     <div className="px-4 sm:px-8 py-8 max-w-6xl">
@@ -21,19 +34,24 @@ export default async function UsersPage() {
           className="grid grid-cols-12 px-5 py-3 border-b label"
           style={{ borderColor: "var(--border)", background: "var(--muted)", color: "var(--muted-foreground)" }}
         >
-          <div className="col-span-4">Person</div>
-          <div className="col-span-3">Title</div>
-          <div className="col-span-2">Profile</div>
+          <div className="col-span-3">Person</div>
+          <div className="col-span-3">Company</div>
+          <div className="col-span-2">Title</div>
+          <div className="col-span-1">Profile</div>
           <div className="col-span-3">Role</div>
         </div>
         {users.map((u) => (
           <div key={u.id} className="grid grid-cols-12 items-center px-5 py-3 border-b" style={{ borderColor: "var(--border)" }}>
-            <div className="col-span-4 min-w-0">
+            <div className="col-span-3 min-w-0">
               <div className="text-sm font-semibold truncate" style={{ color: "var(--foreground)" }}>{u.name || "—"}</div>
               <div className="text-xs truncate" style={{ color: "var(--muted-foreground)" }}>{u.email}</div>
             </div>
-            <div className="col-span-3 text-sm truncate" style={{ color: "var(--muted-foreground)" }}>{u.title || "—"}</div>
-            <div className="col-span-2">
+            <div className="col-span-3 min-w-0 text-sm truncate" style={{ color: companyOf(u).note === "missing" ? "var(--amber)" : "var(--foreground)" }}>
+              {companyOf(u).name}
+              {companyOf(u).note === "invited" && <span className="text-xs" style={{ color: "var(--muted-foreground)" }}> (invited)</span>}
+            </div>
+            <div className="col-span-2 text-sm truncate" style={{ color: "var(--muted-foreground)" }}>{u.title || "—"}</div>
+            <div className="col-span-1">
               <span
                 className="text-xs px-2 py-0.5 rounded-full font-medium"
                 style={
@@ -42,7 +60,7 @@ export default async function UsersPage() {
                     : { background: "var(--amber-muted)", color: "var(--amber)" }
                 }
               >
-                {u.onboardedAt ? "Complete" : "Not finished"}
+                {u.onboardedAt ? "Done" : "Not yet"}
               </span>
             </div>
             <div className="col-span-3">

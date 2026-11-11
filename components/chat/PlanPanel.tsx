@@ -35,14 +35,18 @@ export function PlanPanel({
   plan,
   submit,
   update,
-  toggle,
+  move,
+  assign,
+  startPlan,
   editStep,
   saveTargets,
 }: {
   plan: PlanPanelData;
   submit: (id: string) => Promise<Result>;
   update: (id: string) => Promise<Result>;
-  toggle: (id: string, period: string, index: number, done: boolean) => Promise<Result>;
+  move: (id: string, period: string, index: number, status: string) => Promise<Result>;
+  assign: (id: string, period: string, index: number, assignee: string) => Promise<Result>;
+  startPlan: (id: string) => Promise<Result>;
   editStep: (id: string, period: string, index: number, owner: string, due: string | null) => Promise<Result>;
   saveTargets: (id: string, targets: PlanTarget[]) => Promise<Result>;
 }) {
@@ -114,7 +118,9 @@ export function PlanPanel({
           <ActionPlanView
             content={plan.content}
             today={plan.status === "cancelled" ? null : plan.today}
-            toggle={plan.status === "cancelled" ? undefined : (period, index, done) => toggle(plan.id, period, index, done)}
+            move={plan.status === "cancelled" ? undefined : (period, index, status) => move(plan.id, period, index, status)}
+            assign={plan.status === "cancelled" ? undefined : (period, index, who) => assign(plan.id, period, index, who)}
+            start={plan.status === "cancelled" ? undefined : () => startPlan(plan.id)}
             editStep={plan.status === "active" ? (period, index, owner, due) => editStep(plan.id, period, index, owner, due) : undefined}
             targets={{ current: plan.current, save: plan.status === "active" ? (targets) => saveTargets(plan.id, targets) : undefined }}
           />

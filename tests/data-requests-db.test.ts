@@ -16,7 +16,7 @@ vi.mock("@/lib/email", async (original) => {
 import { schema } from "@/lib/db";
 import type { Company, User } from "@/lib/db/schema";
 import { answerDataRequests, createDataRequest, listDataRequests, setCurrentPlan } from "@/lib/data/data-requests";
-import { addBusinessUpdate, businessMetrics } from "@/lib/data/business-metrics";
+import { addBusinessUpdate, businessMetrics, clearBusinessUpdate } from "@/lib/data/business-metrics";
 import { currentPlan } from "@/lib/data/current-plan";
 
 type DB = typeof import("@/lib/db").db;
@@ -98,6 +98,21 @@ describe("typed-in business updates", () => {
     expect(m.latest.growth).toMatchObject({ value: 7.5 });
     expect(m.latest.retention).toMatchObject({ value: 104 });
     expect(m.updates.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("lets the advisor clear one update, or all of them", async () => {
+    await addBusinessUpdate(founder, co, { period: "2026-09", mrr: 80_000, retention: null });
+    await new Promise((r) => setTimeout(r, 5));
+    await addBusinessUpdate(founder, co, { period: "2026-10", mrr: 86_000, retention: 104 });
+    const before = await businessMetrics(co);
+    expect(before.updates).toHaveLength(2);
+    expect(await clearBusinessUpdate(advisor, co, before.updates[0]!.key)).toBe(3);
+    const after = await businessMetrics(co);
+    expect(after.latest.revenue).toMatchObject({ value: 960_000 });
+    expect(after.latest.retention).toBeNull();
+    expect(await clearBusinessUpdate(advisor, co, "all")).toBe(1);
+    expect((await businessMetrics(co)).updates).toEqual([]);
+    expect(await clearBusinessUpdate(advisor, co, "nonsense")).toBe(0);
   });
 
   it("checks what's typed", async () => {

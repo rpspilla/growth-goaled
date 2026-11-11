@@ -11,7 +11,9 @@ import { createItem, reopenItem, resolveAsAdvisor } from "./actions";
 
 const STATUSES = ["open", "resolved", "unknown", "all"] as const;
 type Status = (typeof STATUSES)[number];
+const STATUS_LABEL: Record<Status, string> = { open: "To do", resolved: "Complete", unknown: "Can't be done", all: "All" };
 
+/** To Dos: everything waiting on the advisor across their companies, each closed with one click. */
 export default async function RegistersPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const user = await requireRole(["advisor", "admin"]);
   const params = await searchParams;
@@ -42,7 +44,7 @@ export default async function RegistersPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className="px-4 sm:px-8 py-8 max-w-6xl">
-      <PageHeader title="Registers" subtitle="Open questions, conflicts and assumptions across your portfolio." />
+      <PageHeader title="To Dos" subtitle="What needs doing across your companies, newest first. Work through each one and mark it complete when it's done." />
 
       {companies.length === 0 ? (
         <div className="rounded-xl border p-6 text-sm" style={{ background: "var(--card)", borderColor: "var(--border)", color: "var(--muted-foreground)" }}>
@@ -65,7 +67,7 @@ export default async function RegistersPage({ searchParams }: { searchParams: Pr
 
             <div className="flex flex-wrap items-center gap-2">
               {STATUSES.map((s) => (
-                <Link key={s} href={href({ status: s })} className="text-xs px-3 py-1 rounded-full capitalize" style={chip(status === s)}>{s}</Link>
+                <Link key={s} href={href({ status: s })} className="text-xs px-3 py-1 rounded-full" style={chip(status === s)}>{STATUS_LABEL[s]}</Link>
               ))}
               <span className="mx-2 h-4 border-l" style={{ borderColor: "var(--border)" }} />
               <Link href={href({ company: undefined })} className="text-xs px-3 py-1 rounded-full" style={chip(!params.company)}>All companies</Link>
@@ -75,7 +77,7 @@ export default async function RegistersPage({ searchParams }: { searchParams: Pr
             </div>
 
             {items.length === 0 ? (
-              <div className="rounded-xl border p-6 text-sm" style={{ background: "var(--card)", borderColor: "var(--border)", color: "var(--muted-foreground)" }}>Nothing here.</div>
+              <div className="rounded-xl border p-6 text-sm" style={{ background: "var(--card)", borderColor: "var(--border)", color: "var(--muted-foreground)" }}>Nothing to do here.</div>
             ) : (
               items.map((item) => (
                 <div key={item.id} className="space-y-1">

@@ -8,7 +8,7 @@ import { z } from "zod";
 import { canViewCompany } from "@/lib/access";
 import { requireRole } from "@/lib/auth/session";
 import { db, schema } from "@/lib/db";
-import { approvePlan, logPlanSession, postAdvisorMessage, requestPlanUpdate, resendPlanEmail, setPlanTargets, setStepDone, updateStep, writePlan, type PlanResult } from "@/lib/data/action-plans";
+import { approvePlan, logPlanSession, postAdvisorMessage, requestPlanUpdate, resendPlanEmail, setPlanTargets, setStepStatus, updateStep, writePlan, type PlanResult } from "@/lib/data/action-plans";
 
 /** The signed-in advisor or admin, and the plan's company if they may see it. */
 async function staffPlan(planId: string) {
@@ -25,7 +25,7 @@ async function staffPlan(planId: string) {
   return { user, ...row };
 }
 
-const step = z.object({ action: z.string().max(500), owner: z.string().max(120), measure: z.string().max(300), done: z.boolean().optional(), due: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() });
+const step = z.object({ action: z.string().max(500), owner: z.string().max(120), measure: z.string().max(300), done: z.boolean().optional(), due: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), status: z.enum(["todo", "doing", "done"]).optional(), assignee: z.enum(["us", "gg"]).optional() });
 const contentSchema = z.object({
   goal: z.string().max(500),
   summary: z.string().max(2000),
@@ -77,12 +77,13 @@ export async function advisorMessageAction(planId: string, text: string): Promis
   return result;
 }
 
-export async function advisorStepAction(planId: string, period: string, index: number, done: boolean): Promise<PlanResult> {
+export async function advisorStepAction(planId: string, period: string, index: number, status: string): Promise<PlanResult> {
   const ctx = await staffPlan(planId);
   if (!ctx) return { ok: false, error: "Plan not found." };
   const p = z.enum(["days30", "days60", "days90"]).safeParse(period);
-  if (!p.success || !Number.isInteger(index) || index < 0) return { ok: false, error: "That change isn't valid." };
-  const result = await setStepDone(ctx.company, ctx.plan.id, p.data, index, Boolean(done));
+  const st = z.enum(["todo", "doing", "done"]).safeParse(status);
+  if (!p.success || !st.success || !Number.isInteger(index) || index < 0) return { ok: false, error: "That change isn't valid." };
+  const result = await setStepStatus(ctx.company, ctx.plan.id, p.data, index, st.data, { staff: true });
   revalidatePath(`/advisor/plans/${ctx.plan.id}`);
   return result;
 }

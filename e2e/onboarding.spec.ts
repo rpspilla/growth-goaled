@@ -109,8 +109,9 @@ test("growth questions: four options, no pricing, and the current plan", async (
   await expect(options).toHaveCount(4);
   await expect(page.locator("main, body").first()).not.toContainText("$");
   await expect(page.getByText(/Snapshot|Assessment \$/)).toHaveCount(0);
-  // No plan yet: the advisor's calendar instead.
+  // No plan yet: still a way to the plan page, and to the advisor's calendar.
   const current = page.getByRole("article", { name: "See my current plan" });
+  await expect(current.getByRole("link", { name: "Open my plan" })).toHaveAttribute("href", "/performance#plan-progress");
   await expect(current.getByRole("link", { name: "Schedule time with an advisor" })).toHaveAttribute("href", "https://calendly.com/ryan-spillane-growthgoaled/30min");
   await expect(page.getByRole("article", { name: "Custom Project" }).getByRole("link", { name: "Discuss a Project" })).toHaveAttribute("href", /calendly\.com/);
   // The FAQ stays.
@@ -127,6 +128,7 @@ test("growth questions: four options, no pricing, and the current plan", async (
   await db.query("insert into action_plans (company_id, conversation_id, topic, tier, status) values ($1, $2, 'pipeline_conversion', 'supported', 'active')", [c.rows[0].id, conversationId]);
   await page.goto("/library");
   await expect(current).toContainText("Why isn't our pipeline converting? · Active");
+  await expect(current.getByRole("link", { name: "Schedule time with an advisor" })).toBeVisible();
   await expect(current.getByRole("link", { name: "Open my plan" })).toHaveAttribute("href", `/chat/${conversationId}#your-plan`);
   await db.end();
   await ctx.close();

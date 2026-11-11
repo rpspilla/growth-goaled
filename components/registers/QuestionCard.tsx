@@ -69,7 +69,7 @@ export function QuestionCard({
         {item.owner === "advisor" && <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>· advisor-owned</span>}
         {closed && (
           <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: "var(--green-muted)", color: "var(--green)" }}>
-            {item.status === "unknown" ? "Marked unknown" : "✓ Resolved"}
+            {item.status === "unknown" ? "Marked unknown" : "✓ Complete"}
           </span>
         )}
       </div>
@@ -94,6 +94,11 @@ export function QuestionCard({
       ) : (
         <>
           <div className="flex items-center gap-2 flex-wrap">
+            {companyName && (
+              <button disabled={pending} onClick={() => act({ kind: "complete" })} className="btn btn-primary text-xs px-3 py-1.5" aria-label={`Mark complete: ${item.title}`}>
+                ✓ Mark complete
+              </button>
+            )}
             {item.type === "conflict" &&
               live.length > 1 &&
               live.map((p) => (

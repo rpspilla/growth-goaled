@@ -189,6 +189,8 @@ export async function resolveRegisterItem(actor: User, company: Company, itemId:
       status = "unknown";
       resolution = { ...resolution, note: action.note || undefined };
       break;
+    case "complete":
+      break;
   }
 
   await db

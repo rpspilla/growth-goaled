@@ -2,11 +2,11 @@ import { z } from "zod";
 
 /** Register item types, in the order the registers view lists them. */
 export const REGISTER_TYPES = [
-  { id: "missing", label: "Missing information", badge: "Missing data", color: "var(--red)" },
-  { id: "question", label: "Unresolved questions", badge: "Question", color: "var(--red)" },
-  { id: "conflict", label: "Data conflicts", badge: "Data conflict", color: "var(--amber)" },
-  { id: "assumption", label: "Assumptions", badge: "Assumption", color: "var(--blue)" },
-  { id: "follow_up", label: "Follow-ups", badge: "Follow-up", color: "var(--muted-foreground)" },
+  { id: "missing", label: "Get missing data", badge: "Get missing data", color: "var(--red)" },
+  { id: "question", label: "Answer questions", badge: "Answer question", color: "var(--red)" },
+  { id: "conflict", label: "Settle conflicts", badge: "Settle conflict", color: "var(--amber)" },
+  { id: "assumption", label: "Check assumptions", badge: "Check assumption", color: "var(--blue)" },
+  { id: "follow_up", label: "Follow up", badge: "Follow up", color: "var(--muted-foreground)" },
 ] as const;
 
 export type RegisterType = (typeof REGISTER_TYPES)[number]["id"];
@@ -26,6 +26,8 @@ export const resolveActionSchema = z.discriminatedUnion("kind", [
   // Point at a file the company already uploaded.
   z.object({ kind: z.literal("document"), documentId: z.uuid() }),
   z.object({ kind: z.literal("unknown"), note: z.string().trim().max(2000).optional() }),
+  // The to do is done (the advisor's one-click close).
+  z.object({ kind: z.literal("complete") }),
 ]);
 
 export type ResolveAction = z.infer<typeof resolveActionSchema>;
@@ -56,6 +58,8 @@ export function describeResolution(r: unknown): string | null {
       return res.note ? `Marked unknown: ${res.note}` : "Marked unknown";
     case "note":
       return res.note ?? "Closed by advisor";
+    case "complete":
+      return "Marked complete";
     default:
       return null;
   }

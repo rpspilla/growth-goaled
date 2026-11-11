@@ -8,7 +8,7 @@ vi.mock("@/lib/db", async () => {
   const schema = await import("@/lib/db/schema");
   return { db: new Proxy({}, { get: (_t, p) => Reflect.get(h.db, p) }), schema };
 });
-vi.mock("@/lib/email", () => ({ sendEmail: async (m: { to: string; subject: string; text: string }) => (h.emails.push(m), h.emailFails ? { sent: false, reason: "Email provider returned 401." } : { sent: true }) }));
+vi.mock("@/lib/email", async (original) => ({ ...(await original<typeof import("@/lib/email")>()), sendEmail: async (m: { to: string; subject: string; text: string }) => (h.emails.push(m), h.emailFails ? { sent: false, reason: "Email provider returned 401." } : { sent: true }) }));
 vi.mock("@/lib/ai/chat", async (original) => {
   const actual = await original<typeof import("@/lib/ai/chat")>();
   return { ...actual, chatTurn: async (input: import("@/lib/ai/chat").ChatInput) => (h.inputs.push(input), { output: actual.fakeChat(input), model: "test", tokensIn: 1, tokensOut: 1 }) };
@@ -21,7 +21,7 @@ vi.mock("@/lib/ai/plan", async (original) => {
 import { schema } from "@/lib/db";
 import type { ChatInput } from "@/lib/ai/chat";
 import type { ActionPlanContent, Company, User } from "@/lib/db/schema";
-import { approvePlan, cancelSupportedPlan, cleanTools, founderPlans, resendPlanEmail, createPlanCheckout, planForConversation, plansForReview, postAdvisorMessage, setStepDone, submitPlan, supportedPlans, writePlan } from "@/lib/data/action-plans";
+import { approvePlan, cancelSupportedPlan, cleanTools, founderPlans, resendPlanEmail, createPlanCheckout, planForConversation, plansForReview, postAdvisorMessage, setStepAssignee, setStepDone, setStepStatus, startPlan, submitPlan, supportedPlans, writePlan } from "@/lib/data/action-plans";
 import { getConversation, sendMessage, startConversation } from "@/lib/data/chat";
 import { recordPaidSession } from "@/lib/data/payments";
 
@@ -149,8 +149,27 @@ describe("$499 action plan", () => {
     expect(await founderPlans(co)).toMatchObject([{ id: plan.id, status: "delivered", conversationId }]);
     expect(await founderPlans(other)).toEqual([]);
     expect(await approvePlan(advisor, co, plan.id, edited, null, "https://dev.test")).toEqual({ ok: false, error: "This plan isn't waiting for review." });
-    // Delivered: the founder ticks off milestones.
-    expect(await setStepDone(co, plan.id, "days30", 0, true)).toEqual({ ok: true });
+    // Delivered: before starting, the founder picks who does each action; the board moves once started.
+    expect(await setStepStatus(co, plan.id, "days30", 0, "doing")).toMatchObject({ ok: false, error: expect.stringContaining("Start the plan first") });
+    expect(await setStepAssignee(co, plan.id, "days30", 0, "gg")).toEqual({ ok: true });
+    h.emails.length = 0;
+    expect(await startPlan(founder, co, plan.id, "https://dev.test")).toEqual({ ok: true, assigned: 1 });
+    // Growth Goaled's share goes to the advisor: a To Do to quote it, and an email.
+    const [todo] = await db().select().from(schema.registerItems).where(eq(schema.registerItems.companyId, co.id));
+    expect(todo).toMatchObject({ type: "follow_up", owner: "advisor", status: "open", title: "Review and quote the work assigned to Growth Goaled (1 action)" });
+    expect(todo!.description).toContain("Days 1–30:");
+    expect(h.emails).toHaveLength(1);
+    expect(h.emails[0]).toMatchObject({ to: "a@gg.test", subject: "Plan Co assigned 1 action to Growth Goaled" });
+    // Started: who-does-what is fixed, and milestones move across the board.
+    expect(await setStepAssignee(co, plan.id, "days30", 0, "us")).toMatchObject({ ok: false });
+    expect(await setStepStatus(co, plan.id, "days30", 0, "doing")).toEqual({ ok: true });
+    expect(await setStepStatus(co, plan.id, "days30", 0, "done")).toEqual({ ok: true });
+    const board = (await planForConversation(co, conversationId))!.content!.days30[0]!;
+    expect(board).toMatchObject({ status: "done", done: true, assignee: "gg" });
+    // Starting again doesn't send the work twice.
+    expect(await startPlan(founder, co, plan.id, "https://dev.test")).toEqual({ ok: true, assigned: 1 });
+    expect(h.emails).toHaveLength(1);
+    expect(await setStepDone(co, plan.id, "days30", 0, false)).toEqual({ ok: true });
     // No advisor in the conversation on the $499 plan.
     expect(await postAdvisorMessage(advisor, co.id, conversationId, "Hi")).toEqual({ ok: false, error: "Advisors take part in conversations with an active supported plan." });
   });

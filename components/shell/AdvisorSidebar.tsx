@@ -16,11 +16,12 @@ const ADVISOR_NAV: { title: string; items: Item[] }[] = [
       { href: "/advisor/plans", label: "Action plans", badgeKey: "plans" },
       { href: "/advisor/payment-links", label: "Payment links" },
       { href: "/advisor/unassigned", label: "Unassigned", badgeKey: "unassigned" },
-      { href: "/advisor/registers", label: "Registers" },
+      { href: "/advisor/registers", label: "To Dos" },
     ],
   },
   {
-    title: "Method",
+    // Reference data and settings; no heading.
+    title: "",
     items: [
       { href: "/advisor/benchmark-library", label: "Benchmark library" },
       { href: "/advisor/settings", label: "Settings" },
@@ -53,8 +54,8 @@ export function AdvisorSidebar({
     <>
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5" aria-label="Advisor">
         {[...ADVISOR_NAV, ...(role === "admin" ? [ADMIN_NAV] : [])].map((group) => (
-          <div key={group.title}>
-            <div className="px-3 mb-1.5 text-sm font-semibold" style={{ color: "#8FA8BF" }}>{group.title}</div>
+          <div key={group.title || "more"}>
+            {group.title && <div className="px-3 mb-1.5 text-sm font-semibold" style={{ color: "#8FA8BF" }}>{group.title}</div>}
             <div className="space-y-0.5">
               {group.items.map((item) => {
                 const badge = item.badgeKey ? badges[item.badgeKey] : 0;

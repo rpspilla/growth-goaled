@@ -163,7 +163,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
                   </div>
                   <p className="text-base" style={{ color: "var(--muted-foreground)" }}>
                     {ready
-                      ? "Reviewed and approved by your Growth Goaled advisor: your 30/60/90-day milestones, risks and how to measure progress."
+                      ? "Reviewed and approved by your Growth Goaled advisor: your 30/60/90-day milestones and how to measure progress."
                       : `An advisor is reviewing it${p.submittedAt ? `; expect it by ${day(new Date(p.submittedAt.getTime() + REVIEW_HOURS * 3600 * 1000))}` : " within 24 hours"}. We'll email you when it's ready.`}
                   </p>
                 </div>
