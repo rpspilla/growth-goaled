@@ -13,8 +13,8 @@ type Result = { ok: boolean; error?: string };
 
 /**
  * The plan as a board: every milestone moves left to right across To do, In progress and Complete
- * (drag it, or use the arrows). Before the plan starts, the founder picks who does each action:
- * their own team, or Growth Goaled; starting sends Growth Goaled's share to the advisor.
+ * (drag it, or use the arrows). Each card has who takes responsibility: the founder's team, or
+ * Growth Goaled; starting the plan (or a later switch) sends Growth Goaled's share to the advisor.
  */
 export function ActionPlanView({
   content,
@@ -103,39 +103,29 @@ export function ActionPlanView({
       >
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded" style={{ background: "var(--muted)", color: "var(--muted-foreground)" }}>{PERIOD_LABEL[s.period as Period]}</span>
-          {s.assignee && !choosing && (
+          {s.assignee && !assign && (
             <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded" style={s.assignee === "gg" ? { background: "var(--green-muted)", color: "var(--green)" } : { background: "var(--blue-muted)", color: "var(--blue)" }}>
-              {s.assignee === "gg" ? "Growth Goaled" : "We do"}
+              {s.assignee === "gg" ? "Growth Goaled" : "We'll do it"}
             </span>
           )}
         </div>
         <div className="text-sm font-medium" style={{ color: "var(--foreground)", textDecoration: s.status === "done" ? "line-through" : undefined }}>{s.step.action}</div>
         <StepMeta step={s.step as PlanStep} today={today} save={editStep ? (owner, due) => editStep(s.period, s.index, owner, due) : undefined} />
-        {choosing && (
-          <div role="radiogroup" aria-label={`Who does: ${s.step.action}`} className="flex gap-1 pt-1">
-            {(
-              [
-                ["us", "We do"],
-                ["gg", "Assign to Growth Goaled"],
-              ] as const
-            ).map(([who, label]) => {
-              const on = (s.assignee ?? "us") === who;
-              return (
-                <button
-                  key={who}
-                  type="button"
-                  role="radio"
-                  aria-checked={on}
-                  disabled={pending}
-                  onClick={() => choose(s, who)}
-                  className="text-xs font-semibold px-2 py-1 rounded-md"
-                  style={on ? { background: who === "gg" ? "var(--green)" : "var(--navy)", color: "#fff" } : { background: "var(--muted)", color: "var(--muted-foreground)" }}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
+        {assign && (
+          <label className="block text-xs pt-1" style={{ color: "var(--muted-foreground)" }}>
+            Who takes responsibility
+            <select
+              aria-label={`Who takes responsibility: ${s.step.action}`}
+              value={s.assignee ?? "us"}
+              disabled={pending}
+              onChange={(e) => choose(s, e.target.value as "us" | "gg")}
+              className="field w-full mt-0.5 text-sm py-1"
+              style={s.assignee === "gg" ? { borderColor: "var(--green)", color: "var(--green)", fontWeight: 600 } : undefined}
+            >
+              <option value="us">We&apos;ll do it</option>
+              <option value="gg">Assign to Growth Goaled</option>
+            </select>
+          </label>
         )}
         {canMove && (
           <div className="flex justify-between pt-1">
@@ -172,7 +162,7 @@ export function ActionPlanView({
           <div className="flex-1 min-w-[16rem]">
             <div className="font-semibold" style={{ color: "var(--foreground)" }}>Before you start: who does each action?</div>
             <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-              Choose &ldquo;We do&rdquo; or &ldquo;Assign to Growth Goaled&rdquo; on each card. Growth Goaled&apos;s share goes to your advisor to review and quote any extra work.
+              Pick who takes responsibility on each card: &ldquo;We&apos;ll do it&rdquo; or &ldquo;Assign to Growth Goaled&rdquo;. Growth Goaled&apos;s share goes to your advisor to review and quote any extra work.
               {gg > 0 && <strong style={{ color: "var(--foreground)" }}> {gg} assigned to Growth Goaled.</strong>}
             </p>
           </div>

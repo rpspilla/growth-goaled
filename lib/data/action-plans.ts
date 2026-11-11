@@ -263,15 +263,39 @@ export async function setStepStatus(company: Pick<Company, "id">, planId: string
   return { ok: true };
 }
 
-/** Before the plan starts: does the founder's team do this action, or Growth Goaled? */
-export async function setStepAssignee(company: Pick<Company, "id">, planId: string, period: Period, index: number, assignee: "us" | "gg"): Promise<PlanResult> {
+/**
+ * Who takes responsibility for an action: the founder's team ("We'll do it") or Growth Goaled. Can be
+ * changed any time; once the plan has started, an action newly handed to Growth Goaled goes straight
+ * to the advisor (a To Do to review and quote it, and an email). Before the start, they're tallied then.
+ */
+export async function setStepAssignee(company: Pick<Company, "id" | "name" | "advisorId">, planId: string, period: Period, index: number, assignee: "us" | "gg", notify?: { user: Pick<User, "id" | "name" | "email">; appUrl: string }): Promise<PlanResult> {
   const plan = await boardPlan(company, planId);
   if (!plan) return { ok: false, error: "This plan can't be changed now." };
-  if (plan.content.startedAt) return { ok: false, error: "The plan has started; ask your advisor to change who does what." };
+  const before = plan.content[period][index]?.assignee;
   const content = withAssignee(plan.content, period, index, assignee);
   if (!content) return { ok: false, error: "Unknown milestone." };
   await db.update(schema.actionPlans).set({ content, updatedAt: new Date() }).where(eq(schema.actionPlans.id, plan.id));
+  if (plan.content.startedAt && assignee === "gg" && before !== "gg" && notify) {
+    await handToGrowthGoaled(notify.user, company, plan, [{ period, step: content[period][index]! }], notify.appUrl);
+  }
   return { ok: true };
+}
+
+/** Growth Goaled's share of a plan, sent to the advisor: a To Do to review and quote it, and an email. */
+async function handToGrowthGoaled(user: Pick<User, "id" | "name" | "email">, company: Pick<Company, "id" | "name" | "advisorId">, plan: Pick<ActionPlan, "id" | "conversationId">, gg: { period: Period; step: PlanStep }[], appUrl: string) {
+  const [conversation] = await db.select({ title: schema.conversations.title }).from(schema.conversations).where(eq(schema.conversations.id, plan.conversationId)).limit(1);
+  const lines = gg.map((g) => `${PERIOD_LABEL[g.period]}: ${g.step.action}`);
+  await db.insert(schema.registerItems).values({
+    companyId: company.id,
+    type: "follow_up",
+    owner: "advisor",
+    title: `Review and quote the work assigned to Growth Goaled (${gg.length} ${gg.length === 1 ? "action" : "actions"})`,
+    description: `${conversation?.title ?? "Action plan"}. ${user.name || user.email} handed these to Growth Goaled:\n${lines.map((l) => `- ${l}`).join("\n")}\nPlan: ${appUrl}/advisor/plans/${plan.id}`.slice(0, 2000),
+  });
+  if (company.advisorId) {
+    const [advisor] = await db.select({ email: schema.users.email }).from(schema.users).where(eq(schema.users.id, company.advisorId)).limit(1);
+    if (advisor) await sendEmail({ to: advisor.email, ...growthGoaledWorkEmail({ companyName: company.name, founderName: user.name || user.email, planTitle: conversation?.title ?? "their action plan", actions: lines, link: `${appUrl}/advisor/plans/${plan.id}` }) }).catch(() => null);
+  }
 }
 
 /**
@@ -285,21 +309,7 @@ export async function startPlan(user: Pick<User, "id" | "name" | "email">, compa
   const content: ActionPlanContent = { ...plan.content, startedAt: new Date().toISOString() };
   await db.update(schema.actionPlans).set({ content, updatedAt: new Date() }).where(eq(schema.actionPlans.id, plan.id));
   const gg = growthGoaledSteps(content);
-  if (gg.length) {
-    const [conversation] = await db.select({ title: schema.conversations.title }).from(schema.conversations).where(eq(schema.conversations.id, plan.conversationId)).limit(1);
-    const lines = gg.map((g) => `${PERIOD_LABEL[g.period]}: ${g.step.action}`);
-    await db.insert(schema.registerItems).values({
-      companyId: company.id,
-      type: "follow_up",
-      owner: "advisor",
-      title: `Review and quote the work assigned to Growth Goaled (${gg.length} ${gg.length === 1 ? "action" : "actions"})`,
-      description: `${conversation?.title ?? "Action plan"}. ${user.name || user.email} handed these to Growth Goaled:\n${lines.map((l) => `- ${l}`).join("\n")}\nPlan: ${appUrl}/advisor/plans/${plan.id}`.slice(0, 2000),
-    });
-    if (company.advisorId) {
-      const [advisor] = await db.select({ email: schema.users.email }).from(schema.users).where(eq(schema.users.id, company.advisorId)).limit(1);
-      if (advisor) await sendEmail({ to: advisor.email, ...growthGoaledWorkEmail({ companyName: company.name, founderName: user.name || user.email, planTitle: conversation?.title ?? "their action plan", actions: lines, link: `${appUrl}/advisor/plans/${plan.id}` }) }).catch(() => null);
-    }
-  }
+  if (gg.length) await handToGrowthGoaled(user, company, plan, gg, appUrl);
   await track("plan_started", { userId: user.id, companyId: company.id, props: { assigned_to_growth_goaled: gg.length } });
   return { ok: true, assigned: gg.length };
 }

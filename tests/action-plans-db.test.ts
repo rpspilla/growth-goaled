@@ -160,8 +160,14 @@ describe("$499 action plan", () => {
     expect(todo!.description).toContain("Days 1–30:");
     expect(h.emails).toHaveLength(1);
     expect(h.emails[0]).toMatchObject({ to: "a@gg.test", subject: "Plan Co assigned 1 action to Growth Goaled" });
-    // Started: who-does-what is fixed, and milestones move across the board.
-    expect(await setStepAssignee(co, plan.id, "days30", 0, "us")).toMatchObject({ ok: false });
+    // Started: milestones move across the board; who takes responsibility can still change, and an
+    // action newly handed to Growth Goaled goes straight to the advisor.
+    expect(await setStepAssignee(co, plan.id, "days60", 0, "gg", { user: founder, appUrl: "https://dev.test" })).toEqual({ ok: true });
+    expect(h.emails).toHaveLength(2);
+    expect(h.emails[1]).toMatchObject({ to: "a@gg.test", subject: "Plan Co assigned 1 action to Growth Goaled" });
+    expect(await db().select().from(schema.registerItems).where(eq(schema.registerItems.companyId, co.id))).toHaveLength(2);
+    expect(await setStepAssignee(co, plan.id, "days60", 0, "us")).toEqual({ ok: true });
+    h.emails.length = 1;
     expect(await setStepStatus(co, plan.id, "days30", 0, "doing")).toEqual({ ok: true });
     expect(await setStepStatus(co, plan.id, "days30", 0, "done")).toEqual({ ok: true });
     const board = (await planForConversation(co, conversationId))!.content!.days30[0]!;

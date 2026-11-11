@@ -144,14 +144,16 @@ export async function stepStatusAction(planId: string, period: string, index: nu
   return result;
 }
 
-/** Before the plan starts: "We do" or "Assign to Growth Goaled". */
+/** Who takes responsibility for an action: "We'll do it" or "Assign to Growth Goaled". */
 export async function stepAssigneeAction(planId: string, period: string, index: number, assignee: string): Promise<ChatResult> {
-  const { company } = await founderCompany();
+  const { user, company } = await founderCompany();
   const plan = id.safeParse(planId);
   const p = periodSchema.safeParse(period);
   const a = z.enum(["us", "gg"]).safeParse(assignee);
   if (!plan.success || !p.success || !a.success || !Number.isInteger(index) || index < 0) return { ok: false, error: "That change isn't valid." };
-  const result = await setStepAssignee(company, plan.data, p.data, index, a.data);
+  const h = await headers();
+  const appUrl = process.env.APP_URL?.replace(/\/$/, "") ?? `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
+  const result = await setStepAssignee(company, plan.data, p.data, index, a.data, { user, appUrl });
   revalidatePath("/chat", "layout");
   return result;
 }

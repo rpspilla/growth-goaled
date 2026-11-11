@@ -90,15 +90,18 @@ test("a founder buys an action plan from the conversation; an advisor approves i
   await expect(panel.getByText("Risks", { exact: true })).toHaveCount(0);
   await expect(panel.getByTestId("human-presence-plan")).toContainText("Ryan Spillane, CEO & Founder");
   await expect(panel.getByTestId("human-presence-plan")).toContainText("2 IPOs");
-  // A board: before starting, choose who does each action; Growth Goaled's share goes to the advisor.
+  // A board: each card has who takes responsibility; starting sends Growth Goaled's share to the advisor.
   const board = panel.getByRole("group", { name: "Plan board" });
   await expect(board.getByRole("region", { name: "To do" }).getByRole("listitem")).toHaveCount(3);
   await expect(board.getByRole("button", { name: /^Move to In progress/ })).toHaveCount(0);
-  await board.getByRole("radiogroup", { name: "Who does: Test 30-day milestone" }).getByRole("radio", { name: "Assign to Growth Goaled" }).click();
+  const who = board.getByRole("combobox", { name: "Who takes responsibility: Test 30-day milestone" });
+  await expect(who).toHaveValue("us");
+  await expect(who.locator("option")).toHaveText(["We'll do it", "Assign to Growth Goaled"]);
+  await who.selectOption("gg");
   await expect(panel.getByRole("region", { name: "Before you start" })).toContainText("1 assigned to Growth Goaled");
   await panel.getByRole("button", { name: "Start the plan" }).click();
   await expect(panel.getByRole("region", { name: "Before you start" })).toHaveCount(0);
-  await expect(board.getByRole("listitem", { name: "Test 30-day milestone" })).toContainText("Growth Goaled");
+  await expect(board.getByRole("combobox", { name: "Who takes responsibility: Test 30-day milestone" })).toHaveValue("gg");
   // Left to right: To do → In progress → Complete.
   await board.getByRole("button", { name: "Move to In progress: Test 30-day milestone" }).click();
   await expect(board.getByRole("region", { name: "In progress" }).getByRole("listitem")).toHaveCount(1);
