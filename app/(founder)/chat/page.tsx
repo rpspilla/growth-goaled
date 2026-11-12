@@ -18,7 +18,7 @@ export default async function ChatIndexPage() {
   const [conversations, facts] = await Promise.all([listConversations(company, 50), listFacts(company)]);
   return (
     <div className="px-4 sm:px-8 py-8 max-w-5xl space-y-12">
-      <PageHeader eyebrow={company.name} title="Strategic Decisions" subtitle="Ask about any commercial decision. Answers use what you've already shared." />
+      <PageHeader title="Strategic Decisions" subtitle="Ask about any commercial decision. Answers use what you've already shared." />
 
       {conversations.length > 0 && (
         <Section id="recent" title="Strategic Decisions">

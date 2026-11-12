@@ -8,10 +8,12 @@ import { UseCaseSidebar } from "@/components/shell/UseCaseSidebar";
 import { selectUseCase } from "@/components/shell/actions";
 import { getUseCase } from "@/lib/use-cases";
 import { stepStates } from "@/lib/use-cases/steps";
+import { CompanyBrandBar } from "@/components/brand/CompanyBrandBar";
+import { companySite } from "@/lib/data/company-site";
 
 export default async function FounderLayout({ children }: { children: ReactNode }) {
   const { user, company, useCases, active } = await founderContext();
-  const companies = await listFounderCompanies(user);
+  const [companies, site] = await Promise.all([listFounderCompanies(user), company ? companySite(company) : null]);
   const options = useCases.filter((u) => u.activatedAt).flatMap((u) => {
     const def = getUseCase(u.useCase);
     return def ? [{ id: def.id, label: def.shortTitle }] : [];
@@ -60,6 +62,7 @@ export default async function FounderLayout({ children }: { children: ReactNode 
         </>
       }
     >
+      {company && <CompanyBrandBar name={company.name} logoUrl={site?.logoUrl ?? null} about={site?.about ?? null} website={site?.website ?? null} />}
       {children}
     </Shell>
   );

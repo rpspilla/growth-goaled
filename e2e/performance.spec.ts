@@ -30,6 +30,13 @@ test("advisor names the plan and asks for data; the founder sees progress and da
   await expect(f.page.getByRole("heading", { name: "Fasten Perf", level: 1 })).toBeVisible();
   await expect(f.page.getByText("Add your website to your company profile to show your logo and what you do.")).toBeVisible();
   await expect(f.page.getByRole("link", { name: "Start a new plan with your advisor here" })).toBeVisible();
+  // Every other founder page carries the company's branding in the same format (the Overview has the full one).
+  await expect(f.page.getByRole("banner", { name: "Fasten Perf branding" })).toHaveCount(0);
+  for (const path of ["/chat", "/performance", "/documents", "/profile/company", "/team", "/library"]) {
+    await f.page.goto(path);
+    await expect(f.page.getByLabel("Fasten Perf branding"), path).toContainText("Fasten Perf");
+  }
+  await f.page.goto("/overview");
 
   // Advisor: names the plan and asks for an update.
   const adv = await as("perf-cro@e2e.test");
