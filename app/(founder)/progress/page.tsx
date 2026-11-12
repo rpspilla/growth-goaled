@@ -23,7 +23,7 @@ export default async function ProgressPage() {
 
   if (!view) {
     return (
-      <div className="px-4 sm:px-8 py-8 max-w-4xl">
+      <div className="page">
         <PageHeader eyebrow={active.def.shortTitle} title="Action plan" subtitle="Track the actions from your growth project, and see your figures move against your baseline." />
         <EmptyState
           title="No plan to track yet"
@@ -38,7 +38,7 @@ export default async function ProgressPage() {
   const live = view.actions.filter((a) => a.status !== "dropped").length;
   const attention = view.revisitDue || view.newSince.length > 0;
   return (
-    <div className="px-4 sm:px-8 py-8 max-w-6xl space-y-8">
+    <div className="page space-y-8">
       <header>
         <div className="label">{active.def.shortTitle}</div>
         <h1 className="font-display text-3xl sm:text-4xl mt-1" style={{ color: "var(--foreground)" }}>

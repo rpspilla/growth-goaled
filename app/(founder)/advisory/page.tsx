@@ -17,7 +17,7 @@ export default async function AdvisoryPage({ searchParams }: { searchParams: Pro
   const booking = advisoryBookingUrl(kind);
 
   return (
-    <div className="p-4 sm:p-8 max-w-3xl">
+    <div className="page">
       {useCase && <Link href="/baseline" className="text-xs" style={{ color: "var(--muted-foreground)" }}>← Back to your results</Link>}
       <PageHeader
         eyebrow="Optional"

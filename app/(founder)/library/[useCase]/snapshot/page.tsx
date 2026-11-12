@@ -103,7 +103,7 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
     })
     .slice(0, Math.max(0, 3 - peerTiles.length));
   return (
-    <div className="px-4 sm:px-8 py-8 max-w-6xl">
+    <div className="page">
       <Link href={`/library/${def.id}`} className="text-sm link inline-flex items-center gap-1">
         <ArrowLeft size={14} aria-hidden /> Edit your answers
       </Link>

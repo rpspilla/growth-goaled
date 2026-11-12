@@ -10,7 +10,7 @@ export default async function CompanyProgressPage({ params }: { params: Promise<
   const { company, active } = await companyContext((await params).id);
   const view = active ? await progressView(company, active.def.id) : null;
   return (
-    <div className="px-4 sm:px-8 py-8 max-w-4xl space-y-6">
+    <div className="page space-y-6">
       <div>
         <div className="label mb-1" style={{ color: "var(--muted-foreground)" }}>Step 5 · Progress &amp; Tracking{active ? ` · ${active.def.shortTitle}` : ""}</div>
         <h1 className="font-display text-3xl font-normal" style={{ color: "var(--foreground)" }}>{company.name}: progress</h1>

@@ -66,7 +66,7 @@ export default async function UseCasePage({ params }: { params: Promise<{ useCas
 
   if (def.comingSoon) {
     return (
-      <div className="px-4 sm:px-8 py-8 max-w-3xl">
+      <div className="page">
         {back}
         {hero}
         <section className="surface surface-pad" aria-labelledby="soon">
@@ -96,7 +96,7 @@ export default async function UseCasePage({ params }: { params: Promise<{ useCas
   }
 
   return (
-    <div className="px-4 sm:px-8 py-8 max-w-6xl">
+    <div className="page">
       {back}
       {hero}
 

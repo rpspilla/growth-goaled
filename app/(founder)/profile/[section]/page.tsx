@@ -16,7 +16,7 @@ export default async function IntakeSectionPage({ params }: { params: Promise<{ 
   const company = await getFounderCompany(user);
   if (!company) {
     return (
-      <div className="px-4 sm:px-8 py-8 max-w-4xl">
+      <div className="page">
         <PageHeader title="Tell us about your company" subtitle="Your company isn't set up yet." />
       </div>
     );

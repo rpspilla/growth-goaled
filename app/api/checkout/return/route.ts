@@ -23,9 +23,9 @@ export async function GET(request: NextRequest) {
   // Action plans: confirm, then back to the conversation the plan is built in.
   const planId = z.uuid().safeParse(request.nextUrl.searchParams.get("plan"));
   if (planId.success) {
-    if (!company) return NextResponse.redirect(new URL("/chat", request.url));
+    if (!company) return NextResponse.redirect(new URL("/whats-next", request.url));
     const [plan] = await db.select().from(schema.actionPlans).where(and(eq(schema.actionPlans.id, planId.data), eq(schema.actionPlans.companyId, company.id))).limit(1);
-    if (!plan) return NextResponse.redirect(new URL("/chat", request.url));
+    if (!plan) return NextResponse.redirect(new URL("/whats-next", request.url));
     const outcome = sessionId && stripeConfigured() ? await confirmCheckout(company, sessionId).catch((err) => (console.error("[stripe] Confirming plan checkout failed", err), "unknown" as const)) : "unknown";
     if (outcome === "paid" && plan.tier === "supported") after(() => writePlan(plan.id, { onlyIfEmpty: true }));
     const state = outcome === "paid" ? "started" : outcome === "failed" ? "failed" : "pending";

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({ db: {}, schema: {} }));
 import { summarize } from "@/lib/data/business-metrics";
-import { planProgress } from "@/lib/data/current-plan";
+import { planProgress, topPriorities } from "@/lib/data/current-plan";
 
 const row = (metric: string, value: number, day: number, extra: Partial<{ documentId: string; filename: string; origin: string; status: string; period: string }> = {}) => ({
   metric,
@@ -43,8 +43,19 @@ describe("planProgress", () => {
   it("counts milestones done, overdue ones and the next to do", () => {
     const step = (action: string, done = false, due?: string) => ({ action, owner: "", measure: "", done, due });
     const p = planProgress({ days30: [step("Hire AE", true), step("Write playbook", false, "2026-11-01")], days60: [step("Ramp AE")], days90: [] }, "2026-11-11");
-    expect(p).toEqual({ done: 1, total: 3, overdue: 1, next: "Write playbook" });
+    expect(p).toMatchObject({ done: 1, total: 3, overdue: 1, next: "Write playbook" });
     expect(planProgress(null)).toBeNull();
     expect(planProgress({ days30: [], days60: [], days90: [] })).toBeNull();
+  });
+});
+
+describe("topPriorities", () => {
+  it("puts what's under way first, then overdue, then plan order; skips done and Growth Goaled's", () => {
+    const s = (action: string, extra: Partial<{ status: "todo" | "doing" | "done"; due: string; assignee: "us" | "gg" }> = {}) => ({ action, ...extra });
+    const top = topPriorities([s("A"), s("B", { status: "done" }), s("C", { due: "2026-11-01" }), s("D", { status: "doing" }), s("E", { assignee: "gg" }), s("F")], "2026-11-11");
+    expect(top.map((t) => t.action)).toEqual(["D", "C", "A"]);
+    expect(top[0]).toMatchObject({ status: "doing", next: "Finish it, then move it to Complete" });
+    expect(top[1]).toMatchObject({ status: "todo", overdue: true, due: "2026-11-01" });
+    expect(topPriorities([s("Only", { status: "done" })])).toEqual([]);
   });
 });

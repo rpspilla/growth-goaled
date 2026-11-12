@@ -66,8 +66,8 @@ export default async function AdvisorPlanPage({ params }: { params: Promise<{ id
 
       {/* The whole screen: the conversation as a narrow, pinned column; the plan gets the rest. */}
       <div className="grid lg:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)] 2xl:grid-cols-[28rem_minmax(0,1fr)] gap-6 items-start">
-        <section aria-label="Strategic Growth Question" className="surface p-4 space-y-3 max-h-[75vh] lg:max-h-[calc(100vh-7rem)] lg:sticky lg:top-6 overflow-y-auto">
-          <h2 className="label">Strategic Growth Question</h2>
+        <section aria-label="The question" className="surface p-4 space-y-3 max-h-[75vh] lg:max-h-[calc(100vh-7rem)] lg:sticky lg:top-6 overflow-y-auto">
+          <h2 className="label">The question</h2>
           {view.messages.map((m) => (
             <div key={m.id} className="text-sm">
               <div className="font-semibold" style={{ color: m.role === "advisor" ? "var(--green)" : m.role === "user" ? "var(--navy)" : "var(--muted-foreground)" }}>

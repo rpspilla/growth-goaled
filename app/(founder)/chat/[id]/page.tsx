@@ -90,10 +90,10 @@ export default async function ConversationPage({ params, searchParams }: { param
     : null;
 
   return (
-    <div className={`px-4 sm:px-8 py-8 ${lastCardId ? "max-w-5xl" : "max-w-3xl"}`}>
+    <div className="page">
     <div className="space-y-6 min-w-0">
       <div>
-        <Link href="/chat" className="link text-sm">← All Strategic Growth Questions</Link>
+        <Link href="/whats-next" className="link text-sm">← What&apos;s Next?</Link>
         <h1 className="font-display text-3xl font-normal mt-2" style={fg}>{view.conversation.title}</h1>
         <div className="mt-3">
           <HumanPresence advisorName={advisor ? advisor.name || advisor.email : null} />
@@ -115,7 +115,8 @@ export default async function ConversationPage({ params, searchParams }: { param
       {panel && <PlanPanel plan={panel} submit={submitPlanAction} update={updatePlanAction} move={stepStatusAction} assign={stepAssigneeAction} startPlan={startPlanAction} editStep={stepDetailsAction} saveTargets={planTargetsAction} />}
 
       <BuildingRefresh active={reading} />
-      <ol className="space-y-5" aria-label="Conversation">
+      {/* The conversation keeps a readable width; the plan above it uses the whole page. */}
+      <ol className="space-y-5 max-w-4xl" aria-label="Conversation">
         {view.messages.map((m) => {
           const rec = m.recommendationId ? view.recommendations.get(m.recommendationId) : undefined;
           if (m.role === "user") {
@@ -164,6 +165,7 @@ export default async function ConversationPage({ params, searchParams }: { param
         })}
       </ol>
 
+      <div className="max-w-4xl">
       <Composer
         conversationId={view.conversation.id}
         send={sendMessageAction}
@@ -172,6 +174,7 @@ export default async function ConversationPage({ params, searchParams }: { param
         attach={attachFilesAction}
         blobPrefix={companyBlobPrefix(company.id)}
       />
+      </div>
       {showNudge(view.messages.filter((m) => m.role === "user").length, Boolean(plan)) && <AdvisorNudge bookHref="/advisory/book?kind=review&offer=nudge" />}
       {trailing && (
         <div className="space-y-4">
@@ -182,7 +185,7 @@ export default async function ConversationPage({ params, searchParams }: { param
         </div>
       )}
       <p className="text-sm" style={muted}>
-        Facts you mention are remembered for your company, so you won&apos;t be asked twice. <Link href="/chat#facts" className="link">See or correct them</Link>. Never shown to other
+        Facts you mention are remembered for your company, so you won&apos;t be asked twice. <Link href="/whats-next#facts" className="link">See or correct them</Link>. Never shown to other
         companies; <Link href="/data-use" className="link">how we use your data</Link>.
       </p>
     </div>

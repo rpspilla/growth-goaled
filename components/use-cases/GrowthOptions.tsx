@@ -35,7 +35,7 @@ export function Option({ icon, title, when, points, children, muted = false }: {
   );
 }
 
-/** The growth projects a founder can start (or open): shared by "What do you need to decide?" and Strategic Growth Questions. */
+/** The growth projects a founder can start (or open): on Growth Projects. */
 export function GrowthOptions({ plan }: { plan: Awaited<ReturnType<typeof currentPlan>> }) {
   return (
       <div className="grid md:grid-cols-2 gap-5">

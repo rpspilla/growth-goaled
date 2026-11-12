@@ -36,7 +36,7 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
   const month = new Date().toISOString().slice(0, 7);
 
   return (
-    <div className="px-4 sm:px-8 py-8 max-w-6xl space-y-12">
+    <div className="page space-y-12">
       <PageHeader title="Company performance" subtitle="Progress on your plan and your business numbers. Every update is kept with the date it arrived, so you can see what changed." />
 
       {requests.length > 0 && (

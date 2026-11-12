@@ -114,7 +114,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   const live = plan ? plan.actions.filter((a) => a.status !== "dropped").length : 0;
 
   return (
-    <div className="px-4 sm:px-8 py-8 max-w-6xl space-y-12">
+    <div className="page space-y-12">
       {company ? (
         <header className="flex gap-5 items-start flex-wrap">
           <CompanyLogo name={company.name} src={site?.logoUrl ?? null} size={72} />
@@ -181,11 +181,11 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
           <HumanPresence />
           {conversations.length > 0 && (
             <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-base">
-              <span style={{ color: "var(--muted-foreground)" }}>Recent strategic growth questions:</span>
+              <span style={{ color: "var(--muted-foreground)" }}>Recent questions:</span>
               {conversations.map((c) => (
                 <Link key={c.id} href={`/chat/${c.id}`} className="link">{c.title}</Link>
               ))}
-              <Link href="/chat" className="link text-sm">All Strategic Growth Questions →</Link>
+              <Link href="/whats-next" className="link text-sm">All in What&apos;s Next? →</Link>
             </div>
           )}
         </div>

@@ -60,7 +60,7 @@ export function IntakeForm({
   const anySaving = Object.values(status).includes("saving");
 
   return (
-    <div className="px-4 sm:px-8 py-8 max-w-4xl">
+    <div className="page">
       <div className="mb-8">
         <div className="flex items-center justify-between mb-1">
           <div className="label" style={{ color: "var(--muted-foreground)" }}>

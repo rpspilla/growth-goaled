@@ -49,7 +49,7 @@ export default async function CompanyDataPage({ params }: { params: Promise<{ id
   reviewItems.sort((x, y) => (order.get(x.key) ?? 0) - (order.get(y.key) ?? 0));
 
   return (
-    <div className="px-4 sm:px-8 py-8 max-w-6xl space-y-6">
+    <div className="page space-y-6">
       <div>
         <div className="label mb-1" style={{ color: "var(--muted-foreground)" }}>Step 3 · Data{active ? ` · ${active.def.shortTitle}` : ""}</div>
         <h1 className="font-display text-3xl font-normal" style={{ color: "var(--foreground)" }}>{company.name}: data</h1>

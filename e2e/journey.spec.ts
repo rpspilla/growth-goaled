@@ -145,9 +145,9 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
 
   // --- Founder: Overview → Library → questionnaire → free Snapshot → $149 purchase → Data ---
   // Before buying, there's no step-by-step journey: just the conversation-first menu.
-  const steps = founder.page.getByRole("navigation", { name: "Steps" });
+  const steps = founder.page.getByRole("group", { name: "Growth project steps" });
   await expect(steps).toHaveCount(0);
-  await expect(founder.page.getByRole("navigation", { name: "Menu" }).getByRole("link", { name: "Strategic Growth Questions" })).toBeVisible();
+  await expect(founder.page.getByRole("navigation", { name: "Menu" }).getByRole("link", { name: "What's Next?" })).toBeVisible();
   await founder.page.goto("/library/series_b_ready/snapshot");
   await expect(founder.page).toHaveURL(/\/library\/series_b_ready$/);
   await expect(founder.page.getByRole("heading", { name: "Coming soon", exact: true })).toBeVisible();
@@ -190,7 +190,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await expect(founder.page).toHaveURL(/\/data\?checkout=success/);
   await expect(founder.page.getByRole("heading", { name: "Data for Fix Churn" })).toBeVisible();
   await expect(steps.getByRole("link", { name: /Data/ })).toBeVisible();
-  // Only what's active: Data, Results and Action plan (growth questions live under Strategic Growth Questions).
+  // Only what's active, under Growth Projects: Data, Results and Action plan.
   await expect(steps.getByRole("link", { name: /Growth questions/ })).toHaveCount(0);
   {
     const db = new Client({ connectionString: E2E_DATABASE_URL });
@@ -378,8 +378,9 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await admin.page.getByRole("button", { name: /Assign|Claim/ }).first().click();
   await admin.page.goto("/advisor/portfolio");
   await admin.page.getByRole("link", { name: /E2E Analytics/ }).first().click();
-  const mirrored = admin.page.getByRole("navigation", { name: "Steps" });
-  for (const label of ["Overview", "Growth questions", "Data", "Results", "Action plan"]) await expect(mirrored.getByRole("link", { name: label })).toBeVisible();
+  // The advisor's view of the company has the founder's menu, in the same order, with the steps under Growth Projects.
+  const mirrored = admin.page.getByRole("navigation", { name: "Menu" });
+  await expect(mirrored.getByRole("link")).toHaveText(["Company Details", "Team", "Overview", "Growth Projects", /Data/, /Results/, /Action plan/, "Performance", "Documents", "What's Next?"]);
   await expect(admin.page.getByText(/Purchased .* · paid/)).toBeVisible();
   // The advisor can see the same results with the QA checks, and mark them reviewed.
   await mirrored.getByRole("link", { name: "Results" }).click();

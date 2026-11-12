@@ -8,6 +8,7 @@ import { UseCaseSidebar } from "@/components/shell/UseCaseSidebar";
 import { selectUseCase } from "@/components/shell/actions";
 import { getUseCase } from "@/lib/use-cases";
 import { stepStates } from "@/lib/use-cases/steps";
+import { founderNav } from "@/lib/nav";
 import { CompanyBrandBar } from "@/components/brand/CompanyBrandBar";
 import { companySite } from "@/lib/data/company-site";
 
@@ -24,23 +25,11 @@ export default async function FounderLayout({ children }: { children: ReactNode 
     <Shell
       sidebar={
         <UseCaseSidebar
-          // The step-by-step assessment journey is only for founders who bought the retired $149 assessment.
-          steps={legacy ? stepStates(active && { useCase: active.def.id, status: active.status }, { overview: false, library: false }) : []}
+          // The step-by-step journey (Data, Results, Action plan) is only for founders with an active growth project.
+          items={founderNav(legacy ? stepStates(active && { useCase: active.def.id, status: active.status }, { overview: false, library: false }) : [])}
           options={options}
           activeUseCase={active?.useCase ?? null}
           select={selectUseCase}
-          libraryHint="Pick a growth question"
-          extraLabel="Company profile"
-          extraCollapsible
-          extra={[
-            { href: "/profile", label: "Company details" },
-            { href: "/team", label: "Team" },
-            { href: "/overview", label: "Overview" },
-            { href: "/chat", label: "Strategic Growth Questions" },
-            { href: "/performance", label: "Performance" },
-            ...(legacy ? [{ href: "/assessments", label: "Growth projects" }] : []),
-            { href: "/documents", label: "Documents" },
-          ]}
         />
       }
       topbar={

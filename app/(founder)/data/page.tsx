@@ -15,7 +15,7 @@ export default async function DataPage() {
   const [data, { active }] = await Promise.all([loadReadiness(), founderContext()]);
   if (!data || !active) {
     return (
-      <div className="px-4 sm:px-8 py-8 max-w-4xl">
+      <div className="page">
         <PageHeader title="Data" subtitle="Your company isn't set up yet. Contact your advisor if this persists." />
       </div>
     );
@@ -42,7 +42,7 @@ export default async function DataPage() {
   const sharperIn = groups.flatMap((g) => g.keys).filter((k) => ["available", "partial"].includes(rows.get(k)?.status ?? "")).length;
 
   return (
-    <div className="px-4 sm:px-8 py-8 max-w-5xl">
+    <div className="page">
       <PageHeader title={`Data for ${useCase.shortTitle}`} subtitle="Share what you have, then run your report. We read and sort every file for you." />
       <DataTopPanel />
 

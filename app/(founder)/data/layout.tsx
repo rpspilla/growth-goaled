@@ -8,7 +8,7 @@ export default async function DataLayout({ children }: { children: ReactNode }) 
   const { active } = await founderContext();
   if (active) return children;
   return (
-    <div className="px-4 sm:px-8 py-8 max-w-3xl">
+    <div className="page">
       <PageHeader eyebrow="Step 2 of 4" title="Data" subtitle="Share the data your growth project needs." />
       <div className="surface p-6 text-base space-y-3" style={{ color: "var(--foreground)" }}>
         <p>This step unlocks when you start a growth project. Pick a question in the library, get your free Snapshot, and we&apos;ll show you exactly which data the growth project needs.</p>

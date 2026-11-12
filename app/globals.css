@@ -87,6 +87,18 @@ a, button { transition: background-color 0.15s ease, color 0.15s ease, border-co
  * surfaces and disclosures look and behave the same across founder and advisor screens.
  */
 @layer components {
+  /* A founder or advisor page: the full width of the content area (Nov 12, 2026), with the usual gutters.
+     Long text inside keeps a readable line length with max-w-3xl on the text itself. */
+  .page {
+    width: 100%;
+    max-width: 120rem;
+    padding: 2rem 1rem;
+  }
+  @media (min-width: 640px) {
+    .page {
+      padding: 2rem 2rem;
+    }
+  }
   .btn {
     display: inline-flex;
     align-items: center;

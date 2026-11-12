@@ -16,6 +16,8 @@ import { BUSINESS_METRICS, businessMetrics, type BusinessKey } from "@/lib/data/
 import { TeamPanel } from "@/components/team/TeamPanel";
 import { companyPeople } from "@/lib/data/team";
 import { companyContext } from "./context";
+import { listConversations } from "@/lib/data/chat";
+import { founderPlans } from "@/lib/data/action-plans";
 
 const CARDS: MetricKey[] = ["arr", "arr_growth", "nrr", "acv"];
 const card = { background: "var(--card)", borderColor: "var(--border)" };
@@ -30,15 +32,16 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
     userName(company.advisorSummaryBy),
     listAdvisoryRequests([company.id]),
   ]);
-  const [people, requests, biz, contracts] = await Promise.all([companyPeople(company.id), listDataRequests(company.id), businessMetrics(company), listContracts(company.id)]);
+  const [people, requests, biz, contracts, questions, plans] = await Promise.all([companyPeople(company.id), listDataRequests(company.id), businessMetrics(company), listContracts(company.id), listConversations(company, 50), founderPlans(company)]);
+  const plansByConversation = new Map(plans.map((p) => [p.conversationId, p.id]));
   const todayIso = new Date().toISOString().slice(0, 10);
   const bizKeys = Object.keys(BUSINESS_METRICS) as BusinessKey[];
   const day = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   const base = `/advisor/companies/${company.id}`;
 
   return (
-    <div className="px-4 sm:px-8 py-8 max-w-6xl space-y-6">
-      <div className="flex items-start justify-between gap-4">
+    <div className="page space-y-6">
+      <div id="details" className="flex items-start justify-between gap-4 scroll-mt-6">
         <div>
           <div className="flex items-center gap-3 mb-2 flex-wrap">
             <h1 className="font-display text-3xl font-normal" style={{ color: "var(--foreground)" }}>{company.name}</h1>
@@ -224,7 +227,7 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
       )}
 
       {!company.isSample && (
-        <section aria-label="Business updates" className="rounded-xl border p-5 space-y-3" style={card}>
+        <section id="business-updates" aria-label="Business updates" className="rounded-xl border p-5 space-y-3 scroll-mt-6" style={card}>
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
               <h2 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>Business updates</h2>
@@ -265,7 +268,7 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
       )}
 
       {!company.isSample && (
-        <section aria-label="People" className="rounded-xl border p-5 space-y-3" style={card}>
+        <section id="people" aria-label="People" className="rounded-xl border p-5 space-y-3 scroll-mt-6" style={card}>
           <div>
             <h2 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>People</h2>
             <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Who at {company.name} has access. Invite a co-founder or teammate; they join as a member and see everything the company has.</p>
@@ -281,6 +284,29 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
           />
         </section>
       )}
+
+      <section id="whats-next" aria-label="What's Next?" className="rounded-xl border p-5 space-y-3 scroll-mt-6" style={card}>
+        <div>
+          <h2 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>What&apos;s Next?</h2>
+          <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>The questions {company.name} has asked, newest first.</p>
+        </div>
+        {questions.length ? (
+          <ul aria-label="Questions asked" className="divide-y text-sm" style={{ borderColor: "var(--border)" }}>
+            {questions.map((q) => {
+              const plan = plansByConversation.get(q.id);
+              return (
+                <li key={q.id} className="py-2.5 flex items-center gap-4 flex-wrap" style={{ borderColor: "var(--border)" }}>
+                  <span className="flex-1 min-w-[12rem] font-medium" style={{ color: "var(--foreground)" }}>{q.title}</span>
+                  <span style={{ color: "var(--muted-foreground)" }}>{day(q.updatedAt)}</span>
+                  {plan ? <Link href={`/advisor/plans/${plan}`} className="link">Open the action plan →</Link> : <span style={{ color: "var(--muted-foreground)" }}>No plan</span>}
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>No questions yet.</p>
+        )}
+      </section>
     </div>
   );
 }

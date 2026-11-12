@@ -2,7 +2,12 @@ import Link from "next/link";
 import { ArrowRight, ClipboardList } from "lucide-react";
 import type { CurrentPlan } from "@/lib/data/current-plan";
 
-/** The plan the company is working on with its advisor, front and centre; or a big way to start one. */
+const dueLabel = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+
+/**
+ * The plan the company is working on with its advisor, front and centre, with its top three
+ * priorities (status and the founder's next step) and a link to the full plan; or a way to start one.
+ */
 export function CurrentPlanCard({ current, startHref = "/library", heading = "Current plan with your advisor" }: { current: CurrentPlan | null; startHref?: string; heading?: string }) {
   if (!current)
     return (
@@ -36,14 +41,32 @@ export function CurrentPlanCard({ current, startHref = "/library", heading = "Cu
               <div className="h-2 rounded-full mt-1.5" style={{ background: "var(--muted)" }} role="progressbar" aria-label="Plan progress" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
                 <div className="h-2 rounded-full" style={{ width: `${pct}%`, background: "var(--green)" }} />
               </div>
-              {p.next && <p className="text-base mt-3" style={{ color: "var(--foreground)" }}><span className="font-semibold" style={{ color: "var(--green)" }}>Next: </span>{p.next}</p>}
             </div>
           ) : (
             <p className="text-base mt-2" style={{ color: "var(--muted-foreground)" }}>Your advisor is setting the milestones; progress shows here as they&apos;re done.</p>
           )}
         </div>
-        {current.plan && <Link href={current.plan.href} className="btn btn-primary">Open the plan</Link>}
+        {current.plan && <Link href={current.plan.href} className="btn btn-primary">Open the full plan</Link>}
       </div>
+      {p && p.priorities.length > 0 && (
+        <div className="mt-6">
+          <h3 className="label mb-2" style={{ color: "var(--muted-foreground)" }}>Your top {p.priorities.length === 1 ? "priority" : `${p.priorities.length} priorities`}</h3>
+          <ol aria-label="Top priorities" className="grid gap-3 lg:grid-cols-3">
+            {p.priorities.map((x, i) => (
+              <li key={i} className="rounded-xl p-4 space-y-2" style={{ background: "var(--muted)" }}>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={x.status === "doing" ? { background: "var(--blue-muted)", color: "var(--blue)" } : { background: "var(--card)", color: "var(--muted-foreground)" }}>
+                    {x.status === "doing" ? "In progress" : "To do"}
+                  </span>
+                  {x.due && <span className="text-xs font-medium" style={{ color: x.overdue ? "var(--red)" : "var(--muted-foreground)" }}>{x.overdue ? "Overdue · " : "Due "}{dueLabel(x.due)}</span>}
+                </div>
+                <p className="text-base font-medium" style={{ color: "var(--foreground)" }}>{x.action}</p>
+                <p className="text-sm" style={{ color: "var(--muted-foreground)" }}><span className="font-semibold" style={{ color: "var(--green)" }}>Your next step: </span>{x.next}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
     </section>
   );
 }

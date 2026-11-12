@@ -79,6 +79,7 @@ export async function updateFactAction(factId: string, value: string): Promise<C
   if (!fact.success || typeof value !== "string") return { ok: false, error: "That change isn't valid." };
   const result = await updateFact(user, company, fact.data, value);
   revalidatePath("/chat");
+  revalidatePath("/whats-next");
   return result;
 }
 
@@ -88,6 +89,7 @@ export async function removeFactAction(factId: string): Promise<ChatResult> {
   if (!fact.success) return { ok: false, error: "That change isn't valid." };
   const result = await removeFact(company, fact.data);
   revalidatePath("/chat");
+  revalidatePath("/whats-next");
   return result;
 }
 

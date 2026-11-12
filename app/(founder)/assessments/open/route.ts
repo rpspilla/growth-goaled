@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   const company = await getFounderCompany(user);
   const useCase = request.nextUrl.searchParams.get("use_case");
   if (!company || !useCase || !isUseCaseId(useCase) || !(await isUseCaseActive(company.id, useCase))) {
-    return NextResponse.redirect(new URL("/assessments", request.url));
+    return NextResponse.redirect(new URL("/library#past-projects", request.url));
   }
   (await cookies()).set(USE_CASE_COOKIE, useCase, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 365 });
   return NextResponse.redirect(new URL("/baseline", request.url));

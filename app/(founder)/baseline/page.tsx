@@ -72,7 +72,7 @@ export default async function ResultsPage() {
   }[state.state];
   const Icon = STATUS.icon;
   return (
-    <div className="px-4 sm:px-8 py-8 max-w-4xl space-y-6">
+    <div className="page space-y-6">
       <BuildingRefresh active={state.state === "building"} />
       <header>
         <div className="label">Results</div>

@@ -12,7 +12,7 @@ export default async function CompanyLibraryPage({ params }: { params: Promise<{
   const activators = new Map(await Promise.all(useCases.filter((u) => u.activatedBy).map(async (u) => [u.activatedBy!, await userName(u.activatedBy)] as const)));
 
   return (
-    <div className="px-4 sm:px-8 py-8 max-w-5xl space-y-6">
+    <div className="page space-y-6">
       <div>
         <div className="label mb-1" style={{ color: "var(--muted-foreground)" }}>Step 2 · Growth questions</div>
         <h1 className="font-display text-3xl font-normal" style={{ color: "var(--foreground)" }}>{company.name}: use cases</h1>

@@ -96,8 +96,10 @@ test("paid steps need a payment Stripe confirmed, never a URL or the browser", a
   await page.goto("/baseline");
   await expect(page).toHaveURL(/\/library$/);
   await page.goto("/assessments/open?use_case=growth_leak");
-  await expect(page).toHaveURL(/\/assessments$/);
-  await expect(page.getByText("No growth projects yet", { exact: true })).toBeVisible();
+  // Past growth projects live on Growth Projects now; with none yet, it shows only the ways to start.
+  await expect(page).toHaveURL(/\/library(#past-projects)?$/);
+  await expect(page.getByRole("heading", { name: "Growth Projects", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your growth projects" })).toHaveCount(0);
   await ctx.close();
 });
 
