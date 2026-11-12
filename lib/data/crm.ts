@@ -2,7 +2,7 @@ import "server-only";
 import { and, asc, desc, eq, gte, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { CrmCompany, CrmContact, CrmStage, User } from "@/lib/db/schema";
-import { DEFAULT_STAGES, domainOf, followUpBucket, fullName, INTERACTIONS, matchCategory, matchSource, normalizeEmail, type FollowUpBucket, type ImportRow, type Priority } from "@/lib/crm";
+import { DEFAULT_STAGES, domainOf, workDomain, followUpBucket, fullName, INTERACTIONS, matchCategory, matchSource, normalizeEmail, type FollowUpBucket, type ImportRow, type Priority } from "@/lib/crm";
 
 type Actor = Pick<User, "id">;
 export type CrmResult<T = object> = ({ ok: true } & T) | { ok: false; error: string };
@@ -163,7 +163,7 @@ export async function moveContact(actor: Actor, contactId: string, stageId: stri
 // ---------------------------------------------------------------------------
 
 /** The company with this website's domain or (case-insensitive) name, else a new one. */
-async function findOrCreateCompany(actor: Actor, name: string | null, website: string | null): Promise<string | null> {
+async function findOrCreateCompany(actor: Actor | null, name: string | null, website: string | null): Promise<string | null> {
   const n = clean(name, 200);
   const domain = domainOf(website);
   if (!n && !domain) return null;
@@ -173,7 +173,7 @@ async function findOrCreateCompany(actor: Actor, name: string | null, website: s
     .where(or(domain ? eq(schema.crmCompanies.domain, domain) : sql`false`, n ? sql`lower(${schema.crmCompanies.name}) = ${n.toLowerCase()}` : sql`false`))
     .limit(1);
   if (found) return found.id;
-  const [created] = await db.insert(schema.crmCompanies).values({ name: n ?? domain!, website: clean(website), domain, createdBy: actor.id }).returning({ id: schema.crmCompanies.id });
+  const [created] = await db.insert(schema.crmCompanies).values({ name: n ?? domain!, website: clean(website), domain, createdBy: actor?.id ?? null }).returning({ id: schema.crmCompanies.id });
   return created!.id;
 }
 
@@ -361,6 +361,39 @@ export async function contactProfile(contactId: string) {
     row.c.email ? db.select({ id: schema.crmSuppressions.id }).from(schema.crmSuppressions).where(eq(schema.crmSuppressions.email, row.c.email)).limit(1) : Promise.resolve([]),
   ]);
   return { contact: row.c, company: row.company, tags: tags.map((t) => t.name), tasks, activities: activities.map((x) => ({ ...x.a, actorName: x.actor })), emails, suppressed: suppressed.length > 0 || row.c.doNotEmail };
+}
+
+/**
+ * A prospect who gave their email in the website chat: their contact (matched by email, else added
+ * to the first column with source "Website chat"), linked to a company from their work email's
+ * domain or the company name they typed. Never changes a company the team already set.
+ */
+export async function leadFromChat(input: { email: string; name?: string | null; title?: string | null; companyName?: string | null }): Promise<{ contactId: string; created: boolean }> {
+  const email = normalizeEmail(input.email);
+  if (!email) throw new Error("leadFromChat: bad email");
+  const domain = workDomain(email);
+  const [existing] = await db.select({ id: schema.crmContacts.id, companyId: schema.crmContacts.companyId }).from(schema.crmContacts).where(eq(schema.crmContacts.email, email)).limit(1);
+  const companyId = existing?.companyId ?? (await findOrCreateCompany(null, input.companyName ?? null, domain));
+  if (existing) {
+    if (!existing.companyId && companyId) await db.update(schema.crmContacts).set({ companyId, updatedAt: new Date() }).where(eq(schema.crmContacts.id, existing.id));
+    return { contactId: existing.id, created: false };
+  }
+  const [first, ...rest] = (clean(input.name, 200) ?? email.split("@")[0]!).split(/\s+/);
+  const { stages } = await pipeline();
+  const stageId = stages[0]!.id;
+  const [last] = await db.select({ position: schema.crmContacts.position }).from(schema.crmContacts).where(eq(schema.crmContacts.stageId, stageId)).orderBy(desc(schema.crmContacts.position)).limit(1);
+  const [row] = await db
+    .insert(schema.crmContacts)
+    .values({ firstName: first!.slice(0, 100), lastName: clean(rest.join(" "), 100), email, jobTitle: clean(input.title, 160), companyId, source: "Website chat", category: "Founder", stageId, position: (last?.position ?? 0) + 1, ownerId: null, createdBy: null })
+    .onConflictDoNothing()
+    .returning({ id: schema.crmContacts.id });
+  if (!row) {
+    // Added by another request a moment ago.
+    const [again] = await db.select({ id: schema.crmContacts.id }).from(schema.crmContacts).where(eq(schema.crmContacts.email, email)).limit(1);
+    return { contactId: again!.id, created: false };
+  }
+  await db.insert(schema.crmActivities).values({ contactId: row.id, kind: "other", body: "Added from the website chat (see Chat for the conversation)", actorId: null });
+  return { contactId: row.id, created: true };
 }
 
 // ---------------------------------------------------------------------------

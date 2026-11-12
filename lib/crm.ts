@@ -21,7 +21,7 @@ export const CATEGORIES = {
 export type Category = keyof typeof CATEGORIES;
 export const CATEGORY_NAMES = Object.keys(CATEGORIES) as Category[];
 
-export const SOURCES = ["LinkedIn", "Referral", "Website", "Existing network", "Event", "Investor introduction", "Other"] as const;
+export const SOURCES = ["LinkedIn", "Referral", "Website", "Website chat", "Existing network", "Event", "Investor introduction", "Other"] as const;
 
 export const OPPORTUNITIES = ["Potential customer", "Potential referral source", "Potential distribution partner", "Potential advisor", "Potential investor", "General relationship"] as const;
 
@@ -58,6 +58,14 @@ export function domainOf(website: string | null | undefined): string | null {
   } catch {
     return null;
   }
+}
+
+const FREE_MAIL = /^(gmail|googlemail|yahoo|ymail|outlook|hotmail|live|msn|icloud|me|mac|aol|proton|protonmail|pm|gmx|zoho|yandex|mail|fastmail|hey)\./;
+
+/** The company domain behind a work email ("ann@acme.com" → "acme.com"); null for personal mailboxes. */
+export function workDomain(email: string | null | undefined): string | null {
+  const d = email?.trim().toLowerCase().split("@")[1];
+  return d && d.includes(".") && !FREE_MAIL.test(d) ? d : null;
 }
 
 export const fullName = (c: { firstName: string; lastName: string | null }) => [c.firstName, c.lastName].filter(Boolean).join(" ");

@@ -1193,7 +1193,7 @@ export type PlanSession = typeof planSessions.$inferSelect;
 // ---------------------------------------------------------------------------
 
 /** `ai`: part of the conversation with the AI (after the scripted sign-up questions). */
-export type GuestMessage = { role: "user" | "assistant"; content: string; ai?: boolean };
+export type GuestMessage = { role: "user" | "assistant"; content: string; ai?: boolean; /** ISO time it was sent (messages from before Nov 2026 have none). */ at?: string };
 
 /** One visitor's pre-sign-up chat, keyed by a random cookie token (only its hash is stored). Claimed into an account after sign-in. */
 export const guestSessions = pgTable(
@@ -1206,14 +1206,18 @@ export const guestSessions = pgTable(
     messages: jsonb("messages").$type<GuestMessage[]>().notNull().default([]),
     card: jsonb("card").$type<RecommendationCard>(),
     aiTurns: integer("ai_turns").notNull().default(0),
+    // Questions put to the AI in this chat (the free-question cap; see lib/guest/limits.ts)
+    questions: integer("questions").notNull().default(0),
     email: text("email"),
+    // The CRM contact this chat belongs to, from the email they gave (its company follows the contact)
+    crmContactId: uuid("crm_contact_id").references((): AnyPgColumn => crmContacts.id, { onDelete: "set null" }),
     // Hash of the visitor's IP, for a daily cap on new guest chats (never the IP itself)
     ipHash: text("ip_hash"),
     claimedBy: uuid("claimed_by").references(() => users.id, { onDelete: "set null" }),
     claimedAt: timestamp("claimed_at", { withTimezone: true }),
     ...timestamps,
   },
-  (t) => [uniqueIndex("guest_sessions_token_idx").on(t.tokenHash), index("guest_sessions_ip_idx").on(t.ipHash, t.createdAt)],
+  (t) => [uniqueIndex("guest_sessions_token_idx").on(t.tokenHash), index("guest_sessions_ip_idx").on(t.ipHash, t.createdAt), index("guest_sessions_contact_idx").on(t.crmContactId)],
 );
 
 export type User = typeof users.$inferSelect;

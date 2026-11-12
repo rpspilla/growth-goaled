@@ -5,11 +5,13 @@ import { requireRole } from "@/lib/auth/session";
 import { ActivityForm, ContactForm, EmailComposer, StageSelect, TaskForm } from "@/components/crm/ContactPanels";
 import { followUpBucket, fullName, PRIORITY_LABEL } from "@/lib/crm";
 import { contactProfile, listCompanies, pipeline, staffUsers } from "@/lib/data/crm";
+import { contactChats } from "@/lib/data/guest";
+import { LeadChats, QuestionCounts } from "@/components/crm/LeadChats";
 import { addTaskAction, completeTaskAction, deleteContactAction, deleteDraftAction, deleteTaskAction, logActivityAction, moveContactAction, saveDraftAction, updateContactAction } from "../../actions";
 
 export const metadata = { title: "Contact" };
 
-const TABS = { activity: "Activity", details: "Details", email: "Email" } as const;
+const TABS = { activity: "Activity", chat: "Chat", details: "Details", email: "Email" } as const;
 const KIND: Record<string, string> = { note: "Note", status_change: "Status", email_draft: "Email draft", email_sent: "Email sent", email_received: "Email received", meeting: "Meeting", call: "Call", task: "Follow-up", other: "Update" };
 const muted = { color: "var(--muted-foreground)" };
 const fg = { color: "var(--foreground)" };
@@ -23,7 +25,7 @@ export default async function ContactPage({ params, searchParams }: { params: Pr
   await requireRole(["advisor", "admin"]);
   const [{ id }, { tab: t }] = await Promise.all([params, searchParams]);
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
-  const [profile, { stages }, companies, owners] = await Promise.all([contactProfile(id), pipeline(), listCompanies(), staffUsers()]);
+  const [profile, { stages }, companies, owners, chat] = await Promise.all([contactProfile(id), pipeline(), listCompanies(), staffUsers(), contactChats(id)]);
   if (!profile) notFound();
   const { contact: c, company, tags, tasks, activities, emails, suppressed } = profile;
   const tab = (t && t in TABS ? t : "activity") as keyof typeof TABS;
@@ -68,7 +70,7 @@ export default async function ContactPage({ params, searchParams }: { params: Pr
       <nav aria-label="Contact sections" className="flex gap-1 border-b" style={{ borderColor: "var(--border)" }}>
         {Object.entries(TABS).map(([k, label]) => (
           <Link key={k} href={`?tab=${k}`} aria-current={tab === k ? "page" : undefined} className="px-4 py-2 text-sm font-medium -mb-px" style={{ borderBottom: `2px solid ${tab === k ? "var(--green)" : "transparent"}`, color: tab === k ? "var(--foreground)" : "var(--muted-foreground)" }}>
-            {label}{k === "email" && emails.length ? ` (${emails.length})` : ""}
+            {label}{k === "email" && emails.length ? ` (${emails.length})` : ""}{k === "chat" && chat.lifetime ? ` (${chat.lifetime})` : ""}
           </Link>
         ))}
       </nav>
@@ -155,6 +157,14 @@ export default async function ContactPage({ params, searchParams }: { params: Pr
           <form action={deleteContactAction.bind(null, c.id)} className="pt-3 border-t" style={{ borderColor: "var(--border)" }}>
             <button type="submit" className="text-sm" style={{ color: "var(--red)" }}>Delete this contact and their history</button>
           </form>
+        </section>
+      )}
+
+      {tab === "chat" && (
+        <section aria-label="Website chat" className="surface p-5 space-y-4">
+          <h2 className="font-semibold" style={fg}>Website chat</h2>
+          <QuestionCounts {...chat} />
+          <LeadChats chats={chat.chats} />
         </section>
       )}
 

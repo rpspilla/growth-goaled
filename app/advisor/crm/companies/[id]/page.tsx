@@ -5,6 +5,8 @@ import { CompanyForm } from "@/components/crm/CompanyForm";
 import { QuickAdd } from "@/components/crm/QuickAdd";
 import { fullName } from "@/lib/crm";
 import { getCompany, listCompanies, pipeline } from "@/lib/data/crm";
+import { companyChats } from "@/lib/data/guest";
+import { LeadChats, QuestionCounts } from "@/components/crm/LeadChats";
 import { addContactAction, saveCompanyAction } from "../../actions";
 
 export const metadata = { title: "CRM company" };
@@ -14,7 +16,7 @@ export default async function CrmCompanyPage({ params }: { params: Promise<{ id:
   await requireRole(["advisor", "admin"]);
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
-  const [data, { stages }, companies] = await Promise.all([getCompany(id), pipeline(), listCompanies()]);
+  const [data, { stages }, companies, chat] = await Promise.all([getCompany(id), pipeline(), listCompanies(), companyChats(id)]);
   if (!data) notFound();
   const { company: co, contacts } = data;
   const muted = { color: "var(--muted-foreground)" };
@@ -36,6 +38,11 @@ export default async function CrmCompanyPage({ params }: { params: Promise<{ id:
           ))}
           {!contacts.length && <li className="py-2" style={muted}>No contacts yet. Add one with this company&apos;s name.</li>}
         </ul>
+      </section>
+      <section aria-label="Website chat" className="surface p-5 space-y-4">
+        <h2 className="font-semibold" style={{ color: "var(--foreground)" }}>Website chat</h2>
+        <QuestionCounts {...chat} />
+        <LeadChats chats={chat.chats} names={Object.fromEntries(contacts.map((c) => [c.id, fullName(c)]))} />
       </section>
       <section className="surface p-5">
         <CompanyForm

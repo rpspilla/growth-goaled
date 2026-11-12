@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
-import { ArrowUp, Check, Loader2, Lock, Mail } from "lucide-react";
+import { ArrowUp, CalendarClock, Check, Loader2, Lock, Mail, Stethoscope } from "lucide-react";
 import { SPIN_UP, type GuestStep } from "@/lib/guest/steps";
 import { understand } from "@/lib/guest/understand";
 import { authClient } from "@/lib/auth/client";
@@ -10,8 +10,11 @@ import type { RecommendationCard } from "@/lib/db/schema";
 import { trackSignupEvent } from "@/app/(auth)/actions";
 import { RecommendationCardView } from "./RecommendationCardView";
 import { HumanPresence } from "@/components/brand/HumanPresence";
+import { FREE_QUESTIONS, type CapScope } from "@/lib/guest/limits";
+import { ADVISOR_CALENDLY } from "./AdvisorNudge";
 
-type Result = { ok: boolean; error?: string };
+type Result = { ok: boolean; error?: string; capped?: CapScope };
+type LinkIntent = "plan" | "library" | null;
 export type GuestViewData = {
   messages: { role: "user" | "assistant"; content: string }[];
   step: { key: string; kind: "text" | "choice" | "select" | "number"; options: readonly { value: string; label: string }[] | null; optional: boolean; placeholder: string | null } | null;
@@ -20,14 +23,17 @@ export type GuestViewData = {
   emailed: boolean;
   email: string | null;
   companyName: string | null;
-  outOfTurns: boolean;
+  /** The free-question limit they've hit, if any: the chat stops and offers the next steps. */
+  capped: CapScope | null;
+  questionsLeft: number;
 };
 
 /**
  * The sign-in page's conversation: "How can we help you grow?", the sign-up questions one at a time
  * (typed like any chat reply: no buttons or dropdowns),
  * then the AI's recommendation, blurred until the visitor gives an email (which also sends the
- * sign-in link that saves it all to their account).
+ * sign-in link that saves it all to their account). After the email the conversation carries on
+ * until the free questions run out, when it offers "Talk to an advisor" and "Diagnose my growth".
  */
 export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestViewData; reply: (text: string) => Promise<Result>; giveEmail: (email: string) => Promise<Result>; restart: () => Promise<void> }) {
   const [text, setText] = useState("");
@@ -75,7 +81,8 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
       if (!r.ok) {
         setOutgoing(null);
         setText(value);
-        setError(r.error ?? "Something went wrong.");
+        // At the cap the next steps show in place of the answer box, saying so.
+        setError(r.capped ? null : (r.error ?? "Something went wrong."));
       }
       router.refresh();
       input.current?.focus();
@@ -91,16 +98,23 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
 
   const step = view.step;
   // With a recommendation waiting behind the email, only the recommendation and the email box show.
-  const locked = Boolean(view.card);
+  const locked = Boolean(view.card) && !view.emailed;
+  const capped = view.capped;
   // The last sign-up answer (if it reads as one) hands over to the AI: say so, and show it working.
   const spinningUp = Boolean(step && sent !== null && step.key === LAST_STEP && understand({ ...step, options: step.options ?? undefined } as GuestStep, sent) !== null);
-  // Email given: the full recommendation is behind the sign-in link, so send them to their inbox.
-  if (view.emailed && view.email) return <CheckInbox email={view.email} card={view.card} company={view.companyName} planIntent={planIntent} giveEmail={giveEmail} firstSend={linkSent} />;
+  const intent: LinkIntent = planIntent ? "plan" : null;
   return (
     <div className="flex flex-col gap-4 w-full">
-      <h2 className="font-display text-3xl sm:text-4xl leading-tight" style={{ color: "var(--foreground)" }}>{view.messages[0]?.content}</h2>
-      <HumanPresence />
-      {view.card && <GuestCard card={view.card} giveEmail={giveEmail} planIntent={planIntent} onSent={setLinkSent} cta={<PlanCta company={view.companyName} onIntent={() => setPlanIntent(true)} where="card" />} />}
+      {/* Email given: the full recommendation is behind the sign-in link; the conversation carries on below. */}
+      {view.emailed && view.email ? (
+        <CheckInbox email={view.email} card={view.card} company={view.companyName} intent={intent} giveEmail={giveEmail} firstSend={linkSent} />
+      ) : (
+        <>
+          <h2 className="font-display text-3xl sm:text-4xl leading-tight" style={{ color: "var(--foreground)" }}>{view.messages[0]?.content}</h2>
+          <HumanPresence />
+        </>
+      )}
+      {view.card && !view.emailed && <GuestCard card={view.card} giveEmail={giveEmail} planIntent={planIntent} onSent={setLinkSent} cta={<PlanCta company={view.companyName} onIntent={() => setPlanIntent(true)} where="card" />} />}
       {!locked && (
         <>
       <ol className="space-y-3" aria-label="Conversation">
@@ -142,6 +156,9 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
         ))}
       </ol>
 
+      {capped ? (
+        <ConvertOptions scope={capped} email={view.email} giveEmail={giveEmail} />
+      ) : (
       <form onSubmit={submit} className="rounded-2xl p-2 pl-4 flex items-end gap-2 focus-within:ring-2 focus-within:ring-[var(--green)]" style={{ border: "1px solid var(--border)", background: "var(--card)", boxShadow: "0 1px 3px rgba(13,27,42,0.06)" }}>
         <label htmlFor="guest-input" className="sr-only">Your answer</label>
         <textarea
@@ -153,7 +170,7 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
           style={{ color: "var(--foreground)", border: 0, boxShadow: "none", outline: "none" }}
           value={text}
           autoFocus
-          placeholder={view.outOfTurns ? "Enter your email above to keep going" : spinningUp ? "Building your recommendation…" : (step?.placeholder ?? "Reply…")}
+          placeholder={spinningUp ? "Building your recommendation…" : (step?.placeholder ?? "Reply…")}
           onChange={(e) => {
             setText(e.target.value);
             e.target.style.height = "auto";
@@ -162,12 +179,17 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) submit(e);
           }}
-          disabled={view.outOfTurns}
         />
-        <button type="submit" aria-label="Send" title="Send" className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center disabled:opacity-40" style={{ background: "var(--navy)", color: "#fff" }} disabled={pending || sent !== null || !text.trim() || view.outOfTurns}>
+        <button type="submit" aria-label="Send" title="Send" className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center disabled:opacity-40" style={{ background: "var(--navy)", color: "#fff" }} disabled={pending || sent !== null || !text.trim()}>
           <ArrowUp size={18} aria-hidden />
         </button>
       </form>
+      )}
+      {!capped && aiPhase && view.questionsLeft <= 3 && (
+        <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+          {view.questionsLeft} free {view.questionsLeft === 1 ? "question" : "questions"} left.
+        </p>
+      )}
 
       {error && <p role="alert" className="text-sm" style={{ color: "var(--red)" }}>{error}</p>}
         </>
@@ -177,7 +199,7 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
           Start over
         </button>
       )}
-      {view.card && <PlanCta company={view.companyName} onIntent={() => setPlanIntent(true)} where="chat" />}
+      {view.card && !view.emailed && <PlanCta company={view.companyName} onIntent={() => setPlanIntent(true)} where="chat" />}
       <div ref={end} />
     </div>
   );
@@ -195,7 +217,7 @@ function GuestCard({ card, giveEmail, planIntent, onSent, cta }: { card: Recomme
     const r = await giveEmail(value);
     if (!r.ok) return setState({ kind: "error", message: r.error ?? "Check the address and try again." });
     // Send the link, then show the inbox screen (it offers to send again if this didn't go out).
-    onSent(await sendSignInLink(value.trim().toLowerCase(), planIntent).then(() => true, () => false));
+    onSent(await sendSignInLink(value.trim().toLowerCase(), planIntent ? "plan" : null).then(() => true, () => false));
     router.refresh();
   }
 
@@ -251,7 +273,7 @@ const MAILBOXES: { name: string; href: string; match: RegExp }[] = [
  * After the email: the full recommendation is in the sign-in link, so the page sends them to their
  * inbox (with a reminder of what's waiting), and lets them resend or fix the address.
  */
-function CheckInbox({ email, card, company, planIntent, giveEmail, firstSend }: { email: string; card: RecommendationCard | null; company: string | null; planIntent: boolean; giveEmail: (email: string) => Promise<Result>; firstSend: boolean | null }) {
+function CheckInbox({ email, card, company, intent, giveEmail, firstSend }: { email: string; card: RecommendationCard | null; company: string | null; intent: LinkIntent; giveEmail: (email: string) => Promise<Result>; firstSend: boolean | null }) {
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "failed">(firstSend === false ? "failed" : "idle");
   const [changing, setChanging] = useState(false);
   const [next, setNext] = useState("");
@@ -259,7 +281,7 @@ function CheckInbox({ email, card, company, planIntent, giveEmail, firstSend }: 
   const router = useRouter();
   const resend = async (address: string) => {
     setStatus("sending");
-    setStatus(await sendSignInLink(address, planIntent).then(() => "sent" as const, () => "failed" as const));
+    setStatus(await sendSignInLink(address, intent).then(() => "sent" as const, () => "failed" as const));
   };
   const change = async (e: FormEvent) => {
     e.preventDefault();
@@ -280,7 +302,7 @@ function CheckInbox({ email, card, company, planIntent, giveEmail, firstSend }: 
       <div>
         <h2 className="font-display text-3xl sm:text-4xl leading-tight" style={{ color: "var(--foreground)" }}>Check your inbox</h2>
         <p className="text-base mt-2" style={{ color: "var(--muted-foreground)" }}>
-          We&apos;ve sent a sign-in link to <strong style={{ color: "var(--foreground)" }}>{email}</strong>. Open it to see your full recommendation{company ? ` for ${company}` : ""}: what to do, your 30/60/90-day plan and how to measure it. No password needed.
+          We&apos;ve sent a sign-in link to <strong style={{ color: "var(--foreground)" }}>{email}</strong>. Open it to see your full recommendation{company ? ` for ${company}` : ""}: what to do, your 30/60/90-day plan and how to measure it. No password needed. You can keep asking questions below in the meantime.
         </p>
       </div>
       {card && (
@@ -379,8 +401,9 @@ function SpinUpProgress() {
   );
 }
 
-async function sendSignInLink(address: string, plan: boolean) {
-  const next = plan ? "/claim?plan=1" : "/claim";
+/** The sign-in link that saves the chat: it opens at the plan offer, the growth projects library, or the saved conversation. */
+async function sendSignInLink(address: string, intent: LinkIntent) {
+  const next = intent === "plan" ? "/claim?plan=1" : intent === "library" ? "/claim?to=library" : "/claim";
   const { error } = await authClient.signIn.magicLink({ email: address, callbackURL: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}` });
   if (error) throw new Error(error.message ?? "couldn't send");
 }
@@ -403,5 +426,57 @@ function PlanCta({ company, onIntent, where }: { company: string | null; onInten
         {label}
       </button>
     </div>
+  );
+}
+
+/**
+ * The free questions are used up: say so plainly, and offer the two ways on. "Diagnose my growth"
+ * sends the sign-in link that saves the chat and opens the growth projects library.
+ */
+function ConvertOptions({ scope, email, giveEmail }: { scope: CapScope; email: string | null; giveEmail: (email: string) => Promise<Result> }) {
+  const [asking, setAsking] = useState(false);
+  const [value, setValue] = useState("");
+  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "failed">("idle");
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  const diagnose = async (address: string) => {
+    setStatus("sending");
+    setStatus(await sendSignInLink(address, "library").then(() => "sent" as const, () => "failed" as const));
+  };
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    const r = await giveEmail(value);
+    if (!r.ok) return setError(r.error ?? "Check the address and try again.");
+    await diagnose(value.trim().toLowerCase());
+    router.refresh();
+  };
+  return (
+    <section aria-label="Your free questions are used up" data-testid="guest-cap" className="rounded-2xl p-5 space-y-4" style={{ background: "var(--green-muted)", border: "1px solid var(--green)" }}>
+      <div>
+        <h3 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>You&apos;ve used your free questions</h3>
+        <p className="text-base mt-1" style={{ color: "var(--muted-foreground)" }}>
+          {scope === "session" ? `That's the ${FREE_QUESTIONS.perSession} free questions for this conversation.` : `That's all ${FREE_QUESTIONS.perLifetime} of your free questions.`} To keep going, talk it through with an advisor, or diagnose your growth with your own numbers.
+        </p>
+      </div>
+      <div className="flex gap-2 flex-wrap">
+        <a href={ADVISOR_CALENDLY} target="_blank" rel="noopener" className="btn btn-primary inline-flex items-center gap-2">
+          <CalendarClock size={16} aria-hidden /> Talk to an advisor
+        </a>
+        <button type="button" className="btn btn-secondary inline-flex items-center gap-2" disabled={status === "sending"} onClick={() => (email ? diagnose(email) : setAsking(true))}>
+          <Stethoscope size={16} aria-hidden /> Diagnose my growth
+        </button>
+      </div>
+      {asking && !email && status !== "sent" && (
+        <form onSubmit={submit} className="flex gap-2 flex-wrap items-end" aria-label="Email for your sign-in link">
+          <label htmlFor="guest-cap-email" className="sr-only">Work email</label>
+          <input id="guest-cap-email" type="email" required className="field flex-1 min-w-[14rem]" placeholder="you@company.com" value={value} onChange={(e) => setValue(e.target.value)} autoComplete="email" />
+          <button type="submit" className="btn btn-primary" disabled={status === "sending"}>Send my sign-in link</button>
+        </form>
+      )}
+      {status === "sent" && <p role="status" className="text-sm" style={{ color: "var(--green)" }}>Sign-in link sent{email ? ` to ${email}` : ""}. Open it to diagnose your growth; this conversation comes with you.</p>}
+      {status === "failed" && <p role="alert" className="text-sm" style={{ color: "var(--red)" }}>We couldn&apos;t send the link just now. Try again.</p>}
+      {error && <p role="alert" className="text-sm" style={{ color: "var(--red)" }}>{error}</p>}
+    </section>
   );
 }

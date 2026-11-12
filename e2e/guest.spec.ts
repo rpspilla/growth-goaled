@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { Client } from "pg";
+import { E2E_DATABASE_URL } from "../playwright.config";
 
 /**
  * The way in for a new founder: a conversation on the sign-in page. The email is only asked for once
@@ -16,7 +18,7 @@ test("a visitor talks it through, unlocks the recommendation with an email, and 
 
   const answer = async (text: string) => {
     await page.getByLabel("Your answer").fill(text);
-    await page.getByRole("button", { name: "Send" }).click();
+    await page.getByRole("button", { name: "Send", exact: true }).click();
   };
   await answer("Our pipeline isn't converting and I don't know whether to hire.");
   await expect(page.getByText("What's your name?")).toBeVisible();
@@ -88,10 +90,43 @@ test("a visitor talks it through, unlocks the recommendation with an email, and 
   await expect(inbox).toContainText("Test mode takeaway");
   await expect(inbox.getByRole("link", { name: /^Open (Gmail|Outlook)$/ }).first()).toBeVisible();
   await expect(page.getByRole("article", { name: "Recommendation" })).toHaveCount(0);
-  await expect(page.getByLabel("Your answer")).toHaveCount(0);
+  // The conversation carries on after the email.
+  await expect(page.getByRole("list", { name: "Conversation" })).toContainText("We close about $20k deals.");
+  await answer("What should my first AE's quota be?");
+  await expect(page.getByRole("list", { name: "Conversation" })).toContainText("What should my first AE's quota be?");
+  await expect(page.getByRole("list", { name: "Conversation" }).getByText(/Test mode/).last()).toBeVisible();
   // Coming back to the page keeps them on the inbox step.
   await page.reload();
   await expect(page.getByRole("region", { name: "Check your inbox" })).toBeVisible();
+
+  // The advisor sees the whole chat, before and after the email, on the CRM contact and its company.
+  const staff = await browser.newContext();
+  const db = new Client({ connectionString: E2E_DATABASE_URL });
+  await db.connect();
+  await db.query("insert into users (email, auth_user_id, role, name, onboarded_at) values ('guest-admin@e2e.test','e2e:guest-admin@e2e.test','admin','Gia Admin', now()) on conflict (auth_user_id) do update set role = 'admin'");
+  const contact = await db.query("select id, company_id, source from crm_contacts where email = 'robin@guestly.test'");
+  expect(contact.rows[0]?.source).toBe("Website chat");
+  await staff.addCookies([{ name: "gg_e2e_user", value: "guest-admin@e2e.test", domain: "localhost", path: "/" }]);
+  const advisor = await staff.newPage();
+  await advisor.goto(`/advisor/crm/contacts/${contact.rows[0].id}?tab=chat`);
+  const chat = advisor.getByRole("region", { name: "Website chat" });
+  await expect(chat.getByRole("list", { name: "Chat 1 messages" })).toContainText("Our pipeline isn't converting and I don't know whether to hire.");
+  await expect(chat.getByRole("list", { name: "Chat 1 messages" })).toContainText("What should my first AE's quota be?");
+  await expect(chat.getByLabel("Website chat questions")).toContainText("3 of 20 free");
+  await expect(chat).toContainText("Company: Guestly");
+  await advisor.goto(`/advisor/crm/companies/${contact.rows[0].company_id}`);
+  await expect(advisor.getByRole("region", { name: "Website chat" })).toContainText("What should my first AE's quota be?");
+  await staff.close();
+
+  // At the cap the chat stops, says so, and offers the two ways on.
+  await db.query("update guest_sessions set questions = 10 where email = 'robin@guestly.test'");
+  await db.end();
+  await page.reload();
+  const cap = page.getByRole("region", { name: "Your free questions are used up" });
+  await expect(cap).toContainText("You've used your free questions");
+  await expect(cap.getByRole("link", { name: "Talk to an advisor" })).toHaveAttribute("href", /calendly\.com/);
+  await expect(cap.getByRole("button", { name: "Diagnose my growth" })).toBeVisible();
+  await expect(page.getByLabel("Your answer")).toHaveCount(0);
 
   // Signing in (the link's landing, /claim) saves it as their account, company and conversation.
   await ctx.addCookies([{ name: "gg_e2e_user", value: "robin@guestly.test", domain: "localhost", path: "/" }]);
