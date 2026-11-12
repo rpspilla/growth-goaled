@@ -397,7 +397,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
 
   // --- Founder: the switcher follows the granted assessment; results now show as reviewed ---
   await founder.page.goto("/data");
-  const switcher = founder.page.getByRole("combobox", { name: "Active question" });
+  const switcher = founder.page.getByRole("combobox", { name: "Active growth project" });
   await switcher.selectOption("winning_icp");
   await expect(founder.page.getByRole("heading", { name: "Data for Repeatable Sales Motion" })).toBeVisible();
   await switcher.selectOption("growth_leak");
