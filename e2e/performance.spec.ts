@@ -65,21 +65,39 @@ test("advisor names the plan and asks for data; the founder sees progress and da
   await expect(adv.page.getByText("Engagement Type")).toBeVisible();
   await expect(adv.page.getByText("Action Plan Progress")).toBeVisible();
   await adv.page.goto(`/advisor/companies/${company}`);
-  // Contracts and billing live on the company record.
+  // Contracts and billing live on the company record: drop the signed file and it's read for you.
   const contracts = adv.page.getByRole("region", { name: "Contracts and billing" });
-  await contracts.getByRole("button", { name: "Add a contract" }).click();
-  const add = contracts.getByRole("form", { name: "Add a contract" });
-  await add.getByLabel("Name").fill("Execute & Monitor agreement");
-  await add.getByLabel("Amount per bill ($)").fill("1,199");
-  await add.getByLabel("Start date", { exact: true }).fill("2026-01-15");
-  await add.getByRole("button", { name: "Save contract" }).click();
+  await expect(contracts.getByRole("button", { name: "Drop a contract here, or choose a file" })).toContainText("Drag and drop a signed contract here");
+  // (Test mode has no file storage: a dropped file is simulated as already uploaded, its first read having failed.)
+  await db.query("insert into contracts (company_id, title, status, blob_url, filename, mime, read_status, read_error) values ($1, 'Signed MSA', 'draft', 'e2e://signed-msa.pdf', 'Signed_MSA.pdf', 'application/pdf', 'failed', 'Temporary problem')", [company]);
+  await adv.page.reload();
   const list = contracts.getByRole("list", { name: "Contracts" });
-  await expect(list).toContainText("Execute & Monitor agreement");
-  await expect(list).toContainText("$1,199 · monthly");
-  await expect(list).toContainText("Next billing:");
-  const before = await list.getByText(/Next billing:/).textContent();
-  await list.getByRole("button", { name: "Mark billed: Execute & Monitor agreement" }).click();
-  await expect(list.getByText(/Next billing:/)).not.toHaveText(before!);
+  await list.getByRole("listitem", { name: "Signed MSA" }).getByRole("button", { name: "Try again" }).click();
+  const read = list.getByRole("listitem", { name: "Test mode: Execute & Monitor agreement" });
+  await expect(read).toBeVisible({ timeout: 15_000 });
+  await expect(read.getByLabel("Test mode: Execute & Monitor agreement details")).toContainText("$1,199 · monthly");
+  await expect(read.getByLabel("Test mode: Execute & Monitor agreement details")).toContainText("Nov 1, 2026 – Oct 31, 2027");
+  await expect(read).toContainText("Scope: monthly CRO support");
+  await expect(read).toContainText("Signed_MSA.pdf");
+  // What was read can be corrected.
+  await read.getByRole("button", { name: /^Edit details:/ }).click();
+  const fix = read.getByRole("form", { name: /^Edit / });
+  await fix.getByLabel("Name").fill("Execute & Monitor agreement");
+  await fix.getByRole("button", { name: "Save details" }).click();
+  const signed = list.getByRole("listitem", { name: "Execute & Monitor agreement" });
+  await expect(signed).toBeVisible();
+  const next = signed.getByLabel("Execute & Monitor agreement details").locator("dd").nth(3);
+  const before = await next.textContent();
+  await signed.getByRole("button", { name: "Mark billed: Execute & Monitor agreement" }).click();
+  await expect(next).not.toHaveText(before!);
+  // Still possible without a file.
+  await contracts.getByRole("button", { name: "No file? Enter a contract by hand" }).click();
+  const add = contracts.getByRole("form", { name: "Add a contract" });
+  await add.getByLabel("Name").fill("Pilot SOW");
+  await add.getByLabel("Amount per bill ($)").fill("5,000");
+  await add.getByLabel("Billing cycle").selectOption("one_time");
+  await add.getByRole("button", { name: "Save contract" }).click();
+  await expect(list.getByRole("listitem", { name: "Pilot SOW" })).toContainText("$5,000 one-time");
   await adv.ctx.close();
   const req = await db.query("select id from data_requests where company_id = $1", [company]);
 

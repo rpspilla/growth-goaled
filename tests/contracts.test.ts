@@ -3,7 +3,11 @@ import { nextBillingDate } from "@/lib/contracts";
 
 const h = vi.hoisted(() => ({ db: null as unknown as Record<string | symbol, unknown> }));
 vi.mock("server-only", () => ({}));
-vi.mock("@vercel/blob", () => ({ head: async (p: string) => ({ url: `https://blob.test/${p}` }), del: async () => {} }));
+vi.mock("@vercel/blob", () => ({ head: async (p: string) => ({ url: `https://blob.test/${p}`, contentType: p.endsWith(".docx") ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document" : "application/pdf" }), del: async () => {}, get: async () => null }));
+const read = vi.hoisted(() => ({ calls: [] as unknown[] }));
+vi.mock("@/lib/ai/contract", () => ({
+  readContract: async (input: unknown) => (read.calls.push(input), { title: "Execute & Monitor Services Agreement", status: "active", billingCycle: "monthly", amount: 1199, startDate: "2026-11-01", endDate: null, nextBillingDate: null, keyTerms: "Parties: Growth Goaled and Signed Co\nPayment: net 15" }),
+}));
 vi.mock("@/lib/db", async () => {
   const schema = await import("@/lib/db/schema");
   return { db: new Proxy({}, { get: (_t, p) => Reflect.get(h.db, p) }), schema };
@@ -11,7 +15,7 @@ vi.mock("@/lib/db", async () => {
 
 import { schema } from "@/lib/db";
 import type { Company, User } from "@/lib/db/schema";
-import { createContract, listContracts, removeContract, updateContract } from "@/lib/data/contracts";
+import { createContract, createContractFromFile, listContracts, readContractFile, removeContract, titleFromFilename, updateContract, updateContractDetails } from "@/lib/data/contracts";
 
 describe("nextBillingDate", () => {
   it("rolls forward by the cycle to the first date on or after today, keeping month ends", () => {
@@ -59,5 +63,34 @@ describe("contracts on a company record", () => {
     expect(await removeContract(other, c!.id)).toBe(false);
     expect(await removeContract(co, c!.id)).toBe(true);
     expect(await listContracts(co.id)).toEqual([]);
+  });
+});
+
+describe("contracts from a file", () => {
+  it("names the contract after the file, reads it, and fills in the details and key terms", async () => {
+    const [advisor] = (await db().insert(schema.users).values({ email: "b@gg.test", authUserId: "b", role: "advisor" }).returning()) as [User];
+    const [co] = (await db().insert(schema.companies).values({ name: "Read Co" }).returning()) as [Company];
+    expect(titleFromFilename("Fasten_MSA-v2.pdf")).toBe("Fasten MSA v2");
+    const r = await createContractFromFile(advisor, co, { pathname: `contracts/${co.id}/Signed_MSA.pdf`, filename: "Signed_MSA.pdf" });
+    if (!r.ok) throw new Error(r.error);
+    expect((await listContracts(co.id))[0]).toMatchObject({ title: "Signed MSA", readStatus: "reading", mime: "application/pdf", status: "draft" });
+    await readContractFile(r.id, { fetchBytes: async () => Buffer.from("%PDF-1.4") });
+    expect(read.calls.at(-1)).toMatchObject({ kind: "pdf", filename: "Signed_MSA.pdf" });
+    const [c] = await listContracts(co.id);
+    expect(c).toMatchObject({ title: "Execute & Monitor Services Agreement", status: "active", billingCycle: "monthly", amountCents: 119_900, startDate: "2026-11-01", readStatus: "done", keyTerms: "Parties: Growth Goaled and Signed Co\nPayment: net 15" });
+    expect(c!.nextBillingDate).not.toBeNull();
+
+    // Word files are kept but not read; the advisor fills them in.
+    const w = await createContractFromFile(advisor, co, { pathname: `contracts/${co.id}/sow.docx`, filename: "sow.docx" });
+    if (!w.ok) throw new Error(w.error);
+    await readContractFile(w.id, { fetchBytes: async () => Buffer.from("x") });
+    const word = (await listContracts(co.id)).find((x) => x.id === w.id)!;
+    expect(word).toMatchObject({ readStatus: "failed", title: "sow" });
+    expect(word.readError).toMatch(/aren't read automatically/);
+    expect(await updateContractDetails(co, w.id, { title: "SOW: Sales Hiring", status: "active", billingCycle: "one_time", amountCents: 500_000, startDate: "2099-12-01", endDate: null, nextBillingDate: null, notes: null })).toEqual({ ok: true });
+    expect((await listContracts(co.id)).find((x) => x.id === w.id)).toMatchObject({ title: "SOW: Sales Hiring", billingCycle: "one_time", amountCents: 500_000, nextBillingDate: "2099-12-01" });
+    expect(await updateContractDetails(co, w.id, { title: " ", status: "active", billingCycle: "monthly", amountCents: null, startDate: null, endDate: null, nextBillingDate: null, notes: null })).toEqual({ ok: false, error: "Give the contract a name." });
+    const [other] = (await db().insert(schema.companies).values({ name: "Not yours" }).returning()) as [Company];
+    expect(await createContractFromFile(advisor, other, { pathname: `contracts/${co.id}/x.pdf`, filename: "x.pdf" })).toEqual({ ok: false, error: "That file doesn't belong to this company." });
   });
 });

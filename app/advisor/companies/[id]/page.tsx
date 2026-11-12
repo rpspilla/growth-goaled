@@ -5,7 +5,7 @@ import { latestMetrics, portfolioRows, userName } from "@/lib/data/portfolio";
 import { formatMetric, type MetricKey } from "@/lib/metrics";
 import { getUseCase, targetSummary } from "@/lib/use-cases";
 import { STEPS, journeyStage } from "@/lib/use-cases/steps";
-import { clearBusinessUpdateAction, setBusinessUpdateDateAction, deleteDataRequestAction, createContractAction, removeContractAction, updateContractAction, cancelCompanyInviteAction, inviteCompanyMemberAction, removeCompanyMemberAction, requestDataAction, setCurrentPlanAction, updateHealth, updateSummary } from "./actions";
+import { clearBusinessUpdateAction, setBusinessUpdateDateAction, deleteDataRequestAction, createContractAction, removeContractAction, updateContractAction, uploadContractAction, rereadContractAction, updateContractDetailsAction, cancelCompanyInviteAction, inviteCompanyMemberAction, removeCompanyMemberAction, requestDataAction, setCurrentPlanAction, updateHealth, updateSummary } from "./actions";
 import { DataRequestForm } from "@/components/advisor/DataRequestForm";
 import { ContractsPanel } from "@/components/advisor/ContractsPanel";
 import { listContracts } from "@/lib/data/contracts";
@@ -191,7 +191,7 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
         <section aria-label="Contracts and billing" className="rounded-xl border p-5 space-y-3" style={card}>
           <div>
             <h2 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>Contracts and billing</h2>
-            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>What {company.name} has signed with Growth Goaled, how often it bills and when next. Only Growth Goaled staff see this.</p>
+            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Drop in what {company.name} has signed with Growth Goaled: we read it and show the terms, billing and dates here. Only Growth Goaled staff see this.</p>
           </div>
           <ContractsPanel
             companyId={company.id}
@@ -199,8 +199,13 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
               id: c.id,
               title: c.title,
               status: c.status,
+              cycleId: c.billingCycle,
               cycle: BILLING_CYCLES.find((b) => b.id === c.billingCycle)!.label,
               amount: c.amountCents === null ? null : formatPrice(c.amountCents),
+              amountRaw: c.amountCents === null ? "" : String(c.amountCents / 100),
+              keyTerms: c.keyTerms,
+              readStatus: (c.readStatus as "reading" | "done" | "failed" | null) ?? null,
+              readError: c.readError,
               start: c.startDate,
               end: c.endDate,
               next: c.nextBillingDate,
@@ -209,6 +214,9 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
               notes: c.notes,
             }))}
             create={createContractAction.bind(null, company.id)}
+            uploaded={uploadContractAction.bind(null, company.id)}
+            edit={updateContractDetailsAction.bind(null, company.id)}
+            reread={rereadContractAction.bind(null, company.id)}
             update={updateContractAction.bind(null, company.id)}
             remove={removeContractAction.bind(null, company.id)}
           />

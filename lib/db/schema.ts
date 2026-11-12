@@ -1251,7 +1251,13 @@ export const contracts = pgTable(
     // The signed document, private in Blob (contracts/<companyId>/...)
     blobUrl: text("blob_url"),
     filename: text("filename"),
+    mime: text("mime"),
     notes: text("notes"),
+    // Reading the uploaded contract: "reading", "done" or "failed" (null: entered by hand)
+    readStatus: text("read_status"),
+    readError: text("read_error"),
+    // The contract's key terms in a few lines (parties, scope, payment, renewal, termination)
+    keyTerms: text("key_terms"),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     ...timestamps,
   },

@@ -16,7 +16,10 @@ import { parseFigure } from "@/lib/figures";
 import { isMetricKey } from "@/lib/metrics";
 import { createDataRequest, deleteDataRequest, setCurrentPlan } from "@/lib/data/data-requests";
 import { clearBusinessUpdate, setBusinessUpdateDate } from "@/lib/data/business-metrics";
-import { createContract, removeContract, updateContract } from "@/lib/data/contracts";
+import { createContract, createContractFromFile, readContractFile, removeContract, updateContract, updateContractDetails } from "@/lib/data/contracts";
+import { after } from "next/server";
+import { db, schema } from "@/lib/db";
+import { and, eq } from "drizzle-orm";
 import { cancelTeammateInvite, inviteTeammate, removeTeammate, type TeamResult } from "@/lib/data/team";
 
 async function managed(companyId: string) {
@@ -254,4 +257,46 @@ export async function setBusinessUpdateDateAction(companyId: string, key: string
   refresh(companyId);
   revalidatePath("/performance");
   revalidatePath("/overview");
+}
+
+/** A contract file dropped onto the company: saved now, read in the background to fill in its details. */
+export async function uploadContractAction(companyId: string, pathname: string, filename: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const ctx = await managed(companyId);
+  if (!ctx) return { ok: false, error: "Company not found." };
+  if (typeof pathname !== "string" || typeof filename !== "string" || pathname.length > 500) return { ok: false, error: "That upload isn't valid." };
+  const r = await createContractFromFile(ctx.user, ctx.company, { pathname, filename });
+  if (r.ok) after(() => readContractFile(r.id));
+  refresh(companyId);
+  return r.ok ? { ok: true } : r;
+}
+
+/** Reads a contract again (e.g. after a failed read). */
+export async function rereadContractAction(companyId: string, contractId: string): Promise<void> {
+  const ctx = await managed(companyId);
+  if (!ctx || !z.uuid().safeParse(contractId).success) return;
+  const updated = await db.update(schema.contracts).set({ readStatus: "reading", readError: null }).where(and(eq(schema.contracts.id, contractId), eq(schema.contracts.companyId, ctx.company.id))).returning({ id: schema.contracts.id });
+  if (updated.length) after(() => readContractFile(contractId));
+  refresh(companyId);
+}
+
+/** Corrects or completes a contract's details (what was read, or entered by hand). */
+export async function updateContractDetailsAction(companyId: string, contractId: string, raw: unknown): Promise<{ ok: true } | { ok: false; error: string }> {
+  const ctx = await managed(companyId);
+  if (!ctx || !z.uuid().safeParse(contractId).success) return { ok: false, error: "Contract not found." };
+  const p = contractInput.safeParse({ ...(raw as object), pathname: null, filename: null });
+  if (!p.success) return { ok: false, error: "Check the contract details." };
+  const amount = p.data.amount.replace(/[$,\s]/g, "");
+  if (amount && !(Number(amount) >= 0)) return { ok: false, error: "The amount doesn't look right." };
+  const r = await updateContractDetails(ctx.company, contractId, {
+    title: p.data.title,
+    status: p.data.status,
+    billingCycle: p.data.billingCycle,
+    amountCents: amount ? Math.round(Number(amount) * 100) : null,
+    startDate: p.data.startDate || null,
+    endDate: p.data.endDate || null,
+    nextBillingDate: p.data.nextBillingDate || null,
+    notes: p.data.notes || null,
+  });
+  refresh(companyId);
+  return r;
 }
