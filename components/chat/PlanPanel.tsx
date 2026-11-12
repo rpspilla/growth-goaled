@@ -7,6 +7,7 @@ import { Pill } from "@/components/ui/Pill";
 import type { ActionPlanContent, PlanTarget } from "@/lib/db/schema";
 import { formatMinutes } from "@/lib/plan-tracking";
 import { ActionPlanView } from "./ActionPlanView";
+import type { FileRef } from "./RequestAnswer";
 
 type Result = { ok: boolean; error?: string };
 export type PlanPanelData = {
@@ -36,7 +37,9 @@ export function PlanPanel({
   submit,
   update,
   move,
-  assign,
+  answer,
+  answerFile,
+  blobPrefix,
   startPlan,
   editStep,
   saveTargets,
@@ -45,7 +48,10 @@ export function PlanPanel({
   submit: (id: string) => Promise<Result>;
   update: (id: string) => Promise<Result>;
   move: (id: string, period: string, index: number, status: string) => Promise<Result>;
-  assign: (id: string, period: string, index: number, assignee: string) => Promise<Result>;
+  answer: (id: string, period: string, index: number, values: Record<string, string>) => Promise<Result>;
+  answerFile: (id: string, period: string, index: number, file: FileRef) => Promise<Result>;
+  /** Where the founder's files go (their company's private folder). */
+  blobPrefix: string;
   startPlan: (id: string) => Promise<Result>;
   editStep: (id: string, period: string, index: number, owner: string, due: string | null) => Promise<Result>;
   saveTargets: (id: string, targets: PlanTarget[]) => Promise<Result>;
@@ -119,7 +125,7 @@ export function PlanPanel({
             content={plan.content}
             today={plan.status === "cancelled" ? null : plan.today}
             move={plan.status === "cancelled" ? undefined : (period, index, status) => move(plan.id, period, index, status)}
-            assign={plan.status === "cancelled" ? undefined : (period, index, who) => assign(plan.id, period, index, who)}
+            answers={plan.status === "cancelled" ? undefined : { blobPrefix, type: (period, index, values) => answer(plan.id, period, index, values), file: (period, index, file) => answerFile(plan.id, period, index, file) }}
             start={plan.status === "cancelled" ? undefined : () => startPlan(plan.id)}
             editStep={plan.status === "active" ? (period, index, owner, due) => editStep(plan.id, period, index, owner, due) : undefined}
             targets={{ current: plan.current, save: plan.status === "active" ? (targets) => saveTargets(plan.id, targets) : undefined }}

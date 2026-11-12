@@ -3,7 +3,8 @@ import { and, asc, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
 import type Stripe from "stripe";
 import { db, schema } from "@/lib/db";
 import type { ActionPlan, ActionPlanContent, Company, PlanStep, User } from "@/lib/db/schema";
-import { growthGoaledSteps, PERIOD_LABEL, withAssignee, withStatus, type StepStatus } from "@/lib/plan-board";
+import { allSteps, growthGoaledSteps, PERIOD_LABEL, withAssignee, withStatus, type StepStatus } from "@/lib/plan-board";
+import { checkAnswer, normalizeRequest, type AdvisorTask, type RequestAnswer } from "@/lib/plan-requests";
 import { carryDues, cleanTargets, isDay, MAX_TARGETS, withDefaultDues } from "@/lib/plan-tracking";
 import { draftPlan } from "@/lib/ai/plan";
 import { chatContext } from "@/lib/chat/context";
@@ -256,7 +257,7 @@ const boardPlan = async (company: Pick<Company, "id">, planId: string) => {
 export async function setStepStatus(company: Pick<Company, "id">, planId: string, period: Period, index: number, status: StepStatus, opts: { staff?: boolean } = {}): Promise<PlanResult> {
   const plan = await boardPlan(company, planId);
   if (!plan) return { ok: false, error: "This plan can't be changed now." };
-  if (!opts.staff && !plan.content.startedAt) return { ok: false, error: "Start the plan first: choose who does each action, then press Start the plan." };
+  if (!opts.staff && !plan.content.startedAt) return { ok: false, error: "Start the plan first: press Start the plan." };
   const content = withStatus(plan.content, period, index, status);
   if (!content) return { ok: false, error: "Unknown milestone." };
   await db.update(schema.actionPlans).set({ content, updatedAt: new Date() }).where(eq(schema.actionPlans.id, plan.id));
@@ -282,15 +283,15 @@ export async function setStepAssignee(company: Pick<Company, "id" | "name" | "ad
 }
 
 /** Growth Goaled's share of a plan, sent to the advisor: a To Do to review and quote it, and an email. */
-async function handToGrowthGoaled(user: Pick<User, "id" | "name" | "email">, company: Pick<Company, "id" | "name" | "advisorId">, plan: Pick<ActionPlan, "id" | "conversationId">, gg: { period: Period; step: PlanStep }[], appUrl: string) {
+async function handToGrowthGoaled(user: Pick<User, "id" | "name" | "email">, company: Pick<Company, "id" | "name" | "advisorId">, plan: Pick<ActionPlan, "id" | "conversationId">, gg: { period: Period; step: PlanStep }[], appUrl: string, tasks: AdvisorTask[] = []) {
   const [conversation] = await db.select({ title: schema.conversations.title }).from(schema.conversations).where(eq(schema.conversations.id, plan.conversationId)).limit(1);
-  const lines = gg.map((g) => `${PERIOD_LABEL[g.period]}: ${g.step.action}`);
+  const lines = [...tasks.map((t) => t.action), ...gg.map((g) => `${PERIOD_LABEL[g.period]}: ${g.step.action}`)];
   await db.insert(schema.registerItems).values({
     companyId: company.id,
     type: "follow_up",
     owner: "advisor",
-    title: `Review and quote the work assigned to Growth Goaled (${gg.length} ${gg.length === 1 ? "action" : "actions"})`,
-    description: `${conversation?.title ?? "Action plan"}. ${user.name || user.email} handed these to Growth Goaled:\n${lines.map((l) => `- ${l}`).join("\n")}\nPlan: ${appUrl}/advisor/plans/${plan.id}`.slice(0, 2000),
+    title: `Review and quote Growth Goaled's work on the plan (${lines.length} ${lines.length === 1 ? "task" : "tasks"})`,
+    description: `${conversation?.title ?? "Action plan"}. ${user.name || user.email} started the plan; Growth Goaled's tasks:\n${lines.map((l) => `- ${l}`).join("\n")}\nPlan: ${appUrl}/advisor/plans/${plan.id}`.slice(0, 2000),
   });
   if (company.advisorId) {
     const [advisor] = await db.select({ email: schema.users.email }).from(schema.users).where(eq(schema.users.id, company.advisorId)).limit(1);
@@ -299,19 +300,43 @@ async function handToGrowthGoaled(user: Pick<User, "id" | "name" | "email">, com
 }
 
 /**
- * The founder starts the plan. Who-does-what is fixed, and the actions handed to Growth Goaled are
- * tallied for the advisor: a To Do to review and quote the work, and an email.
+ * The founder starts the plan. Growth Goaled's tasks (and, on older plans, the actions the founder
+ * handed over) go to the advisor: a To Do to review and quote the work, and an email.
  */
 export async function startPlan(user: Pick<User, "id" | "name" | "email">, company: Pick<Company, "id" | "name" | "advisorId">, planId: string, appUrl: string): Promise<PlanResult<{ assigned: number }>> {
   const plan = await boardPlan(company, planId);
   if (!plan) return { ok: false, error: "This plan can't be started now." };
-  if (plan.content.startedAt) return { ok: true, assigned: growthGoaledSteps(plan.content).length };
+  if (plan.content.startedAt) return { ok: true, assigned: growthGoaledSteps(plan.content).length + (plan.content.advisorTasks?.length ?? 0) };
   const content: ActionPlanContent = { ...plan.content, startedAt: new Date().toISOString() };
   await db.update(schema.actionPlans).set({ content, updatedAt: new Date() }).where(eq(schema.actionPlans.id, plan.id));
   const gg = growthGoaledSteps(content);
-  if (gg.length) await handToGrowthGoaled(user, company, plan, gg, appUrl);
-  await track("plan_started", { userId: user.id, companyId: company.id, props: { assigned_to_growth_goaled: gg.length } });
-  return { ok: true, assigned: gg.length };
+  const tasks = content.advisorTasks ?? [];
+  if (gg.length || tasks.length) await handToGrowthGoaled(user, company, plan, gg, appUrl, tasks);
+  await track("plan_started", { userId: user.id, companyId: company.id, props: { assigned_to_growth_goaled: gg.length + tasks.length } });
+  return { ok: true, assigned: gg.length + tasks.length };
+}
+
+/**
+ * The founder answers one of the plan's inputs: typed values (checked against its fields) or a file
+ * already registered as a document (read by the usual pipeline). Answering completes the item.
+ */
+export async function answerStep(user: Pick<User, "id">, company: Pick<Company, "id">, planId: string, period: Period, index: number, answer: { values: Record<string, unknown> } | { documentId: string; filename: string }): Promise<PlanResult> {
+  const plan = await boardPlan(company, planId);
+  if (!plan) return { ok: false, error: "This plan can't be changed now." };
+  const step = plan.content[period]?.[index];
+  if (!step?.request) return { ok: false, error: "That item doesn't ask for data." };
+  let stored: RequestAnswer;
+  if ("values" in answer) {
+    const checked = checkAnswer(step.request, answer.values);
+    if (!checked.ok) return checked;
+    stored = { values: checked.values, at: new Date().toISOString(), by: user.id };
+  } else {
+    stored = { values: {}, documentId: answer.documentId, filename: answer.filename.slice(0, 255), at: new Date().toISOString(), by: user.id };
+  }
+  const content: ActionPlanContent = { ...plan.content, [period]: plan.content[period].map((s, i) => (i === index ? { ...s, status: "done" as const, done: true, request: { ...s.request!, answer: stored } } : s)) };
+  await db.update(schema.actionPlans).set({ content, updatedAt: new Date() }).where(eq(schema.actionPlans.id, plan.id));
+  await track("plan_input_answered", { userId: user.id, companyId: company.id, props: { via: "values" in answer ? "typed" : "file", answered: allSteps(content).filter((s) => s.step.request?.answer).length } });
+  return { ok: true };
 }
 
 /** Owners, deadlines and targets are edited on live (Execute & Monitor) plans. */
@@ -401,8 +426,12 @@ const cleanSteps = (steps: PlanStep[]): PlanStep[] =>
       ...(isDay(s.due) ? { due: s.due } : {}),
       ...(s.status && ["todo", "doing", "done"].includes(s.status) ? { status: s.status } : {}),
       ...(s.assignee === "us" || s.assignee === "gg" ? { assignee: s.assignee } : {}),
+      ...(s.request ? { request: { ...normalizeRequest({ fields: s.request.fields, columns: s.request.columns }), ...(s.request.answer ? { answer: s.request.answer } : {}) } } : {}),
     }))
     .filter((s) => s.action);
+
+const cleanTasks = (tasks: AdvisorTask[] | undefined): AdvisorTask[] =>
+  (tasks ?? []).map((t) => ({ action: t.action.trim().slice(0, 500), ...(t.why?.trim() ? { why: t.why.trim().slice(0, 500) } : {}), ...(t.status ? { status: t.status } : {}) })).filter((t) => t.action);
 
 /** Tools to evaluate, trimmed and without blanks or repeats (at most eight). */
 export const cleanTools = (tools: ActionPlanContent["tools"]) => {
@@ -425,6 +454,7 @@ export async function approvePlan(advisor: User, company: Pick<Company, "id" | "
     assumptions: content.assumptions.map((r) => r.trim()).filter(Boolean),
     tools: cleanTools(content.tools),
     ...(content.targets?.length ? { targets: cleanTargets(content.targets) ?? [] } : {}),
+    advisorTasks: cleanTasks(content.advisorTasks),
   };
   if (!clean.goal || !clean.days30.length) return { ok: false, error: "A plan needs a goal and at least one 30-day milestone." };
   // Milestones the advisor didn't date get the end of their period, counted from approval.

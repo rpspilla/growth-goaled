@@ -21,7 +21,7 @@ vi.mock("@/lib/ai/plan", async (original) => {
 import { schema } from "@/lib/db";
 import type { ChatInput } from "@/lib/ai/chat";
 import type { ActionPlanContent, Company, User } from "@/lib/db/schema";
-import { approvePlan, cancelSupportedPlan, cleanTools, founderPlans, resendPlanEmail, createPlanCheckout, planForConversation, plansForReview, postAdvisorMessage, setStepAssignee, setStepDone, setStepStatus, startPlan, submitPlan, supportedPlans, writePlan } from "@/lib/data/action-plans";
+import { answerStep, approvePlan, cancelSupportedPlan, cleanTools, founderPlans, resendPlanEmail, createPlanCheckout, planForConversation, plansForReview, postAdvisorMessage, setStepDone, setStepStatus, startPlan, submitPlan, supportedPlans, writePlan } from "@/lib/data/action-plans";
 import { getConversation, sendMessage, startConversation } from "@/lib/data/chat";
 import { recordPaidSession } from "@/lib/data/payments";
 
@@ -149,29 +149,30 @@ describe("$499 action plan", () => {
     expect(await founderPlans(co)).toMatchObject([{ id: plan.id, status: "delivered", conversationId }]);
     expect(await founderPlans(other)).toEqual([]);
     expect(await approvePlan(advisor, co, plan.id, edited, null, "https://dev.test")).toEqual({ ok: false, error: "This plan isn't waiting for review." });
-    // Delivered: before starting, the founder picks who does each action; the board moves once started.
+    // Delivered: founder items are data requests; Growth Goaled's tasks stay on the advisor side.
+    expect(delivered.content!.days30[0]!.request!.fields.map((f) => f.label)).toEqual(["Average deal cycle, founder-closed", "Average deal cycle, AE-closed"]);
+    expect(delivered.content!.advisorTasks).toEqual([{ action: "Test mode: model the hiring plan from the founder's inputs", why: "Sets quota and pipeline needs" }]);
+    // The board moves once the plan is started.
     expect(await setStepStatus(co, plan.id, "days30", 0, "doing")).toMatchObject({ ok: false, error: expect.stringContaining("Start the plan first") });
-    expect(await setStepAssignee(co, plan.id, "days30", 0, "gg")).toEqual({ ok: true });
     h.emails.length = 0;
     expect(await startPlan(founder, co, plan.id, "https://dev.test")).toEqual({ ok: true, assigned: 1 });
-    // Growth Goaled's share goes to the advisor: a To Do to quote it, and an email.
+    // Growth Goaled's tasks go to the advisor: a To Do to quote the work, and an email.
     const [todo] = await db().select().from(schema.registerItems).where(eq(schema.registerItems.companyId, co.id));
-    expect(todo).toMatchObject({ type: "follow_up", owner: "advisor", status: "open", title: "Review and quote the work assigned to Growth Goaled (1 action)" });
-    expect(todo!.description).toContain("Days 1–30:");
+    expect(todo).toMatchObject({ type: "follow_up", owner: "advisor", status: "open", title: "Review and quote Growth Goaled's work on the plan (1 task)" });
+    expect(todo!.description).toContain("Test mode: model the hiring plan");
     expect(h.emails).toHaveLength(1);
-    expect(h.emails[0]).toMatchObject({ to: "a@gg.test", subject: "Plan Co assigned 1 action to Growth Goaled" });
-    // Started: milestones move across the board; who takes responsibility can still change, and an
-    // action newly handed to Growth Goaled goes straight to the advisor.
-    expect(await setStepAssignee(co, plan.id, "days60", 0, "gg", { user: founder, appUrl: "https://dev.test" })).toEqual({ ok: true });
-    expect(h.emails).toHaveLength(2);
-    expect(h.emails[1]).toMatchObject({ to: "a@gg.test", subject: "Plan Co assigned 1 action to Growth Goaled" });
-    expect(await db().select().from(schema.registerItems).where(eq(schema.registerItems.companyId, co.id))).toHaveLength(2);
-    expect(await setStepAssignee(co, plan.id, "days60", 0, "us")).toEqual({ ok: true });
-    h.emails.length = 1;
-    expect(await setStepStatus(co, plan.id, "days30", 0, "doing")).toEqual({ ok: true });
-    expect(await setStepStatus(co, plan.id, "days30", 0, "done")).toEqual({ ok: true });
-    const board = (await planForConversation(co, conversationId))!.content!.days30[0]!;
-    expect(board).toMatchObject({ status: "done", done: true, assignee: "gg" });
+    expect(h.emails[0]).toMatchObject({ to: "a@gg.test" });
+    // The founder answers an input by typing its values: checked, saved, and the item is complete.
+    expect(await answerStep(founder, co, plan.id, "days30", 0, { values: { deal_cycle_founder: "30" } })).toEqual({ ok: false, error: "Enter Average deal cycle, AE-closed." });
+    expect(await answerStep(founder, other, plan.id, "days30", 0, { values: {} })).toEqual({ ok: false, error: "This plan can't be changed now." });
+    expect(await answerStep(founder, co, plan.id, "days30", 0, { values: { deal_cycle_founder: "30 days", deal_cycle_ae: "45" } })).toEqual({ ok: true });
+    let item = (await planForConversation(co, conversationId))!.content!.days30[0]!;
+    expect(item).toMatchObject({ status: "done", done: true, request: { answer: { values: { deal_cycle_founder: "30", deal_cycle_ae: "45" }, by: founder.id } } });
+    // Or with a file (registered as a document first).
+    expect(await answerStep(founder, co, plan.id, "days60", 0, { documentId: "00000000-0000-4000-8000-000000000000", filename: "pipeline.csv" })).toEqual({ ok: true });
+    item = (await planForConversation(co, conversationId))!.content!.days60[0]!;
+    expect(item.request!.answer).toMatchObject({ filename: "pipeline.csv", values: {} });
+    expect(await setStepStatus(co, plan.id, "days90", 0, "doing")).toEqual({ ok: true });
     // Starting again doesn't send the work twice.
     expect(await startPlan(founder, co, plan.id, "https://dev.test")).toEqual({ ok: true, assigned: 1 });
     expect(h.emails).toHaveLength(1);

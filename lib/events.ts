@@ -37,6 +37,7 @@ export type EventName =
   | "invite_sent"
   | "data_requested"
   | "plan_started"
+  | "plan_input_answered"
   | "plan_assignments_sent"
   | "user_deleted"
   | "data_request_answered"

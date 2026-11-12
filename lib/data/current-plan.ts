@@ -4,6 +4,7 @@ import { db, schema } from "@/lib/db";
 import type { Company } from "@/lib/db/schema";
 import { isOverdue } from "@/lib/plan-tracking";
 import { stepStatus } from "@/lib/plan-board";
+import { askFor, type DataRequest } from "@/lib/plan-requests";
 
 /** One of the plan's top priorities: what it is, where it stands, and what the founder does next. */
 export type Priority = { action: string; status: "todo" | "doing"; due: string | null; overdue: boolean; next: string };
@@ -19,7 +20,7 @@ export type CurrentPlan = {
 const today = () => new Date().toISOString().slice(0, 10);
 
 /** Milestones done out of all of them, how many are late, and the next one to do. */
-type Step = { action: string; done?: boolean; due?: string; status?: "todo" | "doing" | "done"; assignee?: "us" | "gg" };
+type Step = { action: string; done?: boolean; due?: string; status?: "todo" | "doing" | "done"; assignee?: "us" | "gg"; request?: Pick<DataRequest, "fields"> };
 export function planProgress(content: { days30: Step[]; days60: Step[]; days90: Step[] } | null, on = today()): PlanProgress | null {
   if (!content) return null;
   const steps = [...content.days30, ...content.days60, ...content.days90].map((s) => ({ ...s, done: stepStatus(s) === "done" }));
@@ -47,7 +48,8 @@ export function topPriorities(steps: Step[], on = today(), n = 3): Priority[] {
       status: status as "todo" | "doing",
       due: s.due ?? null,
       overdue,
-      next: status === "doing" ? "Finish it, then move it to Complete" : "Start it: move it to In progress",
+      // A founder input says exactly what to enter; older milestones say how to move them along.
+      next: s.request?.fields.length ? askFor(s.request) : status === "doing" ? "Finish it, then move it to Complete" : "Start it: move it to In progress",
     }));
 }
 

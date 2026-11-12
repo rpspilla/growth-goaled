@@ -94,35 +94,47 @@ test("a founder buys an action plan from the conversation; an advisor approves i
   await expect(panel.getByText("Risks", { exact: true })).toHaveCount(0);
   await expect(panel.getByTestId("human-presence-plan")).toContainText("Ryan Spillane, CEO & Founder");
   await expect(panel.getByTestId("human-presence-plan")).toContainText("2 IPOs");
-  // A board: each card has who takes responsibility; starting sends Growth Goaled's share to the advisor.
+  // A board of founder inputs: each card names the exact fields, answered by typing them or dropping a file.
   const board = panel.getByRole("group", { name: "Plan board" });
   await expect(board.getByRole("region", { name: "To do" }).getByRole("listitem")).toHaveCount(3);
+  await expect(board.getByRole("combobox", { name: /Who takes responsibility/ })).toHaveCount(0);
   await expect(board.getByRole("button", { name: /^Move to In progress/ })).toHaveCount(0);
-  const who = board.getByRole("combobox", { name: "Who takes responsibility: Test 30-day milestone" });
-  await expect(who).toHaveValue("us");
-  await expect(who.locator("option")).toHaveText(["We'll do it", "Assign to Growth Goaled"]);
-  await who.selectOption("gg");
-  await expect(panel.getByRole("region", { name: "Before you start" })).toContainText("1 assigned to Growth Goaled");
+  const first = board.getByRole("listitem", { name: "Test 30-day milestone" });
+  await expect(first).toContainText("Needed: Average deal cycle, founder-closed · Average deal cycle, AE-closed");
+  // Growth Goaled's tasks are for advisors only.
+  await expect(panel).not.toContainText("model the hiring plan");
   await panel.getByRole("button", { name: "Start the plan" }).click();
   await expect(panel.getByRole("region", { name: "Before you start" })).toHaveCount(0);
-  await expect(board.getByRole("combobox", { name: "Who takes responsibility: Test 30-day milestone" })).toHaveValue("gg");
-  // Left to right: To do → In progress → Complete.
-  await board.getByRole("button", { name: "Move to In progress: Test 30-day milestone" }).click();
-  await expect(board.getByRole("region", { name: "In progress" }).getByRole("listitem")).toHaveCount(1);
-  await board.getByRole("button", { name: "Move to Complete: Test 30-day milestone" }).click();
+  // The file option lists the exact columns.
+  await first.getByRole("button", { name: "Answer: Test 30-day milestone" }).click();
+  await first.getByRole("tab", { name: "Drop a file" }).click();
+  await expect(first).toContainText("The file needs these columns: Deal name, Owner, Created date, Close date");
+  await first.getByRole("tab", { name: "Type the values" }).click();
+  const form = first.getByRole("form", { name: "Answer: Test 30-day milestone" });
+  await form.getByLabel("Average deal cycle, founder-closed (days)").fill("30");
+  await form.getByRole("button", { name: "Save" }).click();
+  await expect(first.getByRole("alert")).toContainText("Enter Average deal cycle, AE-closed.");
+  await form.getByLabel("Average deal cycle, AE-closed (days)").fill("45");
+  await form.getByRole("button", { name: "Save" }).click();
+  // Answering completes it.
   await expect(board.getByRole("region", { name: "Complete" }).getByRole("listitem")).toHaveCount(1);
+  await expect(board.getByRole("region", { name: "Complete" })).toContainText("Average deal cycle, founder-closed: 30 days · Average deal cycle, AE-closed: 45 days");
+  // The other cards still move left to right.
+  await board.getByRole("button", { name: "Move to In progress: Test 60-day milestone" }).click();
+  await expect(board.getByRole("region", { name: "In progress" }).getByRole("listitem")).toHaveCount(1);
   await expect(panel).toContainText("1 of 3 milestones done");
-  // The advisor sees the work handed to Growth Goaled, and a To Do to quote it.
+  // The advisor sees Growth Goaled's tasks, the founder's answers, and a To Do to quote the work.
   await cro.page.goto(cro.page.url());
-  await expect(cro.page.getByRole("region", { name: "Assigned to Growth Goaled" })).toContainText("Test 30-day milestone");
+  await expect(cro.page.getByRole("region", { name: "Growth Goaled's tasks" })).toContainText("Test mode: model the hiring plan from the founder's inputs");
+  await expect(cro.page.getByRole("region", { name: "Plan" })).toContainText("Answered: Average deal cycle, founder-closed: 30 days");
   await expect(cro.page.getByLabel("Planner Co branding")).toContainText("Planner Co");
   await cro.page.goto("/advisor/portfolio");
   await expect(cro.page.getByRole("link", { name: /Planner Co/ })).toContainText("Diagnose");
   await expect(cro.page.getByLabel("Action plan progress: 1 of 3 done")).toBeVisible();
   await cro.page.goto("/advisor/registers");
-  await expect(cro.page.getByText("Review and quote the work assigned to Growth Goaled (1 action)")).toBeVisible();
+  await expect(cro.page.getByText("Review and quote Growth Goaled's work on the plan (1 task)")).toBeVisible();
   await cro.page.getByRole("button", { name: /^Mark complete: Review and quote/ }).click();
-  await expect(cro.page.getByText("Review and quote the work assigned to Growth Goaled (1 action)")).toHaveCount(0);
+  await expect(cro.page.getByText("Review and quote Growth Goaled's work on the plan (1 task)")).toHaveCount(0);
 
   // --- Execute & Monitor (monthly): the advisor is in the conversation ---
   await page.goto("/chat");

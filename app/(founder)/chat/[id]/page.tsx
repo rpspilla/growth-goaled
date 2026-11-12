@@ -20,7 +20,7 @@ import { companyBlobPrefix } from "@/lib/data/documents";
 import { founderContext } from "@/lib/data/founder-context";
 import { formatPrice, pricing } from "@/lib/pricing";
 import { stripeConfigured } from "@/lib/stripe";
-import { attachFilesAction, buyPlanAction, feedbackAction, planTargetsAction, retryMessageAction, sendMessageAction, stepAssigneeAction, stepDetailsAction, stepStatusAction, startPlanAction, submitPlanAction, updatePlanAction } from "../actions";
+import { attachFilesAction, buyPlanAction, feedbackAction, planTargetsAction, retryMessageAction, sendMessageAction, answerStepAction, answerStepFileAction, stepDetailsAction, stepStatusAction, startPlanAction, submitPlanAction, updatePlanAction } from "../actions";
 
 // Each answer is prepared while the founder waits.
 export const maxDuration = 300;
@@ -112,7 +112,7 @@ export default async function ConversationPage({ params, searchParams }: { param
         </p>
       )}
 
-      {panel && <PlanPanel plan={panel} submit={submitPlanAction} update={updatePlanAction} move={stepStatusAction} assign={stepAssigneeAction} startPlan={startPlanAction} editStep={stepDetailsAction} saveTargets={planTargetsAction} />}
+      {panel && <PlanPanel plan={panel} submit={submitPlanAction} update={updatePlanAction} move={stepStatusAction} answer={answerStepAction} answerFile={answerStepFileAction} blobPrefix={companyBlobPrefix(company.id)} startPlan={startPlanAction} editStep={stepDetailsAction} saveTargets={planTargetsAction} />}
 
       <BuildingRefresh active={reading} />
       {/* The conversation keeps a readable width; the plan above it uses the whole page. */}

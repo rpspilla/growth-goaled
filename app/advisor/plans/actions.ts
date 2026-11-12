@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { after } from "next/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { FIELD_KINDS } from "@/lib/plan-requests";
 import { canViewCompany } from "@/lib/access";
 import { requireRole } from "@/lib/auth/session";
 import { db, schema } from "@/lib/db";
@@ -25,7 +26,10 @@ async function staffPlan(planId: string) {
   return { user, ...row };
 }
 
-const step = z.object({ action: z.string().max(500), owner: z.string().max(120), measure: z.string().max(300), done: z.boolean().optional(), due: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), status: z.enum(["todo", "doing", "done"]).optional(), assignee: z.enum(["us", "gg"]).optional() });
+const field = z.object({ key: z.string().max(60), label: z.string().max(120), kind: z.enum(FIELD_KINDS), hint: z.string().max(200).optional(), metric: z.string().max(60).optional() });
+const answer = z.object({ values: z.record(z.string(), z.string().max(500)), documentId: z.string().optional(), filename: z.string().optional(), at: z.string(), by: z.string() });
+const request = z.object({ fields: z.array(field).max(8), columns: z.array(z.string().max(80)).max(12), answer: answer.optional() });
+const step = z.object({ action: z.string().max(500), owner: z.string().max(120), measure: z.string().max(300), done: z.boolean().optional(), due: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), status: z.enum(["todo", "doing", "done"]).optional(), assignee: z.enum(["us", "gg"]).optional(), request: request.optional() });
 const contentSchema = z.object({
   goal: z.string().max(500),
   summary: z.string().max(2000),
@@ -36,6 +40,7 @@ const contentSchema = z.object({
   assumptions: z.array(z.string().max(300)).max(10),
   tools: z.array(z.object({ name: z.string().max(120), category: z.string().max(60), why: z.string().max(400) })).max(8).optional(),
   targets: z.array(z.object({ metric: z.string().max(60), target: z.number(), by: z.string().nullable().optional() })).max(6).optional(),
+  advisorTasks: z.array(z.object({ action: z.string().max(500), why: z.string().max(500).optional(), status: z.enum(["todo", "doing", "done"]).optional() })).max(12).optional(),
 });
 
 /** Approve a $499 plan (with the advisor's edits): it's delivered to the founder and they're emailed. */

@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import type { AdvisorTask, DataRequest } from "@/lib/plan-requests";
 import {
   type AnyPgColumn,
   boolean,
@@ -1104,7 +1105,11 @@ export const actionPlanStatus = pgEnum("action_plan_status", [
  * Complete for plans written before the board). `assignee`: the founder's team ("us") or Growth
  * Goaled ("gg"), chosen before the plan starts.
  */
-export type PlanStep = { action: string; owner: string; measure: string; done?: boolean; due?: string; status?: "todo" | "doing" | "done"; assignee?: "us" | "gg" };
+/**
+ * A milestone. Since Nov 2026 each founder item is a data request (`request`: the exact fields, or a
+ * file with named columns); `assignee` is from older plans, where the founder chose who does it.
+ */
+export type PlanStep = { action: string; owner: string; measure: string; done?: boolean; due?: string; status?: "todo" | "doing" | "done"; assignee?: "us" | "gg"; request?: DataRequest };
 /** A metric the plan should move, tracked against the company's current figure (MetricKey from lib/metrics). */
 export type PlanTarget = { metric: string; target: number; by?: string | null };
 export type ActionPlanContent = {
@@ -1121,6 +1126,8 @@ export type ActionPlanContent = {
   tools?: PlanTool[];
   /** Metric targets (Execute & Monitor), set by the founder or advisor. */
   targets?: PlanTarget[];
+  /** What Growth Goaled does with the founder's inputs: advisors only, never shown to the founder. */
+  advisorTasks?: AdvisorTask[];
 };
 
 /** A tool the plan suggests evaluating: what it is, what kind, and why for this plan. */

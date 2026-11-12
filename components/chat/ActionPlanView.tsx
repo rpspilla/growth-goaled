@@ -6,15 +6,18 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { HumanPresence } from "@/components/brand/HumanPresence";
 import type { ActionPlanContent, PlanStep, PlanTarget } from "@/lib/db/schema";
 import { allSteps, BOARD, PERIOD_LABEL, stepStatus, type Period, type StepStatus } from "@/lib/plan-board";
+import { answerLine } from "@/lib/plan-requests";
 import { PlanTargets } from "./PlanTargets";
 import { StepMeta } from "./StepMeta";
+import { RequestAnswer, type FileRef } from "./RequestAnswer";
 
 type Result = { ok: boolean; error?: string };
 
 /**
- * The plan as a board: every milestone moves left to right across To do, In progress and Complete
- * (drag it, or use the arrows). Each card has who takes responsibility: the founder's team, or
- * Growth Goaled; starting the plan (or a later switch) sends Growth Goaled's share to the advisor.
+ * The plan as a board: every item moves left to right across To do, In progress and Complete
+ * (drag it, or use the arrows). Each founder item asks for specific data, named field by field;
+ * the founder answers by typing the values or dropping a file, which completes it. Starting the
+ * plan sends Growth Goaled's tasks (never shown here to the founder) to the advisor.
  */
 export function ActionPlanView({
   content,
@@ -22,8 +25,8 @@ export function ActionPlanView({
   editStep,
   targets,
   move,
-  assign,
   start,
+  answers,
 }: {
   content: ActionPlanContent;
   /** YYYY-MM-DD from the server, for "Overdue" (null: don't flag). */
@@ -34,10 +37,10 @@ export function ActionPlanView({
   targets?: { current: Record<string, number | null>; save?: (targets: PlanTarget[]) => Promise<Result> };
   /** When set, milestones can be moved across the board. */
   move?: (period: string, index: number, status: StepStatus) => Promise<Result>;
-  /** Founder, before the plan starts: who does each action. */
-  assign?: (period: string, index: number, assignee: "us" | "gg") => Promise<Result>;
   /** Founder, before the plan starts: start it. */
   start?: () => Promise<Result>;
+  /** Founder: answer an input, by typing its values or with a file (uploaded under `blobPrefix`). */
+  answers?: { blobPrefix: string; type: (period: string, index: number, values: Record<string, string>) => Promise<Result>; file: (period: string, index: number, file: FileRef) => Promise<Result> };
 }) {
   const [pending, run] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -45,18 +48,16 @@ export function ActionPlanView({
   const [over, setOver] = useState<StepStatus | null>(null);
   // Moves and choices show straight away; the server confirms (or they revert with an error).
   const [moved, setMoved] = useState<Record<string, StepStatus>>({});
-  const [chosen, setChosen] = useState<Record<string, "us" | "gg">>({});
   const router = useRouter();
   const started = Boolean(content.startedAt);
-  const choosing = Boolean(assign && start && !started);
+  const choosing = Boolean(start && !started);
   const canMove = Boolean(move && (started || !start));
 
   const steps = allSteps(content).map((s) => {
     const key = `${s.period}:${s.index}`;
-    return { ...s, key, status: moved[key] ?? stepStatus(s.step), assignee: chosen[key] ?? s.step.assignee };
+    return { ...s, key, status: moved[key] ?? stepStatus(s.step), assignee: s.step.assignee };
   });
   const done = steps.filter((s) => s.status === "done").length;
-  const gg = steps.filter((s) => s.assignee === "gg").length;
 
   const call = (fn: () => Promise<Result>, undo: () => void) =>
     run(async () => {
@@ -73,12 +74,6 @@ export function ActionPlanView({
     const before = s.status;
     setMoved((m) => ({ ...m, [s.key]: status }));
     call(() => move(s.period, s.index, status), () => setMoved((m) => ({ ...m, [s.key]: before })));
-  };
-  const choose = (s: (typeof steps)[number], who: "us" | "gg") => {
-    if (!assign) return;
-    const before = s.assignee;
-    setChosen((c) => ({ ...c, [s.key]: who }));
-    call(() => assign(s.period, s.index, who), () => setChosen((c) => ({ ...c, [s.key]: before ?? "us" })));
   };
   const order: StepStatus[] = BOARD.map((b) => b.id);
 
@@ -103,7 +98,7 @@ export function ActionPlanView({
       >
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded" style={{ background: "var(--muted)", color: "var(--muted-foreground)" }}>{PERIOD_LABEL[s.period as Period]}</span>
-          {s.assignee && !assign && (
+          {s.assignee === "gg" && !s.step.request && (
             <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded" style={s.assignee === "gg" ? { background: "var(--green-muted)", color: "var(--green)" } : { background: "var(--blue-muted)", color: "var(--blue)" }}>
               {s.assignee === "gg" ? "Growth Goaled" : "We'll do it"}
             </span>
@@ -111,22 +106,26 @@ export function ActionPlanView({
         </div>
         <div className="text-sm font-medium" style={{ color: "var(--foreground)", textDecoration: s.status === "done" ? "line-through" : undefined }}>{s.step.action}</div>
         <StepMeta step={s.step as PlanStep} today={today} save={editStep ? (owner, due) => editStep(s.period, s.index, owner, due) : undefined} />
-        {assign && (
-          <label className="block text-xs pt-1" style={{ color: "var(--muted-foreground)" }}>
-            Who takes responsibility
-            <select
-              aria-label={`Who takes responsibility: ${s.step.action}`}
-              value={s.assignee ?? "us"}
-              disabled={pending}
-              onChange={(e) => choose(s, e.target.value as "us" | "gg")}
-              className="field w-full mt-0.5 text-sm py-1"
-              style={s.assignee === "gg" ? { borderColor: "var(--green)", color: "var(--green)", fontWeight: 600 } : undefined}
-            >
-              <option value="us">We&apos;ll do it</option>
-              <option value="gg">Assign to Growth Goaled</option>
-            </select>
-          </label>
-        )}
+        {s.step.request &&
+          (answers ? (
+            <RequestAnswer
+              action={s.step.action}
+              request={s.step.request}
+              blobPrefix={answers.blobPrefix}
+              answer={async (values) => {
+                const r = await answers.type(s.period, s.index, values);
+                router.refresh();
+                return r;
+              }}
+              answerFile={async (file) => {
+                const r = await answers.file(s.period, s.index, file);
+                router.refresh();
+                return r;
+              }}
+            />
+          ) : (
+            <RequestSummary request={s.step.request} />
+          ))}
         {canMove && (
           <div className="flex justify-between pt-1">
             {i > 0 ? (
@@ -160,10 +159,9 @@ export function ActionPlanView({
       {choosing && (
         <div role="region" aria-label="Before you start" className="rounded-xl p-4 flex gap-4 items-center flex-wrap" style={{ background: "var(--green-muted)" }}>
           <div className="flex-1 min-w-[16rem]">
-            <div className="font-semibold" style={{ color: "var(--foreground)" }}>Before you start: who does each action?</div>
+            <div className="font-semibold" style={{ color: "var(--foreground)" }}>Ready when you are</div>
             <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-              Pick who takes responsibility on each card: &ldquo;We&apos;ll do it&rdquo; or &ldquo;Assign to Growth Goaled&rdquo;. Growth Goaled&apos;s share goes to your advisor to review and quote any extra work.
-              {gg > 0 && <strong style={{ color: "var(--foreground)" }}> {gg} assigned to Growth Goaled.</strong>}
+              Each card asks for specific numbers. Answer by typing them or dropping a file with the columns listed. Starting the plan lets your advisor know, so Growth Goaled can get to work on its part.
             </p>
           </div>
           <button type="button" className="btn btn-primary" disabled={pending} onClick={() => call(start!, () => {})}>
@@ -205,6 +203,17 @@ export function ActionPlanView({
       </div>
       {targets && (targets.save || (content.targets?.length ?? 0) > 0) && <PlanTargets targets={content.targets ?? []} current={targets.current} save={targets.save} />}
       {error && <p role="alert" className="text-sm" style={{ color: "var(--red)" }}>{error}</p>}
+    </div>
+  );
+}
+
+/** An input as advisors see it: what's asked, and the answer once given. */
+function RequestSummary({ request }: { request: NonNullable<PlanStep["request"]> }) {
+  return (
+    <div className="text-xs space-y-0.5 pt-1" style={{ color: "var(--muted-foreground)" }}>
+      <div><span className="font-semibold">Fields: </span>{request.fields.map((f) => f.label).join(" · ") || "—"}</div>
+      {request.columns.length > 0 && <div><span className="font-semibold">File columns: </span>{request.columns.join(", ")}</div>}
+      <div style={{ color: request.answer ? "var(--green)" : undefined }}>{request.answer ? `Answered: ${answerLine(request)}` : "Not answered yet"}</div>
     </div>
   );
 }

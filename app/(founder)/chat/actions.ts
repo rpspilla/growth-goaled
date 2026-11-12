@@ -7,8 +7,8 @@ import { after } from "next/server";
 import { z } from "zod";
 import { founderContext } from "@/lib/data/founder-context";
 import { attachFiles, FEEDBACK_KINDS, giveFeedback, removeFact, retryLastMessage, sendMessage, startConversation, updateFact, type ChatResult } from "@/lib/data/chat";
-import { createPlanCheckout, PlanCheckoutError, requestPlanUpdate, setPlanTargets, setStepAssignee, setStepStatus, startPlan, submitPlan, updateStep, writePlan } from "@/lib/data/action-plans";
-import { processInboxDocument } from "@/lib/data/documents";
+import { answerStep, createPlanCheckout, PlanCheckoutError, requestPlanUpdate, setPlanTargets, setStepAssignee, setStepStatus, startPlan, submitPlan, updateStep, writePlan } from "@/lib/data/action-plans";
+import { processInboxDocument, registerDocument } from "@/lib/data/documents";
 import { stripeConfigured } from "@/lib/stripe";
 
 /** The signed-in founder and their company: conversations are only ever read or changed within it. */
@@ -171,6 +171,40 @@ export async function startPlanAction(planId: string): Promise<ChatResult> {
   revalidatePath("/chat", "layout");
   revalidatePath("/overview");
   return result.ok ? { ok: true } : result;
+}
+
+/** A plan input answered by typing the values it names. */
+export async function answerStepAction(planId: string, period: string, index: number, values: Record<string, string>): Promise<ChatResult> {
+  const { user, company } = await founderCompany();
+  const plan = id.safeParse(planId);
+  const p = periodSchema.safeParse(period);
+  const v = z.record(z.string().max(60), z.string().max(500)).safeParse(values);
+  if (!plan.success || !p.success || !v.success || !Number.isInteger(index) || index < 0) return { ok: false, error: "That answer isn't valid." };
+  const result = await answerStep(user, company, plan.data, p.data, index, { values: v.data });
+  revalidatePath("/chat", "layout");
+  revalidatePath("/overview");
+  return result;
+}
+
+/** A plan input answered with a file (already uploaded to the company's folder): registered, read and sorted like any upload. */
+export async function answerStepFileAction(planId: string, period: string, index: number, file: { pathname: string; filename: string; contentHash?: string }): Promise<ChatResult> {
+  const { user, company } = await founderCompany();
+  const plan = id.safeParse(planId);
+  const p = periodSchema.safeParse(period);
+  const f = z.object({ pathname: z.string().min(1).max(1024), filename: z.string().min(1).max(255), contentHash: z.string().regex(/^[a-f0-9]{64}$/).optional() }).safeParse(file);
+  if (!plan.success || !p.success || !f.success || !Number.isInteger(index) || index < 0) return { ok: false, error: "That file isn't valid." };
+  let doc;
+  try {
+    const registered = await registerDocument(user, company, { ...f.data, docType: "other" });
+    doc = registered.doc;
+    if (!registered.duplicate) after(() => processInboxDocument(registered.doc.id));
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Upload failed." };
+  }
+  const result = await answerStep(user, company, plan.data, p.data, index, { documentId: doc.id, filename: doc.filename });
+  revalidatePath("/chat", "layout");
+  revalidatePath("/overview");
+  return result;
 }
 
 /** Execute & Monitor: a milestone's owner and deadline. */

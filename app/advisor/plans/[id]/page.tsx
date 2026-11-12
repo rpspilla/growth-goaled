@@ -89,6 +89,19 @@ export default async function AdvisorPlanPage({ params }: { params: Promise<{ id
             <div className="surface p-5 space-y-4">
               {plan.status === "delivered" && <p className="text-sm" style={muted}>Approved {plan.approvedAt?.toLocaleDateString("en-US", { month: "short", day: "numeric" })}{plan.reviewNote ? ` · Note: ${plan.reviewNote}` : ""}</p>}
               {plan.status === "delivered" && <ResendPlanEmail planId={plan.id} resend={resendPlanEmailAction} />}
+              {(plan.content.advisorTasks?.length ?? 0) > 0 && (
+                <div role="region" aria-label="Growth Goaled's tasks" className="rounded-xl p-4 space-y-2" style={{ background: "var(--green-muted)" }}>
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="font-semibold" style={fg}>
+                      Growth Goaled&apos;s tasks <span className="text-sm font-normal" style={muted}>· advisors only{!plan.content.startedAt ? " · the founder hasn't started the plan yet" : ""}</span>
+                    </div>
+                    <Link href={`/advisor/payment-links?company=${company.id}`} className="btn btn-primary text-sm">Quote the extra work</Link>
+                  </div>
+                  <ol className="text-sm list-decimal pl-5 space-y-1" style={fg}>
+                    {plan.content.advisorTasks!.map((t, i) => <li key={i}>{t.action}{t.why && <span style={muted}> · {t.why}</span>}</li>)}
+                  </ol>
+                </div>
+              )}
               {gg.length > 0 && (
                 <div role="region" aria-label="Assigned to Growth Goaled" className="rounded-xl p-4 space-y-2" style={{ background: "var(--green-muted)" }}>
                   <div className="flex items-center justify-between gap-3 flex-wrap">
