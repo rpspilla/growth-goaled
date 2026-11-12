@@ -41,6 +41,8 @@ test("advisor names the plan and asks for data; the founder sees progress and da
   // Advisor: names the plan and asks for an update.
   const adv = await as("perf-cro@e2e.test");
   await adv.page.goto(`/advisor/companies/${company}`);
+  // The advisor's company pages carry the same branding.
+  await expect(adv.page.getByLabel("Fasten Perf branding")).toContainText("Fasten Perf");
   const planForm = adv.page.getByRole("region", { name: "Current plan" });
   await planForm.getByLabel("Current plan name").fill("Sales Hiring");
   await planForm.getByRole("button", { name: "Save" }).click();

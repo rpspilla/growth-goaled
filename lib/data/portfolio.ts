@@ -11,6 +11,8 @@ import { allSteps, stepStatus } from "@/lib/plan-board";
 export type PortfolioRow = {
   id: string;
   name: string;
+  /** The company's logo from its website, once it's been read. */
+  logoUrl: string | null;
   isSample: boolean;
   stage: string | null;
   phase: Company["phase"];
@@ -121,6 +123,7 @@ export async function portfolioRows(companies: Company[], now = new Date()): Pro
     return {
       id: c.id,
       name: c.name,
+      logoUrl: c.logoUrl,
       isSample: c.isSample,
       stage: c.stage,
       phase: c.phase,

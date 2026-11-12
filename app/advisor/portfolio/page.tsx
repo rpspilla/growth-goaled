@@ -7,6 +7,7 @@ import { formatMetric } from "@/lib/metrics";
 import { listOpenInvites } from "@/lib/data/invites";
 import { revokeInviteAction } from "./actions";
 import { InviteFounderForm, ResendInviteButton } from "./InviteForms";
+import { CompanyLogo } from "@/components/brand/CompanyLogo";
 
 const date = (d: Date) => new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" }).format(d);
 
@@ -67,7 +68,7 @@ export default async function PortfolioPage() {
           return (
             <Link key={r.id} href={`/advisor/companies/${r.id}`} className="grid grid-cols-12 items-center px-5 py-4 border-b hover:opacity-80" style={{ borderColor: "var(--border)" }}>
               <div className="col-span-2 flex items-center gap-3 min-w-0">
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0" style={{ background: "var(--secondary)", color: "var(--foreground)" }}>{r.name[0]?.toUpperCase()}</div>
+                <CompanyLogo name={r.name} src={r.logoUrl} size={32} />
                 <div className="min-w-0">
                   <div className="text-sm font-semibold truncate" style={{ color: "var(--foreground)" }}>
                     {r.name}

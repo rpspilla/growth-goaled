@@ -115,6 +115,7 @@ test("a founder buys an action plan from the conversation; an advisor approves i
   // The advisor sees the work handed to Growth Goaled, and a To Do to quote it.
   await cro.page.goto(cro.page.url());
   await expect(cro.page.getByRole("region", { name: "Assigned to Growth Goaled" })).toContainText("Test 30-day milestone");
+  await expect(cro.page.getByLabel("Planner Co branding")).toContainText("Planner Co");
   await cro.page.goto("/advisor/portfolio");
   await expect(cro.page.getByRole("link", { name: /Planner Co/ })).toContainText("Diagnose");
   await expect(cro.page.getByLabel("Action plan progress: 1 of 3 done")).toBeVisible();

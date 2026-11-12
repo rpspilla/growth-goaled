@@ -18,6 +18,8 @@ import { getConversation } from "@/lib/data/chat";
 import { advisorMessageAction, advisorStepAction, advisorStepDetailsAction, advisorTargetsAction, approvePlanAction, logSessionAction, redraftPlanAction, resendPlanEmailAction } from "../actions";
 import { ResendPlanEmail } from "@/components/chat/ResendPlanEmail";
 import { growthGoaledSteps, PERIOD_LABEL } from "@/lib/plan-board";
+import { CompanyBrandBar } from "@/components/brand/CompanyBrandBar";
+import { companySite } from "@/lib/data/company-site";
 
 export const maxDuration = 300;
 
@@ -42,13 +44,16 @@ export default async function AdvisorPlanPage({ params }: { params: Promise<{ id
   const due = plan.submittedAt ? new Date(plan.submittedAt.getTime() + REVIEW_HOURS * 3600 * 1000) : null;
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
-  const [perf, sessions] = await Promise.all([companyPerformance(company), plan.tier === "supported" ? planSessionsFor(plan.id) : Promise.resolve([])]);
+  const [perf, sessions, site] = await Promise.all([companyPerformance(company), plan.tier === "supported" ? planSessionsFor(plan.id) : Promise.resolve([]), companySite(company)]);
   const current = Object.fromEntries([...perf.metrics.values()].map((m) => [m.metric, m.value]));
   const gg = plan.content ? growthGoaledSteps(plan.content) : [];
 
   return (
     <div className="px-4 sm:px-8 py-8 w-full space-y-6">
       <BuildingRefresh active={plan.status === "drafting" || Boolean(plan.draftingStartedAt)} />
+      <div className="-mx-4 sm:-mx-8 -mt-6">
+        <CompanyBrandBar name={company.name} logoUrl={site.logoUrl} about={site.about} website={site.website} hideOn={[]} />
+      </div>
       <div>
         <Link href="/advisor/plans" className="link text-sm">← Action plans</Link>
         <div className="flex items-center gap-3 flex-wrap mt-2">

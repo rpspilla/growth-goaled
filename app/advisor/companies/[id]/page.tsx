@@ -41,7 +41,6 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 mb-2 flex-wrap">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-base font-bold" style={{ background: "var(--secondary)", color: "var(--foreground)" }}>{company.name[0]?.toUpperCase()}</div>
             <h1 className="font-display text-3xl font-normal" style={{ color: "var(--foreground)" }}>{company.name}</h1>
             {company.stage && <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ background: "var(--blue-muted)", color: "var(--blue)" }}>{company.stage}</span>}
             {row && row.attention.length > 0 && <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ background: "var(--amber-muted)", color: "var(--amber)" }}>Attention required</span>}
