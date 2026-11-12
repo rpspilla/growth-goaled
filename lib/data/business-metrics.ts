@@ -103,17 +103,38 @@ export async function addBusinessUpdate(user: Pick<User, "id">, company: Pick<Co
  * retention readings are set aside (kept for the record, no longer shown). `key` is an update's key
  * from `summarize` (a file's id, or "manual-<save time>"), or "all".
  */
-export async function clearBusinessUpdate(actor: Pick<User, "id">, company: Pick<Company, "id">, key: string): Promise<number> {
+/** The readings that make up one update (a file's id, "manual-<save time>", or "all"); null for a bad key. */
+function updateScope(company: Pick<Company, "id">, key: string) {
   const scope = [eq(schema.dataPoints.companyId, company.id), inArray(schema.dataPoints.metric, ALL), ne(schema.dataPoints.status, "rejected")];
   if (key.startsWith("manual-")) {
     const ms = Number(key.slice(7));
-    if (!Number.isFinite(ms)) return 0;
+    if (!Number.isFinite(ms)) return null;
     // Stored times carry microseconds; the key has milliseconds.
     scope.push(isNull(schema.dataPoints.documentId), gte(schema.dataPoints.createdAt, new Date(ms)), lt(schema.dataPoints.createdAt, new Date(ms + 1)));
   } else if (key !== "all") {
-    if (!/^[0-9a-f-]{36}$/.test(key)) return 0;
+    if (!/^[0-9a-f-]{36}$/.test(key)) return null;
     scope.push(eq(schema.dataPoints.documentId, key));
   }
-  const cleared = await db.update(schema.dataPoints).set({ status: "rejected", acceptedBy: actor.id, updatedAt: new Date() }).where(and(...scope)).returning({ id: schema.dataPoints.id });
+  return and(...scope);
+}
+
+export async function clearBusinessUpdate(actor: Pick<User, "id">, company: Pick<Company, "id">, key: string): Promise<number> {
+  const scope = updateScope(company, key);
+  if (!scope) return 0;
+  const cleared = await db.update(schema.dataPoints).set({ status: "rejected", acceptedBy: actor.id, updatedAt: new Date() }).where(scope).returning({ id: schema.dataPoints.id });
   return cleared.length;
+}
+
+/**
+ * An admin corrects the date an update was entered (e.g. figures shared late, or typed in for an
+ * earlier month). Its readings move to that day, so the history and "was … on …" follow.
+ */
+export async function setBusinessUpdateDate(company: Pick<Company, "id">, key: string, day: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (key === "all") return { ok: false, error: "Pick one update." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || Number.isNaN(Date.parse(`${day}T12:00:00Z`))) return { ok: false, error: "Pick a valid date." };
+  if (day > new Date().toISOString().slice(0, 10)) return { ok: false, error: "The date can't be in the future." };
+  const scope = updateScope(company, key);
+  if (!scope) return { ok: false, error: "That update wasn't found." };
+  const moved = await db.update(schema.dataPoints).set({ createdAt: new Date(`${day}T12:00:00Z`), updatedAt: new Date() }).where(scope).returning({ id: schema.dataPoints.id });
+  return moved.length ? { ok: true } : { ok: false, error: "That update wasn't found." };
 }

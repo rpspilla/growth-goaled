@@ -114,6 +114,8 @@ test("advisor names the plan and asks for data; the founder sees progress and da
   await adv2.page.goto(`/advisor/companies/${company}`);
   const updates = adv2.page.getByRole("list", { name: "Business updates" });
   await expect(updates.getByRole("listitem")).toHaveCount(2);
+  // Only admins can change an update's date; this advisor sees the dates as text.
+  await expect(updates.getByRole("textbox", { name: /^Date entered/ })).toHaveCount(0);
   await updates.getByRole("button", { name: /^Remove the update from/ }).first().click();
   await expect(updates.getByRole("listitem")).toHaveCount(1);
   // And deletes the data request; it leaves the founder's page too.
@@ -125,6 +127,18 @@ test("advisor names the plan and asks for data; the founder sees progress and da
   await f.page.reload();
   await expect(f.page.getByLabel("Revenue", { exact: true })).toContainText("about $80K a month");
   await expect(f.page.getByRole("region", { name: "Your advisor asked for an update" })).toHaveCount(0);
+
+  // An admin corrects the date the remaining update was entered; the founder sees the new date.
+  await db.query("insert into users (email, auth_user_id, role, name, onboarded_at) values ('perf-admin@e2e.test','e2e:perf-admin@e2e.test','admin','Ada Admin', now()) on conflict (auth_user_id) do update set role = 'admin'");
+  const adm = await as("perf-admin@e2e.test");
+  await adm.page.goto(`/advisor/companies/${company}`);
+  const dated = adm.page.getByRole("list", { name: "Business updates" });
+  await dated.getByRole("textbox", { name: /^Date entered/ }).or(dated.getByLabel(/^Date entered/)).first().fill("2026-10-01");
+  await dated.getByRole("button", { name: /^Save the date/ }).first().click();
+  await expect(dated.getByLabel("Date entered for the update from Oct 1, 2026")).toBeVisible();
+  await adm.ctx.close();
+  await f.page.reload();
+  await expect(f.page.getByLabel("Revenue", { exact: true })).toContainText("Updated Oct 1, 2026");
   await expect(f.page.getByLabel("Retention", { exact: true })).toContainText("No figure yet");
   await db.end();
   await f.ctx.close();

@@ -16,7 +16,7 @@ vi.mock("@/lib/email", async (original) => {
 import { schema } from "@/lib/db";
 import type { Company, User } from "@/lib/db/schema";
 import { answerDataRequests, createDataRequest, deleteDataRequest, listDataRequests, setCurrentPlan } from "@/lib/data/data-requests";
-import { addBusinessUpdate, businessMetrics, clearBusinessUpdate } from "@/lib/data/business-metrics";
+import { addBusinessUpdate, businessMetrics, clearBusinessUpdate, setBusinessUpdateDate } from "@/lib/data/business-metrics";
 import { currentPlan } from "@/lib/data/current-plan";
 
 type DB = typeof import("@/lib/db").db;
@@ -125,6 +125,24 @@ describe("typed-in business updates", () => {
     expect(await clearBusinessUpdate(advisor, co, "all")).toBe(1);
     expect((await businessMetrics(co)).updates).toEqual([]);
     expect(await clearBusinessUpdate(advisor, co, "nonsense")).toBe(0);
+  });
+
+  it("lets an admin change the date an update was entered", async () => {
+    await addBusinessUpdate(founder, co, { period: "2026-09", mrr: 80_000, retention: null });
+    await new Promise((r) => setTimeout(r, 5));
+    await addBusinessUpdate(founder, co, { period: "2026-10", mrr: 86_000, retention: 104 });
+    const [latest, earlier] = (await businessMetrics(co)).updates;
+    expect(await setBusinessUpdateDate(co, earlier!.key, "2026-10-01")).toEqual({ ok: true });
+    expect(await setBusinessUpdateDate(co, latest!.key, "2026-11-02")).toEqual({ ok: true });
+    const m = await businessMetrics(co);
+    expect(m.updates.map((u) => u.at.toISOString().slice(0, 10))).toEqual(["2026-11-02", "2026-10-01"]);
+    expect(m.latest.revenue).toMatchObject({ value: 1_032_000, previous: { value: 960_000 } });
+    expect(m.latest.revenue!.previous!.at.toISOString().slice(0, 10)).toBe("2026-10-01");
+    expect(await setBusinessUpdateDate(co, m.updates[0]!.key, "2999-01-01")).toEqual({ ok: false, error: "The date can't be in the future." });
+    expect(await setBusinessUpdateDate(co, m.updates[0]!.key, "not a date")).toEqual({ ok: false, error: "Pick a valid date." });
+    expect(await setBusinessUpdateDate(co, "all", "2026-10-01")).toEqual({ ok: false, error: "Pick one update." });
+    const [stranger] = (await db().insert(schema.companies).values({ name: "Elsewhere" }).returning()) as [Company];
+    expect(await setBusinessUpdateDate(stranger, m.updates[0]!.key, "2026-10-01")).toEqual({ ok: false, error: "That update wasn't found." });
   });
 
   it("checks what's typed", async () => {

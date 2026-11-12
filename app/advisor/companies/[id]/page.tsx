@@ -5,7 +5,7 @@ import { latestMetrics, portfolioRows, userName } from "@/lib/data/portfolio";
 import { formatMetric, type MetricKey } from "@/lib/metrics";
 import { getUseCase, targetSummary } from "@/lib/use-cases";
 import { STEPS, journeyStage } from "@/lib/use-cases/steps";
-import { clearBusinessUpdateAction, deleteDataRequestAction, createContractAction, removeContractAction, updateContractAction, cancelCompanyInviteAction, inviteCompanyMemberAction, removeCompanyMemberAction, requestDataAction, setCurrentPlanAction, updateHealth, updateSummary } from "./actions";
+import { clearBusinessUpdateAction, setBusinessUpdateDateAction, deleteDataRequestAction, createContractAction, removeContractAction, updateContractAction, cancelCompanyInviteAction, inviteCompanyMemberAction, removeCompanyMemberAction, requestDataAction, setCurrentPlanAction, updateHealth, updateSummary } from "./actions";
 import { DataRequestForm } from "@/components/advisor/DataRequestForm";
 import { ContractsPanel } from "@/components/advisor/ContractsPanel";
 import { listContracts } from "@/lib/data/contracts";
@@ -22,7 +22,8 @@ const card = { background: "var(--card)", borderColor: "var(--border)" };
 
 /** Step 1 mirrored: company summary, its use cases and which step each is on. */
 export default async function CompanyOverviewPage({ params }: { params: Promise<{ id: string }> }) {
-  const { company, useCases } = await companyContext((await params).id);
+  const { user, company, useCases } = await companyContext((await params).id);
+  const isAdmin = user.role === "admin";
   const [metrics, [row], summaryBy, advisory] = await Promise.all([
     latestMetrics([company.id]).then((m) => m.get(company.id) ?? new Map()),
     portfolioRows([company]),
@@ -232,7 +233,14 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
             <ul aria-label="Business updates" className="divide-y text-sm" style={{ borderColor: "var(--border)" }}>
               {biz.updates.map((u) => (
                 <li key={u.key} className="py-2.5 flex items-center gap-4 flex-wrap" style={{ borderColor: "var(--border)" }}>
-                  <span className="font-semibold w-28 shrink-0" style={{ color: "var(--foreground)" }}>{day(u.at)}</span>
+                  {isAdmin ? (
+                    <form action={setBusinessUpdateDateAction.bind(null, company.id, u.key)} className="flex items-center gap-1 shrink-0">
+                      <input type="date" name="day" required defaultValue={u.at.toISOString().slice(0, 10)} max={todayIso} aria-label={`Date entered for the update from ${day(u.at)}`} className="field text-sm py-1" />
+                      <button type="submit" className="link text-sm" aria-label={`Save the date for the update from ${day(u.at)}`}>Save</button>
+                    </form>
+                  ) : (
+                    <span className="font-semibold w-28 shrink-0" style={{ color: "var(--foreground)" }}>{day(u.at)}</span>
+                  )}
                   <span className="flex-1 min-w-[10rem]" style={{ color: "var(--muted-foreground)" }}>{u.source}</span>
                   <span className="flex gap-3 flex-wrap" style={{ color: "var(--foreground)" }}>
                     {bizKeys.filter((k) => u.values[k]).map((k) => <span key={k}>{BUSINESS_METRICS[k].label}: <span className="font-mono">{formatMetric(u.values[k]!.metric as MetricKey, u.values[k]!.value)}</span></span>)}

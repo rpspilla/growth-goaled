@@ -15,7 +15,7 @@ import { chooseFigure, enterFigure, type FigureResult } from "@/lib/data/figures
 import { parseFigure } from "@/lib/figures";
 import { isMetricKey } from "@/lib/metrics";
 import { createDataRequest, deleteDataRequest, setCurrentPlan } from "@/lib/data/data-requests";
-import { clearBusinessUpdate } from "@/lib/data/business-metrics";
+import { clearBusinessUpdate, setBusinessUpdateDate } from "@/lib/data/business-metrics";
 import { createContract, removeContract, updateContract } from "@/lib/data/contracts";
 import { cancelTeammateInvite, inviteTeammate, removeTeammate, type TeamResult } from "@/lib/data/team";
 
@@ -242,4 +242,16 @@ export async function deleteDataRequestAction(companyId: string, requestId: stri
   await deleteDataRequest(ctx.company, requestId);
   refresh(companyId);
   revalidatePath("/performance");
+}
+
+/** Admins only: change the date a business update was entered. */
+export async function setBusinessUpdateDateAction(companyId: string, key: string, formData: FormData): Promise<void> {
+  const ctx = await managed(companyId);
+  if (!ctx || ctx.user.role !== "admin" || typeof key !== "string" || key.length > 60) return;
+  const day = formData.get("day");
+  if (typeof day !== "string") return;
+  await setBusinessUpdateDate(ctx.company, key, day);
+  refresh(companyId);
+  revalidatePath("/performance");
+  revalidatePath("/overview");
 }
