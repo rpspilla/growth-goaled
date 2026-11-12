@@ -23,7 +23,7 @@ const COLUMNS: { status: Status; icon: LucideIcon; color: string }[] = [
 const WHO: Record<Action["assignee"], string> = { founder: "Founder", growth_goaled: "Growth Goaled" };
 
 /** The founder answers an input: typed values, or a file uploaded under `blobPrefix`. */
-type Answers = { blobPrefix: string; type: (id: string, values: Record<string, string>) => Promise<Result>; file: (id: string, file: FileRef) => Promise<Result> };
+type Answers = { blobPrefix: string; type: (id: string, values: Record<string, string>) => Promise<Result>; file: (id: string, file: FileRef) => Promise<Result>; /** Figures already on file, by field key. */ prefill?: Record<string, string> };
 
 function ActionCard({ a, update, answers }: { a: Action; update: (id: string, status: string, note: string | null) => Promise<Result>; answers?: Answers }) {
   const [note, setNote] = useState(a.note ?? "");
@@ -75,6 +75,7 @@ function ActionCard({ a, update, answers }: { a: Action; update: (id: string, st
             action={a.action}
             request={a.request}
             blobPrefix={answers.blobPrefix}
+            prefill={answers.prefill}
             answer={async (values) => {
               const r = await answers.type(a.id, values);
               router.refresh();

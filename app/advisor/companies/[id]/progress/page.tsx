@@ -1,6 +1,9 @@
 import { answerLine } from "@/lib/plan-requests";
 import { progressView } from "@/lib/data/plan";
 import { companyContext } from "../context";
+import { approveGrowthPlanAction } from "../actions";
+import { hiringPlanView } from "@/lib/data/hiring";
+import { HiringMath } from "@/components/progress/HiringMath";
 
 const card = { background: "var(--card)", borderColor: "var(--border)" };
 const STATUS = { not_started: "Not started", in_progress: "In progress", done: "Done", dropped: "Dropped" } as const;
@@ -10,6 +13,7 @@ const date = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month:
 export default async function CompanyProgressPage({ params }: { params: Promise<{ id: string }> }) {
   const { company, active } = await companyContext((await params).id);
   const view = active ? await progressView(company, active.def.id) : null;
+  const hiring = view && active?.def.id === "hire_or_fix" ? await hiringPlanView(company, view.actions.filter((a) => a.assignee === "founder")) : null;
   return (
     <div className="page space-y-6">
       <div>
@@ -22,6 +26,18 @@ export default async function CompanyProgressPage({ params }: { params: Promise<
         </div>
       ) : (
         <>
+          {!view.planApprovedAt ? (
+            <form action={approveGrowthPlanAction.bind(null, company.id, view.deliverableId)} role="region" aria-label="Plan review" className="rounded-xl border p-5 flex items-center gap-4 flex-wrap" style={{ ...card, borderColor: "var(--amber)" }}>
+              <div className="flex-1 min-w-[16rem] text-sm">
+                <div className="font-semibold" style={{ color: "var(--foreground)" }}>Waiting for your review</div>
+                <p style={{ color: "var(--muted-foreground)" }}>The founder sees &ldquo;Your advisor is reviewing your plan&rdquo; and can answer their inputs. The rest of the plan goes live when you approve it.</p>
+              </div>
+              <button type="submit" className="btn btn-primary">Approve the plan</button>
+            </form>
+          ) : (
+            <p className="text-sm" style={{ color: "var(--green)" }}>Plan approved {date(view.planApprovedAt)}: live for the founder.</p>
+          )}
+          {hiring && <HiringMath result={hiring.result} />}
           <div className="rounded-xl border p-5 text-sm space-y-1" style={card}>
             <div style={{ color: "var(--foreground)" }}>
               Plan from brief version {view.version}, committed {date(view.committedAt)}: <span className="font-semibold">{view.decision}</span>

@@ -1,5 +1,6 @@
 "use server";
 
+import { approveGrowthPlan } from "@/lib/data/plan";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireRole } from "@/lib/auth/session";
@@ -299,4 +300,16 @@ export async function updateContractDetailsAction(companyId: string, contractId:
   });
   refresh(companyId);
   return r;
+}
+
+/** Approve the founder's growth project plan: it goes live for them (no plan goes live unreviewed). */
+export async function approveGrowthPlanAction(companyId: string, deliverableId: string): Promise<void> {
+  const ctx = await managed(companyId);
+  if (!ctx) return;
+  const id = z.uuid().safeParse(deliverableId);
+  if (!id.success) return;
+  await approveGrowthPlan(ctx.user, ctx.company.id, id.data);
+  refresh(companyId);
+  revalidatePath("/progress");
+  revalidatePath("/advisor/review");
 }

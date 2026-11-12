@@ -701,6 +701,9 @@ export const deliverables = pgTable(
     codeChecksPassed: boolean("code_checks_passed"),
     // Held for an advisor's review before the founder sees it (e.g. built with fewer than the required sales calls)
     reviewRequired: boolean("review_required").notNull().default(false),
+    // The plan from this brief goes live for the founder only once an advisor approves it (Nov 2026)
+    planApprovedAt: timestamp("plan_approved_at", { withTimezone: true }),
+    planApprovedBy: uuid("plan_approved_by").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
     ...timestamps,
   },
   (t) => [

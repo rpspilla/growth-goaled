@@ -11,6 +11,8 @@ import { founderContext } from "@/lib/data/founder-context";
 import { progressView } from "@/lib/data/plan";
 import { answerPlanInputAction, answerPlanInputFileAction, updatePlanActionAction } from "./actions";
 import { companyBlobPrefix } from "@/lib/data/documents";
+import { hiringPlanView } from "@/lib/data/hiring";
+import { HiringMath } from "@/components/progress/HiringMath";
 
 const date = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 const muted = { color: "var(--muted-foreground)" };
@@ -36,6 +38,22 @@ export default async function ProgressPage() {
 
   // Growth Goaled's items are advisor tasks: the founder sees only their own inputs.
   const mine = view.actions.filter((a) => a.assignee === "founder");
+  const hiring = active.def.id === "hire_or_fix" ? await hiringPlanView(company, mine) : null;
+  const answers = { blobPrefix: companyBlobPrefix(company.id), type: answerPlanInputAction, file: answerPlanInputFileAction, prefill: hiring?.prefill };
+
+  // No plan goes live until an advisor has reviewed it: meanwhile, the founder can already answer their inputs.
+  if (!view.planApprovedAt) {
+    return (
+      <div className="page space-y-6">
+        <PageHeader eyebrow={active.def.shortTitle} title="Action plan" />
+        <div role="status" className="surface p-5" style={{ background: "var(--green-muted)", borderColor: "transparent" }}>
+          <div className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>Your advisor is reviewing your plan.</div>
+          <p className="text-base" style={muted}>We aim to finish within 24 hours. You can answer the inputs below in the meantime, so your plan is ready to go as soon as it&apos;s approved.</p>
+        </div>
+        <PlanTracker actions={mine} update={updatePlanActionAction} answers={answers} />
+      </div>
+    );
+  }
   const done = mine.filter((a) => a.status === "done").length;
   const live = mine.filter((a) => a.status !== "dropped").length;
   const attention = view.revisitDue || view.newSince.length > 0;
@@ -129,7 +147,8 @@ export default async function ProgressPage() {
           Plan · {done} of {live} done
         </h2>
         <p className="text-sm" style={muted}>Each item asks for specific numbers: type them, or drop a file with the columns listed.</p>
-        <PlanTracker actions={mine} update={updatePlanActionAction} answers={{ blobPrefix: companyBlobPrefix(company.id), type: answerPlanInputAction, file: answerPlanInputFileAction }} />
+        <PlanTracker actions={mine} update={updatePlanActionAction} answers={answers} />
+        {hiring && <HiringMath result={hiring.result} />}
       </section>
 
       {view.metrics.length > 0 && (

@@ -21,7 +21,9 @@ export function CurrentPlanCard({ current, startHref = "/library", heading = "Cu
         </Link>
       </section>
     );
-  const p = current.progress;
+  // Not live until an advisor approves it (drafting or in review): no priorities yet.
+  const waiting = current.plan?.status === "drafting" || current.plan?.status === "in_review";
+  const p = waiting ? null : current.progress;
   const pct = p ? Math.round((p.done / p.total) * 100) : 0;
   return (
     <section aria-label="Current plan" className="surface p-6 sm:p-8" style={{ borderColor: "var(--green)", boxShadow: "0 0 0 1px var(--green)" }}>
@@ -42,13 +44,18 @@ export function CurrentPlanCard({ current, startHref = "/library", heading = "Cu
                 <div className="h-2 rounded-full" style={{ width: `${pct}%`, background: "var(--green)" }} />
               </div>
             </div>
-          ) : (
+          ) : waiting ? null : (
             <p className="text-base mt-2" style={{ color: "var(--muted-foreground)" }}>Your advisor is setting the milestones; progress shows here as they&apos;re done.</p>
           )}
         </div>
         {current.plan && <Link href={current.plan.href} className="btn btn-primary">Open the full plan</Link>}
       </div>
-      {p && p.priorities.length > 0 && (
+      {waiting && (
+        <p role="status" className="mt-4 text-base" style={{ color: "var(--foreground)" }}>
+          <strong>Your advisor is reviewing your plan.</strong> <span style={{ color: "var(--muted-foreground)" }}>We aim to finish within 24 hours.</span>
+        </p>
+      )}
+      {!waiting && p && p.priorities.length > 0 && (
         <div className="mt-6">
           <h3 className="label mb-2" style={{ color: "var(--muted-foreground)" }}>Your top {p.priorities.length === 1 ? "priority" : `${p.priorities.length} priorities`}</h3>
           <ol aria-label="Top priorities" className="grid gap-3 lg:grid-cols-3">

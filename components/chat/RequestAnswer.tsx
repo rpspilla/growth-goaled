@@ -17,10 +17,11 @@ const placeholder = (f: RequestField) => (f.kind === "currency" ? "e.g. 24000" :
  * A founder input on the action plan: the exact fields it needs, answered by typing them
  * (self-report, the default) or by dropping a file with the named columns.
  */
-export function RequestAnswer({ action, request, blobPrefix, answer, answerFile }: { action: string; request: DataRequest; blobPrefix: string; answer: (values: Record<string, string>) => Promise<Result>; answerFile: (file: FileRef) => Promise<Result> }) {
+export function RequestAnswer({ action, request, blobPrefix, answer, answerFile, prefill = {} }: { action: string; request: DataRequest; blobPrefix: string; answer: (values: Record<string, string>) => Promise<Result>; answerFile: (file: FileRef) => Promise<Result>; /** Values already on file (the newest confirmed figure), shown filled in and labelled so. */ prefill?: Record<string, string> }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"type" | "file">("type");
-  const [values, setValues] = useState<Record<string, string>>(request.answer?.values ?? {});
+  // Already answered: the answer. Otherwise a figure on file, then the field's labelled default.
+  const [values, setValues] = useState<Record<string, string>>(() => request.answer?.values ?? Object.fromEntries(request.fields.flatMap((f) => (prefill[f.key] ?? f.defaultValue) !== undefined ? [[f.key, prefill[f.key] ?? f.defaultValue!]] : [])));
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
   const [over, setOver] = useState(false);
@@ -92,6 +93,9 @@ export function RequestAnswer({ action, request, blobPrefix, answer, answerFile 
                   {f.label}
                   {KIND_UNIT[f.kind] && ` (${KIND_UNIT[f.kind]})`}
                   <input type={inputType(f)} inputMode={f.kind === "text" || f.kind === "date" ? undefined : "decimal"} className="field w-full mt-0.5 text-sm py-1" value={values[f.key] ?? ""} placeholder={placeholder(f)} onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))} />
+                  {!request.answer && prefill[f.key] !== undefined && <span className="block mt-0.5" style={{ color: "var(--blue)" }}>Filled in from your data. Change it if it&apos;s out of date.</span>}
+                  {!request.answer && prefill[f.key] === undefined && f.defaultValue !== undefined && <span className="block mt-0.5" style={{ color: "var(--amber)" }}>{f.defaultLabel ?? "A default, not your figure."}</span>}
+                  {f.optional && <span className="block mt-0.5">Optional.</span>}
                   {f.hint && <span className="block mt-0.5">{f.hint}</span>}
                 </label>
               ))}

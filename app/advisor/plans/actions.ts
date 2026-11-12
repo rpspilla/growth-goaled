@@ -26,7 +26,7 @@ async function staffPlan(planId: string) {
   return { user, ...row };
 }
 
-const field = z.object({ key: z.string().max(60), label: z.string().max(120), kind: z.enum(FIELD_KINDS), hint: z.string().max(200).optional(), metric: z.string().max(60).optional() });
+const field = z.object({ key: z.string().max(60), label: z.string().max(120), kind: z.enum(FIELD_KINDS), hint: z.string().max(200).optional(), metric: z.string().max(60).optional(), optional: z.boolean().optional(), defaultValue: z.string().max(60).optional(), defaultLabel: z.string().max(200).optional() });
 const answer = z.object({ values: z.record(z.string(), z.string().max(500)), documentId: z.string().optional(), filename: z.string().optional(), at: z.string(), by: z.string() });
 const request = z.object({ fields: z.array(field).max(8), columns: z.array(z.string().max(80)).max(12), answer: answer.optional() });
 const step = z.object({ action: z.string().max(500), owner: z.string().max(120), measure: z.string().max(300), done: z.boolean().optional(), due: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), status: z.enum(["todo", "doing", "done"]).optional(), assignee: z.enum(["us", "gg"]).optional(), request: request.optional() });

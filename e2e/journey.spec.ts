@@ -311,6 +311,15 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await expect(founder.page.getByText(/✓ Saved to your Action plan/)).toBeVisible();
   await founder.page.getByRole("link", { name: "Track progress →" }).click();
   await expect(founder.page.getByRole("heading", { name: "Action plan", exact: true })).toBeVisible();
+  // No plan goes live until an advisor reviews it; the founder's inputs are open meanwhile.
+  await expect(founder.page.getByRole("status").filter({ hasText: "Your advisor is reviewing your plan." })).toBeVisible();
+  await expect(founder.page.getByTestId("founder-input").first()).toBeVisible();
+  await admin.page.goto("/advisor/review");
+  const waiting = admin.page.getByRole("region", { name: /Action plans waiting for approval/ }).or(admin.page.locator("section", { has: admin.page.getByRole("heading", { name: /Action plans waiting for approval/ }) }));
+  await waiting.getByRole("link", { name: /E2E Analytics.*Growth project plan/ }).click();
+  await admin.page.getByRole("button", { name: "Approve the plan" }).click();
+  await expect(admin.page.getByText(/Plan approved .*: live for the founder/)).toBeVisible();
+  await founder.page.reload();
   // One staged action per dimension at least.
   const planHeading = founder.page.getByRole("heading", { name: /Plan · 0 of \d+ done/ });
   await expect(planHeading).toBeVisible();

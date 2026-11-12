@@ -8,6 +8,8 @@ import { listQueue, type QueueItem } from "@/lib/data/deliverables";
 import { salesCallsToCollect } from "@/lib/data/assessments";
 import { getUseCase } from "@/lib/use-cases";
 import { generateBenchmark } from "./actions";
+import { plansAwaitingApproval } from "@/lib/data/plan";
+import { plansForReview } from "@/lib/data/action-plans";
 
 // Drafting runs after the action responds (next/server after()), within this budget.
 export const maxDuration = 300;
@@ -34,7 +36,7 @@ function Row({ item }: { item: QueueItem }) {
 export default async function ReviewQueuePage() {
   const user = await requireRole(["advisor", "admin"]);
   const companies = await listManagedCompanies(user);
-  const [items, calls] = await Promise.all([listQueue(companies.map((c) => c.id)), salesCallsToCollect(companies.map((c) => c.id))]);
+  const [items, calls, growthPlans, boardPlans] = await Promise.all([listQueue(companies.map((c) => c.id)), salesCallsToCollect(companies.map((c) => c.id)), plansAwaitingApproval(companies.map((c) => c.id)), plansForReview(user)]);
   // Latest version per company decides what needs attention.
   const latest = new Map<string, QueueItem>();
   for (const i of items) if (!latest.has(i.companyId) || latest.get(i.companyId)!.version < i.version) latest.set(i.companyId, i);
@@ -44,7 +46,35 @@ export default async function ReviewQueuePage() {
 
   return (
     <div className="px-4 sm:px-8 py-8 max-w-6xl">
-      <PageHeader title="Review Queue" subtitle="AI-generated deliverables awaiting advisor review before release to founders." />
+      <PageHeader title="Review Queue" subtitle="AI-generated deliverables and action plans awaiting advisor review before release to founders." />
+      {/* No action plan goes live until an advisor reviews it (Nov 12, 2026). */}
+      <section className="surface mb-6 overflow-hidden" aria-labelledby="plans-waiting">
+        <div className="px-5 py-3 border-b" style={{ borderColor: "var(--border)" }}>
+          <h2 id="plans-waiting" className="text-base font-semibold" style={{ color: "var(--foreground)" }}>
+            Action plans waiting for approval ({growthPlans.length + boardPlans.length})
+          </h2>
+          <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>The founder sees &ldquo;Your advisor is reviewing your plan&rdquo; until you approve.</p>
+        </div>
+        {growthPlans.map((p) => (
+          <Link key={p.deliverableId} href={`/advisor/companies/${p.companyId}/progress`} className="flex items-center gap-4 px-5 py-4 border-b hover:opacity-80" style={{ borderColor: "var(--border)" }}>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>{p.companyName}</div>
+              <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>Growth project plan · {getUseCase(p.useCase ?? "")?.shortTitle ?? p.useCase} · v{p.version}</div>
+            </div>
+            <span className="text-xs font-semibold" style={{ color: "var(--amber)" }}>Review and approve →</span>
+          </Link>
+        ))}
+        {boardPlans.map((p) => (
+          <Link key={p.plan.id} href={`/advisor/plans/${p.plan.id}`} className="flex items-center gap-4 px-5 py-4 border-b hover:opacity-80" style={{ borderColor: "var(--border)" }}>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>{p.company}</div>
+              <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>Action plan · {p.title}{p.due ? ` · due ${when(p.due.toISOString())}` : ""}</div>
+            </div>
+            <span className="text-xs font-semibold" style={{ color: p.overdue ? "var(--red)" : "var(--amber)" }}>{p.plan.status === "drafting" ? "Being drafted" : "Review and approve →"}</span>
+          </Link>
+        ))}
+        {growthPlans.length + boardPlans.length === 0 && <p className="px-5 py-4 text-sm" style={{ color: "var(--muted-foreground)" }}>Nothing waiting.</p>}
+      </section>
       {calls.length > 0 && (
         <section className="surface mb-6 overflow-hidden" aria-labelledby="calls" style={{ borderColor: "var(--amber)" }}>
           <div className="px-5 py-3 border-b" style={{ borderColor: "var(--border)", background: "var(--amber-muted)" }}>

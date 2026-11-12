@@ -8,8 +8,12 @@
 export const FIELD_KINDS = ["currency", "percent", "days", "number", "text", "date"] as const;
 export type FieldKind = (typeof FIELD_KINDS)[number];
 
-/** One value the founder is asked for. `metric`: the stored figure it becomes (lib/metrics key), when it is one. */
-export type RequestField = { key: string; label: string; kind: FieldKind; hint?: string; metric?: string };
+/**
+ * One value the founder is asked for. `metric`: the stored figure it becomes (lib/metrics key), when
+ * it is one. `optional`: may be left blank. `defaultValue`: shown filled in, labelled by
+ * `defaultLabel` as a default, not as the founder's figure.
+ */
+export type RequestField = { key: string; label: string; kind: FieldKind; hint?: string; metric?: string; optional?: boolean; defaultValue?: string; defaultLabel?: string };
 
 /** How the founder answered: typed values, or a file (read by the usual document pipeline). */
 export type RequestAnswer = { values: Record<string, string>; documentId?: string; filename?: string; at: string; by: string };
@@ -53,6 +57,7 @@ export function checkAnswer(request: Pick<DataRequest, "fields">, raw: Record<st
   const values: Record<string, string> = {};
   for (const f of request.fields) {
     const v = String(raw[f.key] ?? "").trim();
+    if (!v && f.optional) continue;
     if (!v) return { ok: false, error: `Enter ${f.label}.` };
     if (v.length > 500) return { ok: false, error: `${f.label} is too long.` };
     if (f.kind === "text") {
@@ -75,7 +80,7 @@ export function checkAnswer(request: Pick<DataRequest, "fields">, raw: Record<st
 
 /** Pure: "Enter A, B and C" for the request's fields (the founder's next step). */
 export function askFor(request: Pick<DataRequest, "fields">): string {
-  const labels = request.fields.map((f) => f.label);
+  const labels = request.fields.filter((f) => !f.optional).map((f) => f.label);
   if (!labels.length) return "";
   const list = labels.length === 1 ? labels[0]! : `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)}`;
   return `Enter ${list}`;

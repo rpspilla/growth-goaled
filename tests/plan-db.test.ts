@@ -1,6 +1,6 @@
 /** Decision Briefs from calculated evidence, committing the plan, and tracking it (PGlite; agents stubbed). */
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 const h = vi.hoisted(() => ({ db: null as unknown as Record<string | symbol, unknown> }));
 vi.mock("server-only", () => ({}));
@@ -15,11 +15,12 @@ import { schema } from "@/lib/db";
 import type { Company, User } from "@/lib/db/schema";
 import type { AssessmentInput, AssessmentOutput } from "@/lib/ai/assessment";
 import { assembleAssessmentInputs, createAssessmentVersion, founderAssessment, runAssessmentPipeline } from "@/lib/data/assessments";
-import { answerPlanInput, commitPlan, progressView, sendPlanAssignments, setPlanActionAssignee, updatePlanAction } from "@/lib/data/plan";
+import { answerPlanInput, approveGrowthPlan, commitPlan, planItems, plansAwaitingApproval, progressView, sendPlanAssignments, setPlanActionAssignee, updatePlanAction } from "@/lib/data/plan";
 import { dueReminders, sendMonthlyReminders, unsubscribeToken, validUnsubscribe } from "@/lib/data/reminders";
 import { activateUseCase, getCompanyUseCase } from "@/lib/data/use-cases";
 import { analyzeSheets } from "@/lib/metrics-engine";
 import { getUseCase } from "@/lib/use-cases";
+import { HIRING_INPUTS } from "@/lib/hiring-plan";
 
 type DB = typeof import("@/lib/db").db;
 const db = () => h.db as unknown as DB;
@@ -153,12 +154,25 @@ describe("decision briefs from calculated evidence", () => {
     expect((await progressView(co, "growth_leak"))!.actions[0]).toMatchObject({ status: "in_progress", note: "Calls booked" });
     expect(await commitPlan(founder, other, first.deliverableId)).toEqual({ ok: false, error: "That brief isn't available." });
 
+    // No plan goes live until an advisor approves it: it's in the Review Queue until then.
+    expect(progress.planApprovedAt).toBeNull();
+    expect((await plansAwaitingApproval([co.id])).map((x) => x.deliverableId)).toEqual([first.deliverableId]);
+    expect(await approveGrowthPlan(founder, other.id, first.deliverableId)).toEqual({ ok: false, error: "That plan wasn't found." });
+    expect(await approveGrowthPlan(founder, co.id, first.deliverableId)).toEqual({ ok: true });
+    expect((await progressView(co, "growth_leak"))!.planApprovedAt).not.toBeNull();
+    expect(await plansAwaitingApproval([co.id])).toEqual([]);
+
     // Founder items ask for data: the fields come through from the brief, and answering completes it.
     expect(progress.actions[0]!.request).toMatchObject({ fields: [{ key: "churned_customers_last_12_months", label: "Churned customers last 12 months", kind: "number" }], columns: ["Customer", "Churn date"] });
     expect(await answerPlanInput(founder, other, actionId, { values: { churned_customers_last_12_months: "4" } })).toEqual({ ok: false, error: "That item doesn't ask for data." });
     expect(await answerPlanInput(founder, co, actionId, { values: { churned_customers_last_12_months: "four" } })).toEqual({ ok: false, error: "Churned customers last 12 months should be a number." });
     expect(await answerPlanInput(founder, co, actionId, { values: { churned_customers_last_12_months: "4" } })).toEqual({ ok: true });
     expect((await progressView(co, "growth_leak"))!.actions[0]).toMatchObject({ status: "done", request: { answer: { values: { churned_customers_last_12_months: "4" } } } });
+    // A typed figure that is a company metric (ACV, ramp, churn) is stored as a confirmed figure.
+    await db().update(schema.planActions).set({ request: HIRING_INPUTS[2]!.request, status: "not_started" }).where(eq(schema.planActions.id, actionId));
+    expect(await answerPlanInput(founder, co, actionId, { values: { acv: "42000", acv_by_segment: "" } })).toEqual({ ok: true });
+    const [acv] = await db().select().from(schema.dataPoints).where(and(eq(schema.dataPoints.metric, "acv"), eq(schema.dataPoints.origin, "manual")));
+    expect(acv).toMatchObject({ companyId: co.id, value: 42000, status: "accepted", origin: "manual" });
     await updatePlanAction(founder, co, actionId, "in_progress", "Calls booked");
 
     // Who does each action: Founder by default; Growth Goaled can be chosen until the plan goes to the advisor.
@@ -239,5 +253,21 @@ describe("monthly reminder", () => {
     expect(validUnsubscribe(founder.id, "0".repeat(32))).toBe(false);
     await db().insert(schema.events).values({ name: "monthly_reminder_unsubscribed", userId: founder.id });
     expect(await dueReminders(new Date(now + 62 * DAY))).toEqual([]);
+  });
+
+  it("a Growth Hiring Plan asks for exactly the six inputs, then the model's Growth Goaled tasks", () => {
+    const item = (priority: number, audience: "founder" | "growth_goaled") => ({ priority, action: `A${priority}`, rationale: "", timing: "next_30_days" as const, role: null, successMetric: "", metricKey: null, expectedSignal: "", dependenciesRisks: "", dimension: null, audience, request: null, claimKey: `action.${priority}` });
+    const items = planItems("hire_or_fix", [item(1, "founder"), item(2, "growth_goaled"), item(3, "growth_goaled")]);
+    expect(items.map((i) => [i.priority, i.audience, i.action.slice(0, 21)])).toEqual([
+      [1, "founder", "Enter your conversion"],
+      [2, "founder", "Enter your average de"],
+      [3, "founder", "Enter your average an"],
+      [4, "founder", "Confirm how long a ne"],
+      [5, "founder", "Enter your gross reve"],
+      [6, "founder", "Enter your revenue ta"],
+      [7, "growth_goaled", "A2"],
+      [8, "growth_goaled", "A3"],
+    ]);
+    expect(planItems("growth_leak", [item(1, "founder")])).toHaveLength(1);
   });
 });

@@ -1,6 +1,7 @@
 import "server-only";
+import { figureFromField, HIRING_INPUTS } from "@/lib/hiring-plan";
 import { checkAnswer, type DataRequest, type RequestAnswer } from "@/lib/plan-requests";
-import { and, desc, eq, gt, inArray, ne } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, ne } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { Company, User } from "@/lib/db/schema";
 import { parseBrief } from "@/lib/deliverables/assessment";
@@ -22,6 +23,21 @@ export const PLAN_STATUSES = schema.planActionStatus.enumValues;
 
 export type PlanResult = { ok: true } | { ok: false; error: string };
 
+type BriefAction = NonNullable<ReturnType<typeof parseBrief>>["plan"][number];
+
+/**
+ * The items a brief's plan becomes. A Growth Hiring Plan asks for exactly the six hiring inputs
+ * (lib/hiring-plan), then the model's Growth Goaled tasks; other plans keep the model's items.
+ */
+export function planItems(useCase: UseCaseId, plan: BriefAction[]): BriefAction[] {
+  if (useCase !== "hire_or_fix") return plan;
+  const tasks = plan.filter((a) => a.audience === "growth_goaled");
+  return [
+    ...HIRING_INPUTS.map((i, n) => ({ priority: n + 1, action: i.action, rationale: i.measure, timing: i.timing, role: null, successMetric: i.title, metricKey: null, expectedSignal: "", dependenciesRisks: "", dimension: null, audience: "founder" as const, request: i.request, claimKey: `hiring.${i.id}` })),
+    ...tasks.map((a, n) => ({ ...a, priority: HIRING_INPUTS.length + n + 1 })),
+  ];
+}
+
 /** Saves the brief's plan as tracked actions and opens Progress. Committing the same brief twice is a no-op. */
 export async function commitPlan(user: User, company: Company, deliverableId: string): Promise<PlanResult> {
   const [d] = await db
@@ -38,7 +54,7 @@ export async function commitPlan(user: User, company: Company, deliverableId: st
   await db
     .insert(schema.planActions)
     .values(
-      brief.plan.map((a) => {
+      planItems(d.useCase as UseCaseId, brief.plan).map((a) => {
         const b = a.metricKey ? base.get(a.metricKey) : undefined;
         return {
           companyId: company.id,
@@ -117,6 +133,8 @@ export type MetricProgress = {
 
 export type ProgressView = {
   deliverableId: string;
+  /** When an advisor approved the plan (null: waiting for review; the founder sees only their inputs). */
+  planApprovedAt: string | null;
   version: number;
   committedAt: string;
   revisitBy: string;
@@ -214,6 +232,7 @@ export async function progressView(company: Pick<Company, "id">, useCase: UseCas
   const revisitBy = new Date(committedAt.getTime() + brief.followUp.revisitInDays * 86_400_000);
   return {
     deliverableId: d.id,
+    planApprovedAt: d.planApprovedAt?.toISOString() ?? null,
     version: d.version,
     committedAt: committedAt.toISOString(),
     revisitBy: revisitBy.toISOString(),
@@ -293,6 +312,36 @@ export async function answerPlanInput(user: Pick<User, "id">, company: Pick<Comp
     stored = { values: checked.values, at: new Date().toISOString(), by: user.id };
   } else stored = { values: {}, documentId: answer.documentId, filename: answer.filename.slice(0, 255), at: new Date().toISOString(), by: user.id };
   await db.update(schema.planActions).set({ request: { ...a.request, answer: stored }, status: "done", updatedBy: user.id, updatedAt: new Date() }).where(eq(schema.planActions.id, a.id));
+  // Typed figures that are company metrics (ACV, ramp, churn) are stored as confirmed figures, so the
+  // newest confirmed value per figure is what the rest of the app (and the next plan) uses.
+  const figures = Object.entries(stored.values).flatMap(([k, v]) => {
+    const fig = a.request!.fields.some((x) => x.key === k && x.metric) ? figureFromField(k, v) : null;
+    return fig ? [fig] : [];
+  });
+  if (figures.length) {
+    const period = new Date().toISOString().slice(0, 7);
+    await db.insert(schema.dataPoints).values(figures.map((x) => ({ companyId: company.id, metric: x.metric, value: x.value, unit: x.unit, period, origin: "manual" as const, confidence: "high" as const, status: "accepted" as const, acceptedBy: user.id, rawText: `${a.action} (answered on the action plan)`.slice(0, 500) })));
+  }
   await track("plan_input_answered", { userId: user.id, companyId: company.id, props: { via: "values" in answer ? "typed" : "file", plan: "growth_project" } });
   return { ok: true };
+}
+
+/** An advisor approves the plan from a brief: it goes live for the founder. Only for a company they can see (checked by the caller). */
+export async function approveGrowthPlan(advisor: Pick<User, "id">, companyId: string, deliverableId: string): Promise<PlanResult> {
+  const [has] = await db.select({ id: schema.planActions.id }).from(schema.planActions).where(and(eq(schema.planActions.deliverableId, deliverableId), eq(schema.planActions.companyId, companyId))).limit(1);
+  if (!has) return { ok: false, error: "That plan wasn't found." };
+  await db.update(schema.deliverables).set({ planApprovedAt: new Date(), planApprovedBy: advisor.id }).where(and(eq(schema.deliverables.id, deliverableId), eq(schema.deliverables.companyId, companyId), isNull(schema.deliverables.planApprovedAt)));
+  await track("review_decision", { userId: advisor.id, companyId, props: { kind: "growth_plan", decision: "approved" } });
+  return { ok: true };
+}
+
+/** Growth project plans waiting for an advisor, for the Review Queue (companies the advisor can see). */
+export async function plansAwaitingApproval(companyIds: string[]) {
+  if (!companyIds.length) return [];
+  return db
+    .selectDistinct({ deliverableId: schema.deliverables.id, companyId: schema.deliverables.companyId, companyName: schema.companies.name, useCase: schema.deliverables.useCase, version: schema.deliverables.version, at: schema.deliverables.updatedAt })
+    .from(schema.deliverables)
+    .innerJoin(schema.planActions, eq(schema.planActions.deliverableId, schema.deliverables.id))
+    .innerJoin(schema.companies, eq(schema.companies.id, schema.deliverables.companyId))
+    .where(and(inArray(schema.deliverables.companyId, companyIds), isNull(schema.deliverables.planApprovedAt)));
 }
