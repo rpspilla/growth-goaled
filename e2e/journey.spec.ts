@@ -389,7 +389,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await admin.page.getByLabel("Note for the founder").fill("Checked against your profile.");
   await admin.page.getByRole("button", { name: "Mark reviewed" }).click();
   await expect(admin.page.getByText("Reviewed", { exact: true })).toBeVisible();
-  await mirrored.getByRole("link", { name: "Growth questions" }).click();
+  await mirrored.getByRole("link", { name: "Growth Projects" }).click();
   // Pilot: grant an assessment without payment, recorded with a note.
   await admin.page.locator("section", { hasText: "Repeatable Sales Motion" }).getByPlaceholder("Why (e.g. pilot customer)").fill("E2E pilot");
   await admin.page.locator("section", { hasText: "Repeatable Sales Motion" }).getByRole("button", { name: "Grant without payment" }).click();
