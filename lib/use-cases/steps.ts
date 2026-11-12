@@ -35,12 +35,12 @@ export const journeyStage = (active: ActiveUseCase) => (active ? Math.max(1, STA
  * first session goes straight from question to data to answer); the advisor's company view keeps
  * Overview as its first step.
  */
-export function stepStates(active: ActiveUseCase, { overview = true }: { overview?: boolean } = {}): StepState[] {
+export function stepStates(active: ActiveUseCase, { overview = true, library = true }: { overview?: boolean; library?: boolean } = {}): StepState[] {
   const stage = journeyStage(active);
   const currentKey: StepKey = ["library", "data", "baseline", "progress"][stage] as StepKey;
-  return STEPS.filter((s) => overview || s.key !== "overview").map((s, i) => {
+  return STEPS.filter((s) => (overview || s.key !== "overview") && (library || s.key !== "library")).map((s, i) => {
     let lockedReason: string | null = null;
-    if ((s.key === "data" || s.key === "baseline") && !active) lockedReason = "Unlocks when you buy an assessment";
+    if ((s.key === "data" || s.key === "baseline") && !active) lockedReason = "Unlocks when you start a growth project";
     if (s.key === "progress" && stage < 3) lockedReason = active ? "Unlocks when your results are ready" : "Unlocks with your first results";
     const doneAt: Partial<Record<StepKey, number>> = { library: 1, data: 2, baseline: 3 };
     return {

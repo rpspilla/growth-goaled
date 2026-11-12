@@ -262,7 +262,7 @@ describe("founder steps", () => {
     const none = stepStates(null);
     expect(none.map((s) => s.label)).toEqual(["Overview", "Growth questions", "Data", "Results", "Action plan"]);
     expect(none.filter((s) => s.locked).map((s) => s.key)).toEqual(["data", "baseline", "progress"]);
-    expect(none.find((s) => s.key === "data")!.lockedReason).toBe("Unlocks when you buy an assessment");
+    expect(none.find((s) => s.key === "data")!.lockedReason).toBe("Unlocks when you start a growth project");
     expect(none.find((s) => s.key === "baseline")!.label).toBe("Results");
     expect(none.find((s) => s.current)!.key).toBe("library");
 

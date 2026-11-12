@@ -25,7 +25,7 @@ export default async function FounderLayout({ children }: { children: ReactNode 
       sidebar={
         <UseCaseSidebar
           // The step-by-step assessment journey is only for founders who bought the retired $149 assessment.
-          steps={legacy ? stepStates(active && { useCase: active.def.id, status: active.status }, { overview: false }) : []}
+          steps={legacy ? stepStates(active && { useCase: active.def.id, status: active.status }, { overview: false, library: false }) : []}
           options={options}
           activeUseCase={active?.useCase ?? null}
           select={selectUseCase}

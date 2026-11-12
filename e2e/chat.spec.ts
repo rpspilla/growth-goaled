@@ -26,6 +26,10 @@ test("a founder talks a decision through and gets a recommendation card", async 
   await page.goto("/chat");
   await expect(page.getByRole("heading", { name: "Strategic Growth Questions", level: 1 })).toBeVisible();
   await expect(page.getByRole("heading", { name: "What strategic growth question is next?" })).toBeVisible();
+  // Growth projects are started from here too, and past questions sit in History.
+  await expect(page.getByRole("heading", { name: "Start a growth project" })).toBeVisible();
+  await expect(page.getByRole("article", { name: "Revenue conversion sprint" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
   for (const s of ["How do I build a repeatable revenue engine?", "Who should my first GTM hire be?", "How much equity should I give my first sales hire?", "Are we ready to raise our next round?", "How can we improve retention and revenue efficiency?", "Something else."]) {
     await expect(page.getByRole("button", { name: s })).toBeVisible();
   }
@@ -145,6 +149,8 @@ test("a founder talks a decision through and gets a recommendation card", async 
   await expect(conversation).toContainText("talk this through with someone at Growth Goaled");
   await page.goto("/overview");
   await expect(page.getByText(/Recent strategic growth questions/)).toBeVisible();
+  await page.goto("/chat");
+  await expect(page.getByRole("list", { name: "Questions asked" })).toContainText("Should we raise prices before hiring?");
   await ctx.close();
 
   // Another founder can't open it.

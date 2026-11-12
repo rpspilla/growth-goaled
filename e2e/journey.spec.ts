@@ -190,6 +190,8 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   await expect(founder.page).toHaveURL(/\/data\?checkout=success/);
   await expect(founder.page.getByRole("heading", { name: "Data for Fix Churn" })).toBeVisible();
   await expect(steps.getByRole("link", { name: /Data/ })).toBeVisible();
+  // Only what's active: Data, Results and Action plan (growth questions live under Strategic Growth Questions).
+  await expect(steps.getByRole("link", { name: /Growth questions/ })).toHaveCount(0);
   {
     const db = new Client({ connectionString: E2E_DATABASE_URL });
     await db.connect();
