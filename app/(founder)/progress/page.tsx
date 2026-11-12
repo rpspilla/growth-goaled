@@ -24,7 +24,7 @@ export default async function ProgressPage() {
   if (!view) {
     return (
       <div className="px-4 sm:px-8 py-8 max-w-4xl">
-        <PageHeader eyebrow={active.def.shortTitle} title="Action plan" subtitle="Track the actions from your assessment, and see your figures move against your baseline." />
+        <PageHeader eyebrow={active.def.shortTitle} title="Action plan" subtitle="Track the actions from your growth project, and see your figures move against your baseline." />
         <EmptyState
           title="No plan to track yet"
           body="Tracking starts when you commit to the plan in your results. Each action then gets a status, a note and its metric against your baseline."

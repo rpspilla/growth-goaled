@@ -12,16 +12,16 @@ const date = (d: Date | null) => (d ? d.toLocaleDateString("en-US", { month: "sh
 /** Every assessment the founder's company has started or bought. Only their own company's records. */
 export default async function AssessmentsPage() {
   const { company, useCases } = await founderContext();
-  if (!company) return <div className="px-4 sm:px-8 py-8"><PageHeader title="Your assessments" subtitle="Your company isn't set up yet." /></div>;
+  if (!company) return <div className="px-4 sm:px-8 py-8"><PageHeader title="Your growth projects" subtitle="Your company isn't set up yet." /></div>;
   const [payments, completed] = await Promise.all([listPayments(company.id), assessmentCompletions(company.id)]);
   const entries = assessmentHistory(useCases, payments, completed, [], isUseCaseId);
 
   return (
     <div className="px-4 sm:px-8 py-8 max-w-5xl">
-      <PageHeader title="Your assessments" subtitle="Every question you've started, what you've bought, and where each one stands." />
+      <PageHeader title="Your growth projects" subtitle="Every question you've started, what you've bought, and where each one stands." />
       {entries.length === 0 ? (
         <EmptyState
-          title="No assessments yet"
+          title="No growth projects yet"
           body="Pick the growth question you most need answered. Your Snapshot and conversations are free; you only pay if you want an action plan."
           action={<Link href="/library" className="btn btn-primary">Pick a growth question →</Link>}
         />
@@ -30,7 +30,7 @@ export default async function AssessmentsPage() {
           <table className="w-full text-base min-w-[640px]">
             <thead>
               <tr className="text-left text-sm" style={{ color: "var(--muted-foreground)", background: "var(--muted)" }}>
-                {["Assessment", "Purchase", "Status", "Started", "Completed", ""].map((h) => <th key={h} className="px-4 py-2.5 font-semibold">{h}</th>)}
+                {["Growth project", "Purchase", "Status", "Started", "Completed", ""].map((h) => <th key={h} className="px-4 py-2.5 font-semibold">{h}</th>)}
               </tr>
             </thead>
             <tbody>

@@ -1,6 +1,8 @@
 "use client";
 
 // Client component: NavLink takes a render function, which cannot cross the server/client boundary.
+import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { NavLink } from "./NavLink";
 import type { StepState } from "@/lib/use-cases/steps";
 
@@ -22,6 +24,7 @@ export function UseCaseSidebar({
   libraryHint,
   extra = [],
   extraLabel = "Company",
+  extraCollapsible = false,
 }: {
   steps: StepState[];
   basePath?: string;
@@ -32,7 +35,10 @@ export function UseCaseSidebar({
   extra?: ExtraLink[];
   /** Heading over the always-available links. */
   extraLabel?: string;
+  /** The heading opens and closes the links under it (open to start). */
+  extraCollapsible?: boolean;
 }) {
+  const [open, setOpen] = useState(true);
   const hrefFor = (path: string) => (basePath ? (path === "/overview" ? basePath : `${basePath}${path}`) : path);
 
   const journey = steps.length > 0;
@@ -130,8 +136,22 @@ export function UseCaseSidebar({
         )}
         {extra.length > 0 && (
           <>
-            <div className={`px-3 ${journey ? "pt-6" : ""} pb-2 text-[11px] font-semibold uppercase tracking-wider`} style={{ color: "#8FA3B8" }}>{extraLabel}</div>
-            <div className="space-y-0.5">
+            {extraCollapsible ? (
+              <button
+                type="button"
+                aria-expanded={open}
+                aria-controls="sidebar-company"
+                onClick={() => setOpen((o) => !o)}
+                className={`w-full flex items-center justify-between px-3 ${journey ? "mt-6" : ""} py-2 rounded-lg text-sm font-semibold hover:bg-white/5`}
+                style={{ color: "#fff" }}
+              >
+                {extraLabel}
+                <ChevronDown size={16} aria-hidden className="transition-transform" style={{ transform: open ? "rotate(0deg)" : "rotate(-90deg)", color: "#8FA3B8" }} />
+              </button>
+            ) : (
+              <div className={`px-3 ${journey ? "pt-6" : ""} pb-2 text-[11px] font-semibold uppercase tracking-wider`} style={{ color: "#8FA3B8" }}>{extraLabel}</div>
+            )}
+            <div id="sidebar-company" className={`space-y-0.5 ${extraCollapsible ? "pl-2" : ""}`} hidden={extraCollapsible && !open}>
               {extra.map((l) => (
                 <NavLink key={l.href} href={l.href}>
                   {(active) => <span className={`font-medium ${journey ? "pl-8" : ""}`} style={{ color: active ? "#fff" : undefined }}>{l.label}</span>}

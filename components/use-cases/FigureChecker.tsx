@@ -149,12 +149,12 @@ export function FigureChecker({
             : "all confirmed"}
         </span>
       </summary>
-      <p className="text-xs mt-2 mb-1" style={{ color: "var(--muted-foreground)" }} title="These are the figures this assessment uses. Where your company profile and your files disagree, choose the right one; add any that are missing. Your choice updates your profile too.">
+      <p className="text-xs mt-2 mb-1" style={{ color: "var(--muted-foreground)" }} title="These are the figures this growth project uses. Where your company profile and your files disagree, choose the right one; add any that are missing. Your choice updates your profile too.">
         Pick the right value where sources disagree. Updates your profile too.
       </p>
       {changed && (
         <div className="rounded-lg p-3 my-2 text-sm flex items-center gap-3 flex-wrap" role="status" style={{ background: "var(--green-muted)", color: "var(--foreground)" }}>
-          <span className="flex-1">Figures updated. Re-run the assessment to use them.</span>
+          <span className="flex-1">Figures updated. Re-run the growth project to use them.</span>
           {rerun}
         </div>
       )}

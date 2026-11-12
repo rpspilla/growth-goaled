@@ -35,7 +35,7 @@ const KIND = {
 const CHECKOUT_MESSAGE: Record<string, { text: string; color: string }> = {
   cancelled: { text: "Payment cancelled. Nothing was charged, and your answers are saved.", color: "var(--muted-foreground)" },
   failed: { text: "The payment didn't go through, so nothing was charged. You can try again.", color: "var(--red)" },
-  pending: { text: "We're waiting for Stripe to confirm your payment. Refresh in a moment; your assessment opens as soon as it's confirmed.", color: "var(--amber)" },
+  pending: { text: "We're waiting for Stripe to confirm your payment. Refresh in a moment; your growth project opens as soon as it's confirmed.", color: "var(--amber)" },
 };
 
 /** Short tile labels for the founder's own answers on the Snapshot (exact or a range). */
@@ -258,7 +258,7 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
             <ActionPlanNext topicId={planTopic} planPrice={formatPrice(pricing().actionPlanCents)} supportedPrice={formatPrice(pricing().supportedMonthlyCents)} start={startTopicAction} />
           </aside>
         ) : (
-          <aside className="surface p-5 lg:sticky lg:top-6 space-y-3" style={{ borderColor: "var(--green)", borderWidth: 2 }} aria-label="Full assessment">
+          <aside className="surface p-5 lg:sticky lg:top-6 space-y-3" style={{ borderColor: "var(--green)", borderWidth: 2 }} aria-label="Full growth project">
             <div className="label" style={{ color: "var(--green)" }}>
               Next: the full assessment
             </div>
@@ -283,18 +283,18 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
             </ul>
             {row?.activatedAt ? (
               <Link href="/data" className="btn btn-primary btn-lg w-full">
-                You have this assessment · continue →
+                You have this growth project · continue →
               </Link>
             ) : sellable ? (
               <>
-                <PurchaseButton useCaseId={def.id} label={`Get the full assessment · ${price}`} checkout={startAssessmentCheckout} />
+                <PurchaseButton useCaseId={def.id} label={`Start the growth project · ${price}`} checkout={startAssessmentCheckout} />
                 <p data-label className="text-xs text-center" style={{ color: "var(--muted-foreground)" }}>
                   One-time · Stripe · no subscription
                 </p>
               </>
             ) : (
               <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-                {sellableUseCases().includes(def.id) ? "Payments aren't set up in this environment yet." : "The full assessment for this question is launching soon. Your answers are saved, so you'll be ready when it does."}
+                {sellableUseCases().includes(def.id) ? "Payments aren't set up in this environment yet." : "The full growth project for this question is launching soon. Your answers are saved, so you'll be ready when it does."}
               </p>
             )}
             <ExpandableDetail summary="Everything it includes">
@@ -304,7 +304,7 @@ export default async function SnapshotPage({ params, searchParams }: { params: P
                   <li key={g}>• {g}</li>
                 ))}
               </ul>
-              <p>Your assessment opens as soon as Stripe confirms the payment.</p>
+              <p>Your growth project opens as soon as Stripe confirms the payment.</p>
             </ExpandableDetail>
           </aside>
         )}

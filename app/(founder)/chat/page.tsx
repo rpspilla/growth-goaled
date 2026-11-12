@@ -11,17 +11,17 @@ import { removeFactAction, startChatAction, updateFactAction } from "./actions";
 
 export const maxDuration = 300;
 
-/** Strategic Decisions: past ones, the next one, and the history Growth Goaled keeps about the company. */
+/** Strategic Growth Questions: past ones, the next one, and the history Growth Goaled keeps about the company. */
 export default async function ChatIndexPage() {
   const { company } = await founderContext();
   if (!company) redirect("/welcome");
   const [conversations, facts] = await Promise.all([listConversations(company, 50), listFacts(company)]);
   return (
     <div className="px-4 sm:px-8 py-8 max-w-5xl space-y-12">
-      <PageHeader title="Strategic Decisions" subtitle="Ask about any commercial decision. Answers use what you've already shared." />
+      <PageHeader title="Strategic Growth Questions" subtitle="Ask about any commercial decision. Answers use what you've already shared." />
 
       {conversations.length > 0 && (
-        <Section id="recent" title="Strategic Decisions">
+        <Section id="recent" title="Strategic Growth Questions">
           <ul className="surface divide-y" style={{ borderColor: "var(--border)" }}>
             {conversations.map((c) => (
               <li key={c.id} style={{ borderColor: "var(--border)" }}>
@@ -36,7 +36,7 @@ export default async function ChatIndexPage() {
         </Section>
       )}
 
-      <Section id="new" title="What strategic decision is next?">
+      <Section id="new" title="What strategic growth question is next?">
         <ChatStart starters={CHAT_TOPICS.map((t) => ({ id: t.id, starter: t.starter }))} start={startChatAction} heading={false} />
       </Section>
 

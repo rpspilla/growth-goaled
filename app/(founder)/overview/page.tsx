@@ -48,7 +48,7 @@ const TIMING: Record<string, string> = { next_30_days: "Days 1–30", days_31_60
 /** What a founder sees at each stage before results exist: one sentence and one button. */
 const STAGE_COPY = [
   { title: "Want an answer built from your own data?", body: "Pick a growth question for a free Growth Snapshot from one file, then build an action plan in the conversation when you're ready." },
-  { title: "Share your data to get your answer", body: "Your assessment is ready for your data. Share what you have; it works with whatever you've got and says what's missing." },
+  { title: "Share your data to get your answer", body: "Your growth project is ready for your data. Share what you have; it works with whatever you've got and says what's missing." },
   { title: "Your results are being built", body: "We're working through your answers and figures and checking every number. This usually takes a few minutes." },
   { title: "Keep your plan moving", body: "Track your actions and the metrics they should move." },
 ];
@@ -181,11 +181,11 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
           <HumanPresence />
           {conversations.length > 0 && (
             <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-base">
-              <span style={{ color: "var(--muted-foreground)" }}>Recent strategic decisions:</span>
+              <span style={{ color: "var(--muted-foreground)" }}>Recent strategic growth questions:</span>
               {conversations.map((c) => (
                 <Link key={c.id} href={`/chat/${c.id}`} className="link">{c.title}</Link>
               ))}
-              <Link href="/chat" className="link text-sm">All strategic decisions →</Link>
+              <Link href="/chat" className="link text-sm">All Strategic Growth Questions →</Link>
             </div>
           )}
         </div>

@@ -74,8 +74,8 @@ export default async function CompanyResultsPage({ params }: { params: Promise<{
             </Link>
           </div>
         )}
-        {!active && <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>No purchased assessment yet.</p>}
-        {active && !d && <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>The founder hasn&apos;t run this assessment yet.</p>}
+        {!active && <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>No growth project yet.</p>}
+        {active && !d && <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>The founder hasn&apos;t run this growth project yet.</p>}
         {d && (
           <div className="rounded-xl border p-5 space-y-3" style={{ ...card, borderStyle: "dashed" }} aria-label="Review and checks (advisor only)">
             <div className="label">Advisor only · not shown to the founder</div>

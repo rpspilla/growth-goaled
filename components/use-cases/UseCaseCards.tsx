@@ -56,7 +56,7 @@ export function UseCaseCards({
             </article>
           );
         }
-        const cta = state === "active" ? "Open your assessment" : state === "started" ? "Continue" : "Start with a free Snapshot";
+        const cta = state === "active" ? "Open your growth project" : state === "started" ? "Continue" : "Start with a free Snapshot";
         return (
           <article key={u.id} className="surface p-4 flex flex-col gap-3 relative hover:shadow-md transition-shadow">
             <div className="relative">
@@ -90,7 +90,7 @@ export function UseCaseCards({
               </Link>
               {price !== null && price !== undefined && (
                 <span data-label className="text-[11px] font-mono px-2 py-1 rounded" style={{ background: "var(--muted)", color: "var(--muted-foreground)" }}>
-                  {sellable?.includes(u.id) ? `Snapshot free · Assessment ${price}` : planFrom ? `Snapshot free · Action plan ${planFrom}` : "Snapshot free · Assessment soon"}
+                  {sellable?.includes(u.id) ? `Snapshot free · Growth project ${price}` : planFrom ? `Snapshot free · Action plan ${planFrom}` : "Snapshot free · Growth project soon"}
                 </span>
               )}
             </div>

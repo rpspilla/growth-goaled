@@ -110,7 +110,7 @@ export async function portfolioRows(companies: Company[], now = new Date()): Pro
     const engagement = plan
       ? { type: plan.tier === "supported" ? "Execute & Monitor" : "Diagnose", name: c.currentPlan?.trim() || plan.title }
       : latestLegacy
-        ? { type: "Assessment", name: c.currentPlan?.trim() || null }
+        ? { type: "Growth project", name: c.currentPlan?.trim() || null }
         : c.currentPlan?.trim()
           ? { type: "Advisory", name: c.currentPlan.trim() }
           : null;

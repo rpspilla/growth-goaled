@@ -52,7 +52,7 @@ export function BaselineMeter({
         </div>
         <div className="min-w-0 space-y-2">
           <p className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
-            {ready ? "Ready: everything the assessment needs is in." : `${done} of ${total} required items in`}
+            {ready ? "Ready: everything the growth project needs is in." : `${done} of ${total} required items in`}
           </p>
           {calls && (
             <div>

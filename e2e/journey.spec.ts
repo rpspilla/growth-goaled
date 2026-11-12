@@ -147,7 +147,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   // Before buying, there's no step-by-step journey: just the conversation-first menu.
   const steps = founder.page.getByRole("navigation", { name: "Steps" });
   await expect(steps).toHaveCount(0);
-  await expect(founder.page.getByRole("navigation", { name: "Menu" }).getByRole("link", { name: "Strategic Decisions" })).toBeVisible();
+  await expect(founder.page.getByRole("navigation", { name: "Menu" }).getByRole("link", { name: "Strategic Growth Questions" })).toBeVisible();
   await founder.page.goto("/library/series_b_ready/snapshot");
   await expect(founder.page).toHaveURL(/\/library\/series_b_ready$/);
   await expect(founder.page.getByRole("heading", { name: "Coming soon", exact: true })).toBeVisible();
@@ -186,7 +186,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
     await db.end();
   }
   await expect(steps.getByRole("link", { name: /Data/ })).toHaveCount(0);
-  await founder.page.getByRole("button", { name: "Get the full assessment · $149" }).click();
+  await founder.page.getByRole("button", { name: "Start the growth project · $149" }).click();
   await expect(founder.page).toHaveURL(/\/data\?checkout=success/);
   await expect(founder.page.getByRole("heading", { name: "Data for Fix Churn" })).toBeVisible();
   await expect(steps.getByRole("link", { name: /Data/ })).toBeVisible();
@@ -199,8 +199,8 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   }
   // Buying again is refused rather than charged twice.
   await founder.page.goto("/library/growth_leak/snapshot");
-  await expect(founder.page.getByRole("link", { name: /You have this assessment/ })).toBeVisible();
-  await expect(founder.page.getByRole("button", { name: /Get the full assessment/ })).toHaveCount(0);
+  await expect(founder.page.getByRole("link", { name: /You have this growth project/ })).toBeVisible();
+  await expect(founder.page.getByRole("button", { name: /Start the growth project/ })).toHaveCount(0);
   await founder.page.goto("/overview");
   await expect(founder.page.getByText("Sharing data", { exact: true })).toBeVisible();
 
@@ -244,7 +244,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   }
   await founder.page.reload();
   await expect(founder.page.getByText("In · ready to run")).toBeVisible();
-  await expect(founder.page.getByText("Ready: everything the assessment needs is in.")).toBeVisible();
+  await expect(founder.page.getByText("Ready: everything the growth project needs is in.")).toBeVisible();
   // Recorded sales calls are optional for the report (fewer flags the advisor to collect them); this founder shares three.
   await expect(founder.page.getByText("Recorded sales calls: 0 of 3.")).toBeVisible();
   {
@@ -351,7 +351,7 @@ test("founder: free snapshot, $149 assessment, results, optional advisory", asyn
   const figures = admin.page.locator("details", { hasText: "Check your figures" });
   await expect(figures).toContainText("Values disagree");
   await figures.getByRole("button", { name: "Use 101% from board-metrics.xlsx for NRR" }).click();
-  await expect(figures.getByText("Figures updated. Re-run the assessment to use them.")).toBeVisible();
+  await expect(figures.getByText("Figures updated. Re-run the growth project to use them.")).toBeVisible();
   const newArr = figures.locator("li", { hasText: "New ARR" }).first();
   await newArr.getByLabel(/New ARR/).fill("$500K");
   await newArr.getByRole("button", { name: "Save" }).click();

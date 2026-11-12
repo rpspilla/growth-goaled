@@ -27,7 +27,7 @@ export default async function AdvisoryPage({ searchParams }: { searchParams: Pro
       <div className="rounded-xl border p-5 sm:p-6 mb-6" style={card}>
         <div className="text-sm font-semibold mb-2" style={{ color: "var(--foreground)" }}>In the session we&apos;ll</div>
         <ul className="text-sm space-y-1 mb-4" style={{ color: "var(--muted-foreground)" }}>
-          <li>• Review and challenge the assessment findings</li>
+          <li>• Review and challenge the growth project findings</li>
           <li>• Prioritize the recommendations</li>
           <li>• Talk through the trade-offs and strategic decisions</li>
           <li>• Turn it into an execution plan for the next 90 days</li>

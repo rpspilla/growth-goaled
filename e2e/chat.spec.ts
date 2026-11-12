@@ -19,13 +19,13 @@ test("a founder talks a decision through and gets a recommendation card", async 
   const ctx = await browser.newContext();
   await ctx.addCookies([{ name: "gg_e2e_user", value: "chat@e2e.test", domain: "localhost", path: "/" }]);
   const page = await ctx.newPage();
-  // The Overview no longer lists the starters; Strategic Decisions does, in the owner's words.
+  // The Overview no longer lists the starters; Strategic Growth Questions does, in the owner's words.
   await page.goto("/overview");
   await expect(page.getByRole("button", { name: "How do I build a repeatable revenue engine?" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Start a new plan with your advisor here" })).toHaveAttribute("href", "/library");
   await page.goto("/chat");
-  await expect(page.getByRole("heading", { name: "Strategic Decisions", level: 1 })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "What strategic decision is next?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Strategic Growth Questions", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What strategic growth question is next?" })).toBeVisible();
   for (const s of ["How do I build a repeatable revenue engine?", "Who should my first GTM hire be?", "How much equity should I give my first sales hire?", "Are we ready to raise our next round?", "How can we improve retention and revenue efficiency?", "Something else."]) {
     await expect(page.getByRole("button", { name: s })).toBeVisible();
   }
@@ -129,7 +129,7 @@ test("a founder talks a decision through and gets a recommendation card", async 
   await page.getByLabel("What's on your mind?").fill("Should we raise prices before hiring?");
   await page.getByRole("button", { name: "Ask" }).click();
   await expect(page.getByRole("heading", { name: "Should we raise prices before hiring?" })).toBeVisible();
-  await expect(page.getByText(/Recent strategic decisions/)).toHaveCount(0);
+  await expect(page.getByText(/Recent strategic growth questions/)).toHaveCount(0);
   // The chat keeps going; from the sixth exchange it gently points at talking to Growth Goaled.
   const conversation = page.getByRole("list", { name: "Conversation" });
   for (let i = 2; i <= 6; i++) {
@@ -144,7 +144,7 @@ test("a founder talks a decision through and gets a recommendation card", async 
   await expect(nudge.getByText("See the plans")).toHaveCount(0);
   await expect(conversation).toContainText("talk this through with someone at Growth Goaled");
   await page.goto("/overview");
-  await expect(page.getByText(/Recent strategic decisions/)).toBeVisible();
+  await expect(page.getByText(/Recent strategic growth questions/)).toBeVisible();
   await ctx.close();
 
   // Another founder can't open it.

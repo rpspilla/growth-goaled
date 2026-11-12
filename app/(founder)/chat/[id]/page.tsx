@@ -93,7 +93,7 @@ export default async function ConversationPage({ params, searchParams }: { param
     <div className={`px-4 sm:px-8 py-8 ${lastCardId ? "max-w-5xl" : "max-w-3xl"}`}>
     <div className="space-y-6 min-w-0">
       <div>
-        <Link href="/chat" className="link text-sm">← All strategic decisions</Link>
+        <Link href="/chat" className="link text-sm">← All Strategic Growth Questions</Link>
         <h1 className="font-display text-3xl font-normal mt-2" style={fg}>{view.conversation.title}</h1>
         <div className="mt-3">
           <HumanPresence advisorName={advisor ? advisor.name || advisor.email : null} />

@@ -62,7 +62,7 @@ export default async function ReviewQueuePage() {
                   {c.companyName}
                 </div>
                 <div className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-                  {getUseCase(c.useCase)?.question ?? "Assessment"}
+                  {getUseCase(c.useCase)?.question ?? "Growth project"}
                 </div>
               </div>
               <span className="text-sm font-semibold font-mono" style={{ color: "#92400E" }}>

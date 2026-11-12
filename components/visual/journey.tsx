@@ -8,7 +8,7 @@ import { dataItemIcon, dataItemShort } from "./icons";
 
 const STEPS: { label: string; icon: LucideIcon; note: (price: string | null) => string }[] = [
   { label: "Snapshot", icon: Sparkles, note: () => "Free" },
-  { label: "Data", icon: Database, note: (p) => p ?? "Assessment" },
+  { label: "Data", icon: Database, note: (p) => p ?? "Growth project" },
   { label: "Results", icon: BarChart3, note: () => "Minutes" },
   { label: "Action plan", icon: ClipboardCheck, note: () => "Track it" },
 ];

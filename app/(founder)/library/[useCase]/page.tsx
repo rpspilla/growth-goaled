@@ -108,7 +108,7 @@ export default async function UseCasePage({ params }: { params: Promise<{ useCas
         <div className="surface p-4 mb-6 flex items-center gap-3 flex-wrap" style={{ borderColor: "var(--green)" }}>
           <CheckCircle2 size={20} style={{ color: "var(--green)" }} aria-hidden />
           <span className="flex-1 text-base font-semibold" style={{ color: "var(--foreground)" }}>
-            You have this assessment.
+            You have this growth project.
           </span>
           <Link href="/data" className="btn btn-primary">
             Continue your assessment →
@@ -159,7 +159,7 @@ export default async function UseCasePage({ params }: { params: Promise<{ useCas
             </h2>
             <ResultsPreview id={def.id} />
             <div className="mt-3">
-              <ExpandableDetail summary="Everything in the full assessment">
+              <ExpandableDetail summary="Everything in the full growth project">
                 <p>
                   <span className="font-semibold" style={{ color: "var(--foreground)" }}>You&apos;ll decide: </span>
                   {def.decision}
@@ -196,7 +196,7 @@ export default async function UseCasePage({ params }: { params: Promise<{ useCas
             </div>
             <div className="flex items-center justify-between text-sm mt-1.5">
               <span className="font-semibold" style={{ color: "var(--foreground)" }}>
-                {planFrom ? "Action plan" : "Full assessment"}
+                {planFrom ? "Action plan" : "Full growth project"}
               </span>
               <span className="font-mono font-semibold" style={{ color: "var(--foreground)" }}>
                 {sellable ? price : (planFrom ?? "Soon")}
@@ -209,7 +209,7 @@ export default async function UseCasePage({ params }: { params: Promise<{ useCas
                     ? "One-time, for this question. Built from your answers and data; no meeting needed. You decide after seeing the Snapshot."
                     : planFrom
                       ? `Talk it through for free, then build a 30/60/90-day action plan in the conversation: ${formatPrice(pricing().actionPlanCents)} once (advisor-approved, about 24 hours) or ${formatPrice(pricing().supportedMonthlyCents)} a month with a CRO-level advisor.`
-                      : "The free Snapshot is available now; the full assessment for this question is launching soon."}
+                      : "The free Snapshot is available now; the full growth project for this question is launching soon."}
                 </p>
                 {(sellable || !planFrom) && <HowItWorks price={price} sellable={sellable} />}
               </ExpandableDetail>

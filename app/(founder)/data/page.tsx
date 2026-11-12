@@ -34,7 +34,7 @@ export default async function DataPage() {
         { title: "Optional extras", caption: "If you have them to hand", keys: notKey(useCase.optionalItems), required: false },
       ].filter((g) => g.keys.length)
     : [
-        { title: "Needed for the assessment", caption: "Required", keys: useCase.requiredItems, required: true },
+        { title: "Needed for the growth project", caption: "Required", keys: useCase.requiredItems, required: true },
         { title: "Sharpens it", caption: "Optional · makes the answer more precise", keys: useCase.helpfulItems, required: false },
         { title: "Optional extras", caption: "If you have them to hand", keys: useCase.optionalItems, required: false },
       ].filter((g) => g.keys.length);

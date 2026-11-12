@@ -30,14 +30,15 @@ export default async function FounderLayout({ children }: { children: ReactNode 
           activeUseCase={active?.useCase ?? null}
           select={selectUseCase}
           libraryHint="Pick a growth question"
-          extraLabel={legacy ? "Company" : "Your growth"}
+          extraLabel="Company profile"
+          extraCollapsible
           extra={[
-            { href: "/profile", label: "Company profile" },
+            { href: "/profile", label: "Company details" },
             { href: "/team", label: "Team" },
             { href: "/overview", label: "Overview" },
-            { href: "/chat", label: "Strategic Decisions" },
+            { href: "/chat", label: "Strategic Growth Questions" },
             { href: "/performance", label: "Performance" },
-            ...(legacy ? [{ href: "/assessments", label: "All assessments" }] : []),
+            ...(legacy ? [{ href: "/assessments", label: "Growth projects" }] : []),
             { href: "/documents", label: "Documents" },
           ]}
         />
