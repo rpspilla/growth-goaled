@@ -239,6 +239,13 @@
       "when": 1794509909360,
       "tag": "0033_plan_approval",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1794519540325,
+      "tag": "0034_fasten_hiring_plan",
+      "breakpoints": true
     }
   ]
 }
