@@ -94,3 +94,12 @@ export function answerLine(request: DataRequest): string {
     })
     .join(" · ");
 }
+
+/**
+ * Pure: a founder input for a list of data items when no model wrote one (the rule-based plan and
+ * test mode): one field per item, and a file with a column per item.
+ */
+export function inputsFor(items: string[]): { fields: { label: string; kind: FieldKind; hint: string | null }[]; columns: string[] } {
+  const named = items.map((i) => i.trim()).filter(Boolean).slice(0, 6);
+  return { fields: named.map((label) => ({ label, kind: "text" as const, hint: "A figure, or a short summary" })), columns: named };
+}

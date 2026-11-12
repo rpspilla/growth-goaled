@@ -15,7 +15,7 @@ import { schema } from "@/lib/db";
 import type { Company, User } from "@/lib/db/schema";
 import type { AssessmentInput, AssessmentOutput } from "@/lib/ai/assessment";
 import { assembleAssessmentInputs, createAssessmentVersion, founderAssessment, runAssessmentPipeline } from "@/lib/data/assessments";
-import { commitPlan, progressView, sendPlanAssignments, setPlanActionAssignee, updatePlanAction } from "@/lib/data/plan";
+import { answerPlanInput, commitPlan, progressView, sendPlanAssignments, setPlanActionAssignee, updatePlanAction } from "@/lib/data/plan";
 import { dueReminders, sendMonthlyReminders, unsubscribeToken, validUnsubscribe } from "@/lib/data/reminders";
 import { activateUseCase, getCompanyUseCase } from "@/lib/data/use-cases";
 import { analyzeSheets } from "@/lib/metrics-engine";
@@ -84,7 +84,7 @@ const draft = async (i: AssessmentInput) => {
     evidence: [{ text: "Churn and contraction were $10.8K of ARR.", status: "calculated", bearing: "supports", dimension: null, sources: ["analysis:0"] }],
     alternatives: [{ option: "Fix retention", upside: "Stops the leak.", downside: "Slower new growth.", implications: "Focus CS.", sources: [nrr.id] }],
     recommendation: { option: "Fix retention", why: "It's the larger loss.", sources: [nrr.id] },
-    action_plan: [{ priority: 1, action: "Interview churned customers.", rationale: "Find the cause.", timing: "next_30_days", role: null, success_metric: "NRR", metric_key: "nrr", expected_signal: "NRR rising.", dependencies_risks: "Access to churned accounts.", dimension: null, sources: [nrr.id] }],
+    action_plan: [{ priority: 1, action: "Interview churned customers.", rationale: "Find the cause.", timing: "next_30_days", role: null, success_metric: "NRR", metric_key: "nrr", expected_signal: "NRR rising.", dependencies_risks: "Access to churned accounts.", dimension: null, audience: "founder", fields: [{ label: "Churned customers last 12 months", kind: "number", hint: null }], columns: ["Customer", "Churn date"], sources: [nrr.id] }],
     change_triggers: [{ if_this: "Churn turns out to be one-off", then_this: "Shift to acquisition." }],
     follow_up: { metrics: [{ metric_key: "nrr", label: "NRR", why: "The constraint." }], revisit_in_days: 30, revisit_trigger: "A large account gives notice." },
     assumptions: [],
@@ -152,6 +152,14 @@ describe("decision briefs from calculated evidence", () => {
     expect(await updatePlanAction(founder, co, actionId, "in_progress", "Calls booked")).toEqual({ ok: true });
     expect((await progressView(co, "growth_leak"))!.actions[0]).toMatchObject({ status: "in_progress", note: "Calls booked" });
     expect(await commitPlan(founder, other, first.deliverableId)).toEqual({ ok: false, error: "That brief isn't available." });
+
+    // Founder items ask for data: the fields come through from the brief, and answering completes it.
+    expect(progress.actions[0]!.request).toMatchObject({ fields: [{ key: "churned_customers_last_12_months", label: "Churned customers last 12 months", kind: "number" }], columns: ["Customer", "Churn date"] });
+    expect(await answerPlanInput(founder, other, actionId, { values: { churned_customers_last_12_months: "4" } })).toEqual({ ok: false, error: "That item doesn't ask for data." });
+    expect(await answerPlanInput(founder, co, actionId, { values: { churned_customers_last_12_months: "four" } })).toEqual({ ok: false, error: "Churned customers last 12 months should be a number." });
+    expect(await answerPlanInput(founder, co, actionId, { values: { churned_customers_last_12_months: "4" } })).toEqual({ ok: true });
+    expect((await progressView(co, "growth_leak"))!.actions[0]).toMatchObject({ status: "done", request: { answer: { values: { churned_customers_last_12_months: "4" } } } });
+    await updatePlanAction(founder, co, actionId, "in_progress", "Calls booked");
 
     // Who does each action: Founder by default; Growth Goaled can be chosen until the plan goes to the advisor.
     expect((await progressView(co, "growth_leak"))!).toMatchObject({ assignmentSentAt: null, actions: [{ assignee: "founder" }] });

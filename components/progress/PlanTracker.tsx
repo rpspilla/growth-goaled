@@ -5,6 +5,8 @@ import { useState, useTransition } from "react";
 import { CheckCircle2, Circle, CircleDot, type LucideIcon } from "lucide-react";
 import { ExpandableDetail } from "@/components/visual/primitives";
 import type { ProgressView } from "@/lib/data/plan";
+import { answerLine } from "@/lib/plan-requests";
+import { RequestAnswer, type FileRef } from "@/components/chat/RequestAnswer";
 
 type Result = { ok: true } | { ok: false; error: string };
 type Action = ProgressView["actions"][number];
@@ -20,7 +22,10 @@ const COLUMNS: { status: Status; icon: LucideIcon; color: string }[] = [
 
 const WHO: Record<Action["assignee"], string> = { founder: "Founder", growth_goaled: "Growth Goaled" };
 
-function ActionCard({ a, update, assign }: { a: Action; update: (id: string, status: string, note: string | null) => Promise<Result>; assign?: (id: string, assignee: string) => Promise<Result> }) {
+/** The founder answers an input: typed values, or a file uploaded under `blobPrefix`. */
+type Answers = { blobPrefix: string; type: (id: string, values: Record<string, string>) => Promise<Result>; file: (id: string, file: FileRef) => Promise<Result> };
+
+function ActionCard({ a, update, answers }: { a: Action; update: (id: string, status: string, note: string | null) => Promise<Result>; answers?: Answers }) {
   const [note, setNote] = useState(a.note ?? "");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -46,7 +51,7 @@ function ActionCard({ a, update, assign }: { a: Action; update: (id: string, sta
             KPI · {m?.label ?? (a.successMetric!.length > 26 ? `${a.successMetric!.slice(0, 24)}…` : a.successMetric)}
           </span>
         )}
-        {!assign && (
+        {!answers && (
           <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={a.assignee === "growth_goaled" ? { background: "var(--green-muted)", color: "var(--green)" } : { background: "var(--blue-muted)", color: "var(--blue)" }}>
             {WHO[a.assignee]}
           </span>
@@ -64,29 +69,28 @@ function ActionCard({ a, update, assign }: { a: Action; update: (id: string, sta
           <span className="font-semibold" style={{ color: tone }}>{m.latest ?? "no new figure"}</span>
         </div>
       )}
-      {assign && (
-        <label className="block text-xs" style={{ color: "var(--muted-foreground)" }}>
-          Who does it
-          <select
-            aria-label={`Who does it: ${a.action}`}
-            value={a.assignee}
-            disabled={pending}
-            onChange={(e) =>
-              start(async () => {
-                setError(null);
-                const r = await assign(a.id, e.target.value);
-                if (r.ok) router.refresh();
-                else setError(r.error);
-              })
-            }
-            className="w-full mt-0.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold"
-            style={{ ...control, ...(a.assignee === "growth_goaled" ? { borderColor: "var(--green)", color: "var(--green)" } : {}) }}
-          >
-            <option value="founder">Founder</option>
-            <option value="growth_goaled">Growth Goaled</option>
-          </select>
-        </label>
-      )}
+      {a.request &&
+        (answers ? (
+          <RequestAnswer
+            action={a.action}
+            request={a.request}
+            blobPrefix={answers.blobPrefix}
+            answer={async (values) => {
+              const r = await answers.type(a.id, values);
+              router.refresh();
+              return r.ok ? r : { ok: false, error: r.error };
+            }}
+            answerFile={async (file) => {
+              const r = await answers.file(a.id, file);
+              router.refresh();
+              return r.ok ? r : { ok: false, error: r.error };
+            }}
+          />
+        ) : (
+          <p className="text-xs" style={{ color: a.request.answer ? "var(--green)" : "var(--muted-foreground)" }}>
+            {a.request.answer ? `Answered: ${answerLine(a.request)}` : `Asks for: ${a.request.fields.map((f) => f.label).join(" · ")}`}
+          </p>
+        ))}
       <div className="flex items-center gap-2">
         <label className="sr-only" htmlFor={`status-${a.id}`}>
           Status
@@ -141,7 +145,7 @@ function ActionCard({ a, update, assign }: { a: Action; update: (id: string, sta
 }
 
 /** The committed plan as a board: Not started / In progress / Done, with dropped actions behind a toggle. */
-export function PlanTracker({ actions, update, assign }: { actions: Action[]; update: (id: string, status: string, note: string | null) => Promise<Result>; /** Before the plan goes to the advisor: choose who does each action. */ assign?: (id: string, assignee: string) => Promise<Result> }) {
+export function PlanTracker({ actions, update, answers }: { actions: Action[]; update: (id: string, status: string, note: string | null) => Promise<Result>; /** Founder: answer each input (founder items only are passed in). */ answers?: Answers }) {
   const dropped = actions.filter((a) => a.status === "dropped");
   return (
     <div className="space-y-3">
@@ -163,7 +167,7 @@ export function PlanTracker({ actions, update, assign }: { actions: Action[]; up
               {here.length ? (
                 <ul className="space-y-2.5">
                   {here.map((a) => (
-                    <ActionCard key={a.id} a={a} update={update} assign={assign} />
+                    <ActionCard key={a.id} a={a} update={update} answers={answers} />
                   ))}
                 </ul>
               ) : (
@@ -179,7 +183,7 @@ export function PlanTracker({ actions, update, assign }: { actions: Action[]; up
         <ExpandableDetail summary={`Dropped · ${dropped.length}`}>
           <ul className="grid md:grid-cols-3 gap-3">
             {dropped.map((a) => (
-              <ActionCard key={a.id} a={a} update={update} assign={assign} />
+              <ActionCard key={a.id} a={a} update={update} answers={answers} />
             ))}
           </ul>
         </ExpandableDetail>

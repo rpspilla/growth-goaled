@@ -1,4 +1,5 @@
 import "server-only";
+import { normalizeRequest } from "@/lib/plan-requests";
 import { createHash } from "node:crypto";
 import { and, desc, eq, inArray, isNotNull, lt, max, ne, or } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
@@ -319,6 +320,8 @@ export function contentFromAssessment(
         expectedSignal: a.expected_signal,
         dependenciesRisks: a.dependencies_risks,
         dimension: dim(a.dimension),
+        audience: a.audience,
+        request: a.audience === "founder" ? normalizeRequest({ fields: a.fields, columns: a.columns }) : null,
         claimKey: `action.${i}`,
       }))
       .sort((a, b) => a.priority - b.priority)

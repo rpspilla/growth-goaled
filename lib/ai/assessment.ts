@@ -1,6 +1,7 @@
 import "server-only";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
+import { FIELD_KINDS } from "@/lib/plan-requests";
 import type { QaResults } from "@/lib/db/schema";
 import { e2eEnabled } from "@/lib/e2e";
 import type { UseCaseId } from "@/lib/use-cases";
@@ -96,6 +97,9 @@ export const assessmentOutputSchema = z.object({
       expected_signal: z.string(),
       dependencies_risks: z.string(),
       dimension: z.string().nullable(),
+      audience: z.enum(["founder", "growth_goaled"]),
+      fields: z.array(z.object({ label: z.string(), kind: z.enum(FIELD_KINDS), hint: z.string().nullable() })),
+      columns: z.array(z.string()),
       sources,
     }),
   ),
@@ -139,7 +143,7 @@ Rules:
 - evidence: 3–8 key facts, each with a status (verified = a confirmed figure or the founder's answer; calculated = computed in code; inference = your reasoning from evidence; hypothesis = plausible but untested) and whether it supports or contradicts the primary explanation, or is context. Include contradicting evidence when it exists.
 - alternatives: 2–4 realistic options for the decision (including doing nothing or gathering more evidence when relevant), each with upside, downside and implications. Quantify only with input numbers.
 - recommendation: the option you recommend and why it beats the others.
-- action_plan: 3–6 actions over 30–90 days, priority 1 first. role only when the input makes it clear, else null. success_metric names what to measure; metric_key is one of trackable_metrics when it fits, else null. expected_signal says what progress would look like, framed as a recommendation, not a fact. Include dependencies and risks.
+- action_plan: 3–6 actions over 30–90 days, priority 1 first. role only when the input makes it clear, else null. success_metric names what to measure; metric_key is one of trackable_metrics when it fits, else null. expected_signal says what progress would look like, framed as a recommendation, not a fact. Include dependencies and risks. Every action has an audience. Founder actions (audience "founder") ask the founder for specific data, never for work: the action names the exact data and how it's split (e.g. "Enter your average deal cycle time in days, founder-closed and AE-closed"); fields lists each value to type (label as the founder sees it, kind: currency, percent, days, number, text or date, optional hint), 1 to 6; columns lists the exact columns a file must contain to answer it instead, 2 to 8. Work Growth Goaled does with the data (analysis, models, recommendations, reviews) has audience "growth_goaled", with empty fields and columns; the founder never sees those.
 - plan_dimensions: when given, the plan is organised around them. Give every action, and every evidence item that bears on one area, the id of its dimension (dimension); use null only for something that genuinely spans several. Every dimension needs at least one action: where the data for a dimension is missing, the action is to gather it and what to look for. Stage actions across the 30–90 days so each dimension has a sensible first step. Without plan_dimensions, dimension is always null.
 - change_triggers: 2–4 pieces of new evidence or circumstances that would change the recommendation.
 - follow_up: the metrics to monitor, when to revisit (days), and what should trigger an earlier revisit.

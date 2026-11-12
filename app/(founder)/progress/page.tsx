@@ -9,8 +9,8 @@ import { AlertTriangle, ArrowDownRight, ArrowUpRight, CalendarClock, RefreshCw }
 import { RunAssessmentButton } from "@/components/use-cases/RunAssessmentButton";
 import { founderContext } from "@/lib/data/founder-context";
 import { progressView } from "@/lib/data/plan";
-import { planAssigneeAction, sendPlanAssignmentsAction, updatePlanActionAction } from "./actions";
-import { SendToAdvisor } from "@/components/progress/SendToAdvisor";
+import { answerPlanInputAction, answerPlanInputFileAction, updatePlanActionAction } from "./actions";
+import { companyBlobPrefix } from "@/lib/data/documents";
 
 const date = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 const muted = { color: "var(--muted-foreground)" };
@@ -34,8 +34,10 @@ export default async function ProgressPage() {
     );
   }
 
-  const done = view.actions.filter((a) => a.status === "done").length;
-  const live = view.actions.filter((a) => a.status !== "dropped").length;
+  // Growth Goaled's items are advisor tasks: the founder sees only their own inputs.
+  const mine = view.actions.filter((a) => a.assignee === "founder");
+  const done = mine.filter((a) => a.status === "done").length;
+  const live = mine.filter((a) => a.status !== "dropped").length;
   const attention = view.revisitDue || view.newSince.length > 0;
   return (
     <div className="page space-y-8">
@@ -126,14 +128,8 @@ export default async function ProgressPage() {
         <h2 id="progress-plan" className="text-xl font-semibold" style={{ color: "var(--foreground)" }}>
           Plan · {done} of {live} done
         </h2>
-        {view.assignmentSentAt ? (
-          <p role="status" className="text-sm" style={muted}>
-            Sent to your advisor for review on {date(view.assignmentSentAt)}: {view.actions.filter((a) => a.assignee === "growth_goaled" && a.status !== "dropped").length} with Growth Goaled, the rest with you.
-          </p>
-        ) : (
-          <SendToAdvisor growthGoaled={view.actions.filter((a) => a.assignee === "growth_goaled" && a.status !== "dropped").length} total={live} send={sendPlanAssignmentsAction} />
-        )}
-        <PlanTracker actions={view.actions} update={updatePlanActionAction} assign={view.assignmentSentAt ? undefined : planAssigneeAction} />
+        <p className="text-sm" style={muted}>Each item asks for specific numbers: type them, or drop a file with the columns listed.</p>
+        <PlanTracker actions={mine} update={updatePlanActionAction} answers={{ blobPrefix: companyBlobPrefix(company.id), type: answerPlanInputAction, file: answerPlanInputFileAction }} />
       </section>
 
       {view.metrics.length > 0 && (

@@ -7,7 +7,7 @@ import type { ActionPlanContent } from "@/lib/db/schema";
 import { e2eEnabled } from "@/lib/e2e";
 import { normalizeRequest } from "@/lib/plan-requests";
 import { AI_MODEL, anthropic } from "./config";
-import { FOUNDER_INPUT_RULES, requestSchema } from "./plan-rewrite";
+import { FOUNDER_INPUT_RULES, requestSchema } from "./plan-inputs";
 
 export const planOutputSchema = z.object({
   goal: z.string(),

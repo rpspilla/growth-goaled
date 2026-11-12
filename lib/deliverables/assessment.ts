@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { FIELD_KINDS } from "@/lib/plan-requests";
 import { METRICS, type MetricKey } from "@/lib/metrics";
 import { USE_CASE_IDS } from "@/lib/use-cases/types";
 import type { BenchmarkComparison } from "@/lib/benchmark-library/compare";
@@ -98,6 +99,9 @@ export const briefContentSchema = z.object({
       expectedSignal: z.string(),
       dependenciesRisks: z.string(),
       dimension: z.string().nullable().default(null),
+      // Since Nov 2026: founder items ask for data (request); Growth Goaled's are advisor tasks.
+      audience: z.enum(["founder", "growth_goaled"]).default("founder"),
+      request: z.object({ fields: z.array(z.object({ key: z.string(), label: z.string(), kind: z.enum(FIELD_KINDS), hint: z.string().optional(), metric: z.string().optional() })), columns: z.array(z.string()) }).nullable().default(null),
       claimKey,
     }),
   ),
@@ -161,6 +165,8 @@ export function parseBrief(content: unknown): BriefContent | null {
       expectedSignal: "",
       dependenciesRisks: "",
       dimension: null,
+      audience: "founder" as const,
+      request: null,
       claimKey: a.claimKey,
     })),
     changeTriggers: [],

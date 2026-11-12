@@ -80,8 +80,8 @@ const goodDraft = async (i: AssessmentInput) => {
     ],
     recommendation: { option: "Fix first, then hire.", why: "Conversion is the constraint.", sources: [win.id] },
     action_plan: [
-      { priority: 2, action: "Review lost deals.", rationale: "Find the pattern.", timing: "next_30_days", role: null, success_metric: "Loss reasons logged", metric_key: null, expected_signal: "A clear pattern.", dependencies_risks: "CRM hygiene.", dimension: "pipeline", sources: [win.id] },
-      { priority: 1, action: "Tighten qualification.", rationale: "Raises win rate within 90 days.", timing: "days_61_90", role: "Founder", success_metric: "Win rate", metric_key: "win_rate", expected_signal: "Win rate rising.", dependencies_risks: "None.", dimension: null, sources: [win.id] },
+      { priority: 2, action: "Review lost deals.", rationale: "Find the pattern.", timing: "next_30_days", role: null, success_metric: "Loss reasons logged", metric_key: null, expected_signal: "A clear pattern.", dependencies_risks: "CRM hygiene.", dimension: "pipeline", audience: "founder", fields: [{ label: "Loss reasons, last 20 lost deals", kind: "text", hint: null }], columns: ["Deal", "Loss reason"], sources: [win.id] },
+      { priority: 1, action: "Tighten qualification.", rationale: "Raises win rate within 90 days.", timing: "days_61_90", role: "Founder", success_metric: "Win rate", metric_key: "win_rate", expected_signal: "Win rate rising.", dependencies_risks: "None.", dimension: null, audience: "growth_goaled", fields: [], columns: [], sources: [win.id] },
     ],
     change_triggers: [{ if_this: "Win rate rises", then_this: "Start hiring." }],
     follow_up: { metrics: [{ metric_key: "win_rate", label: "Win rate", why: "The constraint." }], revisit_in_days: 45, revisit_trigger: "A big swing in win rate." },

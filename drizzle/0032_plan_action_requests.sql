@@ -1,0 +1,1 @@
+ALTER TABLE "plan_actions" ADD COLUMN "request" jsonb;

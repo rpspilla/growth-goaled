@@ -850,6 +850,9 @@ export const planActions = pgTable(
     assignee: planAssignee("assignee").notNull().default("founder"),
     // When the founder sent the who-does-what split to their advisor for review (then it's fixed)
     assignmentSentAt: timestamp("assignment_sent_at", { withTimezone: true }),
+    // Founder items (since Nov 2026): the exact data asked for, and the founder's answer. Growth
+    // Goaled's items (assignee growth_goaled) are advisor tasks, never shown to the founder.
+    request: jsonb("request").$type<DataRequest>(),
     note: text("note"),
     updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
     ...timestamps,

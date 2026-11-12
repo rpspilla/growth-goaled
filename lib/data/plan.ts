@@ -1,4 +1,5 @@
 import "server-only";
+import { checkAnswer, type DataRequest, type RequestAnswer } from "@/lib/plan-requests";
 import { and, desc, eq, gt, inArray, ne } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { Company, User } from "@/lib/db/schema";
@@ -54,6 +55,8 @@ export async function commitPlan(user: User, company: Company, deliverableId: st
           baselinePeriod: b?.period ?? null,
           expectedSignal: a.expectedSignal,
           risks: a.dependenciesRisks,
+          assignee: a.audience,
+          request: a.request,
           updatedBy: user.id,
         };
       }),
@@ -120,7 +123,7 @@ export type ProgressView = {
   revisitDue: boolean;
   revisitTrigger: string;
   decision: string;
-  actions: { id: string; priority: number; action: string; rationale: string | null; timing: string | null; role: string | null; successMetric: string | null; expectedSignal: string | null; status: PlanStatus; note: string | null; metric: MetricProgress | null; assignee: PlanAssignee }[];
+  actions: { id: string; priority: number; action: string; rationale: string | null; timing: string | null; role: string | null; successMetric: string | null; expectedSignal: string | null; status: PlanStatus; note: string | null; metric: MetricProgress | null; assignee: PlanAssignee; request: DataRequest | null }[];
   /** When the who-does-what split went to the advisor for review (null: not yet; choices still open). */
   assignmentSentAt: string | null;
   metrics: MetricProgress[];
@@ -230,6 +233,7 @@ export async function progressView(company: Pick<Company, "id">, useCase: UseCas
       note: a.note,
       metric: a.metric && isMetricKey(a.metric) ? (metrics.find((m) => m.metric === a.metric) ?? null) : null,
       assignee: a.assignee,
+      request: a.request ?? null,
     })),
     assignmentSentAt: actions.find((a) => a.assignmentSentAt)?.assignmentSentAt?.toISOString() ?? null,
     metrics,
@@ -273,4 +277,22 @@ export async function sendPlanAssignments(user: User, company: Pick<Company, "id
   }
   await track("plan_assignments_sent", { userId: user.id, companyId: company.id, props: { growth_goaled: gg.length, founder: ours.length } });
   return { ok: true, growthGoaled: gg.length };
+}
+
+/**
+ * The founder answers one of the plan's inputs (typed values checked against its fields, or a file
+ * already registered as a document). Answering marks it done. Only the company's own founder items.
+ */
+export async function answerPlanInput(user: Pick<User, "id">, company: Pick<Company, "id">, actionId: string, answer: { values: Record<string, unknown> } | { documentId: string; filename: string }): Promise<PlanResult> {
+  const [a] = await db.select().from(schema.planActions).where(and(eq(schema.planActions.id, actionId), eq(schema.planActions.companyId, company.id))).limit(1);
+  if (!a || a.assignee !== "founder" || !a.request) return { ok: false, error: "That item doesn't ask for data." };
+  let stored: RequestAnswer;
+  if ("values" in answer) {
+    const checked = checkAnswer(a.request, answer.values);
+    if (!checked.ok) return checked;
+    stored = { values: checked.values, at: new Date().toISOString(), by: user.id };
+  } else stored = { values: {}, documentId: answer.documentId, filename: answer.filename.slice(0, 255), at: new Date().toISOString(), by: user.id };
+  await db.update(schema.planActions).set({ request: { ...a.request, answer: stored }, status: "done", updatedBy: user.id, updatedAt: new Date() }).where(eq(schema.planActions.id, a.id));
+  await track("plan_input_answered", { userId: user.id, companyId: company.id, props: { via: "values" in answer ? "typed" : "file", plan: "growth_project" } });
+  return { ok: true };
 }

@@ -1,3 +1,4 @@
+import { inputsFor } from "@/lib/plan-requests";
 import type { AssessmentInput, AssessmentOutput } from "@/lib/ai/assessment";
 import type { ClaimForCheck, CodeCheckResult } from "./checks";
 
@@ -135,6 +136,7 @@ export function fallbackAssessment(input: AssessmentInput): AssessmentOutput {
         sources: [f.id],
       }));
 
+  const missingRequired = input.data_supplied.filter((d) => d.priority === "required" && d.status !== "available" && d.status !== "partial" && d.status !== "not_applicable");
   const options = [
     { option: top ? `Act on the leading explanation: ${lowerFirst(top.title)}` : "Act on the figures you have now", upside: "Starts fixing the likely constraint straight away.", downside: "If the explanation is wrong, effort goes to the wrong place.", implications: "Needs the checks in the plan to confirm it early.", sources: top ? cite(top) : anchor },
     { option: "Close the main data gaps first, then decide", upside: "A firmer diagnosis before committing time or budget.", downside: "A few weeks' delay before acting.", implications: "Share the missing data and confirm the figures listed below.", sources: anchor },
@@ -163,13 +165,14 @@ export function fallbackAssessment(input: AssessmentInput): AssessmentOutput {
       ? { option: options[0]!.option, why: "The calculated evidence points to it more than to the alternatives; the first action checks it quickly.", sources: options[0]!.sources }
       : { option: options[1]!.option, why: "The data can't yet separate the possible explanations, so acting now risks fixing the wrong thing.", sources: anchor },
     action_plan: [
-      ...(top ? [{ priority: 1, action: top.test, rationale: "Confirms or rules out the leading explanation quickly.", timing: "next_30_days" as const, role: null, success_metric: "A clear answer on whether this is the main constraint", metric_key: null, expected_signal: "The pattern either holds across accounts or it doesn't.", dependencies_risks: "Needs the underlying records to hand.", dimension: null, sources: cite(top) }] : []),
-      { priority: top ? 2 : 1, action: "Share the missing required data and confirm the figures read from your files.", rationale: "The full analysis depends on it.", timing: "next_30_days", role: null, success_metric: "All required data marked available", metric_key: null, expected_signal: "No open gaps under Data.", dependencies_risks: "Someone needs time to export the data.", dimension: null, sources: anchor },
-      { priority: top ? 3 : 2, action: "Re-run the assessment once the data is in.", rationale: "You'll get the full written brief and plan.", timing: "days_31_60", role: null, success_metric: "A complete brief", metric_key: null, expected_signal: "A firmer diagnosis.", dependencies_risks: "Depends on the step above.", dimension: null, sources: anchor },
+      // Testing the leading explanation and re-running the assessment are Growth Goaled's work; the founder's part is the data.
+      ...(top ? [{ priority: 1, action: top.test, rationale: "Confirms or rules out the leading explanation quickly.", timing: "next_30_days" as const, role: null, success_metric: "A clear answer on whether this is the main constraint", metric_key: null, expected_signal: "The pattern either holds across accounts or it doesn't.", dependencies_risks: "Needs the underlying records to hand.", dimension: null, audience: "growth_goaled" as const, fields: [], columns: [], sources: cite(top) }] : []),
+      ...(missingRequired.length ? [{ priority: top ? 2 : 1, action: `Enter or upload the data still missing: ${missingRequired.slice(0, 6).map((d) => d.item).join(", ")}.`, rationale: "The full analysis depends on it.", timing: "next_30_days" as const, role: null, success_metric: "All required data marked available", metric_key: null, expected_signal: "No open gaps under Data.", dependencies_risks: "Someone needs time to export the data.", dimension: null, audience: "founder" as const, ...inputsFor(missingRequired.map((d) => d.item)), sources: anchor }] : []),
+      { priority: top ? 3 : 2, action: "Re-run the assessment once the data is in.", rationale: "You'll get the full written brief and plan.", timing: "days_31_60", role: null, success_metric: "A complete brief", metric_key: null, expected_signal: "A firmer diagnosis.", dependencies_risks: "Depends on the step above.", dimension: null, audience: "growth_goaled", fields: [], columns: [], sources: anchor },
       // One first step per plan dimension, so the plan keeps its shape even without the written analysis.
       ...(input.plan_dimensions ?? []).map((d, i) => ({
         priority: (top ? 4 : 3) + i,
-        action: `Share and review the data for ${d.title.toLowerCase()}.`,
+        action: `Enter or upload the data for ${d.title.toLowerCase()}: ${(d.items.length ? d.items : [d.title]).slice(0, 6).join(", ")}.`,
         rationale: d.summary,
         timing: (["next_30_days", "days_31_60", "days_61_90"] as const)[Math.min(i, 2)]!,
         role: null,
@@ -178,6 +181,8 @@ export function fallbackAssessment(input: AssessmentInput): AssessmentOutput {
         expected_signal: "A first read on this area in the next version of the plan.",
         dependencies_risks: "Needs the data listed for this area.",
         dimension: d.id,
+        audience: "founder" as const,
+        ...inputsFor(d.items.length ? d.items : [d.title]),
         sources: anchor,
       })),
     ],

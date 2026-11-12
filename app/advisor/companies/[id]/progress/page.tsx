@@ -1,3 +1,4 @@
+import { answerLine } from "@/lib/plan-requests";
 import { progressView } from "@/lib/data/plan";
 import { companyContext } from "../context";
 
@@ -43,21 +44,27 @@ export default async function CompanyProgressPage({ params }: { params: Promise<
           )}
           <div className="rounded-xl border p-5 text-sm" style={card}>
             <div className="label mb-2" style={{ color: "var(--muted-foreground)" }}>Plan</div>
-            <p className="mb-2" style={{ color: view.assignmentSentAt ? "var(--green)" : "var(--muted-foreground)" }}>
-              {view.assignmentSentAt
-                ? `Who does what, sent for your review on ${date(view.assignmentSentAt)}: ${view.actions.filter((a) => a.assignee === "growth_goaled").length} with Growth Goaled.`
-                : "The founder hasn't sent who-does-what for review yet."}
-            </p>
-            <ol className="space-y-2" aria-label="Plan actions">
-              {view.actions.map((a) => (
+            <h3 className="font-semibold mb-1" style={{ color: "var(--foreground)" }}>Founder inputs</h3>
+            <ol className="space-y-2 mb-4" aria-label="Founder inputs">
+              {view.actions.filter((a) => a.assignee === "founder").map((a) => (
                 <li key={a.id} style={{ color: "var(--foreground)" }}>
-                  {a.priority}. {a.action}{" "}
-                  <span className="text-xs font-semibold px-1.5 py-0.5 rounded" style={a.assignee === "growth_goaled" ? { background: "var(--green-muted)", color: "var(--green)" } : { background: "var(--blue-muted)", color: "var(--blue)" }}>
-                    {a.assignee === "growth_goaled" ? "Growth Goaled" : "Founder"}
-                  </span>{" "}
-                  <span style={{ color: "var(--muted-foreground)" }}>· {STATUS[a.status]}{a.note ? ` · “${a.note}”` : ""}</span>
+                  {a.priority}. {a.action} <span style={{ color: "var(--muted-foreground)" }}>· {STATUS[a.status]}{a.note ? ` · “${a.note}”` : ""}</span>
+                  {a.request && (
+                    <div className="text-xs mt-0.5" style={{ color: a.request.answer ? "var(--green)" : "var(--muted-foreground)" }}>
+                      {a.request.answer ? `Answered: ${answerLine(a.request)}` : `Asks for: ${a.request.fields.map((f) => f.label).join(" · ") || "—"}${a.request.columns.length ? ` (or a file with: ${a.request.columns.join(", ")})` : ""}`}
+                    </div>
+                  )}
                 </li>
               ))}
+            </ol>
+            <h3 className="font-semibold mb-1" style={{ color: "var(--foreground)" }}>Growth Goaled&apos;s tasks <span className="text-xs font-normal" style={{ color: "var(--muted-foreground)" }}>· advisors only</span></h3>
+            <ol className="space-y-2" aria-label="Growth Goaled's tasks">
+              {view.actions.filter((a) => a.assignee === "growth_goaled").map((a) => (
+                <li key={a.id} style={{ color: "var(--foreground)" }}>
+                  {a.priority}. {a.action} <span style={{ color: "var(--muted-foreground)" }}>· {STATUS[a.status]}</span>
+                </li>
+              ))}
+              {!view.actions.some((a) => a.assignee === "growth_goaled") && <li style={{ color: "var(--muted-foreground)" }}>None.</li>}
             </ol>
           </div>
         </>
