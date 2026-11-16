@@ -1,107 +1,85 @@
 import Link from "next/link";
+import { desc, eq } from "drizzle-orm";
+import { CheckCircle2, Circle } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
-import { DataTopPanel } from "@/components/readiness/DataTopPanel";
-import { ItemCard } from "@/components/readiness/ItemCard";
-import { founderContext } from "@/lib/data/founder-context";
+import { InboxDropzone } from "@/components/readiness/InboxDropzone";
+import { Section } from "@/components/ui/Section";
+import { db, schema } from "@/lib/db";
 import { listRegisterItems } from "@/lib/data/registers";
-import { getCategory, getItem, sourcesFor } from "@/lib/readiness";
-import { loadReadiness, toRecord } from "./load";
+import { DATA_SOURCE_GROUPS, latestFor } from "@/lib/data-sources";
+import { loadReadiness } from "./load";
 
 // File reading runs after the upload action responds (next/server after()), within this budget.
 export const maxDuration = 300;
 
-/** Step 3: only the data the active use case needs, in priority order (the layout guarantees one is active). */
+const day = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+/**
+ * Data: one shared place for the founder and advisor to collect and keep the company's data up to
+ * date, for every growth project. CRM deals first, then billing and accounting. Drop any export;
+ * each file is read and sorted, and its figures flow into Performance and the advisor's work.
+ */
 export default async function DataPage() {
-  const [data, { active }] = await Promise.all([loadReadiness(), founderContext()]);
-  if (!data || !active) {
+  const data = await loadReadiness();
+  if (!data) {
     return (
       <div className="page">
         <PageHeader title="Data" subtitle="Your company isn't set up yet. Contact your advisor if this persists." />
       </div>
     );
   }
-  const { company, readiness, blobPrefix } = data;
-  const useCase = active.def;
-  const questions = await listRegisterItems([company.id], { owner: "founder", status: "open" });
-  const rows = new Map(readiness.items.map((i) => [i.itemKey, i]));
-
-  // The key file's items are handled by the "Start here" card; everything else only sharpens the answer.
-  const inKeyFile = new Set(useCase.keyFile?.items ?? []);
-  const notKey = (keys: readonly string[]) => keys.filter((k) => !inKeyFile.has(k));
-  const groups = useCase.keyFile
-    ? [
-        { title: "Most useful", caption: "Each one makes the answer more precise", keys: [...notKey(useCase.requiredItems), ...notKey(useCase.helpfulItems)], required: false },
-        { title: "Optional extras", caption: "If you have them to hand", keys: notKey(useCase.optionalItems), required: false },
-      ].filter((g) => g.keys.length)
-    : [
-        { title: "Needed for the growth project", caption: "Required", keys: useCase.requiredItems, required: true },
-        { title: "Sharpens it", caption: "Optional · makes the answer more precise", keys: useCase.helpfulItems, required: false },
-        { title: "Optional extras", caption: "If you have them to hand", keys: useCase.optionalItems, required: false },
-      ].filter((g) => g.keys.length);
-  const sharperCount = groups.reduce((n, g) => n + g.keys.length, 0);
-  const sharperIn = groups.flatMap((g) => g.keys).filter((k) => ["available", "partial"].includes(rows.get(k)?.status ?? "")).length;
+  const { company, blobPrefix } = data;
+  const [files, questions] = await Promise.all([
+    db
+      .select({ id: schema.documents.id, filename: schema.documents.filename, createdAt: schema.documents.createdAt, status: schema.documents.status })
+      .from(schema.documents)
+      .where(eq(schema.documents.companyId, company.id))
+      .orderBy(desc(schema.documents.createdAt))
+      .limit(200),
+    listRegisterItems([company.id], { owner: "founder", status: "open" }),
+  ]);
 
   return (
-    <div className="page">
-      <PageHeader title={`Data for ${useCase.shortTitle}`} subtitle="Share what you have, then run your report. We read and sort every file for you." />
-      <DataTopPanel />
+    <div className="page space-y-10">
+      <PageHeader title="Data" subtitle="One place for you and your advisor to collect and keep your company's data up to date. Drop any export; we read and sort it." />
 
       {questions.length > 0 && (
-        <Link href="/data/questions" className="block rounded-xl border p-4 mb-6 text-base font-semibold" style={{ background: "var(--card)", borderColor: "var(--amber)", color: "var(--foreground)" }}>
+        <Link href="/data/questions" className="block rounded-xl border p-4 text-base font-semibold" style={{ background: "var(--card)", borderColor: "var(--amber)", color: "var(--foreground)" }}>
           {questions.length} {questions.length === 1 ? "item" : "items"} to review with your advisor →
         </Link>
       )}
 
-      {/* The item-by-item list is optional detail: dropping files above is all most founders need to do. */}
-      <details className="group mb-8" data-testid="make-it-sharper">
-        <summary className="list-none cursor-pointer surface p-4 flex items-center gap-3">
-          <span className="transition-transform group-open:rotate-90 text-lg" style={{ color: "var(--green)" }} aria-hidden>
-            ›
-          </span>
-          <span className="flex-1">
-            <span className="block text-base font-semibold" style={{ color: "var(--foreground)" }}>
-              {useCase.keyFile ? "Make it sharper" : "What we need"}
-            </span>
-            <span data-label className="block text-xs" style={{ color: "var(--muted-foreground)" }}>
-              {useCase.keyFile ? "Optional · each file adds detail to the answer" : "The list of what helps, item by item (optional: dropping files above is enough)"}
-            </span>
-          </span>
-          <span data-label className="font-mono text-xs px-2 py-0.5 rounded-full" style={{ background: "var(--muted)", color: "var(--muted-foreground)" }}>
-            {sharperIn} of {sharperCount} in
-          </span>
-        </summary>
-        <div className="pt-5">
-      {groups.map((g) => (
-        <section key={g.title} className="mb-8">
-          <div className="flex items-baseline gap-2 flex-wrap mb-3">
-            <h2 className="text-lg font-semibold" style={{ color: "var(--foreground)" }} title={g.caption}>{g.title} ({g.keys.length})</h2>
-            <span data-label className="text-xs" style={{ color: "var(--muted-foreground)" }}>{g.caption}</span>
-          </div>
-          <div className="grid md:grid-cols-2 gap-3 items-start">
-            {g.keys.flatMap((key) => {
-              const def = getItem(key);
-              const category = def && getCategory(def.category);
-              if (!def || !category) return [];
-              return [
-                <ItemCard
-                  key={key}
-                  // "Required" means required for this use case's baseline, not the general checklist.
-                  def={{ ...def, required: g.required }}
-                  category={def.category}
-                  sources={sourcesFor(def, category)}
-                  record={toRecord(rows.get(key))}
-                  files={readiness.files.filter((f) => f.itemKeys.includes(key))}
-                  missingFields={readiness.missingFields[key] ?? []}
-                  blobPrefix={blobPrefix}
-                  why={useCase.itemWhy[key]}
-                />,
-              ];
+      <InboxDropzone blobPrefix={blobPrefix} />
+
+      {DATA_SOURCE_GROUPS.map((g) => (
+        <Section key={g.id} id={`data-${g.id}`} title={g.title} lead={g.lead}>
+          <ul aria-label={g.title} className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {g.sources.map((s) => {
+              const latest = latestFor(s, files);
+              return (
+                <li key={s.id} className="surface p-5 space-y-2">
+                  <div className="flex items-center gap-2">
+                    {latest ? <CheckCircle2 size={18} aria-hidden style={{ color: "var(--green)" }} /> : <Circle size={18} aria-hidden style={{ color: "var(--muted-foreground)" }} />}
+                    <h3 className="text-base font-semibold" style={{ color: "var(--foreground)" }}>{s.title}</h3>
+                  </div>
+                  <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>{s.what}</p>
+                  <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+                    <span className="font-semibold">Export: </span>
+                    {s.export}
+                  </p>
+                  <p className="text-sm" style={{ color: latest ? "var(--green)" : "var(--muted-foreground)" }}>
+                    {latest ? `Last updated ${day(latest.createdAt)} · ${latest.filename}` : "Not shared yet"}
+                  </p>
+                </li>
+              );
             })}
-          </div>
-        </section>
+          </ul>
+        </Section>
       ))}
-        </div>
-      </details>
+
+      <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+        Live connections to Stripe, Xero, QuickBooks and your CRM are coming. Until then, exports work the same way. Everything you&apos;ve shared is under <Link href="/documents" className="link">Documents</Link>.
+      </p>
     </div>
   );
 }

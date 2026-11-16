@@ -1,4 +1,5 @@
 import "server-only";
+import { updateProfileFromDocument } from "./intake";
 import { del, get, head, put } from "@vercel/blob";
 import { createHash } from "node:crypto";
 import ExcelJS from "exceljs";
@@ -319,6 +320,8 @@ export async function processDocument(documentId: string): Promise<void> {
       companyId: doc.companyId,
       props: { documentId: doc.id, dataPoints: inserted.length, conflicts: conflicts.length, assumptions: assumptions.length },
     });
+    // Company Details follow the newest files (Founder View redesign); never fails the upload.
+    await updateProfileFromDocument(doc.id, input).catch((err) => console.error(`[profile] Document ${doc.id}: couldn't update the profile`, err));
   } catch (err) {
     const message = err instanceof ExtractionError ? err.message : isAiConfigError(err) ? AI_UNAVAILABLE_FOR_FOUNDERS : "Analysis failed. Try again.";
     console.error(`[extract] Document ${doc.id} failed`, err);

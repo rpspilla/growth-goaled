@@ -17,6 +17,8 @@ import {
   type IntakeValue,
 } from "@/lib/intake";
 import type { CompanyBasics } from "@/lib/onboarding";
+import type { ExtractionInput } from "@/lib/ai/extract";
+import { readProfileFromDocument, type ProfileQuestion } from "@/lib/ai/profile-from-document";
 
 /** Saved answers, falling back to the company row (e.g. name and website from onboarding). */
 export async function getIntakeAnswers(company: Company): Promise<IntakeAnswers> {
@@ -193,4 +195,40 @@ export async function documentFilledAnswers(company: Pick<Company, "id">): Promi
     .leftJoin(schema.dataPoints, eq(schema.dataPoints.id, schema.intakeResponses.dataPointId))
     .where(and(eq(schema.intakeResponses.companyId, company.id), eq(schema.intakeResponses.source, "extracted")));
   return Object.fromEntries(rows.map((r) => [answerKey(r.section, r.field), r.note?.replace(/^From /, "") ?? "your documents"]));
+}
+
+/**
+ * Keeps Company Details up to date from a newly read file (Founder View redesign): the answers the
+ * file states clearly (company, customers, GTM, ICP, hiring) replace answers older than the file;
+ * newer answers, typed or from another file, are kept. Each one says which file it came from.
+ */
+export async function updateProfileFromDocument(documentId: string, input: ExtractionInput): Promise<number> {
+  const [doc] = await db.select().from(schema.documents).where(eq(schema.documents.id, documentId)).limit(1);
+  if (!doc) return 0;
+  const [[company], [uploader]] = await Promise.all([
+    db.select().from(schema.companies).where(eq(schema.companies.id, doc.companyId)).limit(1),
+    doc.uploadedBy ? db.select().from(schema.users).where(eq(schema.users.id, doc.uploadedBy)).limit(1) : Promise.resolve([]),
+  ]);
+  if (!company || !uploader) return 0;
+  const existing = await db.select({ section: schema.intakeResponses.section, field: schema.intakeResponses.field, updatedAt: schema.intakeResponses.updatedAt }).from(schema.intakeResponses).where(eq(schema.intakeResponses.companyId, company.id));
+  const updatedAt = new Map(existing.map((r) => [answerKey(r.section, r.field), r.updatedAt]));
+  // Only questions this file could still update: unanswered, or answered before the file arrived.
+  const questions: ProfileQuestion[] = INTAKE_SECTIONS.flatMap((section) =>
+    section.fields
+      .filter((f) => !f.rangeOf && !f.asChurn)
+      .filter((f) => {
+        const at = updatedAt.get(answerKey(section.id, f.id));
+        return !at || at < doc.createdAt;
+      })
+      .map((f) => ({ key: answerKey(section.id, f.id), section: section.label, label: f.label, kind: f.kind, ...(f.options ? { options: f.options } : {}) })),
+  );
+  const answers = await readProfileFromDocument(input, questions);
+  let saved = 0;
+  for (const a of answers) {
+    const [sectionId, fieldId] = a.key.split(".") as [string, string];
+    const r = await saveIntakeAnswer(uploader, company, sectionId, fieldId, a.value, { source: "extracted", note: `From ${doc.filename}` });
+    if (r.ok) saved++;
+  }
+  if (saved) await track("profile_updated_from_document", { companyId: company.id, props: { documentId: doc.id, answers: saved } });
+  return saved;
 }

@@ -1,20 +1,17 @@
 import Link from "next/link";
 import { Inbox } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
-import { CurrentPlanCard } from "@/components/plan/CurrentPlanCard";
+import { MrrChart } from "@/components/performance/MrrChart";
 import { BusinessUpdateForm } from "@/components/performance/BusinessUpdateForm";
 import { InboxDropzone } from "@/components/readiness/InboxDropzone";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { Section } from "@/components/ui/Section";
-import { Sparkline } from "@/components/ui/Sparkline";
 import { BUSINESS_METRICS, businessMetrics, type BusinessKey, type Reading } from "@/lib/data/business-metrics";
-import { currentPlan } from "@/lib/data/current-plan";
 import { listDataRequests } from "@/lib/data/data-requests";
 import { companyBlobPrefix } from "@/lib/data/documents";
 import { founderContext } from "@/lib/data/founder-context";
 import { companyPerformance } from "@/lib/data/performance";
 import { formatMetric, METRICS, type MetricKey } from "@/lib/metrics";
-import { monthLabel } from "@/lib/metrics-engine/tables";
 import { METRIC_GROUPS, WHY } from "@/lib/performance";
 import { addBusinessUpdateAction } from "./actions";
 
@@ -31,7 +28,7 @@ const sub = (k: BusinessKey, r: Reading) => (k === "revenue" ? `ARR · about ${f
 export default async function PerformancePage({ searchParams }: { searchParams: Promise<{ request?: string }> }) {
   const [{ company }, { request }] = await Promise.all([founderContext(), searchParams]);
   if (!company) return null;
-  const [current, biz, perf, requests] = await Promise.all([currentPlan(company), businessMetrics(company), companyPerformance(company), listDataRequests(company.id, { open: true })]);
+  const [biz, perf, requests] = await Promise.all([businessMetrics(company), companyPerformance(company), listDataRequests(company.id, { open: true })]);
   const others = METRIC_GROUPS.map((g) => ({ ...g, have: g.metrics.filter((m) => perf.metrics.has(m) && !["arr", "mom_growth", "nrr", "grr"].includes(m)) })).filter((g) => g.have.length);
   const month = new Date().toISOString().slice(0, 7);
 
@@ -54,9 +51,6 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
         </section>
       )}
 
-      <Section id="plan-progress" title="Action plan progress">
-        <CurrentPlanCard current={current} heading="Current plan with your advisor" />
-      </Section>
 
       <Section id="business" title="Business metrics" lead="Revenue, month-over-month growth and retention. They update each time new data arrives, from your files or typed in below.">
         <div className="grid sm:grid-cols-3 gap-4">
@@ -83,17 +77,9 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
             );
           })}
         </div>
-        {perf.monthly && (
-          <div className="surface p-5 mt-4" aria-label="Monthly recurring revenue">
-            <div className="flex items-baseline justify-between gap-3 flex-wrap">
-              <span className="text-sm font-semibold" style={{ color: "var(--muted-foreground)" }}>Monthly recurring revenue</span>
-              <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>Calculated from {perf.monthly.filename}</span>
-            </div>
-            <div className="mt-3"><Sparkline values={perf.monthly.points.map((p) => p.mrr)} label="Monthly recurring revenue by month" width={800} height={70} /></div>
-            <div className="flex justify-between text-sm mt-2" style={{ color: "var(--muted-foreground)" }}>
-              <span>{monthLabel(perf.monthly.points[0]!.month)}: {formatMetric("arr", perf.monthly.points[0]!.mrr)}</span>
-              <span className="font-semibold" style={{ color: "var(--foreground)" }}>{monthLabel(perf.monthly.points.at(-1)!.month)}: {formatMetric("arr", perf.monthly.points.at(-1)!.mrr)}</span>
-            </div>
+        {perf.monthly && perf.monthly.points.length >= 2 && (
+          <div className="mt-4">
+            <MrrChart points={perf.monthly.points} source={perf.monthly.filename} />
           </div>
         )}
         <div className="surface p-5 mt-4 space-y-3">

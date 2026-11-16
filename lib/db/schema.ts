@@ -1498,3 +1498,105 @@ export const crmSuppressions = pgTable("crm_suppressions", { id: id(), email: te
 export type CrmContact = typeof crmContacts.$inferSelect;
 export type CrmCompany = typeof crmCompanies.$inferSelect;
 export type CrmStage = typeof crmStages.$inferSelect;
+
+// ---------------------------------------------------------------------------
+// Advisor-owned work, shown to the founder (Founder View redesign, Nov 16, 2026)
+// The advisor creates and manages growth projects, their documents and results, and each week's
+// priorities; the founder only views them.
+// ---------------------------------------------------------------------------
+
+export const growthProjectStatus = pgEnum("growth_project_status", ["open", "completed"]);
+
+/** A growth project the advisor runs with the company (e.g. Growth Hiring Plan). Founders see its history. */
+export const growthProjects = pgTable(
+  "growth_projects",
+  {
+    id: id(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    status: growthProjectStatus("status").notNull().default("open"),
+    startedOn: date("started_on").notNull(),
+    completedOn: date("completed_on"),
+    // The use case it grew out of, for projects carried over from the earlier growth projects
+    companyUseCaseId: uuid("company_use_case_id").references(() => companyUseCases.id, { onDelete: "set null" }),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [index("growth_projects_company_idx").on(t.companyId), uniqueIndex("growth_projects_use_case_idx").on(t.companyUseCaseId)],
+);
+
+export const projectDocumentKind = pgEnum("project_document_kind", ["action_plan", "document"]);
+
+/** A plan or document the advisor shares on a project: a link (Google Doc…) or an uploaded file. Visible to the founder once added. */
+export const projectDocuments = pgTable(
+  "project_documents",
+  {
+    id: id(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => growthProjects.id, { onDelete: "cascade" }),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    kind: projectDocumentKind("kind").notNull().default("document"),
+    title: text("title").notNull(),
+    // Either a link (https://…) or a private file uploaded by the advisor
+    url: text("url"),
+    blobUrl: text("blob_url"),
+    filename: text("filename"),
+    mime: text("mime"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [index("project_documents_project_idx").on(t.projectId)],
+);
+
+/** A result the advisor tracks on a project (e.g. "Pipeline created by the new hire: $240k"). Shown to the founder only once approved. */
+export const projectResults = pgTable(
+  "project_results",
+  {
+    id: id(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => growthProjects.id, { onDelete: "cascade" }),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    value: text("value"),
+    note: text("note"),
+    position: integer("position").notNull().default(0),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    approvedBy: uuid("approved_by").references(() => users.id, { onDelete: "set null" }),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [index("project_results_project_idx").on(t.projectId)],
+);
+
+/** One of the week's top priorities, set by the advisor: what matters, and the action for the next seven days. */
+export const weeklyPriorities = pgTable(
+  "weekly_priorities",
+  {
+    id: id(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    // Monday of the week (YYYY-MM-DD)
+    weekStart: date("week_start").notNull(),
+    title: text("title").notNull(),
+    action: text("action").notNull(),
+    dueOn: date("due_on"),
+    position: integer("position").notNull().default(0),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [index("weekly_priorities_company_week_idx").on(t.companyId, t.weekStart)],
+);
+
+export type GrowthProject = typeof growthProjects.$inferSelect;
+export type ProjectDocument = typeof projectDocuments.$inferSelect;
+export type ProjectResult = typeof projectResults.$inferSelect;
+export type WeeklyPriority = typeof weeklyPriorities.$inferSelect;

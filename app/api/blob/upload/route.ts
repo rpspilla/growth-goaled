@@ -3,12 +3,14 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getFounderCompany, getManagedCompany } from "@/lib/data/companies";
 import { contractBlobPrefix } from "@/lib/contracts";
+import { projectBlobPrefix } from "@/lib/project-files";
 import { companyBlobPrefix } from "@/lib/data/documents";
 import { ACCEPTED_TYPES, INBOX_FOLDER, MAX_UPLOAD_BYTES } from "@/lib/documents";
+import { PROJECT_FILE_TYPES } from "@/lib/project-files";
 
 /**
  * Issues client-upload tokens for the private Blob store: founders for paths under their own
- * company's prefix, staff for contracts of companies they manage.
+ * company's prefix, staff for contracts and growth project documents of companies they manage.
  * Uploads are registered afterwards by the upload page's server action.
  */
 export async function POST(request: Request) {
@@ -24,6 +26,12 @@ export async function POST(request: Request) {
           const companyId = pathname.split("/")[1] ?? "";
           if (!/^[0-9a-f-]{36}$/.test(companyId) || !(await getManagedCompany(user, companyId)) || !pathname.startsWith(contractBlobPrefix(companyId))) throw new Error("Not allowed");
           return { allowedContentTypes: ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword", "image/png", "image/jpeg"], maximumSizeInBytes: MAX_UPLOAD_BYTES, addRandomSuffix: true };
+        }
+        // Staff share plans and documents on a company's growth projects (projects/<companyId>/…).
+        if (user && (user.role === "advisor" || user.role === "admin") && pathname.startsWith("projects/")) {
+          const companyId = pathname.split("/")[1] ?? "";
+          if (!/^[0-9a-f-]{36}$/.test(companyId) || !(await getManagedCompany(user, companyId)) || !pathname.startsWith(projectBlobPrefix(companyId))) throw new Error("Not allowed");
+          return { allowedContentTypes: PROJECT_FILE_TYPES, maximumSizeInBytes: MAX_UPLOAD_BYTES, addRandomSuffix: true };
         }
         if (!user || user.role !== "founder") throw new Error("Not allowed");
         const company = await getFounderCompany(user);

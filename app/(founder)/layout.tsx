@@ -6,31 +6,18 @@ import { CompanySwitcher } from "@/components/shell/CompanySwitcher";
 import { Shell, StagingBadge, UserMenu } from "@/components/shell/Shell";
 import { UseCaseSidebar } from "@/components/shell/UseCaseSidebar";
 import { selectUseCase } from "@/components/shell/actions";
-import { getUseCase } from "@/lib/use-cases";
-import { stepStates } from "@/lib/use-cases/steps";
 import { founderNav } from "@/lib/nav";
 import { CompanyBrandBar } from "@/components/brand/CompanyBrandBar";
 import { companySite } from "@/lib/data/company-site";
 
 export default async function FounderLayout({ children }: { children: ReactNode }) {
-  const { user, company, useCases, active } = await founderContext();
+  const { user, company } = await founderContext();
   const [companies, site] = await Promise.all([listFounderCompanies(user), company ? companySite(company) : null]);
-  const options = useCases.filter((u) => u.activatedAt).flatMap((u) => {
-    const def = getUseCase(u.useCase);
-    return def ? [{ id: def.id, label: def.shortTitle }] : [];
-  });
-  const legacy = options.length > 0;
 
   return (
     <Shell
       sidebar={
-        <UseCaseSidebar
-          // The step-by-step journey (Data, Results, Action plan) is only for founders with an active growth project.
-          items={founderNav(legacy ? stepStates(active && { useCase: active.def.id, status: active.status }, { overview: false, library: false }) : [])}
-          options={options}
-          activeUseCase={active?.useCase ?? null}
-          select={selectUseCase}
-        />
+        <UseCaseSidebar items={founderNav()} options={[]} activeUseCase={null} select={selectUseCase} />
       }
       topbar={
         <>
