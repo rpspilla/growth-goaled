@@ -54,7 +54,7 @@ test("an allowed founder can run several company profiles, each with its own dat
     await check.end();
   }
   await page.getByRole("button", { name: "Switch to founder view" }).click();
-  await expect(page).toHaveURL(/\/library$/);
+  await expect(page).toHaveURL(/\/overview$/);
   await expect(page.getByLabel(/^Company: First Co/)).toBeVisible();
   await ctx.close();
 
