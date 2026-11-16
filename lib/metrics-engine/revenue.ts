@@ -51,6 +51,8 @@ function fromWide(t: Table): { perCustomer: Series | null; totals: Map<string, n
   if (months.length < 2) return null;
   const labelCol = t.header.findIndex((_, i) => !months.some(([mi]) => mi === i));
   if (labelCol < 0) return null;
+  const metricRows = fromMetricRows(t, months, labelCol);
+  if (metricRows !== undefined) return metricRows;
   const sheetAnnual = annual(t.sheet) || annual(t.header[labelCol] ?? "");
   const per: Series = new Map();
   let totalRow: Map<string, number> | null = null;
@@ -93,6 +95,36 @@ function fromWide(t: Table): { perCustomer: Series | null; totals: Map<string, n
     for (const s of perCustomer.values()) for (const [m, v] of s) totals.set(m, (totals.get(m) ?? 0) + v);
   } else return null;
   return { perCustomer, totals, columns: [t.header[labelCol]!, ...months.map(([, m]) => monthLabel(m))].slice(0, 6), annualised: scale !== 1 };
+}
+
+/** A row that names a metric (an MRR roll-forward, subscriber counts, churn rates…), not a customer. */
+const METRIC_LABEL = /mrr|\barr\b|subscriber|churn|retention|rate\b|lifetime|ltv|arpu|average|per subscriber|customer value|roll-?forward|fx adjustment|reactivat|expansion|contraction/i;
+const ENDING_MRR = [/^ending mrr$/i, /^closing mrr$/i, /^end(ing)? of (month|period) mrr$/i, /^total mrr$/i, /^mrr$/i];
+
+/**
+ * A metrics-by-row export, like Stripe's "Subscription metrics – monthly" (rows: Beginning MRR, New
+ * MRR, Expansion MRR, Churned MRR, Ending MRR, subscriber counts, churn rates; columns: months).
+ * MRR is the Ending MRR row; the rows are metrics, never customers, so nothing per customer is
+ * worked out from them. Returns undefined when the sheet isn't of this shape.
+ */
+function fromMetricRows(t: Table, months: (readonly [number, string])[], labelCol: number): ReturnType<typeof fromWide> | undefined {
+  const labels = t.rows.map((r) => (r[labelCol] ?? "").trim()).filter(Boolean);
+  const metricish = labels.filter((l) => METRIC_LABEL.test(l)).length;
+  const header = t.header[labelCol] ?? "";
+  if (!/metric/i.test(header) && (metricish < 3 || metricish < labels.length / 2)) return undefined;
+  for (const pattern of ENDING_MRR) {
+    const row = t.rows.find((r) => pattern.test((r[labelCol] ?? "").trim()));
+    if (!row) continue;
+    const totals = new Map<string, number>();
+    for (const [i, m] of months) {
+      const v = parseNumber(row[i]);
+      if (v !== null) totals.set(m, v);
+    }
+    if (totals.size < 2) return null;
+    return { perCustomer: null, totals, columns: [header, (row[labelCol] ?? "").trim(), ...months.map(([, m]) => monthLabel(m))].slice(0, 6), annualised: false };
+  }
+  // Metric rows without an MRR line: not a revenue table we can read safely.
+  return null;
 }
 
 const at = (s: Map<string, number>, m: string) => s.get(m) ?? 0;

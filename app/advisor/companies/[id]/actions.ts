@@ -19,6 +19,7 @@ import { createDataRequest, deleteDataRequest, setCurrentPlan } from "@/lib/data
 import { clearBusinessUpdate, setBusinessUpdateDate } from "@/lib/data/business-metrics";
 import { createContract, createContractFromFile, readContractFile, removeContract, updateContract, updateContractDetails } from "@/lib/data/contracts";
 import { after } from "next/server";
+import { processDocument } from "@/lib/data/documents";
 import { db, schema } from "@/lib/db";
 import { and, eq } from "drizzle-orm";
 import { cancelTeammateInvite, inviteTeammate, removeTeammate, type TeamResult } from "@/lib/data/team";
@@ -312,4 +313,17 @@ export async function approveGrowthPlanAction(companyId: string, deliverableId: 
   refresh(companyId);
   revalidatePath("/progress");
   revalidatePath("/advisor/review");
+}
+
+/** Read one of the company's files again (e.g. after a fix to how a format is read): its proposed figures are replaced. */
+export async function rereadDocumentAction(companyId: string, documentId: string): Promise<void> {
+  const ctx = await managed(companyId);
+  if (!ctx) return;
+  const id = z.uuid().safeParse(documentId);
+  if (!id.success) return;
+  const [doc] = await db.select({ id: schema.documents.id }).from(schema.documents).where(and(eq(schema.documents.id, id.data), eq(schema.documents.companyId, ctx.company.id))).limit(1);
+  if (!doc) return;
+  await db.update(schema.documents).set({ status: "analyzing", error: null }).where(eq(schema.documents.id, doc.id));
+  after(() => processDocument(doc.id));
+  refresh(companyId);
 }

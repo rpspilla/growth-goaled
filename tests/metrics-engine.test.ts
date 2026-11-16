@@ -65,6 +65,37 @@ describe("revenue calculations", () => {
     expect(a.warnings.join(" ")).toMatch(/not a full year/);
   });
 
+  it("reads Stripe's subscription metrics export from its Ending MRR row, never as customers", () => {
+    // The shape of Stripe's "Subscription metrics – monthly" CSV: one row per metric, one column per month.
+    const m = ["2026-06", "2026-07", "2026-08", "2026-09", "2026-10", "2026-11"];
+    const r = (label: string, unit: string, ...v: number[]) => [label, unit, ...v.map(String)];
+    const stripe = {
+      name: "Subscription_metrics_-_monthly_2026-06-01_to_2026-11-30.csv",
+      rows: [
+        ["metric_title", "unit", ...m],
+        ["MRR Roll-forward", "", "", "", "", "", "", ""],
+        r("Beginning MRR", "usd", 90000, 95000, 98000, 99000, 101000, 104000),
+        r("New MRR", "usd", 6000, 4000, 2000, 3000, 4000, 5000),
+        r("Reactivated MRR", "usd", 0, 0, 0, 0, 0, 0),
+        r("Expansion MRR", "usd", 1000, 1000, 1000, 1000, 1000, 1000),
+        r("Contraction MRR", "usd", -500, -500, -500, -500, -500, -500),
+        r("Churned MRR", "usd", -1500, -1500, -1500, -1500, -1500, -1500),
+        r("FX adjustment MRR", "usd", 0, 0, 0, 0, 0, 0),
+        r("Ending MRR", "usd", 95000, 98000, 99000, 101000, 104000, 108000),
+        ["Subscriber Roll-forward", "", "", "", "", "", "", ""],
+        r("Beginning Subscribers", "count", 10, 11, 12, 12, 13, 13),
+        r("Ending Subscribers", "count", 11, 12, 12, 13, 13, 14),
+        r("Revenue churn rate", "percent", 1.6, 1.5, 1.5, 1.5, 1.4, 1.4),
+        r("Average Revenue per Subscriber", "usd", 8636, 8166, 8250, 7769, 8000, 7714),
+      ],
+    };
+    const a = analyzeSheets([stripe]);
+    expect(a.monthly).toEqual(m.map((month, i) => ({ month, mrr: [95000, 98000, 99000, 101000, 104000, 108000][i] })));
+    expect(metric(a, "arr")).toMatchObject({ value: 1_296_000, period: "Nov 2026" });
+    // Rows are metrics, not customers: nothing per customer is worked out.
+    for (const k of ["customers", "nrr", "grr", "acv", "top_customer_concentration", "new_arr", "expansion_arr", "churned_arr"]) expect(metric(a, k)).toBeUndefined();
+  });
+
   it("doesn't treat a P&L as a customer table", () => {
     const pl = { name: "P&L", rows: [["Line", "Jan 2026", "Feb 2026", "Mar 2026"], ["Revenue", "100000", "110000", "120000"], ["COGS", "20000", "22000", "24000"], ["Total expenses", "300000", "300000", "300000"], ["Cash", "2400000", "2210000", "2030000"]] };
     const a = analyzeSheets([pl]);
