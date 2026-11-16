@@ -29,17 +29,17 @@ test("advisor names the plan and asks for data; the founder sees progress and da
   // One "Company profile" heading in the menu, open to start, with everything under it.
   const companyProfile = f.page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Company profile" });
   await expect(companyProfile).toHaveAttribute("aria-expanded", "true");
-  await expect(menu).toHaveText(["Company Details", "Team", "Overview", "Growth Projects", "Performance", "Documents", "What's Next?"]);
+  await expect(menu).toHaveText(["Company Details", "Team", "Overview", "Growth Projects", "Data", "Performance", "Documents", "What's Next?"]);
   await companyProfile.click();
   await expect(menu).toHaveCount(0);
   await companyProfile.click();
-  await expect(menu).toHaveCount(7);
+  await expect(menu).toHaveCount(8);
   await expect(f.page.getByRole("heading", { name: "Fasten Perf", level: 1 })).toBeVisible();
   await expect(f.page.getByText("Add your website to your company profile to show your logo and what you do.")).toBeVisible();
-  await expect(f.page.getByRole("link", { name: "Start a new plan with your advisor here" })).toBeVisible();
+  await expect(f.page.getByText("Your advisor will share your plan here.")).toBeVisible();
   // Every other founder page carries the company's branding in the same format (the Overview has the full one).
   await expect(f.page.getByRole("banner", { name: "Fasten Perf branding" })).toHaveCount(0);
-  for (const path of ["/chat", "/performance", "/documents", "/profile/company", "/team", "/library"]) {
+  for (const path of ["/chat", "/performance", "/documents", "/profile/company", "/team", "/projects", "/data"]) {
     await f.page.goto(path);
     await expect(f.page.getByLabel("Fasten Perf branding"), path).toContainText("Fasten Perf");
   }
@@ -108,10 +108,6 @@ test("advisor names the plan and asks for data; the founder sees progress and da
   await adv.ctx.close();
   const req = await db.query("select id from data_requests where company_id = $1", [company]);
 
-  // Founder: the plan leads the Overview.
-  await f.page.reload();
-  await expect(f.page.getByRole("region", { name: "Current plan" })).toContainText("Sales Hiring");
-  await expect(f.page.getByRole("link", { name: "Start a new plan with your advisor here" })).toHaveCount(0);
 
   // The email's link: Performance, at the upload area, with what was asked.
   await f.page.goto(`/performance?request=${req.rows[0].id}#upload`);
@@ -122,9 +118,9 @@ test("advisor names the plan and asks for data; the founder sees progress and da
   await expect(f.page.getByRole("region", { name: "Share new data" })).toBeVisible();
   await expect(f.page.getByRole("button", { name: /Choose files|browse/i }).or(f.page.getByText(/Drop|drag/i).first())).toBeVisible();
 
-  // (i) Action plan progress and (ii) business metrics are always there.
-  await expect(f.page.getByRole("heading", { name: "Action plan progress" })).toBeVisible();
-  await expect(f.page.getByRole("region", { name: "Current plan" })).toContainText("Sales Hiring");
+  // Company performance only: no action plan progress or plan cards; business metrics are always there.
+  await expect(f.page.getByRole("heading", { name: "Action plan progress" })).toHaveCount(0);
+  await expect(f.page.getByRole("region", { name: "Current plan" })).toHaveCount(0);
   for (const name of ["Revenue", "Month-over-month growth", "Retention"]) await expect(f.page.getByLabel(name, { exact: true })).toContainText("No figure yet");
 
   // Two months typed in: revenue, growth worked out, retention; each update dated.

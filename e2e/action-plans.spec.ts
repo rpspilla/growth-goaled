@@ -66,12 +66,8 @@ test("a founder buys an action plan from the conversation; an advisor approves i
   await cro.page.getByRole("button", { name: "Re-send the email to the founder" }).click();
   await expect(cro.page.getByText(/The email wasn.t sent/)).toBeVisible();
 
-  // Delivered to the founder: the Overview says it's ready and opens it.
-  await page.goto("/overview");
-  const ready = page.getByRole("region", { name: "Your action plans" });
-  await expect(ready).toContainText("Your action plan is ready");
-  await ready.getByRole("link", { name: "Open your action plan" }).click();
-  await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}#your-plan$/);
+  // Delivered to the founder in the conversation (conversation plans live under What's Next?).
+  await page.goto(`${planUrl}#your-plan`);
   await expect(panel).toContainText("Approved by your advisor");
   // The email's link: straight to the plan when signed in; a log-in form that lands there when not.
   const conversationPath = new URL(planUrl).pathname;

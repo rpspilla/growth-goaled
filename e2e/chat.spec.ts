@@ -22,7 +22,6 @@ test("a founder talks a decision through and gets a recommendation card", async 
   // The Overview no longer lists the starters; What's Next? does, in the owner's words.
   await page.goto("/overview");
   await expect(page.getByRole("button", { name: "How do I build a repeatable revenue engine?" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Start a new plan with your advisor here" })).toHaveAttribute("href", "/library");
   // The old Strategic Growth Questions address lands on What's Next?.
   await page.goto("/chat");
   await expect(page).toHaveURL(/\/whats-next$/);
@@ -148,8 +147,6 @@ test("a founder talks a decision through and gets a recommendation card", async 
   await expect(nudge.getByRole("link", { name: "Schedule time with an advisor" })).toHaveAttribute("href", "https://calendly.com/ryan-spillane-growthgoaled/30min");
   await expect(nudge.getByText("See the plans")).toHaveCount(0);
   await expect(conversation).toContainText("talk this through with someone at Growth Goaled");
-  await page.goto("/overview");
-  await expect(page.getByText(/Recent questions/)).toBeVisible();
   await page.goto("/chat");
   await expect(page.getByRole("list", { name: "Questions asked" })).toContainText("Should we raise prices before hiring?");
   await ctx.close();

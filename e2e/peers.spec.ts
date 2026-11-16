@@ -31,9 +31,6 @@ test("the Overview falls back to the standard reference for growth, churn and re
   const ctx = await browser.newContext();
   await ctx.addCookies([{ name: "gg_e2e_user", value: "peers@e2e.test", domain: "localhost", path: "/" }]);
   const page = await ctx.newPage();
-  await page.goto("/library/growth_leak/snapshot");
-  await expect(page.getByTestId("teaser")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "How you compare with peers" })).toHaveCount(0);
   await page.goto("/overview");
   await expect(page.getByRole("heading", { name: "Company Benchmark Performance" })).toBeVisible();
 

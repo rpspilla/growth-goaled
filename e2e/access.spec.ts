@@ -57,7 +57,7 @@ test("founders can't open advisor pages", async ({ browser }) => {
   const { ctx, page } = await as(browser, "access-founder@e2e.test");
   for (const path of ["/advisor/portfolio", "/advisor/benchmarks", "/advisor/benchmark-library", "/advisor/benchmark-library/sources", "/advisor/analytics", `/advisor/companies/${companyId}`]) {
     await page.goto(path);
-    await expect(page, path).toHaveURL(/\/library$/); // their next step: no question chosen yet;
+    await expect(page, path).toHaveURL(/\/overview$/); // their home: the Overview
   }
   await ctx.close();
 });
@@ -71,17 +71,18 @@ test("old founder routes redirect into the five steps", async ({ browser }) => {
     ["/questions", /\/data\/questions$/],
     ["/upload", /\/data$/],
     ["/intake/company", /\/profile\/company$/],
-    // No active use case yet, so Baseline sends them to the library.
-    ["/benchmark", /\/library$/],
-    ["/hiring", /\/library$/],
+    // Results and the hiring step live inside growth projects now.
+    ["/benchmark", /\/projects$/],
+    ["/hiring", /\/projects$/],
   ];
   for (const [from, to] of cases) {
     await page.goto(from);
     await expect(page, from).toHaveURL(to);
   }
-  // Data is locked until an assessment is bought.
+  // Data is one shared page, open to every founder: CRM and billing.
   await page.goto("/data");
-  await expect(page.getByText(/This step unlocks when you start a growth project\./)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Data", level: 1 })).toBeVisible();
+  for (const name of ["CRM data", "Billing and financial data"]) await expect(page.getByRole("heading", { name })).toBeVisible();
   await ctx.close();
 });
 
@@ -89,17 +90,16 @@ test("paid steps need a payment Stripe confirmed, never a URL or the browser", a
   const { ctx, page } = await as(browser, "access-founder@e2e.test");
   // A made-up success return doesn't unlock anything.
   await page.goto("/api/checkout/return?use_case=growth_leak&session_id=cs_forged");
-  await expect(page).toHaveURL(/\/library\/growth_leak\/snapshot\?checkout=pending|\/library\/growth_leak$/);
-  await page.goto("/data");
-  await expect(page.getByText(/This step unlocks when you start a growth project\./)).toBeVisible();
-  // Results and "open assessment" links for something not bought go back to the library / history.
+  await expect(page).toHaveURL(/\/projects$/);
+  // Results and "open assessment" links land on Growth Projects, a history the advisor keeps.
   await page.goto("/baseline");
-  await expect(page).toHaveURL(/\/library$/);
+  await expect(page).toHaveURL(/\/projects$/);
   await page.goto("/assessments/open?use_case=growth_leak");
-  // Past growth projects live on Growth Projects now; with none yet, it shows only the ways to start.
-  await expect(page).toHaveURL(/\/library(#past-projects)?$/);
+  await expect(page).toHaveURL(/\/projects$/);
   await expect(page.getByRole("heading", { name: "Growth Projects", level: 1 })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Your growth projects" })).toHaveCount(0);
+  await expect(page.getByText(/No growth projects yet/)).toBeVisible();
+  // Nothing unlocked by the forged return.
+  expect(await page.locator("text=Growth Hiring Plan").count()).toBe(0);
   await ctx.close();
 });
 
