@@ -228,6 +228,25 @@ Growth Goaled's own prospecting and relationships, at **/advisor/crm** ("CRM" in
 - **Assessment plan (Progress)**: each action has **Who does it** (Founder or Growth Goaled); **Send to my advisor for review** fixes the split and gives the advisor a To Do and an email (`sendPlanAssignments`, migration `0029_plan_action_assignee.sql`).
 - **Advisor company page** also lists the founder's **Business updates** with Remove / Clear all (readings set aside, not deleted). **Users** shows each person's company (staff: Growth Goaled), and admins can delete people (optionally with a company only they belonged to). Data requests can be deleted one by one or all at once.
 
+### Founder View (redesign, Nov 16, 2026): the advisor owns the work, the founder views it
+
+The founder view is an executive dashboard, not a project tool. Advisors run everything from **Growth projects** on the advisor's company page (`/advisor/companies/[id]/projects`, `lib/data/projects.ts`, migration 0035); founders only view it.
+
+| | Advisor | Founder |
+|---|---|---|
+| Growth projects (`growth_projects`) | create, rename, set Open/Completed with dates, delete | Growth Projects (`/projects`): history with status, started and completed dates |
+| Action plan and documents (`project_documents`) | add a link (Google Doc…, https only) or upload a file (PDF, Word, PowerPoint, Excel, CSV, image) to `projects/<companyId>/` | Review Action Plan card on the project and the Overview; documents under it; files open via `/api/project-files/[id]` |
+| Results (`project_results`) | define label, value, note; Approve/Withdraw; editing an approved one takes it back to draft | the project page shows approved results only |
+| Weekly priorities (`weekly_priorities`) | up to 5 a week (Monday start), each with the action for the next 7 days and an optional due date within the week | Overview's Top priorities: this week's, else the latest earlier week's, labelled with its week |
+
+- **Overview** (`app/(founder)/overview/page.tsx`): the open projects (else the latest one) with Review Action Plan and documents; Business metrics: ARR, NRR, Sales Cycle and MoM growth only; six-month MRR chart (`components/performance/MrrChart.tsx`: month × MRR line, month-over-month change with direction under each month, hover and screen-reader table); Top priorities; Company Benchmark Performance (unchanged).
+- **Growth Projects** (`/projects`, `/projects/[id]`): no founder-driven selection. `/library`, `/library/*`, `/assessments` redirect to it; `/baseline` (Results) and `/progress` (Action plan) redirect to the matching project.
+- **Data** (`/data`): one page for every project: drop any export (read and sorted as before), with what to share for CRM (won, lost, pipeline, deal history, activity) and billing (Stripe, Xero, QuickBooks, other), each with the export to use and when a matching file was last shared (`lib/data-sources.ts`). Live connections come later. No growth-project-specific data pages or "rerun my report".
+- **Performance**: company performance only (no Action plan progress or plan cards); MRR uses the same chart.
+- **Company Details from documents**: after each file is read, `updateProfileFromDocument` asks the model for the profile answers the file states clearly (company, customers, GTM, ICP, hiring); an answer is replaced only when it's older than the file, saved as "From <file>". Event `profile_updated_from_document`.
+- **MRR data fix**: Stripe's "Subscription metrics – monthly" export (one row per metric) is read from its **Ending MRR** row; it was being summed as if each metric row were a customer. Advisors can **Re-read** a spreadsheet on the company's Documents page after such a fix.
+- Existing growth projects carried over as open advisor projects. The earlier founder inputs, task boards, hiring numbers and review gate stay in the data but are no longer shown to founders. Team, Documents and What's Next? are unchanged.
+
 ### Founder home, Strategic Decisions and Performance
 
 - **Menu** (Nov 12, 2026 call; `lib/nav.ts`): one **Company profile** heading (opens and closes, open to start) with, in this order, **Company Details** (`/profile`), **Team**, **Overview**, **Growth Projects** (`/library`), **Performance**, **Documents** and **What's Next?** (`/whats-next`). While a growth project is active, its Data, Results and Action plan sit indented under Growth Projects. The advisor's view of a company (`/advisor/companies/[id]`) shows the same menu in the same order; items without their own advisor page open the matching section of the company page (Company Details → the header, Team → People, Performance → Business updates, What's Next? → the questions asked). Assessments are called **growth projects** throughout.
