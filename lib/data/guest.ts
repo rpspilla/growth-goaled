@@ -235,7 +235,7 @@ async function leadAlertRecipients(): Promise<string[]> {
  * they told us, the conversation so far and a link to their CRM contact. Once per chat and email
  * (a changed email is a new alert). Never fails the visitor's request.
  */
-export async function notifyNewLead(guestId: string, appUrl: string): Promise<number> {
+export async function notifyNewLead(guestId: string, appUrl: string, opts: { force?: boolean } = {}): Promise<number> {
   const [g] = await db.select().from(schema.guestSessions).where(eq(schema.guestSessions.id, guestId)).limit(1);
   if (!g?.email) return 0;
   const already = await db
@@ -243,7 +243,8 @@ export async function notifyNewLead(guestId: string, appUrl: string): Promise<nu
     .from(schema.events)
     .where(and(eq(schema.events.name, "lead_alert_sent"), sql`${schema.events.props}->>'guestId' = ${g.id}`, sql`${schema.events.props}->>'emailHash' = ${hashToken(g.email)}`))
     .limit(1);
-  if (already.length) return 0;
+  // Staff can send it again on purpose (e.g. for a lead from before alerts existed).
+  if (already.length && !opts.force) return 0;
   const p = g.profile;
   const band = REVENUE_BANDS.find((b) => b.value === p.revenueBand)?.label;
   const details: [string, string][] = (

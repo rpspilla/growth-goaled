@@ -7,7 +7,7 @@ import { followUpBucket, fullName, PRIORITY_LABEL } from "@/lib/crm";
 import { contactProfile, listCompanies, pipeline, staffUsers } from "@/lib/data/crm";
 import { contactChats } from "@/lib/data/guest";
 import { LeadChats, QuestionCounts } from "@/components/crm/LeadChats";
-import { addTaskAction, completeTaskAction, deleteContactAction, deleteDraftAction, deleteTaskAction, logActivityAction, moveContactAction, saveDraftAction, updateContactAction } from "../../actions";
+import { sendLeadAlertAction, addTaskAction, completeTaskAction, deleteContactAction, deleteDraftAction, deleteTaskAction, logActivityAction, moveContactAction, saveDraftAction, updateContactAction } from "../../actions";
 
 export const metadata = { title: "Contact" };
 
@@ -164,7 +164,7 @@ export default async function ContactPage({ params, searchParams }: { params: Pr
         <section aria-label="Website chat" className="surface p-5 space-y-4">
           <h2 className="font-semibold" style={fg}>Website chat</h2>
           <QuestionCounts {...chat} />
-          <LeadChats chats={chat.chats} />
+          <LeadChats chats={chat.chats} sendAlert={sendLeadAlertAction.bind(null, c.id)} />
         </section>
       )}
 

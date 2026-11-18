@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireRole } from "@/lib/auth/session";
+import { headers } from "next/headers";
+import { and, eq } from "drizzle-orm";
+import { db, schema } from "@/lib/db";
+import { notifyNewLead } from "@/lib/data/guest";
 import { mapImportRows, PRIORITIES, type Priority } from "@/lib/crm";
 import { parseCsv } from "@/lib/file-profile";
 import {
@@ -219,4 +223,16 @@ export async function deleteStageAction(stageId: string, fd: FormData): Promise<
   if (!uuid.safeParse(stageId).success) return;
   await deleteStage(user, stageId, str(fd, "moveTo"));
   refresh();
+}
+
+/** Emails the lead alert for one of a contact's website chats (again, or for a lead from before alerts existed). */
+export async function sendLeadAlertAction(contactId: string, chatId: string): Promise<void> {
+  await staff();
+  if (!z.uuid().safeParse(contactId).success || !z.uuid().safeParse(chatId).success) return;
+  const [chat] = await db.select({ id: schema.guestSessions.id }).from(schema.guestSessions).where(and(eq(schema.guestSessions.id, chatId), eq(schema.guestSessions.crmContactId, contactId))).limit(1);
+  if (!chat) return;
+  const h = await headers();
+  const appUrl = process.env.APP_URL?.replace(/\/$/, "") ?? `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
+  await notifyNewLead(chat.id, appUrl, { force: true });
+  revalidatePath(`/advisor/crm/contacts/${contactId}`);
 }

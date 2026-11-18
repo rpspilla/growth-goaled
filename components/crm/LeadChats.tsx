@@ -44,7 +44,7 @@ export function QuestionCounts({ lifetime, sessions, mostInOneSession }: { lifet
 }
 
 /** Every website chat, oldest first: what they told us, then the whole conversation with times. */
-export function LeadChats({ chats, names }: { chats: LeadChat[]; names?: Record<string, string> }) {
+export function LeadChats({ chats, names, sendAlert }: { chats: LeadChat[]; names?: Record<string, string>; /** Staff: email the lead alert for a chat (bound to the contact). */ sendAlert?: (chatId: string) => Promise<void> }) {
   if (!chats.length) return <p className="text-sm" style={muted}>No website chats yet. When a prospect chats on the sign-in page and gives this email, the conversation shows here.</p>;
   return (
     <ol className="space-y-5" aria-label="Website chats">
@@ -61,6 +61,11 @@ export function LeadChats({ chats, names }: { chats: LeadChat[]; names?: Record<
                 Started {when(c.startedAt)} · {c.questions} {c.questions === 1 ? "question" : "questions"}
                 {c.claimed ? " · signed up" : ""}
               </span>
+              {sendAlert && c.email && (
+                <form action={sendAlert.bind(null, c.id)}>
+                  <button type="submit" className="link text-xs" aria-label={`Send lead alert for chat ${n + 1}`}>Send lead alert</button>
+                </form>
+              )}
             </div>
             {told.length > 0 && (
               <dl className="grid sm:grid-cols-2 gap-x-4 gap-y-1 text-sm">
