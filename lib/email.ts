@@ -143,3 +143,27 @@ ${p.founder.length ? `<p style="font-size:13px;color:#64748B;margin-bottom:0">Th
 </div>`;
   return { subject, text, html };
 }
+
+/** To Growth Goaled: a prospect gave their email in the website chat (a new lead, with what they said). */
+export function leadAlertEmail(p: { name: string | null; email: string; company: string | null; details: [string, string][]; messages: { role: "user" | "assistant"; content: string }[]; questions: number; link: string }) {
+  const who = p.name ? `${p.name} (${p.email})` : p.email;
+  const subject = `New lead from the website chat: ${p.name ?? p.email}${p.company ? `, ${p.company}` : ""}`;
+  const convo = p.messages.slice(-12);
+  const text = `${who} gave their email in the website chat.
+
+${p.details.map(([k, v]) => `${k}: ${v}`).join("\n")}
+Questions asked: ${p.questions}
+
+The conversation so far${p.messages.length > convo.length ? " (latest messages)" : ""}:
+${convo.map((m) => `${m.role === "user" ? "Prospect" : "Growth Goaled"}: ${m.content}`).join("\n\n")}
+
+Open the contact in the CRM: ${p.link}`;
+  const html = `<div style="font-family:Inter,Arial,sans-serif;color:#0D1B2A;max-width:560px">
+<p style="font-size:15px"><strong>${escape(who)}</strong> gave their email in the website chat.</p>
+<table style="font-size:14px;border-collapse:collapse">${p.details.map(([k, v]) => `<tr><td style="color:#64748B;padding:2px 12px 2px 0;vertical-align:top">${escape(k)}</td><td style="padding:2px 0">${escape(v)}</td></tr>`).join("")}<tr><td style="color:#64748B;padding:2px 12px 2px 0">Questions asked</td><td>${p.questions}</td></tr></table>
+<p style="font-size:13px;color:#64748B;margin:16px 0 4px">The conversation so far${p.messages.length > convo.length ? " (latest messages)" : ""}</p>
+${convo.map((m) => `<p style="font-size:14px;margin:6px 0;padding:8px 10px;border-radius:8px;background:${m.role === "user" ? "#E8F0FB" : "#F1F5F9"}"><span style="font-size:12px;color:#64748B">${m.role === "user" ? "Prospect" : "Growth Goaled"}</span><br>${escape(m.content).replace(/\n/g, "<br>")}</p>`).join("")}
+<p><a href="${escape(p.link)}" style="display:inline-block;background:#155A3C;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600">Open the contact in the CRM</a></p>
+</div>`;
+  return { subject, text, html };
+}

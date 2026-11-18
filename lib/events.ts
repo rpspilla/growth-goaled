@@ -10,6 +10,7 @@ export type EventName =
   | "guest_question_asked"
   | "guest_question_cap_reached"
   | "guest_question_blocked"
+  | "lead_alert_sent"
   | "action_plan_purchased"
   | "action_plan_submitted"
   | "action_plan_delivered"

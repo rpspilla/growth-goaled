@@ -12,6 +12,7 @@ import { basicsFrom, GUEST_STEPS, interpretAnswer, nextStep, OPENING, SPIN_UP } 
 import { capReached, FREE_QUESTIONS, questionsLeft, type CapScope, type QuestionCounts } from "@/lib/guest/limits";
 import { REVENUE_BANDS } from "@/lib/onboarding";
 import { leadFromChat } from "./crm";
+import { leadAlertEmail, sendEmail } from "@/lib/email";
 import { getFounderCompany } from "./companies";
 import { saveCompanyBasics } from "./intake";
 
@@ -219,6 +220,61 @@ export async function guestEmail(g: GuestSession, email: string): Promise<GuestR
     await track("guest_question_cap_reached", { props: { scope: "lifetime", session: counts.session, lifetime: counts.lifetime, at: "email" } });
   }
   return { ok: true };
+}
+
+/** Who hears about new leads: LEAD_ALERT_EMAILS (comma-separated), else every admin. */
+async function leadAlertRecipients(): Promise<string[]> {
+  const listed = (process.env.LEAD_ALERT_EMAILS ?? "").split(",").map((e) => e.trim()).filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+  if (listed.length) return [...new Set(listed)];
+  const admins = await db.select({ email: schema.users.email }).from(schema.users).where(eq(schema.users.role, "admin"));
+  return [...new Set(admins.map((a) => a.email))];
+}
+
+/**
+ * Emails Growth Goaled when a prospect gives their email in the website chat: who they are, what
+ * they told us, the conversation so far and a link to their CRM contact. Once per chat and email
+ * (a changed email is a new alert). Never fails the visitor's request.
+ */
+export async function notifyNewLead(guestId: string, appUrl: string): Promise<number> {
+  const [g] = await db.select().from(schema.guestSessions).where(eq(schema.guestSessions.id, guestId)).limit(1);
+  if (!g?.email) return 0;
+  const already = await db
+    .select({ id: schema.events.id })
+    .from(schema.events)
+    .where(and(eq(schema.events.name, "lead_alert_sent"), sql`${schema.events.props}->>'guestId' = ${g.id}`, sql`${schema.events.props}->>'emailHash' = ${hashToken(g.email)}`))
+    .limit(1);
+  if (already.length) return 0;
+  const p = g.profile;
+  const band = REVENUE_BANDS.find((b) => b.value === p.revenueBand)?.label;
+  const details: [string, string][] = (
+    [
+      ["Email", g.email],
+      ["Name", p.name],
+      ["Company", p.companyName],
+      ["Wants help with", p.challenge],
+      ["Revenue", band],
+      ["Founded", p.foundedYear],
+      ["Funding stage", p.stage],
+      ["Vertical", p.vertical === "Other" ? p.verticalOther : p.vertical],
+      ["Account executives", p.aes],
+      ["BDRs/SDRs", p.bdrs],
+      ["Customer success", p.cs],
+    ] as [string, string | undefined][]
+  ).filter((d): d is [string, string] => Boolean(d[1]?.trim()));
+  const msg = leadAlertEmail({
+    name: p.name?.trim() || null,
+    email: g.email,
+    company: p.companyName?.trim() || null,
+    details,
+    messages: g.messages.slice(1).map((m) => ({ role: m.role, content: m.content })),
+    questions: g.questions,
+    link: g.crmContactId ? `${appUrl}/advisor/crm/contacts/${g.crmContactId}?tab=chat` : `${appUrl}/advisor/crm`,
+  });
+  let sent = 0;
+  for (const to of await leadAlertRecipients()) if ((await sendEmail({ to, ...msg }).catch(() => ({ sent: false }))).sent) sent++;
+  // The email itself stays in the chat record; events only keep a hash, to send one alert per email.
+  await track("lead_alert_sent", { props: { guestId: g.id, emailHash: hashToken(g.email), recipients: sent } });
+  return sent;
 }
 
 /**

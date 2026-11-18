@@ -3,7 +3,8 @@
 import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { GUEST_COOKIE, guestByToken, guestEmail, guestReply, newToken, startGuest, type GuestResult } from "@/lib/data/guest";
+import { GUEST_COOKIE, guestByToken, guestEmail, guestReply, newToken, notifyNewLead, startGuest, type GuestResult } from "@/lib/data/guest";
+import { after } from "next/server";
 
 const COOKIE = { httpOnly: true, sameSite: "lax" as const, secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 30 };
 
@@ -43,6 +44,12 @@ export async function guestEmailAction(email: string): Promise<GuestResult> {
   const parsed = z.email().safeParse(String(email).trim().toLowerCase());
   if (!parsed.success) return { ok: false, error: "Enter a valid email address, like you@company.com." };
   const result = await guestEmail(g, parsed.data);
+  // Growth Goaled hears about the new lead straight away (after the response, so the visitor isn't kept waiting).
+  if (result.ok) {
+    const h = await headers();
+    const appUrl = process.env.APP_URL?.replace(/\/$/, "") ?? `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
+    after(() => notifyNewLead(g.id, appUrl).catch((err) => console.error("[guest] Lead alert failed", err)));
+  }
   revalidatePath("/sign-in");
   return result;
 }

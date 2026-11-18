@@ -4,6 +4,8 @@ import { eq } from "drizzle-orm";
 
 const h = vi.hoisted(() => ({ db: null as unknown as Record<string | symbol, unknown>, inputs: [] as unknown[] }));
 vi.mock("server-only", () => ({}));
+const mails = vi.hoisted(() => [] as { to: string; subject: string; text: string }[]);
+vi.mock("@/lib/email", async (original) => ({ ...(await original<typeof import("@/lib/email")>()), sendEmail: async (m: { to: string; subject: string; text: string }) => (mails.push(m), { sent: true }) }));
 vi.mock("@/lib/db", async () => {
   const schema = await import("@/lib/db/schema");
   return { db: new Proxy({}, { get: (_t, p) => Reflect.get(h.db, p) }), schema };
@@ -16,7 +18,7 @@ vi.mock("@/lib/ai/chat", async (original) => {
 import { schema } from "@/lib/db";
 import type { ChatInput } from "@/lib/ai/chat";
 import type { GuestSession, User } from "@/lib/db/schema";
-import { claimGuest, companyChats, contactChats, guestByToken, guestEmail, guestReply, guestView, newToken, questionCounts, startGuest } from "@/lib/data/guest";
+import { claimGuest, companyChats, contactChats, guestByToken, guestEmail, guestReply, guestView, newToken, notifyNewLead, questionCounts, startGuest } from "@/lib/data/guest";
 import { FREE_QUESTIONS } from "@/lib/guest/limits";
 import { OPENING, SPIN_UP } from "@/lib/guest/steps";
 
@@ -218,5 +220,33 @@ describe("free-question cap and the CRM record", () => {
     expect(await say("Mine?")).toMatchObject({ ok: false, capped: "lifetime" });
     const [contact] = await db().select().from(schema.crmContacts).where(eq(schema.crmContacts.email, "pat@acme.test"));
     expect((await companyChats(contact!.companyId!)).lifetime).toBe(21);
+  });
+});
+
+describe("new lead alert", () => {
+  it("emails the admins once per chat and email, with what the prospect said and a link to the contact", async () => {
+    mails.length = 0;
+    delete process.env.LEAD_ALERT_EMAILS;
+    await db().insert(schema.users).values([{ email: "boss@gg.test", authUserId: "boss", role: "admin" }, { email: "f@x.test", authUserId: "f", role: "founder" }]);
+    await startGuest(token, null);
+    await answerAll();
+    await guestEmail(await current(), "sam@acme.test");
+    const g = await current();
+    expect(await notifyNewLead(g.id, "https://app.test")).toBe(1);
+    expect(mails).toHaveLength(1);
+    expect(mails[0]).toMatchObject({ to: "boss@gg.test", subject: "New lead from the website chat: Sam Founder, Acme" });
+    expect(mails[0]!.text).toContain("Wants help with: Our pipeline isn't converting.");
+    expect(mails[0]!.text).toContain("Revenue: $1M–$3M");
+    expect(mails[0]!.text).toContain(`https://app.test/advisor/crm/contacts/${g.crmContactId}?tab=chat`);
+    // Once per chat and email; the event keeps no email address.
+    expect(await notifyNewLead(g.id, "https://app.test")).toBe(0);
+    const [ev] = await db().select().from(schema.events).where(eq(schema.events.name, "lead_alert_sent"));
+    expect(JSON.stringify(ev!.props)).not.toContain("sam@acme.test");
+    // A changed email is a new lead; LEAD_ALERT_EMAILS decides who hears.
+    process.env.LEAD_ALERT_EMAILS = "leads@gg.test, other@gg.test";
+    await guestEmail(await current(), "sam@newco.test");
+    expect(await notifyNewLead(g.id, "https://app.test")).toBe(2);
+    expect(mails.slice(1).map((m) => m.to)).toEqual(["leads@gg.test", "other@gg.test"]);
+    delete process.env.LEAD_ALERT_EMAILS;
   });
 });
