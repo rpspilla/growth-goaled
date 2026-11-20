@@ -56,6 +56,7 @@ export async function arrGrowth(company: Pick<Company, "id">): Promise<ArrGrowth
   const readings = await db
     .select({ value: schema.dataPoints.value, period: schema.dataPoints.period, status: schema.dataPoints.status, origin: schema.dataPoints.origin, createdAt: schema.dataPoints.createdAt, updatedAt: schema.dataPoints.updatedAt })
     .from(schema.dataPoints)
-    .where(and(eq(schema.dataPoints.companyId, company.id), eq(schema.dataPoints.metric, "arr"), ne(schema.dataPoints.status, "rejected")));
+    .where(and(eq(schema.dataPoints.companyId, company.id), eq(schema.dataPoints.metric, "arr")));
+  // Rejected figures too: ones set aside for an earlier month still count as history.
   return arrGrowthSinceLastUpdate(readings);
 }

@@ -29,6 +29,15 @@ describe("growth since the last data update", () => {
     ]);
     expect(g).toMatchObject({ pct: 33.3, from: { value: 1_247_450, period: "Jul 2026", confirmed: false } });
   });
+  it("counts a chosen figure from when it first arrived, even when choosing it copied it to the profile", () => {
+    const g = arrGrowthSinceLastUpdate([
+      r(1_200_000, "2026-11-20", { period: "Current", origin: "manual" }),
+      r(1_200_000, "2026-11-01", { period: "Nov 2026" }),
+      r(3_900_000, "2026-11-02", { status: "rejected", period: "Nov 2026" }),
+      r(1_000_000, "2026-08-01", { status: "rejected", period: "Aug 2026" }),
+    ]);
+    expect(g).toMatchObject({ pct: 20, from: { value: 1_000_000 }, to: { period: "Nov 2026" } });
+  });
   it("is null with nothing to compare", () => {
     expect(arrGrowthSinceLastUpdate([])).toBeNull();
     expect(arrGrowthSinceLastUpdate([r(1_000_000, "2026-11-01")])).toBeNull();

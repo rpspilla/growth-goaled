@@ -27,7 +27,7 @@ test("founder and advisor see the company's documents, plans first", async ({ br
   await db.query("insert into conversation_messages (conversation_id, role, content, document_ids) values ($1, 'user', 'Shared a file: pipeline.csv', $2::jsonb)", [conversation, JSON.stringify([shared.rows[0].id])]);
   await db.query("insert into documents (company_id, doc_type, blob_url, filename, mime, size, status) values ($1, 'financial_model', 'e2e://model.xlsx', 'model.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 3145728, 'failed')", [company]);
   // Two data updates: ARR grew 20% since the earlier one.
-  await db.query("insert into data_points (company_id, metric, value, unit, origin, status, confidence, period, created_at, updated_at) values ($1, 'arr', 1000000, 'usd', 'manual', 'accepted', 'high', 'Aug 2026', '2026-08-01', '2026-08-01'), ($1, 'arr', 1200000, 'usd', 'manual', 'accepted', 'high', 'Nov 2026', '2026-11-01', '2026-11-01')", [company]);
+  await db.query("insert into data_points (company_id, metric, value, unit, origin, status, confidence, period, created_at, updated_at) values ($1, 'arr', 1000000, 'usd', 'manual', 'accepted', 'high', 'Aug 2026', '2026-08-01', '2026-08-01'), ($1, 'arr', 1200000, 'usd', 'manual', 'accepted', 'high', 'Nov 2026', '2026-11-01', '2026-11-01'), ($1, 'arr', 3900000, 'usd', 'calculated', 'proposed', 'high', 'Nov 2026', '2026-11-02', '2026-11-02')", [company]);
   await db.end();
 
   const as = async (email: string) => {
@@ -89,6 +89,12 @@ test("founder and advisor see the company's documents, plans first", async ({ br
   const growth = adv.page.getByLabel("Growth since the last data update");
   await expect(growth).toContainText("▲ +20%");
   await expect(growth).toContainText("Since the Aug 1, 2026 update · $1M (Aug 2026) → $1.2M (Nov 2026)");
+  // A wrong ARR read from a file: the tile says the values disagree and the choice is right below it.
+  await expect(adv.page.getByText("Values disagree · choose the right one ↓")).toBeVisible();
+  const check = adv.page.getByRole("region", { name: "Choose the right figure" });
+  await check.getByRole("button", { name: /^Use \$1\.2M .* for ARR$/ }).first().click();
+  await expect(check).toHaveCount(0);
+  await expect(growth).toContainText("▲ +20%");
   await adv.page.getByRole("link", { name: "Documents" }).click();
   await expect(adv.page).toHaveURL(new RegExp(`/advisor/companies/${company}/documents$`));
   await expect(adv.page.getByRole("list", { name: "Action plans" }).getByRole("link", { name: "Open plan" })).toHaveAttribute("href", `/advisor/plans/${plan.rows[0].id}`);

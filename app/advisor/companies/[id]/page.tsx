@@ -5,7 +5,7 @@ import { latestMetrics, portfolioRows, userName } from "@/lib/data/portfolio";
 import { formatMetric, type MetricKey } from "@/lib/metrics";
 import { getUseCase, targetSummary } from "@/lib/use-cases";
 import { STEPS, journeyStage } from "@/lib/use-cases/steps";
-import { clearBusinessUpdateAction, setBusinessUpdateDateAction, deleteDataRequestAction, createContractAction, removeContractAction, updateContractAction, uploadContractAction, rereadContractAction, updateContractDetailsAction, cancelCompanyInviteAction, inviteCompanyMemberAction, removeCompanyMemberAction, requestDataAction, setCurrentPlanAction, updateHealth, updateSummary } from "./actions";
+import { chooseFigureForCompany, enterFigureForCompany, clearBusinessUpdateAction, setBusinessUpdateDateAction, deleteDataRequestAction, createContractAction, removeContractAction, updateContractAction, uploadContractAction, rereadContractAction, updateContractDetailsAction, cancelCompanyInviteAction, inviteCompanyMemberAction, removeCompanyMemberAction, requestDataAction, setCurrentPlanAction, updateHealth, updateSummary } from "./actions";
 import { DataRequestForm } from "@/components/advisor/DataRequestForm";
 import { ContractsPanel } from "@/components/advisor/ContractsPanel";
 import { listContracts } from "@/lib/data/contracts";
@@ -19,6 +19,8 @@ import { companyContext } from "./context";
 import { listConversations } from "@/lib/data/chat";
 import { founderPlans } from "@/lib/data/action-plans";
 import { arrGrowth } from "@/lib/data/performance";
+import { figureChoices } from "@/lib/data/figures";
+import { FigureChecker } from "@/components/use-cases/FigureChecker";
 
 const CARDS: MetricKey[] = ["arr", "arr_growth", "nrr", "acv"];
 const card = { background: "var(--card)", borderColor: "var(--border)" };
@@ -34,7 +36,9 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
     listAdvisoryRequests([company.id]),
   ]);
   const [people, requests, biz, contracts, questions, plans] = await Promise.all([companyPeople(company.id), listDataRequests(company.id), businessMetrics(company), listContracts(company.id), listConversations(company, 50), founderPlans(company)]);
-  const growth = await arrGrowth(company);
+  const [growth, tileFigures] = await Promise.all([arrGrowth(company), figureChoices(company, ["arr", "nrr", "acv"])]);
+  // Tiles whose figure has several values on file that disagree: the advisor picks the right one here.
+  const disagreeing = tileFigures.filter((f) => f.state === "conflict");
   const plansByConversation = new Map(plans.map((p) => [p.conversationId, p.id]));
   const todayIso = new Date().toISOString().slice(0, 10);
   const bizKeys = Object.keys(BUSINESS_METRICS) as BusinessKey[];
@@ -93,15 +97,27 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
             );
           }
           const v = metrics.get(m);
+          const conflict = disagreeing.some((f) => f.metric === m);
           return (
-            <div key={m} className="rounded-xl border p-4" style={card}>
+            <div key={m} className="rounded-xl border p-4" style={conflict ? { ...card, borderColor: "var(--amber)" } : card}>
               <div className="label mb-1" style={{ color: "var(--muted-foreground)" }}>{m.toUpperCase()}</div>
               <div className="font-mono text-xl font-semibold" style={{ color: v ? "var(--foreground)" : "var(--muted-foreground)" }}>{v ? formatMetric(m, v.value) : "—"}</div>
+              {conflict && <a href="#check-figures" className="text-xs font-medium" style={{ color: "#92400E" }}>Values disagree · choose the right one ↓</a>}
             </div>
           );
         })}
       </div>
 
+
+      {disagreeing.length > 0 && (
+        <section id="check-figures" aria-labelledby="check-figures-h" className="rounded-xl border p-5 space-y-2 scroll-mt-6" style={{ ...card, borderColor: "var(--amber)" }}>
+          <h2 id="check-figures-h" className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>Choose the right figure</h2>
+          <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+            These have more than one value on file. Press <strong>Use this one</strong> on the correct value: it becomes the figure shown above, and the values that disagree are set aside.
+          </p>
+          <FigureChecker choices={disagreeing} choose={chooseFigureForCompany.bind(null, company.id)} enter={enterFigureForCompany.bind(null, company.id)} />
+        </section>
+      )}
 
       <section>
         <h2 className="text-lg font-semibold mb-2" style={{ color: "var(--foreground)" }}>Growth questions</h2>
