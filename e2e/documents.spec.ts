@@ -62,6 +62,7 @@ test("founder and advisor see the company's documents, plans first", async ({ br
   await files.getByRole("checkbox", { name: "Select model.xlsx" }).check();
   await expect(bar).toContainText("2 selected");
   await expect(bar.getByRole("button", { name: "Download 2" })).toBeVisible();
+  await expect(bar.getByRole("button", { name: /Re-read/ })).toHaveCount(0);
   await bar.getByRole("button", { name: "Clear selection" }).click();
   await expect(bar).toHaveCount(0);
   await f.page.getByRole("button", { name: "List view" }).click();
@@ -93,5 +94,11 @@ test("founder and advisor see the company's documents, plans first", async ({ br
   await expect(adv.page.getByRole("list", { name: "Action plans" }).getByRole("link", { name: "Open plan" })).toHaveAttribute("href", `/advisor/plans/${plan.rows[0].id}`);
   await expect(adv.page.getByRole("list", { name: "Data and input materials" }).getByRole("listitem")).toHaveCount(2);
   await expect(adv.page.getByText("Shared in “Should we hire more salespeople?”")).toBeVisible();
+  // Spreadsheets can be read again from their tile or the selection bar (advisors only).
+  const advFiles = adv.page.getByRole("list", { name: "Data and input materials" });
+  await expect(advFiles.getByRole("button", { name: "Re-read pipeline.csv" })).toBeVisible();
+  await advFiles.getByRole("listitem", { name: "model.xlsx" }).click();
+  await adv.page.getByRole("toolbar", { name: "Selected files" }).getByRole("button", { name: "Re-read" }).click();
+  await expect(advFiles.getByRole("listitem", { name: "model.xlsx" })).toContainText("Being read");
   await adv.ctx.close();
 });

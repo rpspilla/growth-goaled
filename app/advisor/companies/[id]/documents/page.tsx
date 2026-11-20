@@ -4,7 +4,7 @@ import { fileRows, planRows } from "@/lib/document-rows";
 import { companyContext } from "../context";
 import { rereadDocumentAction } from "../actions";
 import { db, schema } from "@/lib/db";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 export const metadata = { title: "Documents" };
 
@@ -14,34 +14,21 @@ export default async function CompanyDocumentsPage({ params }: { params: Promise
   const { plans, files } = await companyDocumentLibrary(company.id);
   // Spreadsheets and CSVs, whose figures are calculated in code: re-read after a fix to how a format is read.
   const sheets = await db
-    .select({ id: schema.documents.id, filename: schema.documents.filename, status: schema.documents.status, updatedAt: schema.documents.updatedAt })
+    .select({ id: schema.documents.id })
     .from(schema.documents)
-    .where(and(eq(schema.documents.companyId, company.id), inArray(schema.documents.mime, ["text/csv", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"])))
-    .orderBy(desc(schema.documents.updatedAt));
+    .where(and(eq(schema.documents.companyId, company.id), inArray(schema.documents.mime, ["text/csv", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"])));
   return (
     <div className="page space-y-6">
       <header>
         <h1 className="font-display text-2xl sm:text-3xl" style={{ color: "var(--foreground)" }}>Documents</h1>
-        <p className="text-sm mt-1" style={{ color: "var(--muted-foreground)" }}>{company.name}&apos;s action plans and everything they&apos;ve shared, as the founder sees it.</p>
+        <p className="text-sm mt-1" style={{ color: "var(--muted-foreground)" }}>{company.name}&apos;s action plans and everything they&apos;ve shared, as the founder sees it. Select a spreadsheet and press Re-read to read its figures again.</p>
       </header>
-      <DocumentLibrary plans={planRows(plans, (p) => `/advisor/plans/${p.id}`)} files={fileRows(files, null)} emptyPlans="No action plans yet." />
-      {sheets.length > 0 && (
-        <section aria-label="Re-read spreadsheets" className="surface p-5 space-y-2">
-          <h2 className="font-semibold" style={{ color: "var(--foreground)" }}>Re-read a spreadsheet</h2>
-          <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Reads the file again and replaces the figures it proposed (confirmed figures stay).</p>
-          <ul className="divide-y text-sm" style={{ borderColor: "var(--border)" }}>
-            {sheets.map((d) => (
-              <li key={d.id} className="py-2 flex items-center gap-3 flex-wrap" style={{ borderColor: "var(--border)" }}>
-                <span className="flex-1 min-w-[12rem]" style={{ color: "var(--foreground)" }}>{d.filename}</span>
-                <span style={{ color: "var(--muted-foreground)" }}>{d.status === "analyzing" ? "Reading…" : d.status}</span>
-                <form action={rereadDocumentAction.bind(null, company.id, d.id)}>
-                  <button type="submit" className="link" aria-label={`Re-read ${d.filename}`} disabled={d.status === "analyzing"}>Re-read</button>
-                </form>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <DocumentLibrary
+        plans={planRows(plans, (p) => `/advisor/plans/${p.id}`)}
+        files={fileRows(files, null)}
+        emptyPlans="No action plans yet."
+        reread={{ ids: sheets.map((d) => d.id), action: rereadDocumentAction.bind(null, company.id) }}
+      />
     </div>
   );
 }

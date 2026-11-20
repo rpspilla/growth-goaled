@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, ClipboardList, Download, ExternalLink, File, FileImage, FileSpreadsheet, FileText, LayoutGrid, List, Presentation, X } from "lucide-react";
+import { Check, ClipboardList, RefreshCw, Download, ExternalLink, File, FileImage, FileSpreadsheet, FileText, LayoutGrid, List, Presentation, X } from "lucide-react";
 
 export type PlanRow = { id: string; title: string; tier: string; status: string; date: string; href: string };
 export type FileRow = {
@@ -58,7 +58,19 @@ function downloadAll(files: FileRow[]) {
  * grid of tiles (or a list), coloured by type. Click a tile to select it (several with the checkbox),
  * double-click to open; the bar above acts on the selection.
  */
-export function DocumentLibrary({ plans, files, emptyPlans }: { plans: PlanRow[]; files: FileRow[]; emptyPlans: string }) {
+export function DocumentLibrary({
+  plans,
+  files,
+  emptyPlans,
+  reread,
+}: {
+  plans: PlanRow[];
+  files: FileRow[];
+  emptyPlans: string;
+  /** Advisors: spreadsheets that can be read again (e.g. after a fix to how a format is read). */
+  reread?: { ids: string[]; action: (documentId: string) => Promise<void> };
+}) {
+  const canReread = (f: FileRow) => !!reread?.ids.includes(f.id) && f.status !== "Being read";
   const [view, setView] = useState<View>("grid");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const choose = setView;
@@ -127,6 +139,11 @@ export function DocumentLibrary({ plans, files, emptyPlans }: { plans: PlanRow[]
             {picked.length === 1 && picked[0]!.previewHref && (
               <a href={picked[0]!.previewHref} target="_blank" rel="noopener" className="btn btn-secondary text-sm inline-flex items-center gap-1.5"><ExternalLink size={15} aria-hidden /> Open</a>
             )}
+            {reread && picked.some(canReread) && (
+              <button type="button" onClick={() => picked.filter(canReread).forEach((f) => void reread.action(f.id))} className="btn btn-secondary text-sm inline-flex items-center gap-1.5">
+                <RefreshCw size={15} aria-hidden /> Re-read{picked.filter(canReread).length > 1 ? ` ${picked.filter(canReread).length}` : ""}
+              </button>
+            )}
             <button type="button" onClick={() => downloadAll(picked)} className="btn btn-secondary text-sm inline-flex items-center gap-1.5"><Download size={15} aria-hidden /> Download{picked.length > 1 ? ` ${picked.length}` : ""}</button>
           </div>
         )}
@@ -162,6 +179,7 @@ export function DocumentLibrary({ plans, files, emptyPlans }: { plans: PlanRow[]
                     <div className="flex items-center gap-2">
                       <span className="flex-1" style={f.failed ? { color: "var(--amber)" } : undefined}>{f.status}</span>
                       {f.sourceUrl && <a href={f.sourceUrl} target="_blank" rel="noopener" className="link">Original link</a>}
+                      {reread && canReread(f) && <button type="button" onClick={() => void reread.action(f.id)} className="link" aria-label={`Re-read ${f.filename}`}>Re-read</button>}
                       <a href={f.downloadHref} className="link inline-flex items-center gap-1" aria-label={`Download ${f.filename}`} title="Download"><Download size={14} aria-hidden /></a>
                     </div>
                   </div>
@@ -208,6 +226,7 @@ export function DocumentLibrary({ plans, files, emptyPlans }: { plans: PlanRow[]
                       <td className="py-2 pr-3 whitespace-nowrap hidden sm:table-cell" style={f.failed ? { color: "var(--amber)" } : muted}>{f.status}</td>
                       <td className="py-2 pr-3 text-right whitespace-nowrap">
                         {f.sourceUrl && <a href={f.sourceUrl} target="_blank" rel="noopener" className="link mr-3">Original link</a>}
+                        {reread && canReread(f) && <button type="button" onClick={() => void reread.action(f.id)} className="link mr-3" aria-label={`Re-read ${f.filename}`}>Re-read</button>}
                         <a href={f.downloadHref} className="link inline-flex" aria-label={`Download ${f.filename}`} title="Download"><Download size={16} aria-hidden /></a>
                       </td>
                     </tr>
