@@ -18,6 +18,9 @@ const KINDS: [RegExp, string][] = [
   [/^image\//, "Image"],
   [/^text\//, "Text"],
 ];
+/** Types a browser shows safely in a tab (no HTML or SVG, which could run script). */
+export const VIEWABLE = new Set(["application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp"]);
+
 export const fileKind = (mime: string) => KINDS.find(([re]) => re.test(mime))?.[1] ?? "File";
 
 const STATUS: Record<LibraryFile["status"], string> = { uploaded: "Uploaded", analyzing: "Being read", done: "Read", failed: "Couldn't be read", stored: "Stored" };
@@ -36,5 +39,6 @@ export const fileRows = (files: LibraryFile[], conversationHref: ((id: string) =
     failed: f.status === "failed",
     source: f.conversation ? { label: `Shared in “${f.conversation.title}”`, href: conversationHref ? conversationHref(f.conversation.id) : null } : { label: "Data step", href: null },
     downloadHref: `/api/files/${f.id}`,
+    previewHref: VIEWABLE.has(f.mime) ? `/api/files/${f.id}?view=1` : null,
     sourceUrl: f.sourceUrl,
   }));

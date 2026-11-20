@@ -3,6 +3,7 @@ import { and, desc, eq, isNotNull, ne } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { Company } from "@/lib/db/schema";
 import { isMetricKey, type MetricKey } from "@/lib/metrics";
+import { arrGrowthSinceLastUpdate, type ArrGrowth } from "@/lib/arr-growth";
 
 export type CompanyMetric = {
   metric: MetricKey;
@@ -48,4 +49,13 @@ export async function companyPerformance(company: Pick<Company, "id">) {
     metrics,
     monthly: revenueFile ? { filename: revenueFile.filename, points: revenueFile.analysis!.monthly!.slice(-12) } : null,
   };
+}
+
+/** Growth since the company's last data update (see lib/arr-growth). */
+export async function arrGrowth(company: Pick<Company, "id">): Promise<ArrGrowth | null> {
+  const readings = await db
+    .select({ value: schema.dataPoints.value, period: schema.dataPoints.period, status: schema.dataPoints.status, origin: schema.dataPoints.origin, createdAt: schema.dataPoints.createdAt, updatedAt: schema.dataPoints.updatedAt })
+    .from(schema.dataPoints)
+    .where(and(eq(schema.dataPoints.companyId, company.id), eq(schema.dataPoints.metric, "arr"), ne(schema.dataPoints.status, "rejected")));
+  return arrGrowthSinceLastUpdate(readings);
 }

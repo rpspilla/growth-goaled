@@ -18,6 +18,7 @@ import { companyPeople } from "@/lib/data/team";
 import { companyContext } from "./context";
 import { listConversations } from "@/lib/data/chat";
 import { founderPlans } from "@/lib/data/action-plans";
+import { arrGrowth } from "@/lib/data/performance";
 
 const CARDS: MetricKey[] = ["arr", "arr_growth", "nrr", "acv"];
 const card = { background: "var(--card)", borderColor: "var(--border)" };
@@ -33,6 +34,7 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
     listAdvisoryRequests([company.id]),
   ]);
   const [people, requests, biz, contracts, questions, plans] = await Promise.all([companyPeople(company.id), listDataRequests(company.id), businessMetrics(company), listContracts(company.id), listConversations(company, 50), founderPlans(company)]);
+  const growth = await arrGrowth(company);
   const plansByConversation = new Map(plans.map((p) => [p.conversationId, p.id]));
   const todayIso = new Date().toISOString().slice(0, 10);
   const bizKeys = Object.keys(BUSINESS_METRICS) as BusinessKey[];
@@ -66,10 +68,34 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {CARDS.map((m) => {
+          if (m === "arr_growth") {
+            const up = growth && growth.pct >= 0;
+            return (
+              <div key={m} className="rounded-xl border p-4" style={card} aria-label="Growth since the last data update">
+                <div className="label mb-1" style={{ color: "var(--muted-foreground)" }}>Growth</div>
+                {growth ? (
+                  <>
+                    <div className="font-mono text-xl font-semibold" style={{ color: up ? "var(--green)" : "var(--red)" }}>
+                      {up ? "▲ +" : "▼ "}{growth.pct.toLocaleString("en-US")}%
+                    </div>
+                    <div className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>
+                      Since the {day(growth.from.at)} update · {formatMetric("arr", growth.from.value)}{growth.from.period ? ` (${growth.from.period})` : ""} → {formatMetric("arr", growth.to.value)}{growth.to.period ? ` (${growth.to.period})` : ""}
+                      {!growth.from.confirmed && " · earlier figure not confirmed"}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="font-mono text-xl font-semibold" style={{ color: "var(--muted-foreground)" }}>—</div>
+                    <div className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>Shows once there are two data updates to compare.</div>
+                  </>
+                )}
+              </div>
+            );
+          }
           const v = metrics.get(m);
           return (
             <div key={m} className="rounded-xl border p-4" style={card}>
-              <div className="label mb-1" style={{ color: "var(--muted-foreground)" }}>{m === "arr_growth" ? "Growth" : m.toUpperCase()}</div>
+              <div className="label mb-1" style={{ color: "var(--muted-foreground)" }}>{m.toUpperCase()}</div>
               <div className="font-mono text-xl font-semibold" style={{ color: v ? "var(--foreground)" : "var(--muted-foreground)" }}>{v ? formatMetric(m, v.value) : "—"}</div>
             </div>
           );

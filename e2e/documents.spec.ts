@@ -26,6 +26,8 @@ test("founder and advisor see the company's documents, plans first", async ({ br
   const shared = await db.query("insert into documents (company_id, doc_type, blob_url, filename, mime, size, status, inbox) values ($1, 'other', 'e2e://pipeline.csv', 'pipeline.csv', 'text/csv', 2048, 'done', true) returning id", [company]);
   await db.query("insert into conversation_messages (conversation_id, role, content, document_ids) values ($1, 'user', 'Shared a file: pipeline.csv', $2::jsonb)", [conversation, JSON.stringify([shared.rows[0].id])]);
   await db.query("insert into documents (company_id, doc_type, blob_url, filename, mime, size, status) values ($1, 'financial_model', 'e2e://model.xlsx', 'model.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 3145728, 'failed')", [company]);
+  // Two data updates: ARR grew 20% since the earlier one.
+  await db.query("insert into data_points (company_id, metric, value, unit, origin, status, confidence, period, created_at, updated_at) values ($1, 'arr', 1000000, 'usd', 'manual', 'accepted', 'high', 'Aug 2026', '2026-08-01', '2026-08-01'), ($1, 'arr', 1200000, 'usd', 'manual', 'accepted', 'high', 'Nov 2026', '2026-11-01', '2026-11-01')", [company]);
   await db.end();
 
   const as = async (email: string) => {
@@ -53,6 +55,20 @@ test("founder and advisor see the company's documents, plans first", async ({ br
   await expect(files).toContainText("Data step");
   await expect(files).toContainText("Couldn't be read");
   await expect(files.getByRole("link", { name: "Download pipeline.csv" })).toHaveAttribute("href", `/api/files/${shared.rows[0].id}`);
+  // Like Google Drive: click a tile to select it, act on the selection; switch to a list.
+  await files.getByRole("listitem", { name: "pipeline.csv" }).click();
+  const bar = f.page.getByRole("toolbar", { name: "Selected files" });
+  await expect(bar).toContainText("1 selected");
+  await files.getByRole("checkbox", { name: "Select model.xlsx" }).check();
+  await expect(bar).toContainText("2 selected");
+  await expect(bar.getByRole("button", { name: "Download 2" })).toBeVisible();
+  await bar.getByRole("button", { name: "Clear selection" }).click();
+  await expect(bar).toHaveCount(0);
+  await f.page.getByRole("button", { name: "List view" }).click();
+  const table = f.page.getByRole("table", { name: "Data and input materials" });
+  await expect(table.getByRole("row")).toHaveCount(3);
+  await expect(table).toContainText("Couldn't be read");
+  await f.page.getByRole("button", { name: "Grid view" }).click();
   // Test mode has no file storage, so the founder's own download finds nothing to send, but it's theirs.
   expect((await f.page.request.get(`/api/files/${shared.rows[0].id}`)).status()).toBe(404);
   await f.ctx.close();
@@ -69,6 +85,9 @@ test("founder and advisor see the company's documents, plans first", async ({ br
   // The advisor sees the same under the company.
   const adv = await as("docs-cro@e2e.test");
   await adv.page.goto(`/advisor/companies/${company}`);
+  const growth = adv.page.getByLabel("Growth since the last data update");
+  await expect(growth).toContainText("▲ +20%");
+  await expect(growth).toContainText("Since the Aug 1, 2026 update · $1M (Aug 2026) → $1.2M (Nov 2026)");
   await adv.page.getByRole("link", { name: "Documents" }).click();
   await expect(adv.page).toHaveURL(new RegExp(`/advisor/companies/${company}/documents$`));
   await expect(adv.page.getByRole("list", { name: "Action plans" }).getByRole("link", { name: "Open plan" })).toHaveAttribute("href", `/advisor/plans/${plan.rows[0].id}`);
