@@ -13,7 +13,7 @@ test("CROs contribute attributed intelligence; founders ask one CRO's AI or the 
   await db.connect();
   await db.query("delete from cro_profiles where name in ('Nora Network', 'Omar Okafor')");
   await db.query("insert into users (email, auth_user_id, role, name, onboarded_at) values ('net-admin@e2e.test','e2e:net-admin@e2e.test','admin','Ned Admin', now()) on conflict (auth_user_id) do update set role = 'admin'");
-  for (const [email, name] of [["net-nora@e2e.test", "Nora Login"], ["net-omar@e2e.test", "Omar Login"]])
+  for (const [email, name] of [["net-nora@e2e.test", "Nora Login"], ["net-omar@e2e.test", "Omar Login"]] as const)
     await db.query("insert into users (email, auth_user_id, role, name, onboarded_at) values ($1, $2, 'advisor', $3, now()) on conflict (auth_user_id) do update set role = 'advisor', name = $3", [email, `e2e:${email}`, name]);
   const u = await db.query("insert into users (email, auth_user_id, role, name, onboarded_at) values ('net-founder@e2e.test','e2e:net-founder@e2e.test','founder','Fay Founder', now()) on conflict (auth_user_id) do update set name = 'Fay Founder' returning id");
   await db.query("delete from companies where name = 'Netco'");
@@ -33,7 +33,7 @@ test("CROs contribute attributed intelligence; founders ask one CRO's AI or the 
   for (const [name, login, bio, expertise] of [
     ["Nora Network", "Nora Login", "Two-time Seed-stage CRO who rebuilt founder-led sales motions.", "sales hiring, founder-led sales"],
     ["Omar Okafor", "Omar Login", "Scaled SaaS sales teams from $1M to $20M ARR.", "sales hiring, organizational design"],
-  ]) {
+  ] as const) {
     await admin.page.goto("/advisor/cros");
     await expect(admin.page.getByRole("heading", { name: "CRO network" })).toBeVisible({ timeout: 120_000 });
     const add = admin.page.getByRole("form", { name: "Add a CRO" });
