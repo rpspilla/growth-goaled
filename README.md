@@ -231,6 +231,14 @@ Growth Goaled's own prospecting and relationships, at **/advisor/crm** ("CRM" in
 - **Assessment plan (Progress)**: each action has **Who does it** (Founder or Growth Goaled); **Send to my advisor for review** fixes the split and gives the advisor a To Do and an email (`sendPlanAssignments`, migration `0029_plan_action_assignee.sql`).
 - **Advisor company page** also lists the founder's **Business updates** with Remove / Clear all (readings set aside, not deleted). **Users** shows each person's company (staff: Growth Goaled), and admins can delete people (optionally with a company only they belonged to). Data requests can be deleted one by one or all at once.
 
+### Follow-up loop (Nov 24, 2026): weekly check-in, outcomes, advisor notes
+
+- **Outcomes.** A done (or dropped) commitment asks "How did it go?": Worked / Partly worked / Didn't work, with a note (`commitments.outcome`, `outcome_note`; migration 0038). The CRO's context carries the last 8 closed commitments with their outcomes, and the prompt says to build on what worked and not repeat what didn't. Advisors see outcomes on the company's projects.
+- **Weekly check-in.** Vercel Cron, Mondays 13:00 UTC (`/api/cron/weekly-checkin`, `lib/data/checkins.ts`): each founder of a company with commitments overdue, due in the next 7 days, or done in the last 14 days without an outcome gets one email (at most once per company in 6 days; never sample companies; one-click unsubscribe signed for this email only: `?k=weekly`). It opens `/checkin`: Slipped (move date, tick, drop), Due this week, Done: how did it go?, then "Talk the week through with your CRO", with a summary already written ("Weekly check-in. Done: … Overdue: … What should I focus on this week?"). The Overview's commitments show "Weekly check-in (n)" when there's something to check in on.
+- **Advisor notes in any conversation.** Advisors open any conversation of a company they manage (company page → Conversations → `/advisor/companies/[id]/conversations/[cid]`): messages, cards with their attribution, what was committed from it, and **Add a note**. The founder sees it in the conversation and is emailed (at most once an hour per advisor and conversation); the AI CRO follows the advisor's direction (`postAdvisorNote` in `lib/data/chat.ts`).
+- **Deeper cards.** Every new decision card has **The tradeoffs** (what the choice costs or risks) and **Considered instead** (alternatives and why not now), website chat included.
+- The website chat already carries into the account on sign-up (`claimGuest`); "Diagnose my growth" now lands in that conversation instead of the retired library.
+
 ### Multi-CRO intelligence (Nov 23, 2026): one CRO's AI, or the Collective
 
 Brief and mapping: `docs/briefs/2026-11-23-multi-cro-intelligence.md`.

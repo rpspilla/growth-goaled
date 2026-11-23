@@ -60,9 +60,12 @@ test("weekly check-in: move, finish, record outcomes, talk the week through", as
   await expect(f.page.getByRole("group", { name: "How did it go: Book three AE interviews" })).toBeVisible();
   await f.page.getByRole("group", { name: "How did it go: Book three AE interviews" }).getByRole("button", { name: "Partly worked" }).click();
 
-  // The week's conversation starts from where things stand.
-  await f.page.reload();
+  // The week's conversation starts from where things stand (once the last save has landed).
   const box = f.page.getByRole("textbox", { name: "What are you working through?" });
+  await expect(async () => {
+    await f.page.reload();
+    await expect(box).toHaveValue(/- Done: Book three AE interviews \(partly worked\)/, { timeout: 2_000 });
+  }).toPass({ timeout: 30_000 });
   await expect(box).toHaveValue(/^Weekly check-in\./);
   await expect(box).toHaveValue(/- Done: Post the AE job \(worked: 40 applicants in a week\)/);
   await expect(box).toHaveValue(/- Done: Book three AE interviews \(partly worked\)/);
