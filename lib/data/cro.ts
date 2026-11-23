@@ -101,14 +101,15 @@ export async function saveCroProfile(actor: Actor, id: string | null, input: Pro
   if (id ? !canEditProfile(actor, existing) : actor.role !== "admin") return { ok: false, error: "Only an admin or the CRO can change this profile." };
   const name = clean(input.name, 120);
   if (!name) return { ok: false, error: "Enter the CRO's name." };
-  const photo = httpsOrNull(input.photoUrl);
+  // The photo is set by its own upload (setCroPhoto); a link is still accepted when given.
+  const photo = input.photoUrl === undefined ? { ok: true as const, value: undefined } : httpsOrNull(input.photoUrl);
   const site = httpsOrNull(input.websiteUrl);
   if (!photo.ok) return { ok: false, error: "Use an https:// link for the photo." };
   if (!site.ok) return { ok: false, error: "Use an https:// link for the website profile." };
   const values = {
     name,
     headline: clean(input.headline, 200),
-    photoUrl: photo.value,
+    ...(photo.value !== undefined ? { photoUrl: photo.value } : {}),
     bio: clean(input.bio),
     careerHistory: clean(input.careerHistory),
     accomplishments: clean(input.accomplishments),
@@ -538,4 +539,58 @@ export async function decideConflict(actor: Pick<User, "id" | "role">, conflictI
   if (!updated.length) return { ok: false, error: "That conflict wasn't found." };
   await track("cro_conflict_decided", { userId: actor.id, props: { decision } });
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Profile photos (Nov 24, 2026): uploaded by drag and drop, resized in the browser, kept in the
+// database and served at /api/cro-photo/[id] (public once the CRO is published).
+
+export const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+export const MAX_PHOTO_BYTES = 512 * 1024;
+
+/** The file's real type from its first bytes (never the name or the browser's claim). */
+export function sniffImage(bytes: Uint8Array): (typeof PHOTO_TYPES)[number] | null {
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "image/png";
+  if (String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP") return "image/webp";
+  return null;
+}
+
+export async function setCroPhoto(actor: Actor, croId: string, bytes: Uint8Array): Promise<Result<{ url: string }>> {
+  const cro = await getCroProfile(croId);
+  if (!cro) return { ok: false, error: "That CRO wasn't found." };
+  if (!canEditProfile(actor, cro)) return { ok: false, error: "Only an admin or the CRO can change this photo." };
+  if (!bytes.length) return { ok: false, error: "That file is empty." };
+  if (bytes.length > MAX_PHOTO_BYTES) return { ok: false, error: "That photo is too large. Use one under 10 MB." };
+  const mime = sniffImage(bytes);
+  if (!mime) return { ok: false, error: "Use a JPG, PNG or WebP image." };
+  const now = new Date();
+  const data = Buffer.from(bytes).toString("base64");
+  await db.insert(schema.croPhotos).values({ croId, mime, data, updatedAt: now }).onConflictDoUpdate({ target: schema.croPhotos.croId, set: { mime, data, updatedAt: now } });
+  const url = `/api/cro-photo/${croId}?v=${now.getTime()}`;
+  await db.update(schema.croProfiles).set({ photoUrl: url, updatedAt: now }).where(eq(schema.croProfiles.id, croId));
+  return { ok: true, url };
+}
+
+export async function removeCroPhoto(actor: Actor, croId: string): Promise<Result> {
+  const cro = await getCroProfile(croId);
+  if (!cro) return { ok: false, error: "That CRO wasn't found." };
+  if (!canEditProfile(actor, cro)) return { ok: false, error: "Only an admin or the CRO can change this photo." };
+  await db.delete(schema.croPhotos).where(eq(schema.croPhotos.croId, croId));
+  await db.update(schema.croProfiles).set({ photoUrl: null, updatedAt: new Date() }).where(eq(schema.croProfiles.id, croId));
+  return { ok: true };
+}
+
+/** The stored photo: anyone may see a published CRO's; a draft's only staff. */
+export async function croPhoto(croId: string, viewer: Pick<User, "role"> | null): Promise<{ mime: string; bytes: Buffer } | null> {
+  if (!/^[0-9a-f-]{36}$/.test(croId)) return null;
+  const [row] = await db
+    .select({ mime: schema.croPhotos.mime, data: schema.croPhotos.data, status: schema.croProfiles.status })
+    .from(schema.croPhotos)
+    .innerJoin(schema.croProfiles, eq(schema.croProfiles.id, schema.croPhotos.croId))
+    .where(eq(schema.croPhotos.croId, croId))
+    .limit(1);
+  if (!row) return null;
+  if (row.status !== "published" && viewer?.role !== "admin" && viewer?.role !== "advisor") return null;
+  return { mime: row.mime, bytes: Buffer.from(row.data, "base64") };
 }

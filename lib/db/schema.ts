@@ -1820,6 +1820,17 @@ export const croIntelligenceConflicts = pgTable(
 
 export type CroIntelligenceConflict = typeof croIntelligenceConflicts.$inferSelect;
 export type CroProfile = typeof croProfiles.$inferSelect;
+
+/** A CRO's uploaded profile photo (Nov 24, 2026): resized in the browser, served at /api/cro-photo/[id]. */
+export const croPhotos = pgTable("cro_photos", {
+  croId: uuid("cro_id")
+    .primaryKey()
+    .references(() => croProfiles.id, { onDelete: "cascade" }),
+  mime: text("mime").notNull(),
+  // Base64 of the image (at most ~512 KB once decoded)
+  data: text("data").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
 export type CroIntelligence = typeof croIntelligence.$inferSelect;
 export type CroIntelligenceContributor = typeof croIntelligenceContributors.$inferSelect;
 

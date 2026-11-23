@@ -14,6 +14,6 @@ export default function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     // Everything except public pages, the auth API, Next internals and static files
-    "/((?!sign-in|sign-up|invite|pay/|sample|network|data-use|terms|privacy|refunds|api/auth|api/stripe/webhook|api/cron|api/email|auth/callback|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|ico|webp)$).*)",
+    "/((?!sign-in|sign-up|invite|pay/|sample|network|api/cro-photo|data-use|terms|privacy|refunds|api/auth|api/stripe/webhook|api/cron|api/email|auth/callback|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|ico|webp)$).*)",
   ],
 };

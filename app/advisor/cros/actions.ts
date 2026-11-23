@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireRole } from "@/lib/auth/session";
 import { parseTags, PHILOSOPHY_FIELDS, STYLE_FIELDS } from "@/lib/cro";
-import { decideConflict, detectConflicts, saveCroProfile, saveIntelligence, setCroProfileAdmin, setIntelligenceStatus, setStance, type ProfileInput, type RecordInput, type Result } from "@/lib/data/cro";
+import { decideConflict, detectConflicts, removeCroPhoto, saveCroProfile, setCroPhoto, saveIntelligence, setCroProfileAdmin, setIntelligenceStatus, setStance, type ProfileInput, type RecordInput, type Result } from "@/lib/data/cro";
 import { after } from "next/server";
 
 // The CRO network is run by Growth Goaled staff (advisors and admins); what each may change is checked in lib/data/cro.
@@ -18,13 +18,13 @@ function refresh() {
   revalidatePath("/advisor/cros", "layout");
   revalidatePath("/advisor/intelligence", "layout");
   revalidatePath("/cros", "layout");
+  revalidatePath("/network", "layout");
 }
 
 function profileFrom(f: FormData): ProfileInput {
   return {
     name: str(f, "name"),
     headline: str(f, "headline"),
-    photoUrl: str(f, "photoUrl"),
     bio: str(f, "bio"),
     careerHistory: str(f, "careerHistory"),
     accomplishments: str(f, "accomplishments"),
@@ -166,6 +166,25 @@ export async function decideConflictAction(conflictId: string, decision: "confir
   const user = await staff();
   if (!uuid(conflictId) || (decision !== "confirmed" && decision !== "dismissed")) return { ok: false, error: "That conflict wasn't found." };
   const r = await decideConflict(user, conflictId, decision);
+  if (r.ok) refresh();
+  return r;
+}
+
+/** Upload (or replace) a CRO's profile photo; the browser has already resized it. */
+export async function uploadCroPhotoAction(croId: string, f: FormData): Promise<Result<{ url: string }>> {
+  const user = await staff();
+  if (!uuid(croId)) return { ok: false, error: "That CRO wasn't found." };
+  const file = f.get("photo");
+  if (!(file instanceof File)) return { ok: false, error: "Choose a photo." };
+  const r = await setCroPhoto(user, croId, new Uint8Array(await file.arrayBuffer()));
+  if (r.ok) refresh();
+  return r;
+}
+
+export async function removeCroPhotoAction(croId: string): Promise<Result> {
+  const user = await staff();
+  if (!uuid(croId)) return { ok: false, error: "That CRO wasn't found." };
+  const r = await removeCroPhoto(user, croId);
   if (r.ok) refresh();
   return r;
 }

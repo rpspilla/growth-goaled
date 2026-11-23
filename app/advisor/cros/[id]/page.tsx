@@ -6,7 +6,8 @@ import { requireRole } from "@/lib/auth/session";
 import { db, schema } from "@/lib/db";
 import { INTELLIGENCE_STATUSES, INTELLIGENCE_TYPES, PHILOSOPHY_FIELDS, STYLE_FIELDS } from "@/lib/cro";
 import { getCroProfile, listIntelligence } from "@/lib/data/cro";
-import { croAdminAction, saveCroAction } from "../actions";
+import { croAdminAction, removeCroPhotoAction, saveCroAction, uploadCroPhotoAction } from "../actions";
+import { CroPhotoUpload } from "@/components/advisor/CroPhotoUpload";
 
 export const metadata = { title: "CRO profile" };
 
@@ -90,9 +91,9 @@ export default async function CroProfilePage({ params }: { params: Promise<{ id:
           <section className="surface p-5 space-y-4">
             <h2 className="text-lg font-semibold" style={fg}>Identity and background</h2>
             <div className="grid md:grid-cols-2 gap-4">
+              <CroPhotoUpload name={cro.name} photoUrl={cro.photoUrl} upload={uploadCroPhotoAction.bind(null, cro.id)} remove={removeCroPhotoAction.bind(null, cro.id)} />
               <Field name="name" label="Name" value={cro.name} />
               <Field name="headline" label="Headline" value={cro.headline} />
-              <Field name="photoUrl" label="Profile photo (https link)" value={cro.photoUrl} />
               <Field name="websiteUrl" label="Website profile (https link)" value={cro.websiteUrl} />
             </div>
             <Field name="bio" label="Professional biography" value={cro.bio} rows={4} />
