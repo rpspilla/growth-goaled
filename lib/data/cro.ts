@@ -335,12 +335,13 @@ export async function setStance(actor: Actor, recordId: string, stance: "endorse
  * The Collective: the most relevant validated records of published CROs in the Collective, and
  * network positions. Null when there's nothing to add (no CROs or records yet).
  */
-export async function intelligenceFor(company: Pick<Company, "stage" | "industry">, croId: string | null, q: Omit<Query, "stage" | "industry">): Promise<IntelligenceBundle | null> {
+export async function intelligenceFor(company: Pick<Company, "stage" | "industry">, croId: string | null, q: Omit<Query, "stage" | "industry">, opts: { excludeSourceKey?: string } = {}): Promise<IntelligenceBundle | null> {
   const query: Query = { ...q, stage: company.stage, industry: company.industry };
   const cro = croId ? await publishedCro(croId) : null;
   const [allValidated, confirmed] = await Promise.all([listIntelligence({ status: "validated" }), db.select().from(schema.croIntelligenceConflicts).where(eq(schema.croIntelligenceConflicts.status, "confirmed"))]);
   // Each record carries its confirmed conflicts (both ways), for the Collective to name.
-  const validated = allValidated.map((r) => ({
+  // Evaluations leave out the CRO's own answer to the scenario being tested (it's the reference).
+  const validated = allValidated.filter((r) => !opts.excludeSourceKey || r.sourceKey !== opts.excludeSourceKey).map((r) => ({
     ...r,
     conflicts: confirmed.flatMap((c) => (c.recordId === r.id ? [{ otherId: c.otherId, why: c.why }] : c.otherId === r.id ? [{ otherId: c.recordId, why: c.why }] : [])),
   }));

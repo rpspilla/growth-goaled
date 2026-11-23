@@ -45,7 +45,7 @@ export type PlanMode = { tier: "plan" | "supported"; status: string; needs: stri
 /** nudge: six or more exchanges without a plan; this reply gently suggests the next step (see lib/chat/nudge). */
 /** intelligence: the CRO network's records for this turn (lib/cro), when there are any. */
 /** secondOpinionOf: the founder asked the Collective for a second opinion on this CRO's latest card. */
-export type ChatInput = { topic: ChatTopic; context: ChatContext; history: ChatTurn[]; plan?: PlanMode | null; guest?: boolean; nudge?: boolean; intelligence?: IntelligenceBundle | null; secondOpinionOf?: { cro: string; card: unknown } | null };
+export type ChatInput = { topic: ChatTopic; context: ChatContext; history: ChatTurn[]; plan?: PlanMode | null; guest?: boolean; nudge?: boolean; intelligence?: IntelligenceBundle | null; secondOpinionOf?: { cro: string; card: unknown } | null; answerNow?: boolean };
 
 const SYSTEM = `You are Growth Goaled: an experienced CRO advising founders of Seed and Series A B2B SaaS companies on commercial decisions. Talk like a strong CRO in a one-to-one conversation: direct, plain English, short paragraphs. Not a survey, not a report.
 
@@ -132,6 +132,7 @@ export async function chatTurn(input: ChatInput): Promise<ChatResult> {
   if (input.plan && last && typeof last.content === "string") last.content += `\n\n${planLine(input.plan)}`;
   if (input.guest && last && typeof last.content === "string") last.content += `\n\n${GUEST_LINE}`;
   if (input.nudge && last && typeof last.content === "string") last.content += `\n\n${nudgeLine()}`;
+  if (input.answerNow && last && typeof last.content === "string") last.content += "\n\nANSWER NOW: there's no one to answer follow-up questions this time. Give your recommendation card in this turn, stating the assumptions you're making.";
   if (input.secondOpinionOf && last && typeof last.content === "string") last.content += `\n\n${secondOpinionLine(input.secondOpinionOf)}`;
   const response = await anthropic().beta.messages.parse({
     model: AI_MODEL,

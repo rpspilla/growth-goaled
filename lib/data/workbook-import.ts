@@ -7,6 +7,7 @@ import { track } from "@/lib/events";
 import { parseCsv } from "@/lib/file-profile";
 import { CATEGORY_EXPERTISE, parseWorkbook, scenarioContent, WorkbookError, type WorkbookScenario } from "@/lib/workbook";
 import { croForUser, listCroProfiles, setIntelligenceStatus } from "./cro";
+import { upsertEvalScenarios } from "./evals";
 
 /**
  * Importing a CRO Training Workbook (Nov 24, 2026): each scenario a CRO answered becomes a Scenario
@@ -107,6 +108,8 @@ export async function importWorkbook(actor: Pick<User, "id" | "role">, input: { 
     summary.recordIds.push(...ids);
   }
   summary.skippedNames = [...skipped];
+  // Every scenario joins the evaluation set (answered or not).
+  await upsertEvalScenarios(scenarios, `CRO Training Workbook (${input.filename.slice(0, 120)})`);
   await track("cro_workbook_imported", { userId: actor.id, props: { scenarios: summary.scenarios, created: summary.created, updated: summary.updated } });
   return { ok: true, ...summary };
 }

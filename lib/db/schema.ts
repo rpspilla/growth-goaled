@@ -1822,3 +1822,68 @@ export type CroIntelligenceConflict = typeof croIntelligenceConflicts.$inferSele
 export type CroProfile = typeof croProfiles.$inferSelect;
 export type CroIntelligence = typeof croIntelligence.$inferSelect;
 export type CroIntelligenceContributor = typeof croIntelligenceContributors.$inferSelect;
+
+// ---------------------------------------------------------------------------
+// Evaluation (Nov 24, 2026): founder scenarios replayed against the Collective or one CRO's AI and
+// scored by a judge on the multi-CRO rubric (lib/evals.ts). The CRO Training Workbook feeds the
+// scenarios; a CRO's own workbook answer is the reference for their AI.
+// ---------------------------------------------------------------------------
+
+export const evalScenarios = pgTable(
+  "eval_scenarios",
+  {
+    id: id(),
+    // "GG-001" from the workbook, or "BRIEF-1" for the built-in ones
+    key: text("key").notNull(),
+    category: text("category"),
+    stage: text("stage"),
+    situation: text("situation").notNull(),
+    question: text("question").notNull(),
+    source: text("source"),
+    active: boolean("active").notNull().default(true),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("eval_scenarios_key_idx").on(t.key)],
+);
+
+export const evalRunStatus = pgEnum("eval_run_status", ["running", "done", "failed"]);
+
+export const evalRuns = pgTable("eval_runs", {
+  id: id(),
+  // The Collective (croId null) or one CRO's AI
+  croId: uuid("cro_id").references(() => croProfiles.id, { onDelete: "set null" }),
+  scenarioIds: jsonb("scenario_ids").$type<string[]>().notNull(),
+  status: evalRunStatus("status").notNull().default("running"),
+  // Mean score per criterion once done
+  averages: jsonb("averages").$type<Record<string, number>>(),
+  methodologyVersion: text("methodology_version").notNull(),
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+  ...timestamps,
+});
+
+export const evalResults = pgTable(
+  "eval_results",
+  {
+    id: id(),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => evalRuns.id, { onDelete: "cascade" }),
+    scenarioId: uuid("scenario_id")
+      .notNull()
+      .references(() => evalScenarios.id, { onDelete: "cascade" }),
+    // The AI CRO's answer: reply, card and the records it used
+    answer: jsonb("answer").$type<{ reply: string; card: unknown; used: string[] }>(),
+    // Criterion → 1–5 (null: not applicable), with a one-line note each
+    scores: jsonb("scores").$type<Record<string, number | null>>(),
+    notes: jsonb("notes").$type<Record<string, string>>(),
+    summary: text("summary"),
+    error: text("error"),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("eval_results_run_scenario_idx").on(t.runId, t.scenarioId)],
+);
+
+export type EvalScenario = typeof evalScenarios.$inferSelect;
+export type EvalRun = typeof evalRuns.$inferSelect;
+export type EvalResult = typeof evalResults.$inferSelect;

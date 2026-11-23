@@ -45,8 +45,19 @@ see published CROs only.
   they're talking to; every card shows "Informed by" and, in the Collective, "Where our CROs see it
   differently".
 
-## Not built (waiting on section 6 or later)
+## Sections 6–13 (Nov 24, 2026)
 
-Public website directory and profile pages outside the app, the guest (website) chat choosing a CRO,
-outcome capture feeding records back, CRO-level quality reporting, embeddings (only if the library
-grows past what tag scoring handles).
+- **Engagement (0040):** company default CRO, switching within a conversation (each answer credited),
+  second opinion, earlier conversations labelled with their perspective, "Strongest on this"
+  expertise matching (`matchCros`), public pages `/network` and `/network/[slug]` deep-linking into
+  the website chat.
+- **Knowledge (0041):** training workbook import (`lib/workbook.ts`, `lib/data/workbook-import.ts`),
+  corrections, AI-flagged conflicts with confirm/dismiss, contributions by CRO in the quality report.
+- **Evaluation (0042):** `eval_scenarios`, `eval_runs`, `eval_results`; rubric in `lib/evals.ts`,
+  judge in `lib/ai/judge.ts`, runs in `lib/data/evals.ts`, screens `/advisor/evals` and
+  `/advisor/evals/[id]`.
+
+## Not built
+
+Embeddings (only if the library grows past what tag scoring handles); scheduled evaluation runs
+(today they run while the page is open).

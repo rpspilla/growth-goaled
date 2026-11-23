@@ -136,8 +136,8 @@ test("CROs contribute attributed intelligence; founders ask one CRO's AI or the 
 
   // The quality report: conversations by CRO, and the records answers drew on.
   await admin.page.goto("/advisor/quality");
-  await expect(admin.page.getByRole("table", { name: "By CRO" })).toContainText("Nora Network's AI");
-  await expect(admin.page.getByRole("table", { name: "By CRO" })).toContainText("Growth Goaled Collective");
+  await expect(admin.page.getByRole("table", { name: "By CRO", exact: true })).toContainText("Nora Network's AI");
+  await expect(admin.page.getByRole("table", { name: "By CRO", exact: true })).toContainText("Growth Goaled Collective");
   await expect(admin.page.getByRole("table", { name: "Intelligence records in use" })).toContainText("Founders sell until the motion repeats");
 
   // --- Engagement: a default, a second opinion, switching without losing anything ---
