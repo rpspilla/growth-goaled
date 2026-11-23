@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { z } from "zod";
 import { founderContext } from "@/lib/data/founder-context";
-import { attachFiles, FEEDBACK_KINDS, giveFeedback, removeFact, retryLastMessage, sendMessage, startConversation, updateFact, type ChatResult } from "@/lib/data/chat";
+import { attachFiles, FEEDBACK_KINDS, giveFeedback, removeFact, retryLastMessage, secondOpinion, sendMessage, setDefaultCro, startConversation, switchPerspective, updateFact, type ChatResult } from "@/lib/data/chat";
 import { answerStep, createPlanCheckout, PlanCheckoutError, requestPlanUpdate, setPlanTargets, setStepAssignee, setStepStatus, startPlan, submitPlan, updateStep, writePlan } from "@/lib/data/action-plans";
 import { processInboxDocument, registerDocument } from "@/lib/data/documents";
 import { stripeConfigured } from "@/lib/stripe";
@@ -26,9 +26,10 @@ export async function startChatAction(_prev: StartState, formData: FormData): Pr
   const { user, company } = await founderCompany();
   const topic = z.string().max(40).safeParse(formData.get("topic"));
   const text = formData.get("text");
-  const cro = z.uuid().safeParse(formData.get("cro"));
+  // "cro" sent: the founder's choice ("" = the Collective); not sent: the company's default.
+  const cro = formData.has("cro") ? (z.uuid().safeParse(formData.get("cro")).data ?? null) : undefined;
   if (!topic.success) return { error: "Pick a question." };
-  const result = await startConversation(user, company, topic.data, typeof text === "string" ? text : null, cro.success ? cro.data : null);
+  const result = await startConversation(user, company, topic.data, typeof text === "string" ? text : null, cro);
   if (!result.ok) return { error: result.error };
   revalidatePath("/", "layout");
   redirect(`/chat/${result.conversationId}`);
@@ -300,4 +301,31 @@ export async function rescheduleCommitmentAction(commitmentId: string, dueOn: st
   const result = await rescheduleCommitment(user, company, commitmentId, dueOn);
   if (result.ok) revalidatePath("/", "layout");
   return result.ok ? { ok: true } : { ok: false, error: result.error };
+}
+
+/** Who answers from here on in this conversation: a CRO's AI, or (null) the Collective. */
+export async function switchPerspectiveAction(conversationId: string, croId: string | null): Promise<ChatResult> {
+  const { user, company } = await founderCompany();
+  if (!id.safeParse(conversationId).success || (croId !== null && !id.safeParse(croId).success)) return { ok: false, error: "That isn't available." };
+  const result = await switchPerspective(user, company, conversationId, croId);
+  if (result.ok) revalidatePath(`/chat/${conversationId}`);
+  return result;
+}
+
+/** A second opinion from the Collective on the CRO's latest recommendation. */
+export async function secondOpinionAction(conversationId: string): Promise<ChatResult> {
+  const { user, company } = await founderCompany();
+  if (!id.safeParse(conversationId).success) return { ok: false, error: "Conversation not found." };
+  const result = await secondOpinion(user, company, conversationId);
+  revalidatePath(`/chat/${conversationId}`);
+  return result;
+}
+
+/** The company's default: who its founders talk to unless they choose otherwise. */
+export async function setDefaultCroAction(croId: string | null): Promise<ChatResult> {
+  const { user, company } = await founderCompany();
+  if (croId !== null && !id.safeParse(croId).success) return { ok: false, error: "That CRO isn't available." };
+  const result = await setDefaultCro(user, company, croId);
+  if (result.ok) revalidatePath("/", "layout");
+  return result;
 }

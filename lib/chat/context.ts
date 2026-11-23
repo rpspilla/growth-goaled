@@ -28,7 +28,7 @@ export type ChatContext = {
     attention: string[];
   };
   /** Earlier conversations, newest first (not the current one): what was asked and decided. */
-  earlierConversations: { date: string; question: string; takeaway: string | null; recommendation: string | null; committed: boolean }[];
+  earlierConversations: { date: string; question: string; perspective: string; takeaway: string | null; recommendation: string | null; committed: boolean }[];
   compensationData: {
     source: string;
     metric: string;
@@ -131,8 +131,9 @@ async function openWork(company: Company): Promise<ChatContext["work"]> {
 /** The latest ten other conversations: the question, and the latest recommendation in each (if any) and whether it was committed. */
 async function earlierConversations(company: Company, current: string | null): Promise<ChatContext["earlierConversations"]> {
   const convs = await db
-    .select({ id: schema.conversations.id, title: schema.conversations.title, updatedAt: schema.conversations.updatedAt })
+    .select({ id: schema.conversations.id, title: schema.conversations.title, updatedAt: schema.conversations.updatedAt, cro: schema.croProfiles.name })
     .from(schema.conversations)
+    .leftJoin(schema.croProfiles, eq(schema.croProfiles.id, schema.conversations.croId))
     .where(and(eq(schema.conversations.companyId, company.id), ...(current ? [ne(schema.conversations.id, current)] : [])))
     .orderBy(desc(schema.conversations.updatedAt))
     .limit(10);
@@ -147,6 +148,8 @@ async function earlierConversations(company: Company, current: string | null): P
     return {
       date: c.updatedAt.toISOString().slice(0, 10),
       question: c.title,
+      // Whose perspective it was: a different CRO's advice is weighed as theirs, not repeated as this one's
+      perspective: c.cro ? `${c.cro}'s AI CRO` : "Growth Goaled Collective",
       takeaway: rec?.card.takeaway ?? null,
       recommendation: rec?.card.recommendation ?? null,
       committed: recs.some((r) => r.conversationId === c.id && r.status === "committed"),

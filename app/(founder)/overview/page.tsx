@@ -113,7 +113,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
       )}
 
 
-      <AskBox starters={CHAT_TOPICS.map((t) => ({ id: t.id, starter: t.starter }))} start={startChatAction} cros={cros.map((c) => ({ id: c.id, name: c.name }))} />
+      <AskBox starters={CHAT_TOPICS.map((t) => ({ id: t.id, starter: t.starter }))} start={startChatAction} cros={cros.map((c) => ({ id: c.id, name: c.name }))} defaultCroId={company.defaultCroId} />
 
       {conversations.length > 0 && (
         <Section id="conversations" title="Pick up where you left off" aside={<Link href="/whats-next" className="link text-sm">All conversations →</Link>}>

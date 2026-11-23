@@ -27,7 +27,7 @@ export type GuestViewData = {
   capped: CapScope | null;
   questionsLeft: number;
   /** Published CROs the visitor can talk to instead of the Collective, the one chosen, and whether it's fixed. */
-  cros: { id: string; name: string; headline: string | null }[];
+  cros: { id: string; name: string; headline: string | null; slug: string }[];
   croId: string | null;
   croLocked: boolean;
 };
@@ -45,12 +45,15 @@ export function GuestChat({
   giveEmail,
   restart,
   chooseCro,
+  preferredCroId = null,
 }: {
   view: GuestViewData;
   reply: (text: string) => Promise<Result>;
   giveEmail: (email: string) => Promise<Result>;
   restart: () => Promise<void>;
   chooseCro?: (croId: string | null) => Promise<Result>;
+  /** From a public CRO page (?cro=): choose that CRO's AI once, if nothing's been chosen and the AI hasn't answered. */
+  preferredCroId?: string | null;
 }) {
   const [text, setText] = useState("");
   // The message on its way, shown straight away (outside the transition, whose updates React holds
@@ -86,6 +89,13 @@ export function GuestChat({
     viewed.current = true;
     void trackSignupEvent("signup_viewed");
   }, []);
+
+  const preferredApplied = useRef(false);
+  useEffect(() => {
+    if (preferredApplied.current || !preferredCroId || !chooseCro || view.croLocked || view.croId) return;
+    preferredApplied.current = true;
+    void chooseCro(preferredCroId).then(() => router.refresh());
+  }, [preferredCroId, chooseCro, view.croLocked, view.croId, router]);
 
   const send = (value: string) => {
     setError(null);

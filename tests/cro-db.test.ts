@@ -25,9 +25,10 @@ vi.mock("@/lib/ai/chat", async (original) => {
 import { schema } from "@/lib/db";
 import type { ChatInput } from "@/lib/ai/chat";
 import type { Company, User } from "@/lib/db/schema";
-import { disagreements, intelligenceBlock, relevance, selectIntelligence, slugify, type RecordForRetrieval } from "@/lib/cro";
-import { croForUser, getIntelligence, intelligenceFor, listIntelligence, saveCroProfile, saveIntelligence, setCroProfileAdmin, setIntelligenceStatus, setStance } from "@/lib/data/cro";
-import { getConversation, sendMessage, startConversation } from "@/lib/data/chat";
+import { disagreements, intelligenceBlock, matchCros, relevance, selectIntelligence, slugify, type RecordForRetrieval } from "@/lib/cro";
+import { croForUser, getIntelligence, intelligenceFor, listIntelligence, saveCroProfile, saveIntelligence, setCroProfileAdmin, setIntelligenceStatus, setStance, strongestCros } from "@/lib/data/cro";
+import { getConversation, secondOpinion, sendMessage, setDefaultCro, startConversation, switchPerspective } from "@/lib/data/chat";
+import { chatContext } from "@/lib/chat/context";
 
 type DB = typeof import("@/lib/db").db;
 const db = () => h.db as unknown as DB;
@@ -274,5 +275,68 @@ describe("conversations with a CRO or the Collective", () => {
     // With no CROs or records at all, there's nothing to add.
     await db().delete(schema.croIntelligence);
     expect(await intelligenceFor(co, null, { text: "x", topicId: "other" })).toBeNull();
+  });
+});
+
+describe("engagement: default, switching, second opinion, matching", () => {
+  it("new conversations start with the company's default; an explicit choice wins; a stale default falls back to the Collective", async () => {
+    expect(await setDefaultCro(founder, co, "00000000-0000-4000-8000-000000000000")).toEqual({ ok: false, error: "That CRO isn't available." });
+    expect(await setDefaultCro(founder, co, anaCro)).toEqual({ ok: true });
+    co = (await db().select().from(schema.companies).where(eq(schema.companies.id, co.id)))[0]!;
+    const a = await startConversation(founder, co, "first_gtm_hire", null);
+    if (!a.ok) throw new Error(a.error);
+    expect((await getConversation(co, a.conversationId))!.conversation.croId).toBe(anaCro);
+    const b = await startConversation(founder, co, "first_gtm_hire", null, null);
+    if (!b.ok) throw new Error(b.error);
+    expect((await getConversation(co, b.conversationId))!.conversation.croId).toBeNull();
+    await setCroProfileAdmin(admin, anaCro, { status: "draft", inCollective: true, userId: ana.id });
+    const c = await startConversation(founder, co, "first_gtm_hire", null);
+    if (!c.ok) throw new Error(c.error);
+    expect((await getConversation(co, c.conversationId))!.conversation.croId).toBeNull();
+  });
+
+  it("switching keeps the history and credits each answer to its CRO; the new perspective sees earlier answers labelled", async () => {
+    const r = await startConversation(founder, co, "first_gtm_hire", null, anaCro);
+    if (!r.ok) throw new Error(r.error);
+    expect(await switchPerspective(founder, co, r.conversationId, "00000000-0000-4000-8000-000000000000")).toEqual({ ok: false, error: "That CRO isn't available." });
+    expect(await switchPerspective(founder, co, r.conversationId, benCro)).toEqual({ ok: true });
+    h.inputs.length = 0;
+    await sendMessage(founder, co, r.conversationId, "And what would you do?");
+    const input = h.inputs.at(-1) as ChatInput;
+    expect(input.intelligence?.mode === "individual" && input.intelligence.cro.name).toBe("Ben Brooks");
+    expect(input.history.find((t) => t.role === "assistant")!.content).toMatch(/^\[Earlier answer from Ana Alvarez's AI CRO\]/);
+    const view = (await getConversation(co, r.conversationId))!;
+    expect(view.messages.filter((m) => m.role === "assistant").map((m) => m.croId)).toEqual([anaCro, benCro]);
+    expect(view.cros.get(anaCro)).toBe("Ana Alvarez");
+    // Earlier conversations say whose perspective answered.
+    const ctx = await chatContext(co, { compensation: false });
+    expect(ctx.earlierConversations[0]!.perspective).toBe("Ben Brooks's AI CRO");
+  });
+
+  it("a second opinion is one Collective answer in the CRO's conversation, which stays with the CRO", async () => {
+    const r = await startConversation(founder, co, "first_gtm_hire", null, anaCro);
+    if (!r.ok) throw new Error(r.error);
+    expect(await secondOpinion(founder, co, r.conversationId)).toEqual({ ok: false, error: "Ask for a second opinion once there's a recommendation." });
+    await sendMessage(founder, co, r.conversationId, "Two of us sell.");
+    h.inputs.length = 0;
+    expect(await secondOpinion(founder, co, r.conversationId)).toEqual({ ok: true });
+    const input = h.inputs.at(-1) as ChatInput;
+    expect(input.secondOpinionOf?.cro).toBe("Ana Alvarez");
+    expect(input.intelligence === null || input.intelligence?.mode === "collective").toBe(true);
+    const view = (await getConversation(co, r.conversationId))!;
+    const last = view.messages.at(-1)!;
+    expect(last).toMatchObject({ role: "assistant", croId: null, secondOpinion: true });
+    expect(last.content).toContain("second opinion from the Collective");
+    expect(view.conversation.croId).toBe(anaCro);
+    const collective = await startConversation(founder, co, "first_gtm_hire", null, null);
+    if (!collective.ok) throw new Error(collective.error);
+    expect(await secondOpinion(founder, co, collective.conversationId)).toEqual({ ok: false, error: "This conversation is already with the Collective." });
+  });
+
+  it("matches the CROs strongest on a question from their validated records", async () => {
+    await validated(ana, record());
+    await validated(ben, record({ primaryCroId: benCro, title: "Pricing pages that convert", expertise: ["pricing"], tags: ["pricing"] }));
+    expect((await strongestCros(co, { text: "Should we hire a VP of Sales?", topicId: "first_gtm_hire" })).map((c) => c.name)).toEqual(["Ana Alvarez"]);
+    expect(matchCros([], ["x"], { text: "x", topicId: "other", stage: null, industry: null })).toEqual([]);
   });
 });

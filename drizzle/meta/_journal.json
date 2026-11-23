@@ -281,6 +281,13 @@
       "when": 1795462814022,
       "tag": "0039_drift_outcome_records_guest_cro",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1795467466726,
+      "tag": "0040_engagement_preference",
+      "breakpoints": true
     }
   ]
 }

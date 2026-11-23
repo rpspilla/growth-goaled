@@ -59,9 +59,13 @@ export async function getConversation(company: Pick<Company, "id">, conversation
         db.select().from(schema.recommendationFeedback).where(inArray(schema.recommendationFeedback.recommendationId, recIds)).orderBy(desc(schema.recommendationFeedback.createdAt)),
       ])
     : [[], []];
+  // The CROs whose perspectives appear (the conversation's and each answer's), by name.
+  const croIds = [...new Set([conversation.croId, ...messages.map((m) => m.croId)].filter((x): x is string => Boolean(x)))];
+  const cros = croIds.length ? await db.select({ id: schema.croProfiles.id, name: schema.croProfiles.name }).from(schema.croProfiles).where(inArray(schema.croProfiles.id, croIds)) : [];
   return {
     conversation,
     messages,
+    cros: new Map(cros.map((c) => [c.id, c.name])),
     plan: plan ?? null,
     authors: new Map(authors.map((a) => [a.id, a.name || a.email])),
     documents: new Map(docs.map((d) => [d.id, d])),
@@ -107,12 +111,14 @@ export async function startConversation(
   company: Company,
   topicId: string,
   text: string | null,
-  /** A published CRO's AI representation; null for the Growth Goaled Collective. */
-  croId: string | null = null,
+  /** A published CRO's AI representation; null for the Growth Goaled Collective; undefined: the company's default. */
+  croId?: string | null,
 ): Promise<{ ok: false; error: string } | { ok: true; conversationId: string; error: string | null }> {
   const topic = getChatTopic(topicId);
   if (!topic) return { ok: false, error: "Unknown question." };
-  const cro = croId ? await publishedCro(croId) : null;
+  const wanted = croId === undefined ? (company.defaultCroId ?? null) : croId;
+  const cro = wanted ? await publishedCro(wanted) : null;
+  // An explicit choice must be available; a stale default (unpublished since) falls back to the Collective.
   if (croId && !cro) return { ok: false, error: "That CRO isn't available." };
   const first = topic.id === "other" ? (text ?? "").trim() : topic.starter;
   if (!first) return { ok: false, error: "Tell us what you'd like to work through." };
@@ -125,7 +131,7 @@ export async function startConversation(
 }
 
 /** Saves the founder's message, answers it with the company's context, and keeps any facts and recommendation it produces. */
-export async function sendMessage(user: User, company: Company, conversationId: string, raw: string): Promise<ChatResult> {
+export async function sendMessage(user: User, company: Company, conversationId: string, raw: string, opts: { secondOpinion?: boolean } = {}): Promise<ChatResult> {
   const text = raw.trim();
   if (!text) return { ok: false, error: "Type a message first." };
   if (text.length > MAX_MESSAGE_LENGTH) return { ok: false, error: `Keep messages under ${MAX_MESSAGE_LENGTH.toLocaleString("en-US")} characters.` };
@@ -137,15 +143,28 @@ export async function sendMessage(user: User, company: Company, conversationId: 
   }
 
   await db.insert(schema.conversationMessages).values({ conversationId, role: "user", content: text });
-  const history = [...view.messages.map((m) => ({ role: m.role, content: m.content, author: m.authorId ? (view.authors.get(m.authorId) ?? null) : null })), { role: "user" as const, content: text }];
+  // Whose perspective answers this turn: the conversation's (a CRO's AI or the Collective), or the
+  // Collective once, for a second opinion. Earlier answers from another perspective are labelled.
+  const perspective = opts.secondOpinion ? null : view.conversation.croId;
+  const label = (id: string | null) => (id ? `${view.cros.get(id) ?? "Another CRO"}'s AI CRO` : "the Growth Goaled Collective");
+  const history = [
+    ...view.messages.map((m) => ({
+      role: m.role,
+      content: m.role === "assistant" && (m.croId ?? null) !== perspective ? `[Earlier answer from ${label(m.croId ?? null)}]\n${m.content}` : m.content,
+      author: m.authorId ? (view.authors.get(m.authorId) ?? null) : null,
+    })),
+    { role: "user" as const, content: text },
+  ];
   const context = await chatContext(company, { compensation: Boolean(topic.usesCompensationData), conversationId });
   const plan = view.plan && view.plan.status !== "pending_payment" ? { tier: view.plan.tier, status: view.plan.status, needs: view.plan.needs } : null;
   // The CRO intelligence for this turn: the chosen CRO's, or the Collective's most relevant.
-  const intelligence = await intelligenceFor(company, view.conversation.croId, { text: `${view.conversation.title}\n${text}`, topicId: topic.id });
+  const intelligence = await intelligenceFor(company, perspective, { text: `${view.conversation.title}\n${text}`, topicId: topic.id });
+  const lastCard = [...view.messages].reverse().find((m) => m.recommendationId);
+  const secondOpinionOf = opts.secondOpinion && view.conversation.croId && lastCard ? { cro: view.cros.get(view.conversation.croId) ?? "this CRO", card: view.recommendations.get(lastCard.recommendationId!)?.card ?? null } : null;
 
   let result;
   try {
-    result = await chatTurn({ topic, context, history, plan, intelligence, nudge: nudgeDue(history.filter((t) => t.role === "user").length, Boolean(plan)) });
+    result = await chatTurn({ topic, context, history, plan, intelligence, secondOpinionOf, nudge: nudgeDue(history.filter((t) => t.role === "user").length, Boolean(plan)) });
   } catch (err) {
     console.error("[chat] Turn failed", err);
     const error = err instanceof ChatError ? err.message : isAiConfigError(err) ? "Answers aren't available right now. Your message is saved; try again shortly." : "Something went wrong. Your message is saved; try again.";
@@ -196,6 +215,8 @@ export async function sendMessage(user: User, company: Company, conversationId: 
     questions: output.questions,
     recommendationId,
     intelligenceIds: used.length ? used.map((u) => u.id) : null,
+    croId: perspective,
+    secondOpinion: Boolean(opts.secondOpinion),
     model: result.model,
     tokensIn: result.tokensIn,
     tokensOut: result.tokensOut,
@@ -336,4 +357,40 @@ export function advisorNoteEmail(p: { to: string; name: string | null; who: stri
     text: `${first ? `Hi ${first},\n\n` : ""}${p.who} added a note to your conversation "${p.title}":\n\n${excerpt}\n\nReply or keep going with your CRO: ${p.url}`,
     html: `<div style="font-family:Inter,Arial,sans-serif;color:#0D1B2A;max-width:520px">${first ? `<p style="font-size:15px">Hi ${esc(first)},</p>` : ""}<p style="font-size:15px"><strong>${esc(p.who)}</strong> added a note to your conversation <strong>${esc(p.title)}</strong>:</p><blockquote style="margin:12px 0;padding:8px 14px;border-left:3px solid #155A3C;font-size:15px;white-space:pre-wrap">${esc(excerpt)}</blockquote><p><a href="${esc(p.url)}" style="display:inline-block;background:#155A3C;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600">Open the conversation</a></p></div>`,
   };
+}
+
+/**
+ * Switch whose perspective answers from here on (a published CRO's AI, or null for the Collective).
+ * Nothing about the company or the conversation is lost: earlier answers keep their own CRO.
+ */
+export async function switchPerspective(user: Pick<User, "id">, company: Pick<Company, "id">, conversationId: string, croId: string | null): Promise<ChatResult> {
+  const cro = croId ? await publishedCro(croId) : null;
+  if (croId && !cro) return { ok: false, error: "That CRO isn't available." };
+  const updated = await db
+    .update(schema.conversations)
+    .set({ croId: cro?.id ?? null, updatedAt: new Date() })
+    .where(and(eq(schema.conversations.id, conversationId), eq(schema.conversations.companyId, company.id)))
+    .returning({ id: schema.conversations.id });
+  if (!updated.length) return { ok: false, error: "Conversation not found." };
+  await track("perspective_switched", { userId: user.id, companyId: company.id, props: { to: cro ? cro.slug : "collective" } });
+  return { ok: true };
+}
+
+/** A second opinion from the Collective on the CRO's latest recommendation, in the same conversation. */
+export async function secondOpinion(user: User, company: Company, conversationId: string): Promise<ChatResult> {
+  const view = await getConversation(company, conversationId);
+  if (!view) return { ok: false, error: "Conversation not found." };
+  if (!view.conversation.croId) return { ok: false, error: "This conversation is already with the Collective." };
+  if (!view.messages.some((m) => m.recommendationId)) return { ok: false, error: "Ask for a second opinion once there's a recommendation." };
+  await track("second_opinion", { userId: user.id, companyId: company.id, props: {} });
+  return sendMessage(user, company, conversationId, "Second opinion, please: what does the Growth Goaled network think?", { secondOpinion: true });
+}
+
+/** The company's default: who its founders talk to unless they choose otherwise. */
+export async function setDefaultCro(user: Pick<User, "id">, company: Pick<Company, "id">, croId: string | null): Promise<ChatResult> {
+  const cro = croId ? await publishedCro(croId) : null;
+  if (croId && !cro) return { ok: false, error: "That CRO isn't available." };
+  await db.update(schema.companies).set({ defaultCroId: cro?.id ?? null, updatedAt: new Date() }).where(eq(schema.companies.id, company.id));
+  await track("default_cro_set", { userId: user.id, companyId: company.id, props: { to: cro ? cro.slug : "collective" } });
+  return { ok: true };
 }

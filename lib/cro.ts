@@ -133,9 +133,10 @@ export function relevance(r: RecordForRetrieval, q: Query): number {
   for (const e of r.expertise) if (topic.has(norm(e))) score += 3;
   for (const tag of [...r.tags, ...r.expertise]) if (tag && text.includes(norm(tag))) score += 2;
   for (const w of words(`${r.title} ${r.category ?? ""}`)) if (qWords.has(w)) score += 1;
+  // Stage and industry rank records that are on topic; they never make an off-topic record relevant.
+  if (score === 0) return 0;
   if (q.stage && r.stages.some((s) => norm(s) === norm(q.stage!))) score += 2;
   if (q.industry && r.industries.some((s) => norm(s) === norm(q.industry!))) score += 2;
-  if (score === 0) return 0;
   const endorsements = r.stances.filter((s) => s.stance === "endorses").length;
   return score + EVIDENCE_WEIGHT[r.evidence] + Math.min(endorsements, 2) * 0.5;
 }
@@ -231,4 +232,25 @@ export function intelligenceBlock(b: IntelligenceBundle): string {
     return `${INDIVIDUAL_RULES(cro.name)}\n\nCRO PROFILE (JSON):\n${JSON.stringify(profile)}\n\nCRO INTELLIGENCE (JSON; ${b.records.length ? "validated records" : "none documented for this question yet"}):\n${JSON.stringify(b.records.map(recordJson))}`;
   }
   return `${COLLECTIVE_RULES}\n\nCRO INTELLIGENCE (JSON; validated records from ${b.croCount} CRO${b.croCount === 1 ? "" : "s"}${b.records.length ? "" : "; none matched this question, so rely on general CRO judgment and say so"}):\n${JSON.stringify(b.records.map(recordJson))}\n\nDISAGREEMENTS AMONG THESE RECORDS (JSON):\n${JSON.stringify(disagreements(b.records))}`;
+}
+
+/**
+ * The CROs strongest on a question (expertise matching): each CRO's three most relevant validated
+ * records they hold, summed; CROs with nothing relevant are left out. Best first.
+ */
+export function matchCros(records: RecordForRetrieval[], croIds: string[], q: Query, limit = 3): string[] {
+  return croIds
+    .map((id) => {
+      const scores = records
+        .filter((r) => r.status === "validated" && r.modes.includes("individual") && holdsView(r, id))
+        .map((r) => relevance(r, q))
+        .filter((x) => x > 0)
+        .sort((a, b) => b - a)
+        .slice(0, 3);
+      return { id, score: scores.reduce((a, b) => a + b, 0) };
+    })
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map((x) => x.id);
 }

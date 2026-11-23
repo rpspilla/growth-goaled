@@ -5,7 +5,8 @@ import { CHAT_TOPICS } from "@/lib/chat/topics";
 import { PHILOSOPHY_FIELDS } from "@/lib/cro";
 import { founderContext } from "@/lib/data/founder-context";
 import { publishedCro } from "@/lib/data/cro";
-import { startChatAction } from "../../chat/actions";
+import { setDefaultCroAction, startChatAction } from "../../chat/actions";
+import { DefaultCroButton } from "@/components/chat/Perspective";
 
 export const metadata = { title: "CRO" };
 
@@ -36,7 +37,10 @@ export default async function CroPage({ params }: { params: Promise<{ slug: stri
           <div>
             <h1 className="font-display text-3xl sm:text-4xl" style={fg}>{cro.name}</h1>
             {cro.headline && <p className="text-lg" style={muted}>{cro.headline}</p>}
-            {cro.websiteUrl && <a href={cro.websiteUrl} target="_blank" rel="noopener" className="link text-sm">Website profile</a>}
+            <div className="flex items-center gap-4 flex-wrap">
+              {cro.websiteUrl && <a href={cro.websiteUrl} target="_blank" rel="noopener" className="link text-sm">Website profile</a>}
+              <DefaultCroButton croId={cro.id} isDefault={company.defaultCroId === cro.id} label={`${cro.name}'s AI CRO`} set={setDefaultCroAction} />
+            </div>
           </div>
         </div>
       </div>

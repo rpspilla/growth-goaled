@@ -27,7 +27,7 @@ export default async function WhatsNextPage() {
     <div className="page space-y-12">
       <PageHeader title="Ask your CRO" subtitle="Any growth decision, in your own words. Answers use what you've already shared and the work under way." />
 
-      <AskBox starters={CHAT_TOPICS.map((t) => ({ id: t.id, starter: t.starter }))} start={startChatAction} cros={cros.map((c) => ({ id: c.id, name: c.name }))} />
+      <AskBox starters={CHAT_TOPICS.map((t) => ({ id: t.id, starter: t.starter }))} start={startChatAction} cros={cros.map((c) => ({ id: c.id, name: c.name }))} defaultCroId={company.defaultCroId} />
 
       <div id="facts" className="scroll-mt-24">
         <Section id="facts-title" title="History" lead="The questions you've asked, and what we remember about your company from them.">

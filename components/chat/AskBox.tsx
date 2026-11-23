@@ -47,6 +47,7 @@ export function AskBox({
   fixedCro,
   initialText = "",
   title = "What are you working through?",
+  defaultCroId = null,
 }: {
   starters: Starter[];
   start: (prev: StartState, formData: FormData) => Promise<StartState>;
@@ -58,6 +59,8 @@ export function AskBox({
   /** Words already in the box (the weekly check-in's summary). */
   initialText?: string;
   title?: string;
+  /** The company's default (who the ask box starts on). */
+  defaultCroId?: string | null;
 }) {
   const [state, action] = useActionState(start, {});
   const [text, setText] = useState(initialText);
@@ -79,11 +82,11 @@ export function AskBox({
           cros.length > 0 && (
             <div className="flex items-center gap-2 flex-wrap text-sm">
               <span className="font-semibold" style={{ color: "var(--foreground)" }}>Ask</span>
-              <select name="cro" defaultValue="" className="field py-1.5" aria-label="Who to ask">
-                <option value="">The Growth Goaled Collective (all our CROs)</option>
+              <select name="cro" defaultValue={cros.some((c) => c.id === defaultCroId) ? (defaultCroId ?? "") : ""} className="field py-1.5" aria-label="Who to ask">
+                <option value="">The Growth Goaled Collective (all our CROs){!defaultCroId ? " · your default" : ""}</option>
                 {cros.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name}&apos;s AI CRO
+                    {c.name}&apos;s AI CRO{c.id === defaultCroId ? " · your default" : ""}
                   </option>
                 ))}
               </select>

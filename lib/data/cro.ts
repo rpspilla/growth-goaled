@@ -3,7 +3,7 @@ import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { Company, CroIntelligence, CroPhilosophy, CroProfile, CroStyle, User } from "@/lib/db/schema";
 import { track } from "@/lib/events";
-import { INTELLIGENCE_TYPES, PHILOSOPHY_FIELDS, STYLE_FIELDS, TOPIC_EXPERTISE, selectIntelligence, slugify, type IntelligenceBundle, type Query, type RecordForRetrieval } from "@/lib/cro";
+import { INTELLIGENCE_TYPES, PHILOSOPHY_FIELDS, STYLE_FIELDS, TOPIC_EXPERTISE, matchCros, selectIntelligence, slugify, type IntelligenceBundle, type Query, type RecordForRetrieval } from "@/lib/cro";
 
 /**
  * Multi-CRO intelligence (Nov 23, 2026). CRO profiles and their intelligence records.
@@ -425,4 +425,12 @@ export async function draftOutcomeRecord(commitmentId: string): Promise<string |
     .returning({ id: schema.croIntelligence.id });
   if (cro) await db.insert(schema.croIntelligenceContributors).values({ recordId: r!.id, croId: cro.id, stance: "author" });
   return r!.id;
+}
+
+/** Published CROs strongest on this question, best first (none when nobody's records match). */
+export async function strongestCros(company: Pick<Company, "stage" | "industry">, q: Omit<Query, "stage" | "industry">, limit = 3): Promise<CroProfile[]> {
+  const [profiles, validated] = await Promise.all([listCroProfiles({ published: true }), listIntelligence({ status: "validated" })]);
+  if (!profiles.length) return [];
+  const ids = matchCros(validated, profiles.map((p) => p.id), { ...q, stage: company.stage, industry: company.industry }, limit);
+  return ids.map((id) => profiles.find((p) => p.id === id)!);
 }

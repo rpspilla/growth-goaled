@@ -44,7 +44,8 @@ export type PlanMode = { tier: "plan" | "supported"; status: string; needs: stri
 /** guest: a visitor on the sign-in page who hasn't signed up; give the recommendation early. */
 /** nudge: six or more exchanges without a plan; this reply gently suggests the next step (see lib/chat/nudge). */
 /** intelligence: the CRO network's records for this turn (lib/cro), when there are any. */
-export type ChatInput = { topic: ChatTopic; context: ChatContext; history: ChatTurn[]; plan?: PlanMode | null; guest?: boolean; nudge?: boolean; intelligence?: IntelligenceBundle | null };
+/** secondOpinionOf: the founder asked the Collective for a second opinion on this CRO's latest card. */
+export type ChatInput = { topic: ChatTopic; context: ChatContext; history: ChatTurn[]; plan?: PlanMode | null; guest?: boolean; nudge?: boolean; intelligence?: IntelligenceBundle | null; secondOpinionOf?: { cro: string; card: unknown } | null };
 
 const SYSTEM = `You are Growth Goaled: an experienced CRO advising founders of Seed and Series A B2B SaaS companies on commercial decisions. Talk like a strong CRO in a one-to-one conversation: direct, plain English, short paragraphs. Not a survey, not a report.
 
@@ -53,7 +54,7 @@ How to run the conversation:
 - Ask at most two questions per turn, and say briefly why each one matters. Never ask for anything already in COMPANY CONTEXT (profile answers, figures, saved facts, earlier recommendations).
 - Keep facts, assumptions and hypotheses apart, and say which is which. Say plainly when there isn't enough information for a reliable recommendation, and what it would take.
 - Challenge the founder's assumptions when the evidence points elsewhere.
-- COMPANY CONTEXT has open_work (their growth projects, the commitments in them with owner, due date and status, this week's priorities from their advisor, approved results) and earlier_conversations (what they asked before and what was recommended). Use them like a CRO who was in those meetings: connect the question to the work under way, don't recommend again what they've already committed to (build on it or say why it should change), and when a relevant commitment is overdue, ask about it briefly. Closed commitments carry their outcome (worked, partly worked, didn't work) and the founder's note: learn from them, build on what worked, and don't repeat what didn't without saying what's different now. A message starting "Weekly check-in." is the founder's weekly review: acknowledge what got done, ask about what slipped (one question), and give the one or two things that matter most this week. open_work.attention lists patterns (a commitment moved again and again, long overdue, a run of drops): when one bears on the question, name it plainly once, ask what's really in the way, and suggest re-committing, re-scoping or dropping it on purpose. Don't nag, and don't raise it every turn. If the founder's question pulls against an open commitment, say so plainly.
+- COMPANY CONTEXT has open_work (their growth projects, the commitments in them with owner, due date and status, this week's priorities from their advisor, approved results) and earlier_conversations (what they asked before, which perspective answered — a CRO's AI or the Collective — and what was recommended; another perspective's advice is that CRO's view: build on it or say where you see it differently). Use them like a CRO who was in those meetings: connect the question to the work under way, don't recommend again what they've already committed to (build on it or say why it should change), and when a relevant commitment is overdue, ask about it briefly. Closed commitments carry their outcome (worked, partly worked, didn't work) and the founder's note: learn from them, build on what worked, and don't repeat what didn't without saying what's different now. A message starting "Weekly check-in." is the founder's weekly review: acknowledge what got done, ask about what slipped (one question), and give the one or two things that matter most this week. open_work.attention lists patterns (a commitment moved again and again, long overdue, a run of drops): when one bears on the question, name it plainly once, ask what's really in the way, and suggest re-committing, re-scoping or dropping it on purpose. Don't nag, and don't raise it every turn. If the founder's question pulls against an open commitment, say so plainly.
 - Use the topic's framework (what to evaluate, what a good answer produces) as your checklist, not as a script. For "Something else", find the closest framework and adapt it; never force the problem into an irrelevant category.
 
 Numbers:
@@ -110,6 +111,10 @@ export const nudgeLine = () => {
   return `GROWTH GOALED: this founder has been talking this through for a while without a plan. Keep helping fully, as before. At the end of your reply, once and in one or two sentences, gently suggest the next step that fits what they're working on: a free call with someone at Growth Goaled to talk it through, or turning it into a plan (Diagnose: a CRO-reviewed 30/60/90-day action plan, ${formatPrice(actionPlanCents)} once; or Execute & Monitor: a CRO advisor alongside them, ${formatPrice(supportedMonthlyCents)}/month). Say why it would help with their situation. No pressure, no hard sell, and don't put it in the questions.`;
 };
 
+/** The founder wants the network's view on a CRO's recommendation, without losing that CRO's. */
+export const secondOpinionLine = (p: { cro: string; card: unknown }) =>
+  `SECOND OPINION: the founder is talking to ${p.cro}'s AI CRO and asked for a second opinion from the Growth Goaled Collective on its latest recommendation (JSON): ${JSON.stringify(p.card)}. Answer as the Collective, once: say where the network agrees with ${p.cro}'s view, where it would differ and why, and what that means for this company. Respect ${p.cro}'s perspective (it stays the founder's main conversation); don't rewrite it. Give a card only if your recommendation differs; put the differing views in perspectives.`;
+
 export class ChatError extends Error {}
 
 export type ChatResult = { output: ChatOutput; model: string; tokensIn: number; tokensOut: number };
@@ -127,6 +132,7 @@ export async function chatTurn(input: ChatInput): Promise<ChatResult> {
   if (input.plan && last && typeof last.content === "string") last.content += `\n\n${planLine(input.plan)}`;
   if (input.guest && last && typeof last.content === "string") last.content += `\n\n${GUEST_LINE}`;
   if (input.nudge && last && typeof last.content === "string") last.content += `\n\n${nudgeLine()}`;
+  if (input.secondOpinionOf && last && typeof last.content === "string") last.content += `\n\n${secondOpinionLine(input.secondOpinionOf)}`;
   const response = await anthropic().beta.messages.parse({
     model: AI_MODEL,
     max_tokens: 8000,
@@ -160,7 +166,7 @@ function fakeTurn(input: ChatInput): ChatOutput {
   const records = input.intelligence?.records ?? [];
   const used = records.slice(0, 2).map((r) => ({ id: r.id, how: `Test mode: used "${r.title}"` }));
   const split = input.intelligence?.mode === "collective" ? disagreements(records)[0] : undefined;
-  const lead = input.intelligence?.mode === "individual" ? `Test mode (${input.intelligence.cro.name}'s AI): ` : "";
+  const lead = input.secondOpinionOf ? "Test mode (second opinion from the Collective): " : input.intelligence?.mode === "individual" ? `Test mode (${input.intelligence.cro.name}'s AI): ` : "";
   return {
     ...out,
     reply: `${lead}${out.reply}`,

@@ -358,7 +358,7 @@ export async function guestView(g: GuestSession | null) {
     questionsLeft: questionsLeft(counts),
     totalSteps: GUEST_STEPS.length,
     // Who the visitor talks to: the Collective, or a published CRO's AI (fixed once the AI has answered)
-    cros: (await listCroProfiles({ published: true })).map((c) => ({ id: c.id, name: c.name, headline: c.headline })),
+    cros: (await listCroProfiles({ published: true })).map((c) => ({ id: c.id, name: c.name, headline: c.headline, slug: c.slug })),
     croId: g?.croId ?? null,
     croLocked: (g?.aiTurns ?? 0) > 0,
   };

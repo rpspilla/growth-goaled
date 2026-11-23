@@ -13,10 +13,11 @@ export const maxDuration = 300;
 /**
  * The way in: "How can we help you grow?" as a conversation; returning users sign in below it.
  * With ?next= (a link in one of our emails, e.g. "your action plan is ready") it's a sign-in that
- * lands there, or straight there when already signed in.
+ * lands there, or straight there when already signed in. ?cro=<slug> (from a public CRO page) starts
+ * the chat with that CRO's AI chosen.
  */
-export default async function SignInPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
-  const { next: raw } = await searchParams;
+export default async function SignInPage({ searchParams }: { searchParams: Promise<{ next?: string; cro?: string }> }) {
+  const { next: raw, cro } = await searchParams;
   const next = raw ? safeNextPath(raw) : null;
   if (next && next !== "/") {
     if (await getCurrentUser()) redirect(next);
@@ -28,7 +29,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   }
   return (
     <AuthShell brand={<Positioning compact />}>
-      <GuestEntry />
+      <GuestEntry cro={cro} />
     </AuthShell>
   );
 }

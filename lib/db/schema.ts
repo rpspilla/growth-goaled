@@ -161,6 +161,8 @@ export const companies = pgTable(
     siteCheckedAt: timestamp("site_checked_at", { withTimezone: true }),
     // The plan the company is working on with its advisor, as the advisor names it (e.g. "Sales Hiring")
     currentPlan: text("current_plan"),
+    // Who the company's founders talk to by default: a CRO's AI, or null for the Growth Goaled Collective
+    defaultCroId: uuid("default_cro_id").references((): AnyPgColumn => croProfiles.id, { onDelete: "set null" }),
     ...timestamps,
   },
   (t) => [index("companies_advisor_id_idx").on(t.advisorId)],
@@ -1013,6 +1015,11 @@ export const conversationMessages = pgTable(
     recommendationId: uuid("recommendation_id"),
     // The CRO intelligence records this answer drew on (attribution is never lost)
     intelligenceIds: jsonb("intelligence_ids").$type<string[]>(),
+    // Whose perspective answered (assistant turns): a CRO's AI, or null for the Collective. A
+    // conversation can switch perspective, so each answer keeps its own.
+    croId: uuid("cro_id").references(() => croProfiles.id, { onDelete: "set null" }),
+    // A one-off answer from the Collective, asked for as a second opinion in a CRO's conversation
+    secondOpinion: boolean("second_opinion").notNull().default(false),
     model: text("model"),
     tokensIn: integer("tokens_in"),
     tokensOut: integer("tokens_out"),

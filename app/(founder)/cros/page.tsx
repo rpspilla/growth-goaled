@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { founderContext } from "@/lib/data/founder-context";
 import { listCroProfiles } from "@/lib/data/cro";
+import { DefaultCroButton } from "@/components/chat/Perspective";
+import { setDefaultCroAction } from "../chat/actions";
 
 export const metadata = { title: "Our CROs" };
 
@@ -19,14 +21,17 @@ export default async function CroDirectoryPage() {
   const cros = await listCroProfiles({ published: true });
   return (
     <div className="page space-y-8">
-      <PageHeader title="Our CROs" subtitle="Talk to one CRO's AI, built from their own documented expertise and judgment, or to the Growth Goaled Collective, which draws on all of them." />
+      <PageHeader title="Our CROs" subtitle="Talk to one CRO's AI, built from their own documented expertise and judgment, or to the Growth Goaled Collective, which draws on all of them. Your default is who new conversations start with; you can switch in any conversation without losing anything." />
 
       <section aria-label="The Growth Goaled Collective" className="surface p-5 space-y-2">
         <h2 className="text-xl font-semibold" style={fg}>The Growth Goaled Collective</h2>
         <p className="text-base" style={muted}>
           One recommendation that draws on the most relevant experience across our CROs. Where they see it differently, you&apos;ll hear why, and which view fits your company.
         </p>
-        <Link href="/whats-next" className="btn btn-primary inline-block">Ask the Collective</Link>
+        <div className="flex items-center gap-4 flex-wrap">
+          <Link href="/whats-next" className="btn btn-primary inline-block">Ask the Collective</Link>
+          <DefaultCroButton croId={null} isDefault={!company.defaultCroId || !cros.some((c) => c.id === company.defaultCroId)} label="the Collective" set={setDefaultCroAction} />
+        </div>
       </section>
 
       {cros.length ? (
@@ -49,7 +54,10 @@ export default async function CroDirectoryPage() {
               </div>
               {c.expertise.length > 0 && <p className="text-sm" style={muted}>{c.expertise.slice(0, 6).join(" · ")}</p>}
               <div className="flex-1" />
-              <Link href={`/cros/${c.slug}`} className="link">Profile and ask {c.name.split(" ")[0]}&apos;s AI →</Link>
+              <div className="flex items-center gap-4 flex-wrap">
+                <Link href={`/cros/${c.slug}`} className="link">Profile and ask {c.name.split(" ")[0]}&apos;s AI →</Link>
+                <DefaultCroButton croId={c.id} isDefault={company.defaultCroId === c.id} label={`${c.name}'s AI CRO`} set={setDefaultCroAction} />
+              </div>
             </li>
           ))}
         </ul>
