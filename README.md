@@ -231,6 +231,16 @@ Growth Goaled's own prospecting and relationships, at **/advisor/crm** ("CRM" in
 - **Assessment plan (Progress)**: each action has **Who does it** (Founder or Growth Goaled); **Send to my advisor for review** fixes the split and gives the advisor a To Do and an email (`sendPlanAssignments`, migration `0029_plan_action_assignee.sql`).
 - **Advisor company page** also lists the founder's **Business updates** with Remove / Clear all (readings set aside, not deleted). **Users** shows each person's company (staff: Growth Goaled), and admins can delete people (optionally with a company only they belonged to). Data requests can be deleted one by one or all at once.
 
+### Multi-CRO intelligence (Nov 23, 2026): one CRO's AI, or the Collective
+
+Brief and mapping: `docs/briefs/2026-11-23-multi-cro-intelligence.md`.
+
+- **CRO profiles** (`cro_profiles`; `/advisor/cros`): background, tagged expertise, philosophy and communication style in the CRO's own words. Admins create, publish (needs a bio), link the CRO's login and keep them in or out of the Collective; the CRO edits their own.
+- **Intelligence library** (`cro_intelligence`, `cro_intelligence_contributors`; `/advisor/intelligence`): 12 record types, attributed to a CRO (or a network position), with evidence level, stages, industries, tags, related records and the modes it may be used in. Draft → submitted → validated by another CRO or an admin (never the author); editing validated content makes a new version to validate again. Other CROs endorse or dispute (with why).
+- **Founders** choose on the ask box: the Growth Goaled Collective (default) or a published CRO's AI (`/cros`, `/cros/[slug]`). `conversations.cro_id` records it. The conversation says who they're talking to (a CRO's AI is never presented as the person).
+- **Retrieval** (`lib/cro.ts` `selectIntelligence`, `lib/data/cro.ts` `intelligenceFor`): validated records only. Individual = that CRO's profile and records only; Collective = the most relevant across CROs in it, scored on topic expertise, the question, stage, industry and evidence (agreement capped), with disputes passed along. The CRO prompt block (`intelligenceBlock`) sets each mode's rules.
+- **Attribution**: the model lists the records it used; ids it wasn't given are dropped. Stored on the message (`intelligence_ids`) and the card (`sources`, `perspectives`); cards show "Informed by" and, in the Collective, "Where our CROs see it differently".
+
 ### AI CRO (Nov 23, 2026): ask, decide, commit, follow up
 
 Brief: `docs/briefs/2026-11-23-ai-cro-sprint.md` (from the AI CRO Product Audit). Supersedes the menu order and the Overview's top half described in the sections below.
