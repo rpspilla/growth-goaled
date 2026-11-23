@@ -6,7 +6,7 @@ import { getIntakeAnswers } from "@/lib/data/intake";
 import { companyPerformance } from "@/lib/data/performance";
 import { answerKey, INTAKE_SECTIONS } from "@/lib/intake";
 import { formatMetric, METRICS } from "@/lib/metrics";
-import { isOverdue } from "@/lib/commitments";
+import { isOverdue, OUTCOMES } from "@/lib/commitments";
 import { companyCommitments } from "@/lib/data/commitments";
 import { currentPriorities, today } from "@/lib/data/projects";
 
@@ -21,7 +21,7 @@ export type ChatContext = {
   /** The work under way (AI CRO sprint): growth projects, the commitments in them, this week's priorities, approved results. */
   work: {
     projects: { name: string; status: string; started: string; completed: string | null; from_conversation: string | null }[];
-    commitments: { title: string; owner: string; due: string | null; measure: string | null; status: string; overdue: boolean; project: string }[];
+    commitments: { title: string; owner: string; due: string | null; measure: string | null; status: string; overdue: boolean; project: string; outcome: string | null; outcome_note: string | null }[];
     priorities: { week: string; current: boolean; items: { title: string; action: string; due: string | null }[] } | null;
     results: { project: string; label: string; value: string | null; note: string | null }[];
   };
@@ -116,10 +116,10 @@ async function openWork(company: Company): Promise<ChatContext["work"]> {
   const name = new Map(shown.map((p) => [p.id, p.name]));
   const titles = new Map(sources.map((c) => [c.id, c.title]));
   const open = commitments.filter((c) => c.status === "open").slice(0, 15);
-  const closed = commitments.filter((c) => c.status !== "open").slice(0, 5);
+  const closed = commitments.filter((c) => c.status !== "open").slice(0, 8);
   return {
     projects: shown.map((p) => ({ name: p.name, status: p.status, started: p.startedOn, completed: p.completedOn, from_conversation: p.conversationId ? (titles.get(p.conversationId) ?? null) : null })),
-    commitments: [...open, ...closed].map((c) => ({ title: c.title, owner: c.owner, due: c.dueOn, measure: c.measure, status: c.status, overdue: isOverdue(c, on), project: name.get(c.projectId) ?? "" })),
+    commitments: [...open, ...closed].map((c) => ({ title: c.title, owner: c.owner, due: c.dueOn, measure: c.measure, status: c.status, overdue: isOverdue(c, on), project: name.get(c.projectId) ?? "", outcome: c.outcome ? OUTCOMES[c.outcome] : null, outcome_note: c.outcomeNote })),
     priorities: priorities ? { week: priorities.weekStart, current: priorities.current, items: priorities.items.map((p) => ({ title: p.title, action: p.action, due: p.dueOn })) } : null,
     results: results.map((r) => ({ project: name.get(r.projectId) ?? "", label: r.label, value: r.value, note: r.note })),
   };

@@ -11,7 +11,7 @@ import { CommitmentList } from "@/components/projects/CommitmentList";
 import { commitmentItems } from "@/lib/commitments";
 import { companyCommitments } from "@/lib/data/commitments";
 import { today } from "@/lib/data/projects";
-import { commitmentStatusAction } from "../../chat/actions";
+import { commitmentOutcomeAction, commitmentStatusAction, rescheduleCommitmentAction } from "../../chat/actions";
 
 /**
  * One growth project, as the founder sees it: the Review Action Plan card (the advisor's document),
@@ -47,7 +47,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
       {commitments.length > 0 && (
         <Section id="commitments" title="Commitments" lead="What you committed to with your CRO for this project.">
-          <CommitmentList items={commitmentItems(commitments, new Map([[p.id, p.name]]), today(), { withProject: false })} label={`Commitments of ${p.name}`} setStatus={commitmentStatusAction} />
+          <CommitmentList items={commitmentItems(commitments, new Map([[p.id, p.name]]), today(), { withProject: false })} label={`Commitments of ${p.name}`} actions={{ setStatus: commitmentStatusAction, setOutcome: commitmentOutcomeAction, reschedule: rescheduleCommitmentAction }} />
         </Section>
       )}
 

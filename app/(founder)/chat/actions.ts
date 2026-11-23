@@ -10,7 +10,7 @@ import { attachFiles, FEEDBACK_KINDS, giveFeedback, removeFact, retryLastMessage
 import { answerStep, createPlanCheckout, PlanCheckoutError, requestPlanUpdate, setPlanTargets, setStepAssignee, setStepStatus, startPlan, submitPlan, updateStep, writePlan } from "@/lib/data/action-plans";
 import { processInboxDocument, registerDocument } from "@/lib/data/documents";
 import { stripeConfigured } from "@/lib/stripe";
-import { commitRecommendation, setCommitmentStatus } from "@/lib/data/commitments";
+import { commitRecommendation, rescheduleCommitment, setCommitmentOutcome, setCommitmentStatus } from "@/lib/data/commitments";
 
 /** The signed-in founder and their company: conversations are only ever read or changed within it. */
 async function founderCompany() {
@@ -280,6 +280,24 @@ export async function commitmentStatusAction(commitmentId: string, status: "open
   const { user, company } = await founderCompany();
   if (!id.safeParse(commitmentId).success || !["open", "done", "dropped"].includes(status)) return { ok: false, error: "That commitment wasn't found." };
   const result = await setCommitmentStatus(user, company, commitmentId, status);
+  if (result.ok) revalidatePath("/", "layout");
+  return result.ok ? { ok: true } : { ok: false, error: result.error };
+}
+
+/** How a closed commitment went (check-in, Overview, project page). */
+export async function commitmentOutcomeAction(commitmentId: string, outcome: "worked" | "partly" | "didnt", note: string | null): Promise<{ ok: boolean; error?: string }> {
+  const { user, company } = await founderCompany();
+  if (!id.safeParse(commitmentId).success || !["worked", "partly", "didnt"].includes(outcome)) return { ok: false, error: "That commitment wasn't found." };
+  const result = await setCommitmentOutcome(user, company, commitmentId, outcome, typeof note === "string" ? note : null);
+  if (result.ok) revalidatePath("/", "layout");
+  return result.ok ? { ok: true } : { ok: false, error: result.error };
+}
+
+/** Still on it: a new due date. */
+export async function rescheduleCommitmentAction(commitmentId: string, dueOn: string): Promise<{ ok: boolean; error?: string }> {
+  const { user, company } = await founderCompany();
+  if (!id.safeParse(commitmentId).success || typeof dueOn !== "string") return { ok: false, error: "That commitment wasn't found." };
+  const result = await rescheduleCommitment(user, company, commitmentId, dueOn);
   if (result.ok) revalidatePath("/", "layout");
   return result.ok ? { ok: true } : { ok: false, error: result.error };
 }

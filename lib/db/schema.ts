@@ -1612,6 +1612,8 @@ export const weeklyPriorities = pgTable(
 );
 
 export const commitmentStatus = pgEnum("commitment_status", ["open", "done", "dropped"]);
+/** How a closed commitment went, in the founder's words (weekly check-in, Nov 24, 2026). */
+export const commitmentOutcome = pgEnum("commitment_outcome", ["worked", "partly", "didnt"]);
 
 /**
  * Something the company committed to do, inside a growth project (AI CRO sprint, Nov 23, 2026): made
@@ -1636,6 +1638,9 @@ export const commitments = pgTable(
     measure: text("measure"),
     status: commitmentStatus("status").notNull().default("open"),
     closedAt: timestamp("closed_at", { withTimezone: true }),
+    // How it went, once done (or dropped): the AI CRO learns from it in the next conversation
+    outcome: commitmentOutcome("outcome"),
+    outcomeNote: text("outcome_note"),
     position: integer("position").notNull().default(0),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     ...timestamps,

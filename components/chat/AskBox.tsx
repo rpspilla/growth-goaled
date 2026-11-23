@@ -45,6 +45,8 @@ export function AskBox({
   lead,
   cros = [],
   fixedCro,
+  initialText = "",
+  title = "What are you working through?",
 }: {
   starters: Starter[];
   start: (prev: StartState, formData: FormData) => Promise<StartState>;
@@ -53,15 +55,18 @@ export function AskBox({
   cros?: { id: string; name: string }[];
   /** On a CRO's page: always that CRO's AI. */
   fixedCro?: { id: string; name: string };
+  /** Words already in the box (the weekly check-in's summary). */
+  initialText?: string;
+  title?: string;
 }) {
   const [state, action] = useActionState(start, {});
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialText);
   const common = starters.filter((s) => s.id !== "other");
   return (
     <section aria-labelledby="ask-cro" className="surface p-5 sm:p-6 space-y-4">
       <div>
         <h2 id="ask-cro" className="font-display text-2xl sm:text-3xl leading-tight" style={{ color: "var(--foreground)" }}>
-          What are you working through?
+          {title}
         </h2>
         <p className="text-base mt-1" style={{ color: "var(--muted-foreground)" }}>
           {lead ?? "Ask your CRO about any growth decision. It knows your company, your numbers and the work under way, so you won't be asked twice."}

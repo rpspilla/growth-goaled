@@ -22,6 +22,8 @@ export function projectNameFrom(takeaway: string, fallback: string): string {
   return name || fallback.slice(0, 80);
 }
 
+export const OUTCOMES = { worked: "Worked", partly: "Partly worked", didnt: "Didn't work" } as const;
+
 /** Overdue: open and due before today. */
 export const isOverdue = (c: { status: string; dueOn: string | null }, today: string) => c.status === "open" && c.dueOn !== null && c.dueOn < today;
 
@@ -29,7 +31,7 @@ const dayLabel = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("e
 
 /** Rows for the commitments list (Overview, project page, advisor). */
 export function commitmentItems(
-  rows: { id: string; title: string; owner: string; dueOn: string | null; measure: string | null; status: "open" | "done" | "dropped"; projectId: string; conversationId: string | null }[],
+  rows: { id: string; title: string; owner: string; dueOn: string | null; measure: string | null; status: "open" | "done" | "dropped"; projectId: string; conversationId: string | null; outcome?: "worked" | "partly" | "didnt" | null; outcomeNote?: string | null }[],
   projects: Map<string, string>,
   today: string,
   opts: { withProject?: boolean } = {},
@@ -44,5 +46,7 @@ export function commitmentItems(
     status: c.status,
     project: opts.withProject !== false && projects.has(c.projectId) ? { id: c.projectId, name: projects.get(c.projectId)! } : null,
     conversationId: c.conversationId,
+    outcome: c.outcome ?? null,
+    outcomeNote: c.outcomeNote ?? null,
   }));
 }

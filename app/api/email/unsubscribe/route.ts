@@ -7,12 +7,17 @@ const page = (title: string, body: string, status = 200) =>
     { status, headers: { "content-type": "text/html; charset=utf-8" } },
   );
 
-/** One-click stop for the monthly reminder (signed link in the email; no sign-in needed). */
+/** One-click stop for the monthly reminder, or (k=weekly) the weekly check-in (signed link in the email; no sign-in needed). */
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const userId = url.searchParams.get("u") ?? "";
   const token = url.searchParams.get("t") ?? "";
-  if (!/^[0-9a-f-]{36}$/i.test(userId) || !validUnsubscribe(userId, token)) return page("Link not valid", "This unsubscribe link is incomplete or has expired. Reply to any of our emails and we'll stop them.", 400);
+  const weekly = url.searchParams.get("k") === "weekly";
+  if (!/^[0-9a-f-]{36}$/i.test(userId) || !validUnsubscribe(userId, token, weekly ? "weekly-checkin" : "monthly-reminder")) return page("Link not valid", "This unsubscribe link is incomplete or has expired. Reply to any of our emails and we'll stop them.", 400);
+  if (weekly) {
+    await track("weekly_checkin_unsubscribed", { userId });
+    return page("You're unsubscribed", "You won't get the weekly check-in email any more. Your commitments are still on your Overview.");
+  }
   await track("monthly_reminder_unsubscribed", { userId });
   return page("You're unsubscribed", "You won't get the monthly progress email any more. Your Action plan is still there whenever you want it.");
 }

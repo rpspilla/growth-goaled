@@ -28,7 +28,8 @@ import { listConversations } from "@/lib/data/chat";
 import { companyCommitments } from "@/lib/data/commitments";
 import { listCroProfiles } from "@/lib/data/cro";
 import { today } from "@/lib/data/projects";
-import { commitmentStatusAction, startChatAction } from "../chat/actions";
+import { commitmentStatusAction, rescheduleCommitmentAction, startChatAction } from "../chat/actions";
+import { checkinCount, checkinItems } from "@/lib/data/checkins";
 
 /** The four numbers the Overview leads with (Founder View redesign): nothing else here. */
 const OVERVIEW_METRICS: MetricKey[] = ["arr", "nrr", "sales_cycle_days", "mom_growth"];
@@ -74,6 +75,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
     companyCommitments(company, { status: ["open"] }),
     listCroProfiles({ published: true }),
   ]);
+  const toCheckIn = checkinCount(await checkinItems(company));
   const projectNames = new Map(projects.map((p) => [p.id, p.name]));
   const firstName = user.name?.split(" ")[0];
   // The open projects lead (the Growth Hiring Plan for most companies); else the latest completed one.
@@ -130,8 +132,13 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
       )}
 
       {commitments.length > 0 && (
-        <Section id="commitments" title="Your commitments" lead="What you committed to with your CRO. Tick them off as you go; your CRO asks about the ones that slip.">
-          <CommitmentList items={commitmentItems(commitments, projectNames, today())} label="Your commitments" setStatus={commitmentStatusAction} />
+        <Section
+          id="commitments"
+          title="Your commitments"
+          lead="What you committed to with your CRO. Tick them off as you go; your CRO asks about the ones that slip."
+          aside={toCheckIn ? <Link href="/checkin" className="btn btn-primary text-sm">Weekly check-in ({toCheckIn})</Link> : undefined}
+        >
+          <CommitmentList items={commitmentItems(commitments, projectNames, today())} label="Your commitments" actions={{ setStatus: commitmentStatusAction, reschedule: rescheduleCommitmentAction }} />
         </Section>
       )}
 

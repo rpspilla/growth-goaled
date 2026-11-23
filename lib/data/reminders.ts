@@ -19,10 +19,12 @@ export const REMINDER_EVERY_DAYS = 30;
 const DAY = 86_400_000;
 
 const secret = () => process.env.CRON_SECRET || process.env.NEON_AUTH_COOKIE_SECRET || "";
-export const unsubscribeToken = (userId: string) => createHmac("sha256", secret()).update(`monthly-reminder:${userId}`).digest("hex").slice(0, 32);
-export function validUnsubscribe(userId: string, token: string): boolean {
+/** Signed one-click unsubscribe tokens, one per email kind (the monthly progress email, the weekly check-in). */
+export type EmailKind = "monthly-reminder" | "weekly-checkin";
+export const unsubscribeToken = (userId: string, kind: EmailKind = "monthly-reminder") => createHmac("sha256", secret()).update(`${kind}:${userId}`).digest("hex").slice(0, 32);
+export function validUnsubscribe(userId: string, token: string, kind: EmailKind = "monthly-reminder"): boolean {
   if (!secret()) return false;
-  const want = Buffer.from(unsubscribeToken(userId));
+  const want = Buffer.from(unsubscribeToken(userId, kind));
   const got = Buffer.from(token);
   return want.length === got.length && timingSafeEqual(want, got);
 }

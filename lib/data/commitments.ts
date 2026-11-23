@@ -121,3 +121,34 @@ export async function committedProjects(company: Pick<Company, "id">, recommenda
     .where(and(eq(schema.commitments.companyId, company.id), inArray(schema.commitments.recommendationId, recommendationIds)));
   return new Map(rows.flatMap((r) => (r.rec ? [[r.rec, { id: r.id, name: r.name }] as const] : [])));
 }
+
+/** How a done (or dropped) commitment went: worked, partly or didn't, and a note. The AI CRO reads these. */
+export async function setCommitmentOutcome(user: Pick<User, "id">, company: Pick<Company, "id">, commitmentId: string, outcome: NonNullable<Commitment["outcome"]>, note: string | null): Promise<Result> {
+  const [c] = await db
+    .select({ id: schema.commitments.id, status: schema.commitments.status })
+    .from(schema.commitments)
+    .where(and(eq(schema.commitments.id, commitmentId), eq(schema.commitments.companyId, company.id)))
+    .limit(1);
+  if (!c) return { ok: false, error: "That commitment wasn't found." };
+  if (c.status === "open") return { ok: false, error: "Mark it done or dropped first." };
+  await db
+    .update(schema.commitments)
+    .set({ outcome, outcomeNote: clean(note, 1000), updatedAt: new Date() })
+    .where(eq(schema.commitments.id, c.id));
+  await track("commitment_outcome", { userId: user.id, companyId: company.id, props: { outcome } });
+  return { ok: true };
+}
+
+/** Still on it: a new due date (today or later) for an open commitment. */
+export async function rescheduleCommitment(user: Pick<User, "id">, company: Pick<Company, "id">, commitmentId: string, dueOn: string): Promise<Result> {
+  if (!isDay(dueOn)) return { ok: false, error: "Pick a valid date." };
+  if (dueOn < today()) return { ok: false, error: "Pick today or a later date." };
+  const updated = await db
+    .update(schema.commitments)
+    .set({ dueOn, updatedAt: new Date() })
+    .where(and(eq(schema.commitments.id, commitmentId), eq(schema.commitments.companyId, company.id), eq(schema.commitments.status, "open")))
+    .returning({ id: schema.commitments.id });
+  if (!updated.length) return { ok: false, error: "That commitment wasn't found." };
+  await track("commitment_rescheduled", { userId: user.id, companyId: company.id, props: {} });
+  return { ok: true };
+}
