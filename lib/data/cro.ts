@@ -3,7 +3,7 @@ import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { Company, CroIntelligence, CroPhilosophy, CroProfile, CroStyle, User } from "@/lib/db/schema";
 import { track } from "@/lib/events";
-import { INTELLIGENCE_TYPES, PHILOSOPHY_FIELDS, STYLE_FIELDS, selectIntelligence, slugify, type IntelligenceBundle, type Query, type RecordForRetrieval } from "@/lib/cro";
+import { INTELLIGENCE_TYPES, PHILOSOPHY_FIELDS, STYLE_FIELDS, TOPIC_EXPERTISE, selectIntelligence, slugify, type IntelligenceBundle, type Query, type RecordForRetrieval } from "@/lib/cro";
 
 /**
  * Multi-CRO intelligence (Nov 23, 2026). CRO profiles and their intelligence records.
@@ -363,4 +363,66 @@ export async function attributionFor(ids: string[]): Promise<Map<string, { title
     .leftJoin(schema.croProfiles, eq(schema.croProfiles.id, schema.croIntelligence.primaryCroId))
     .where(inArray(schema.croIntelligence.id, unique));
   return new Map(rows.map((r) => [r.id, { title: r.title, type: r.type, cro: r.cro, evidence: r.evidence }]));
+}
+
+// ---------------------------------------------------------------------------
+// Founder outcomes into the library (Nov 24, 2026)
+// ---------------------------------------------------------------------------
+
+const OUTCOME_WORDS = { worked: "Worked", partly: "Partly worked", didnt: "Didn't work" } as const;
+const scrub = (text: string, name: string) => (name.trim().length >= 3 ? text.replace(new RegExp(name.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), "the company") : text);
+
+/**
+ * When a founder says how a commitment from a recommendation went, a draft Outcome record for the
+ * library: what was recommended, what they committed to, the measure and the outcome, with the
+ * company reduced to its stage and industry (its name is taken out). Attributed to the CRO whose AI
+ * gave the recommendation, or the network for the Collective. A CRO checks it's anonymised, then
+ * submits it like any other record. Once per commitment; nothing when there are no CROs yet.
+ */
+export async function draftOutcomeRecord(commitmentId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ c: schema.commitments, card: schema.recommendations.card, topic: schema.recommendations.topic, croId: schema.conversations.croId, company: schema.companies })
+    .from(schema.commitments)
+    .innerJoin(schema.companies, eq(schema.companies.id, schema.commitments.companyId))
+    .leftJoin(schema.recommendations, eq(schema.recommendations.id, schema.commitments.recommendationId))
+    .leftJoin(schema.conversations, eq(schema.conversations.id, schema.commitments.conversationId))
+    .where(eq(schema.commitments.id, commitmentId))
+    .limit(1);
+  if (!row || !row.c.outcome || !row.card || row.company.isSample) return null;
+  const [existing] = await db.select({ id: schema.croIntelligence.id }).from(schema.croIntelligence).where(eq(schema.croIntelligence.fromCommitmentId, commitmentId)).limit(1);
+  if (existing) return null;
+  const [anyCro] = await db.select({ id: schema.croProfiles.id }).from(schema.croProfiles).limit(1);
+  if (!anyCro) return null;
+  const cro = row.croId ? await getCroProfile(row.croId) : null;
+  const name = row.company.name;
+  const who = [row.company.stage, row.company.industry].filter(Boolean).join(" ") || "A";
+  const content = [
+    `Recommended: ${scrub(row.card.recommendation, name)}`,
+    `Committed to: ${scrub(row.c.title, name)}`,
+    row.c.measure ? `Measure: ${scrub(row.c.measure, name)}` : null,
+    `Outcome: ${OUTCOME_WORDS[row.c.outcome]}.${row.c.outcomeNote ? ` ${scrub(row.c.outcomeNote, name)}` : ""}`,
+    `Company: ${who} company (anonymised).`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  const [r] = await db
+    .insert(schema.croIntelligence)
+    .values({
+      type: "outcome",
+      category: "Founder outcome",
+      title: `${OUTCOME_WORDS[row.c.outcome]}: ${scrub(row.c.title, name)}`.slice(0, 200),
+      content,
+      expertise: [...(TOPIC_EXPERTISE[row.topic ?? ""] ?? [])],
+      stages: row.company.stage ? [row.company.stage] : [],
+      industries: row.company.industry ? [row.company.industry] : [],
+      primaryCroId: cro?.id ?? null,
+      classification: cro ? "individual" : "collective",
+      source: "A founder's commitment outcome. Check it's anonymised before submitting.",
+      status: "draft",
+      evidence: "case_evidence",
+      fromCommitmentId: commitmentId,
+    })
+    .returning({ id: schema.croIntelligence.id });
+  if (cro) await db.insert(schema.croIntelligenceContributors).values({ recordId: r!.id, croId: cro.id, stance: "author" });
+  return r!.id;
 }

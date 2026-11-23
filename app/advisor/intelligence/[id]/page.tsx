@@ -42,6 +42,12 @@ export default async function IntelligenceRecordPage({ params }: { params: Promi
         </p>
       </header>
 
+      {r.fromCommitmentId && (
+        <p role="note" className="rounded-xl px-4 py-3 text-sm" style={{ background: "var(--amber-muted)", color: "var(--foreground)" }}>
+          Drafted from a founder&apos;s commitment outcome. The company&apos;s name was taken out; check nothing else identifies them (people, clients, exact figures) before you submit it.
+        </p>
+      )}
+
       <section className="surface p-5 space-y-3" aria-label="Review">
         <h2 className="text-lg font-semibold" style={fg}>Review</h2>
         <p className="text-sm" style={muted}>

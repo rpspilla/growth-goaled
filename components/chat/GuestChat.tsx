@@ -26,6 +26,10 @@ export type GuestViewData = {
   /** The free-question limit they've hit, if any: the chat stops and offers the next steps. */
   capped: CapScope | null;
   questionsLeft: number;
+  /** Published CROs the visitor can talk to instead of the Collective, the one chosen, and whether it's fixed. */
+  cros: { id: string; name: string; headline: string | null }[];
+  croId: string | null;
+  croLocked: boolean;
 };
 
 /**
@@ -35,7 +39,19 @@ export type GuestViewData = {
  * sign-in link that saves it all to their account). After the email the conversation carries on
  * until the free questions run out, when it offers "Talk to an advisor" and "Diagnose my growth".
  */
-export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestViewData; reply: (text: string) => Promise<Result>; giveEmail: (email: string) => Promise<Result>; restart: () => Promise<void> }) {
+export function GuestChat({
+  view,
+  reply,
+  giveEmail,
+  restart,
+  chooseCro,
+}: {
+  view: GuestViewData;
+  reply: (text: string) => Promise<Result>;
+  giveEmail: (email: string) => Promise<Result>;
+  restart: () => Promise<void>;
+  chooseCro?: (croId: string | null) => Promise<Result>;
+}) {
   const [text, setText] = useState("");
   // The message on its way, shown straight away (outside the transition, whose updates React holds
   // until the server answers) until the transcript has it.
@@ -112,6 +128,9 @@ export function GuestChat({ view, reply, giveEmail, restart }: { view: GuestView
         <>
           <h2 className="font-display text-3xl sm:text-4xl leading-tight" style={{ color: "var(--foreground)" }}>{view.messages[0]?.content}</h2>
           <HumanPresence />
+          {view.cros.length > 0 && chooseCro && (
+            <CroPicker cros={view.cros} croId={view.croId} locked={view.croLocked} choose={chooseCro} onError={setError} />
+          )}
         </>
       )}
       {view.card && !view.emailed && <GuestCard card={view.card} giveEmail={giveEmail} planIntent={planIntent} onSent={setLinkSent} cta={<PlanCta company={view.companyName} onIntent={() => setPlanIntent(true)} where="card" />} />}
@@ -478,5 +497,49 @@ function ConvertOptions({ scope, email, giveEmail }: { scope: CapScope; email: s
       {status === "failed" && <p role="alert" className="text-sm" style={{ color: "var(--red)" }}>We couldn&apos;t send the link just now. Try again.</p>}
       {error && <p role="alert" className="text-sm" style={{ color: "var(--red)" }}>{error}</p>}
     </section>
+  );
+}
+
+/** Who to talk to: the Growth Goaled Collective, or one CRO's AI (an AI, never the person). Fixed once the AI has answered. */
+function CroPicker({ cros, croId, locked, choose, onError }: { cros: GuestViewData["cros"]; croId: string | null; locked: boolean; choose: (croId: string | null) => Promise<Result>; onError: (e: string | null) => void }) {
+  const [pending, start] = useTransition();
+  const router = useRouter();
+  const chosen = cros.find((c) => c.id === croId) ?? null;
+  if (locked) {
+    return (
+      <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+        {chosen ? `Talking to ${chosen.name}'s AI CRO: an AI built from ${chosen.name}'s documented expertise, not ${chosen.name.split(" ")[0]} in person.` : "Talking to the Growth Goaled Collective: our CROs' combined expertise."}
+      </p>
+    );
+  }
+  const pick = (v: string | null) =>
+    start(async () => {
+      onError(null);
+      const r = await choose(v);
+      if (!r.ok) onError(r.error ?? "That didn't work. Try again.");
+      router.refresh();
+    });
+  const options = [{ id: null as string | null, label: "The Growth Goaled Collective", title: "All our CROs' combined expertise" }, ...cros.map((c) => ({ id: c.id as string | null, label: `${c.name}'s AI CRO`, title: c.headline ?? `An AI built from ${c.name}'s documented expertise` }))];
+  return (
+    <div role="group" aria-label="Who to talk to" className="flex items-center gap-2 flex-wrap text-sm">
+      <span className="font-semibold" style={{ color: "var(--foreground)" }}>Talk to</span>
+      {options.map((o) => {
+        const on = (o.id ?? null) === (croId ?? null);
+        return (
+          <button
+            key={o.id ?? "collective"}
+            type="button"
+            aria-pressed={on}
+            title={o.title}
+            disabled={pending}
+            onClick={() => !on && pick(o.id)}
+            className="rounded-full px-3 py-1 text-sm font-medium disabled:opacity-60"
+            style={on ? { background: "var(--green)", color: "#fff", border: "1px solid var(--green)" } : { border: "1px solid var(--border)", color: "var(--foreground)", background: "var(--card)" }}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }

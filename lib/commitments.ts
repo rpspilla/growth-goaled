@@ -31,7 +31,7 @@ const dayLabel = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("e
 
 /** Rows for the commitments list (Overview, project page, advisor). */
 export function commitmentItems(
-  rows: { id: string; title: string; owner: string; dueOn: string | null; measure: string | null; status: "open" | "done" | "dropped"; projectId: string; conversationId: string | null; outcome?: "worked" | "partly" | "didnt" | null; outcomeNote?: string | null }[],
+  rows: { id: string; title: string; owner: string; dueOn: string | null; measure: string | null; status: "open" | "done" | "dropped"; projectId: string; conversationId: string | null; outcome?: "worked" | "partly" | "didnt" | null; outcomeNote?: string | null; timesMoved?: number }[],
   projects: Map<string, string>,
   today: string,
   opts: { withProject?: boolean } = {},
@@ -48,5 +48,27 @@ export function commitmentItems(
     conversationId: c.conversationId,
     outcome: c.outcome ?? null,
     outcomeNote: c.outcomeNote ?? null,
+    timesMoved: c.timesMoved ?? 0,
   }));
+}
+
+const DAY_MS = 86_400_000;
+const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / DAY_MS);
+
+/**
+ * Patterns worth a CRO's attention (Nov 24, 2026): a commitment whose date keeps moving (3+ times),
+ * one long overdue (14+ days), and commitments dropped in the last 30 days. Plain sentences, most
+ * telling first; empty when there's nothing to say.
+ */
+export function driftSignals(
+  rows: { title: string; status: "open" | "done" | "dropped"; dueOn: string | null; timesMoved?: number; closedAt: Date | null }[],
+  today: string,
+): string[] {
+  const out: string[] = [];
+  for (const c of rows.filter((r) => r.status === "open" && (r.timesMoved ?? 0) >= 3)) out.push(`"${c.title}" has been moved ${c.timesMoved} times`);
+  for (const c of rows.filter((r) => r.status === "open" && r.dueOn && daysBetween(r.dueOn, today) >= 14)) out.push(`"${c.title}" is ${daysBetween(c.dueOn!, today)} days overdue`);
+  const since = Date.parse(`${today}T12:00:00Z`) - 30 * DAY_MS;
+  const dropped = rows.filter((r) => r.status === "dropped" && (r.closedAt?.getTime() ?? 0) >= since);
+  if (dropped.length >= 2) out.push(`${dropped.length} commitments dropped in the last 30 days (${dropped.map((d) => `"${d.title}"`).join(", ")})`);
+  return out;
 }

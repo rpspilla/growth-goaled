@@ -20,6 +20,7 @@ export type CommitmentItem = {
   conversationId: string | null;
   outcome: Outcome | null;
   outcomeNote: string | null;
+  timesMoved: number;
 };
 
 type Res = { ok: boolean; error?: string };
@@ -73,6 +74,7 @@ function Row({ c: saved, actions }: { c: CommitmentItem; actions?: CommitmentAct
               <CalendarCheck size={13} aria-hidden /> {c.overdue && !closed ? `Overdue: was due ${c.dueLabel}` : `by ${c.dueLabel}`}
             </span>
           )}
+          {c.status === "open" && c.timesMoved >= 3 && <Pill tone="amber">{`Moved ${c.timesMoved} times`}</Pill>}
           {c.status === "done" && <Pill tone="green">Done</Pill>}
           {c.status === "dropped" && <Pill tone="neutral">Dropped</Pill>}
           {c.outcome && <Pill tone={OUTCOME_TONE[c.outcome]}>{OUTCOMES[c.outcome]}</Pill>}

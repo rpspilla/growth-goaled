@@ -29,6 +29,7 @@ const ADVISOR_NAV: { title: string; items: Item[] }[] = [
     items: [
       { href: "/advisor/cros", label: "CROs" },
       { href: "/advisor/intelligence", label: "Intelligence library" },
+      { href: "/advisor/quality", label: "AI CRO quality" },
     ],
   },
   {

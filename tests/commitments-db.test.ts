@@ -161,7 +161,7 @@ describe("the context the CRO sees", () => {
     expect((await chatContext(co, { compensation: false, conversationId })).earlierConversations).toEqual([]);
     // Another company sees none of it.
     const theirs = await chatContext(other, { compensation: false });
-    expect(theirs.work).toEqual({ projects: [], commitments: [], priorities: null, results: [] });
+    expect(theirs.work).toEqual({ projects: [], commitments: [], priorities: null, results: [], attention: [] });
     expect(theirs.earlierConversations).toEqual([]);
 
     // A new conversation's turn carries the work and the earlier conversation.

@@ -1,4 +1,5 @@
 import "server-only";
+import { driftSignals } from "@/lib/commitments";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { Company, User } from "@/lib/db/schema";
@@ -53,7 +54,7 @@ export async function latestMetrics(companyIds: string[]): Promise<Map<string, M
 export async function portfolioRows(companies: Company[], now = new Date()): Promise<PortfolioRow[]> {
   const ids = companies.map((c) => c.id);
   if (!ids.length) return [];
-  const [metrics, registers, items, deliverables, scores, calls] = await Promise.all([
+  const [metrics, registers, items, deliverables, scores, calls, commitmentRows] = await Promise.all([
     latestMetrics(ids),
     db
       .select({ companyId: schema.registerItems.companyId, type: schema.registerItems.type, owner: schema.registerItems.owner })
@@ -67,6 +68,10 @@ export async function portfolioRows(companies: Company[], now = new Date()): Pro
       .orderBy(desc(schema.deliverables.version)),
     db.select().from(schema.companyScores).where(inArray(schema.companyScores.companyId, ids)).orderBy(desc(schema.companyScores.updatedAt)),
     salesCallsToCollect(ids),
+    db
+      .select({ companyId: schema.commitments.companyId, title: schema.commitments.title, status: schema.commitments.status, dueOn: schema.commitments.dueOn, timesMoved: schema.commitments.timesMoved, closedAt: schema.commitments.closedAt })
+      .from(schema.commitments)
+      .where(inArray(schema.commitments.companyId, ids)),
   ]);
   // The plan each company works on: its latest live action plan, else its latest committed assessment plan.
   const [plans, legacy] = await Promise.all([
@@ -100,6 +105,8 @@ export async function portfolioRows(companies: Company[], now = new Date()): Pro
     if (benchmarkStatus === "failed" || benchmarkStatus === "stalled") attention.push("Benchmark run failed");
     if (conflicts) attention.push(`${conflicts} data ${conflicts === 1 ? "conflict" : "conflicts"}`);
     if (c.health === "critical") attention.push("Health: at risk");
+    const drift = driftSignals(commitmentRows.filter((r) => r.companyId === c.id), now.toISOString().slice(0, 10));
+    if (drift.length) attention.push(`${drift.length} commitment ${drift.length === 1 ? "pattern" : "patterns"} to raise`);
     const missingCalls = calls.find((x) => x.companyId === c.id);
     if (missingCalls) attention.push(`Sales calls to collect (${missingCalls.count} of ${missingCalls.expected})`);
 

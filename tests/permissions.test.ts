@@ -23,7 +23,7 @@ const GUARDS = /requireRole\(|requireUser\(|founderCompany\(\)|founderMetric\(|m
 const PUBLIC_ACTIONS: Record<string, string> = { trackSignupEvent: "Sign-up funnel events from signed-out visitors; fixed names only, no personal data." };
 // The sign-in page's guest chat: public by design (no account yet), each scoped to the visitor's own
 // guest session through an unguessable httpOnly cookie token.
-const GUEST_ACTIONS = new Set(["guestReplyAction", "guestEmailAction", "guestRestartAction"]);
+const GUEST_ACTIONS = new Set(["guestReplyAction", "guestEmailAction", "guestRestartAction", "guestCroAction"]);
 // Shared loaders that call requireRole themselves (asserted below).
 const FOUNDER_CONTEXT = path.join(root, "lib/data/founder-context.ts");
 const COMPANY_CONTEXT = path.join(root, "app/advisor/companies/[id]/context.ts");

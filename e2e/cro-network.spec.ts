@@ -134,5 +134,21 @@ test("CROs contribute attributed intelligence; founders ask one CRO's AI or the 
   await expect(differ).toContainText("Omar Okafor: Strong inbound changes the answer");
   await expect(differ).toContainText("the view that fits your company");
 
+  // The quality report: conversations by CRO, and the records answers drew on.
+  await admin.page.goto("/advisor/quality");
+  await expect(admin.page.getByRole("table", { name: "By CRO" })).toContainText("Nora Network's AI");
+  await expect(admin.page.getByRole("table", { name: "By CRO" })).toContainText("Growth Goaled Collective");
+  await expect(admin.page.getByRole("table", { name: "Intelligence records in use" })).toContainText("Founders sell until the motion repeats");
+
+  // A visitor on the website chat can pick a CRO's AI before the conversation starts.
+  const visitor = await browser.newContext();
+  const v = await visitor.newPage();
+  await v.goto("/sign-in");
+  const who = v.getByRole("group", { name: "Who to talk to" });
+  await expect(who.getByRole("button", { name: "The Growth Goaled Collective" })).toHaveAttribute("aria-pressed", "true");
+  await who.getByRole("button", { name: "Nora Network's AI CRO" }).click();
+  await expect(who.getByRole("button", { name: "Nora Network's AI CRO" })).toHaveAttribute("aria-pressed", "true");
+  await visitor.close();
+
   for (const x of [f, omar, nora, admin]) await x.ctx.close();
 });

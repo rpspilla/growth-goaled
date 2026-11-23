@@ -75,7 +75,7 @@ export default async function IntelligencePage({ searchParams }: { searchParams:
                 <div className="flex-1 min-w-[16rem]">
                   <Link href={`/advisor/intelligence/${r.id}`} className="text-base font-semibold hover:underline" style={fg}>{r.title}</Link>
                   <div className="text-sm mt-0.5" style={muted}>
-                    {INTELLIGENCE_TYPES[r.type]} · {r.primaryCroName ?? "Network position"}
+                    {r.fromCommitmentId ? "From a founder outcome · " : ""}{INTELLIGENCE_TYPES[r.type]} · {r.primaryCroName ?? "Network position"}
                     {r.stances.some((s) => s.stance === "co_author") ? ` with ${r.stances.filter((s) => s.stance === "co_author").map((s) => s.croName).join(", ")}` : ""} · {EVIDENCE_LEVELS[r.evidence]} · v{r.version}
                   </div>
                   {(endorse > 0 || dispute > 0) && (

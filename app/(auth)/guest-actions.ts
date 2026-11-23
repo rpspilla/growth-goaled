@@ -3,7 +3,7 @@
 import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { GUEST_COOKIE, guestByToken, guestEmail, guestReply, newToken, notifyNewLead, startGuest, type GuestResult } from "@/lib/data/guest";
+import { chooseGuestCro, GUEST_COOKIE, guestByToken, guestEmail, guestReply, newToken, notifyNewLead, startGuest, type GuestResult } from "@/lib/data/guest";
 import { after } from "next/server";
 
 const COOKIE = { httpOnly: true, sameSite: "lax" as const, secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 30 };
@@ -59,4 +59,16 @@ export async function guestRestartAction(): Promise<void> {
   await guestSession();
   (await cookies()).delete(GUEST_COOKIE);
   revalidatePath("/sign-in");
+}
+
+/** Who the visitor talks to: a published CRO's AI, or (empty) the Growth Goaled Collective. */
+export async function guestCroAction(croId: string | null): Promise<GuestResult> {
+  const g = await guestSession(true);
+  if (!g) return { ok: false, error: "Something went wrong. Please refresh and try again." };
+  if ("error" in g) return { ok: false, error: g.error };
+  const id = croId ? z.uuid().safeParse(croId) : null;
+  if (id && !id.success) return { ok: false, error: "That CRO isn't available." };
+  const result = await chooseGuestCro(g, id ? id.data : null);
+  revalidatePath("/sign-in");
+  return result;
 }

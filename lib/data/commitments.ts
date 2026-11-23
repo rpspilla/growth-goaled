@@ -1,10 +1,11 @@
 import "server-only";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { Commitment, Company, User } from "@/lib/db/schema";
 import { track } from "@/lib/events";
 import { MAX_COMMITMENTS, type CommitmentDraft } from "@/lib/commitments";
 import { today, type Result } from "./projects";
+import { draftOutcomeRecord } from "./cro";
 
 /**
  * Commitments (AI CRO sprint, Nov 23, 2026): a decision card's next steps, turned into tracked work
@@ -136,6 +137,8 @@ export async function setCommitmentOutcome(user: Pick<User, "id">, company: Pick
     .set({ outcome, outcomeNote: clean(note, 1000), updatedAt: new Date() })
     .where(eq(schema.commitments.id, c.id));
   await track("commitment_outcome", { userId: user.id, companyId: company.id, props: { outcome } });
+  // A draft Outcome record for the CRO intelligence library (anonymised; a CRO checks and submits it).
+  await draftOutcomeRecord(c.id).catch((err) => console.error("[cro] Outcome record failed", err));
   return { ok: true };
 }
 
@@ -145,7 +148,7 @@ export async function rescheduleCommitment(user: Pick<User, "id">, company: Pick
   if (dueOn < today()) return { ok: false, error: "Pick today or a later date." };
   const updated = await db
     .update(schema.commitments)
-    .set({ dueOn, updatedAt: new Date() })
+    .set({ dueOn, timesMoved: sql`${schema.commitments.timesMoved} + 1`, updatedAt: new Date() })
     .where(and(eq(schema.commitments.id, commitmentId), eq(schema.commitments.companyId, company.id), eq(schema.commitments.status, "open")))
     .returning({ id: schema.commitments.id });
   if (!updated.length) return { ok: false, error: "That commitment wasn't found." };

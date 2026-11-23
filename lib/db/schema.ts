@@ -1243,6 +1243,8 @@ export const guestSessions = pgTable(
     ipHash: text("ip_hash"),
     claimedBy: uuid("claimed_by").references(() => users.id, { onDelete: "set null" }),
     claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    // The CRO whose AI the visitor chose (null: the Growth Goaled Collective)
+    croId: uuid("cro_id").references((): AnyPgColumn => croProfiles.id, { onDelete: "set null" }),
     ...timestamps,
   },
   (t) => [uniqueIndex("guest_sessions_token_idx").on(t.tokenHash), index("guest_sessions_ip_idx").on(t.ipHash, t.createdAt), index("guest_sessions_contact_idx").on(t.crmContactId)],
@@ -1644,6 +1646,8 @@ export const commitments = pgTable(
     // How it went, once done (or dropped): the AI CRO learns from it in the next conversation
     outcome: commitmentOutcome("outcome"),
     outcomeNote: text("outcome_note"),
+    // How often its due date was moved (Nov 24, 2026): three or more and the CRO says so
+    timesMoved: integer("times_moved").notNull().default(0),
     position: integer("position").notNull().default(0),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     ...timestamps,
@@ -1747,6 +1751,8 @@ export const croIntelligence = pgTable(
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
     version: integer("version").notNull().default(1),
     relatedIds: jsonb("related_ids").$type<string[]>().notNull().default([]),
+    // Drafted from a founder's commitment outcome, for a CRO to check (anonymised) and submit
+    fromCommitmentId: uuid("from_commitment_id").references(() => commitments.id, { onDelete: "set null" }),
     // Where it may be used: an individual CRO's conversations, the Collective, or both
     modes: intelligenceMode("modes").array().notNull().default(sql`'{individual,collective}'::intelligence_mode[]`),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),

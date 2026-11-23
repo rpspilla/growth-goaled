@@ -6,7 +6,7 @@ import { getIntakeAnswers } from "@/lib/data/intake";
 import { companyPerformance } from "@/lib/data/performance";
 import { answerKey, INTAKE_SECTIONS } from "@/lib/intake";
 import { formatMetric, METRICS } from "@/lib/metrics";
-import { isOverdue, OUTCOMES } from "@/lib/commitments";
+import { driftSignals, isOverdue, OUTCOMES } from "@/lib/commitments";
 import { companyCommitments } from "@/lib/data/commitments";
 import { currentPriorities, today } from "@/lib/data/projects";
 
@@ -24,6 +24,8 @@ export type ChatContext = {
     commitments: { title: string; owner: string; due: string | null; measure: string | null; status: string; overdue: boolean; project: string; outcome: string | null; outcome_note: string | null }[];
     priorities: { week: string; current: boolean; items: { title: string; action: string; due: string | null }[] } | null;
     results: { project: string; label: string; value: string | null; note: string | null }[];
+    /** Patterns worth raising: commitments that keep moving, long overdue, or a run of drops. */
+    attention: string[];
   };
   /** Earlier conversations, newest first (not the current one): what was asked and decided. */
   earlierConversations: { date: string; question: string; takeaway: string | null; recommendation: string | null; committed: boolean }[];
@@ -122,6 +124,7 @@ async function openWork(company: Company): Promise<ChatContext["work"]> {
     commitments: [...open, ...closed].map((c) => ({ title: c.title, owner: c.owner, due: c.dueOn, measure: c.measure, status: c.status, overdue: isOverdue(c, on), project: name.get(c.projectId) ?? "", outcome: c.outcome ? OUTCOMES[c.outcome] : null, outcome_note: c.outcomeNote })),
     priorities: priorities ? { week: priorities.weekStart, current: priorities.current, items: priorities.items.map((p) => ({ title: p.title, action: p.action, due: p.dueOn })) } : null,
     results: results.map((r) => ({ project: name.get(r.projectId) ?? "", label: r.label, value: r.value, note: r.note })),
+    attention: driftSignals(commitments, on),
   };
 }
 

@@ -15,6 +15,7 @@ import { leadFromChat } from "./crm";
 import { leadAlertEmail, sendEmail } from "@/lib/email";
 import { getFounderCompany } from "./companies";
 import { saveCompanyBasics } from "./intake";
+import { intelligenceFor, listCroProfiles, publishedCro } from "./cro";
 
 export const GUEST_COOKIE = "gg_guest";
 /** New guest chats per visitor IP per day (GUEST_DAILY_PER_IP, default 20). */
@@ -63,7 +64,7 @@ function guestContext(profile: Record<string, string>): ChatContext {
     answers: [],
     figures: [],
     facts: [],
-    work: { projects: [], commitments: [], priorities: null, results: [] },
+    work: { projects: [], commitments: [], priorities: null, results: [], attention: [] },
     earlierConversations: [],
     compensationData: [],
   };
@@ -163,10 +164,13 @@ async function ask(g: GuestSession, question?: GuestMessage): Promise<GuestResul
   return aiTurn(bumped);
 }
 
-async function aiTurn(g: Pick<GuestSession, "id" | "profile" | "messages" | "aiTurns" | "card">): Promise<GuestResult> {
+async function aiTurn(g: Pick<GuestSession, "id" | "profile" | "messages" | "aiTurns" | "card" | "croId">): Promise<GuestResult> {
   let result;
+  // The CRO the visitor chose (or the Collective): their intelligence, attributed as in the app.
+  const history = aiHistory(g);
+  const intelligence = await intelligenceFor({ stage: g.profile.stage ?? null, industry: g.profile.vertical ?? null }, g.croId, { text: history.filter((t) => t.role === "user").map((t) => t.content).join("\n").slice(-2000), topicId: "other" });
   try {
-    result = await chatTurn({ topic: getChatTopic("other")!, context: guestContext(g.profile), history: aiHistory(g), guest: true });
+    result = await chatTurn({ topic: getChatTopic("other")!, context: guestContext(g.profile), history, guest: true, intelligence });
   } catch (err) {
     console.error("[guest] Turn failed", err);
     return { ok: false, error: err instanceof ChatError ? err.message : isAiConfigError(err) ? "Answers aren't available right now. Please try again shortly." : "Something went wrong. Please try again." };
@@ -186,6 +190,13 @@ async function aiTurn(g: Pick<GuestSession, "id" | "profile" | "messages" | "aiT
         missing: output.recommendation.missing,
         tradeoffs: output.recommendation.tradeoffs.slice(0, 4),
         alternatives: output.recommendation.alternatives.slice(0, 4).map((a) => ({ option: a.option, whyNot: a.why_not })),
+        ...(output.recommendation.perspectives.length ? { perspectives: output.recommendation.perspectives.slice(0, 4) } : {}),
+        // Attribution: only records the model was given
+        ...(() => {
+          const given = new Set(intelligence?.records.map((r) => r.id) ?? []);
+          const used = output.intelligence_used.filter((u, i, all) => given.has(u.id) && all.findIndex((x) => x.id === u.id) === i).map((u) => ({ id: u.id, how: u.how.slice(0, 300) }));
+          return used.length ? { sources: used } : {};
+        })(),
       }
     : null;
   // Answering the follow-up questions refines the recommendation; an answer without a new card keeps the last one.
@@ -194,7 +205,7 @@ async function aiTurn(g: Pick<GuestSession, "id" | "profile" | "messages" | "aiT
   return { ok: true };
 }
 
-async function save(id: string, patch: Partial<Pick<GuestSession, "profile" | "messages" | "card" | "aiTurns" | "email">>) {
+async function save(id: string, patch: Partial<Pick<GuestSession, "profile" | "messages" | "card" | "aiTurns" | "email" | "croId">>) {
   await db.update(schema.guestSessions).set({ ...patch, updatedAt: new Date() }).where(eq(schema.guestSessions.id, id));
 }
 
@@ -310,7 +321,7 @@ export async function claimGuest(user: User, token: string | undefined | null): 
   }
 
   const challenge = g.profile.challenge ?? "Something else";
-  const [conversation] = await db.insert(schema.conversations).values({ companyId: company!.id, userId: user.id, topic: "other", title: challenge.slice(0, 120) }).returning({ id: schema.conversations.id });
+  const [conversation] = await db.insert(schema.conversations).values({ companyId: company!.id, userId: user.id, topic: "other", title: challenge.slice(0, 120), croId: g.croId }).returning({ id: schema.conversations.id });
   const conversationId = conversation!.id;
   let recommendationId: string | null = null;
   if (g.card) {
@@ -346,7 +357,20 @@ export async function guestView(g: GuestSession | null) {
     capped: capReached(counts),
     questionsLeft: questionsLeft(counts),
     totalSteps: GUEST_STEPS.length,
+    // Who the visitor talks to: the Collective, or a published CRO's AI (fixed once the AI has answered)
+    cros: (await listCroProfiles({ published: true })).map((c) => ({ id: c.id, name: c.name, headline: c.headline })),
+    croId: g?.croId ?? null,
+    croLocked: (g?.aiTurns ?? 0) > 0,
   };
+}
+
+/** The visitor picks a published CRO's AI, or (null) the Collective, before the AI has answered. */
+export async function chooseGuestCro(g: GuestSession, croId: string | null): Promise<GuestResult> {
+  if (g.aiTurns > 0 || g.claimedAt) return { ok: false, error: "This conversation has started; start a new one to talk to someone else." };
+  const cro = croId ? await publishedCro(croId) : null;
+  if (croId && !cro) return { ok: false, error: "That CRO isn't available." };
+  await save(g.id, { croId: cro?.id ?? null });
+  return { ok: true };
 }
 
 // ---------------------------------------------------------------------------
