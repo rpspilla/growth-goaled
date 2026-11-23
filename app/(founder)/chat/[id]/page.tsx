@@ -11,6 +11,10 @@ import { BuildingRefresh } from "@/components/deliverables/BuildingRefresh";
 import { PlanOffer } from "@/components/chat/PlanOffer";
 import { PlanPanel, type PlanPanelData } from "@/components/chat/PlanPanel";
 import { RecommendationCardView } from "@/components/chat/RecommendationCardView";
+import { CommitToThis } from "@/components/chat/CommitToThis";
+import { projectNameFrom, proposeCommitments } from "@/lib/commitments";
+import { committedProjects } from "@/lib/data/commitments";
+import { companyProjects, today } from "@/lib/data/projects";
 import { db, schema } from "@/lib/db";
 import { planSessionsFor, REVIEW_HOURS } from "@/lib/data/action-plans";
 import { companyPerformance } from "@/lib/data/performance";
@@ -20,7 +24,7 @@ import { companyBlobPrefix } from "@/lib/data/documents";
 import { founderContext } from "@/lib/data/founder-context";
 import { formatPrice, pricing } from "@/lib/pricing";
 import { stripeConfigured } from "@/lib/stripe";
-import { attachFilesAction, buyPlanAction, feedbackAction, planTargetsAction, retryMessageAction, sendMessageAction, answerStepAction, answerStepFileAction, stepDetailsAction, stepStatusAction, startPlanAction, submitPlanAction, updatePlanAction } from "../actions";
+import { commitRecommendationAction, attachFilesAction, buyPlanAction, feedbackAction, planTargetsAction, retryMessageAction, sendMessageAction, answerStepAction, answerStepFileAction, stepDetailsAction, stepStatusAction, startPlanAction, submitPlanAction, updatePlanAction } from "../actions";
 
 // Each answer is prepared while the founder waits.
 export const maxDuration = 300;
@@ -38,7 +42,7 @@ const CHECKOUT: Record<string, { text: string; tone: string }> = {
 
 /** One conversation: the founder's messages, each answer, advisor messages, the decision cards, and the action plan built from it. */
 export default async function ConversationPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ checkout?: string; billing_error?: string }> }) {
-  const { company } = await founderContext();
+  const { user, company } = await founderContext();
   if (!company) redirect("/welcome");
   const [{ id: raw }, { checkout, billing_error: billingError }] = await Promise.all([params, searchParams]);
   const id = z.uuid().safeParse(raw);
@@ -56,6 +60,17 @@ export default async function ConversationPage({ params, searchParams }: { param
   const offer = !plan && stripeConfigured();
   const { actionPlanCents, supportedMonthlyCents } = pricing();
   const [advisor] = company.advisorId ? await db.select({ name: schema.users.name, email: schema.users.email }).from(schema.users).where(eq(schema.users.id, company.advisorId)).limit(1) : [];
+
+  // "Commit to this" on the latest card: its next steps as commitments, into a new or an open growth project.
+  const [committed, openProjects] = trailing ? await Promise.all([committedProjects(company, [trailing.id]), companyProjects(company)]) : [new Map(), []];
+  const commit = trailing
+    ? {
+        proposals: proposeCommitments(trailing.card, user.name?.trim() || "Founder", today()),
+        projectName: projectNameFrom(trailing.card.takeaway, view.conversation.title),
+        openProjects: openProjects.filter((p) => p.status === "open").map((p) => ({ id: p.id, name: p.name })),
+        committed: committed.get(trailing.id) ?? null,
+      }
+    : null;
 
   // For a bought plan: the company's latest figures (targets) and, on Execute & Monitor, the live CRO time logged.
   const [perf, sessions] = plan ? await Promise.all([companyPerformance(company), plan.tier === "supported" ? planSessionsFor(plan.id) : Promise.resolve([])]) : [null, []];
@@ -93,7 +108,7 @@ export default async function ConversationPage({ params, searchParams }: { param
     <div className="page">
     <div className="space-y-6 min-w-0">
       <div>
-        <Link href="/whats-next" className="link text-sm">← What&apos;s Next?</Link>
+        <Link href="/whats-next" className="link text-sm">← Ask your CRO</Link>
         <h1 className="font-display text-3xl font-normal mt-2" style={fg}>{view.conversation.title}</h1>
         <div className="mt-3">
           <HumanPresence advisorName={advisor ? advisor.name || advisor.email : null} />
@@ -179,6 +194,7 @@ export default async function ConversationPage({ params, searchParams }: { param
       {trailing && (
         <div className="space-y-4">
           <RecommendationCardView id={trailing.id} card={trailing.card} given={(view.feedback.get(trailing.id) ?? []).map((f) => f.kind)} deeper={null} feedback={feedbackAction} compact />
+          {commit && <CommitToThis {...commit} commit={commitRecommendationAction.bind(null, trailing.id)} />}
           {offer && trailing.id === lastCardId && (
             <PlanOffer conversationId={view.conversation.id} planPrice={formatPrice(actionPlanCents)} supportedPrice={formatPrice(supportedMonthlyCents)} buy={buyPlanAction} bookHref="/advisory/book?kind=review" />
           )}

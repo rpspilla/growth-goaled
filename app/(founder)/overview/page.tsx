@@ -20,6 +20,14 @@ import type { PeerComparison } from "@/lib/benchmark-library/peers";
 import { METRICS, type MetricKey } from "@/lib/metrics";
 import { projectDay } from "@/lib/project-links";
 import { weekLabel } from "@/lib/weeks";
+import { AskBox } from "@/components/chat/AskBox";
+import { CommitmentList } from "@/components/projects/CommitmentList";
+import { CHAT_TOPICS } from "@/lib/chat/topics";
+import { commitmentItems } from "@/lib/commitments";
+import { listConversations } from "@/lib/data/chat";
+import { companyCommitments } from "@/lib/data/commitments";
+import { today } from "@/lib/data/projects";
+import { commitmentStatusAction, startChatAction } from "../chat/actions";
 
 /** The four numbers the Overview leads with (Founder View redesign): nothing else here. */
 const OVERVIEW_METRICS: MetricKey[] = ["arr", "nrr", "sales_cycle_days", "mom_growth"];
@@ -46,21 +54,25 @@ function benchmarkLead(peers: PeerComparison[]): string {
 }
 
 /**
- * The founder's executive dashboard: the advisor's plans with their documents, the four numbers
- * that matter, six months of MRR, this week's priorities from the advisor, and benchmarks. The
- * advisor runs all of it from the Advisor View; nothing here asks the founder to manage anything.
+ * The founder's home. It opens with their AI CRO ("What are you working through?", AI CRO sprint,
+ * Nov 23, 2026), the conversations to pick up and the commitments they've made; then the advisor's
+ * plans with their documents, the four numbers that matter, six months of MRR, this week's
+ * priorities from the advisor, and benchmarks.
  */
 export default async function OverviewPage({ searchParams }: { searchParams: Promise<{ welcome?: string }> }) {
   const { welcome } = await searchParams;
   const { user, company } = await founderContext();
   if (!company) redirect("/welcome");
-  const [perf, peers, site, projects, priorities] = await Promise.all([
+  const [perf, peers, site, projects, priorities, conversations, commitments] = await Promise.all([
     companyPerformance(company),
     getIntakeAnswers(company).then((a) => snapshotPeers(company, a)),
     companySite(company),
     companyProjects(company),
     currentPriorities(company),
+    listConversations(company, 3),
+    companyCommitments(company, { status: ["open"] }),
   ]);
+  const projectNames = new Map(projects.map((p) => [p.id, p.name]));
   const firstName = user.name?.split(" ")[0];
   // The open projects lead (the Growth Hiring Plan for most companies); else the latest completed one.
   const open = projects.filter((p) => p.status === "open");
@@ -96,6 +108,30 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         </div>
       )}
 
+
+      <AskBox starters={CHAT_TOPICS.map((t) => ({ id: t.id, starter: t.starter }))} start={startChatAction} />
+
+      {conversations.length > 0 && (
+        <Section id="conversations" title="Pick up where you left off" aside={<Link href="/whats-next" className="link text-sm">All conversations →</Link>}>
+          <ul aria-label="Recent conversations" className="surface divide-y" style={{ borderColor: "var(--border)" }}>
+            {conversations.map((c) => (
+              <li key={c.id} style={{ borderColor: "var(--border)" }}>
+                <Link href={`/chat/${c.id}`} className="flex items-center gap-4 p-4 hover:bg-[var(--muted)] rounded-xl">
+                  <span className="flex-1 min-w-0 text-base font-semibold truncate" style={{ color: "var(--foreground)" }}>{c.title}</span>
+                  <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>{c.updatedAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                  <span aria-hidden style={{ color: "var(--muted-foreground)" }}>→</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {commitments.length > 0 && (
+        <Section id="commitments" title="Your commitments" lead="What you committed to with your CRO. Tick them off as you go; your CRO asks about the ones that slip.">
+          <CommitmentList items={commitmentItems(commitments, projectNames, today())} label="Your commitments" setStatus={commitmentStatusAction} />
+        </Section>
+      )}
 
       <Section id="plans" title="Your plans" lead="Plans and documents from your Growth Goaled advisor." aside={projects.length ? <Link href="/projects" className="link text-sm">All growth projects →</Link> : undefined}>
         {shown.length ? (

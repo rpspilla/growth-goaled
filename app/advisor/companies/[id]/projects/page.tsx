@@ -5,6 +5,9 @@ import { ProjectFileUpload } from "@/components/advisor/ProjectFileUpload";
 import { companyProjects, documentHref, prioritiesFor, today } from "@/lib/data/projects";
 import { addDays, MAX_PRIORITIES, weekLabel, weekStart } from "@/lib/weeks";
 import { companyContext } from "../context";
+import { CommitmentList } from "@/components/projects/CommitmentList";
+import { commitmentItems } from "@/lib/commitments";
+import { companyCommitments } from "@/lib/data/commitments";
 import { addProjectFileAction, addProjectLinkAction, approveResultAction, createProjectAction, deleteProjectAction, deleteResultAction, removeProjectDocumentAction, savePrioritiesAction, saveResultAction, updateProjectAction } from "./actions";
 
 export const metadata = { title: "Growth projects" };
@@ -23,7 +26,8 @@ export default async function CompanyProjectsPage({ params, searchParams }: { pa
   const { company } = await companyContext(id);
   const thisWeek = weekStart(today());
   const week = w && /^\d{4}-\d{2}-\d{2}$/.test(w) ? weekStart(w) : thisWeek;
-  const [projects, priorities] = await Promise.all([companyProjects(company, { allResults: true }), prioritiesFor(company, week)]);
+  const [projects, priorities, commitments] = await Promise.all([companyProjects(company, { allResults: true }), prioritiesFor(company, week), companyCommitments(company)]);
+  const names = new Map(projects.map((p) => [p.id, p.name]));
   const base = `/advisor/companies/${company.id}/projects`;
 
   return (
@@ -158,6 +162,15 @@ export default async function CompanyProjectsPage({ params, searchParams }: { pa
               <ProjectFileUpload companyId={company.id} label={`Upload a document for ${p.name}`} save={addProjectFileAction.bind(null, company.id, p.id, "document")} />
             </div>
           </div>
+
+          {commitments.some((c) => c.projectId === p.id) && (
+            <div className="space-y-3">
+              <h3 className="font-semibold" style={fg}>
+                Commitments <span className="text-sm font-normal" style={muted}>· made by the founder with their AI CRO; they tick them off</span>
+              </h3>
+              <CommitmentList items={commitmentItems(commitments.filter((c) => c.projectId === p.id), names, today(), { withProject: false }).map((c) => ({ ...c, conversationId: null }))} label={`Commitments of ${p.name}`} />
+            </div>
+          )}
 
           <div className="space-y-3">
             <h3 className="font-semibold" style={fg}>Results <span className="text-sm font-normal" style={muted}>· the founder sees only approved ones</span></h3>

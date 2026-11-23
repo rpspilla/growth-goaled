@@ -7,10 +7,16 @@ import { ReviewActionPlan } from "@/components/projects/ReviewActionPlan";
 import { founderContext } from "@/lib/data/founder-context";
 import { companyProject } from "@/lib/data/projects";
 import { projectDay } from "@/lib/project-links";
+import { CommitmentList } from "@/components/projects/CommitmentList";
+import { commitmentItems } from "@/lib/commitments";
+import { companyCommitments } from "@/lib/data/commitments";
+import { today } from "@/lib/data/projects";
+import { commitmentStatusAction } from "../../chat/actions";
 
 /**
  * One growth project, as the founder sees it: the Review Action Plan card (the advisor's document),
- * the results the advisor has approved, and the documents shared on it. Nothing to manage here.
+ * the commitments made with their AI CRO (ticked off here), the results the advisor has approved,
+ * and the documents shared on it.
  */
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { company } = await founderContext();
@@ -19,10 +25,14 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const p = await companyProject(company, id);
   if (!p) notFound();
+  const commitments = await companyCommitments(company, { projectIds: [p.id] });
   return (
     <div className="page space-y-8">
       <div>
         <Link href="/projects" className="link text-sm">← Growth Projects</Link>
+        {p.conversationId && (
+          <Link href={`/chat/${p.conversationId}`} className="link text-sm ml-4">The conversation it came from →</Link>
+        )}
         <div className="flex items-center gap-3 flex-wrap mt-2">
           <h1 className="font-display text-3xl sm:text-4xl" style={{ color: "var(--foreground)" }}>{p.name}</h1>
           <Pill tone={p.status === "completed" ? "neutral" : "green"}>{p.status === "completed" ? "Completed" : "Open"}</Pill>
@@ -34,6 +44,12 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       </div>
 
       <ReviewActionPlan plan={p.actionPlan} project={p.name} />
+
+      {commitments.length > 0 && (
+        <Section id="commitments" title="Commitments" lead="What you committed to with your CRO for this project.">
+          <CommitmentList items={commitmentItems(commitments, new Map([[p.id, p.name]]), today(), { withProject: false })} label={`Commitments of ${p.name}`} setStatus={commitmentStatusAction} />
+        </Section>
+      )}
 
       <Section id="results" title="Results" lead="The outcomes your advisor tracks for this project.">
         {p.results.length ? (

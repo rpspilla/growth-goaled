@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
-import { ChatStart } from "@/components/chat/ChatStart";
+import { AskBox } from "@/components/chat/AskBox";
 import { FactsEditor } from "@/components/chat/FactsEditor";
 import { Section } from "@/components/ui/Section";
 import { listConversations, listFacts } from "@/lib/data/chat";
@@ -11,12 +11,12 @@ import { removeFactAction, startChatAction, updateFactAction } from "../chat/act
 
 export const maxDuration = 300;
 
-export const metadata = { title: "What's Next?" };
+export const metadata = { title: "Ask your CRO" };
 
 /**
- * What's Next? (was "Strategic Growth Questions", at /chat): the next question to ask, and History
- * (the questions asked so far, and what Growth Goaled remembers about the company). Starting a growth
- * project lives on Growth Projects.
+ * Ask your CRO (was "What's Next?", and "Strategic Growth Questions" at /chat): the next question,
+ * in the founder's own words, and History (the questions asked so far, and what Growth Goaled
+ * remembers about the company).
  */
 export default async function WhatsNextPage() {
   const { company } = await founderContext();
@@ -24,11 +24,9 @@ export default async function WhatsNextPage() {
   const [conversations, facts] = await Promise.all([listConversations(company, 50), listFacts(company)]);
   return (
     <div className="page space-y-12">
-      <PageHeader title="What's Next?" subtitle="Ask about any commercial decision. Answers use what you've already shared." />
+      <PageHeader title="Ask your CRO" subtitle="Any growth decision, in your own words. Answers use what you've already shared and the work under way." />
 
-      <Section id="new" title="What strategic growth question is next?">
-        <ChatStart starters={CHAT_TOPICS.map((t) => ({ id: t.id, starter: t.starter }))} start={startChatAction} heading={false} />
-      </Section>
+      <AskBox starters={CHAT_TOPICS.map((t) => ({ id: t.id, starter: t.starter }))} start={startChatAction} />
 
       <div id="facts" className="scroll-mt-24">
         <Section id="facts-title" title="History" lead="The questions you've asked, and what we remember about your company from them.">

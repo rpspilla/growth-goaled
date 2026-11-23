@@ -29,7 +29,7 @@ test("advisor names the plan and asks for data; the founder sees progress and da
   // One "Company profile" heading in the menu, open to start, with everything under it.
   const companyProfile = f.page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Company profile" });
   await expect(companyProfile).toHaveAttribute("aria-expanded", "true");
-  await expect(menu).toHaveText(["Company Details", "Team", "Overview", "Growth Projects", "Data", "Performance", "Documents", "What's Next?"]);
+  await expect(menu).toHaveText(["Ask your CRO", "Company Details", "Team", "Overview", "Growth Projects", "Data", "Performance", "Documents"]);
   await companyProfile.click();
   await expect(menu).toHaveCount(0);
   await companyProfile.click();

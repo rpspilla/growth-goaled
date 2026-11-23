@@ -69,7 +69,7 @@ test("the advisor runs the work; the founder sees plans, priorities, approved re
   // --- Founder: the Overview is an executive dashboard ---
   const f = await as("fv@e2e.test");
   await f.page.goto("/overview");
-  await expect(f.page.getByRole("navigation", { name: "Menu" }).getByRole("link")).toHaveText(["Company Details", "Team", "Overview", "Growth Projects", "Data", "Performance", "Documents", "What's Next?"]);
+  await expect(f.page.getByRole("navigation", { name: "Menu" }).getByRole("link")).toHaveText(["Ask your CRO", "Company Details", "Team", "Overview", "Growth Projects", "Data", "Performance", "Documents"]);
   const plans = f.page.getByRole("article", { name: "Growth Hiring Plan" });
   await expect(plans.getByRole("link", { name: "Review Action Plan: Growth Hiring Plan" })).toHaveAttribute("href", "https://docs.google.com/document/d/e2e-plan");
   await expect(plans.getByRole("link", { name: "AE comp model" })).toHaveAttribute("href", "https://docs.google.com/spreadsheets/d/e2e-comp");

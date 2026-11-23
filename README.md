@@ -231,6 +231,16 @@ Growth Goaled's own prospecting and relationships, at **/advisor/crm** ("CRM" in
 - **Assessment plan (Progress)**: each action has **Who does it** (Founder or Growth Goaled); **Send to my advisor for review** fixes the split and gives the advisor a To Do and an email (`sendPlanAssignments`, migration `0029_plan_action_assignee.sql`).
 - **Advisor company page** also lists the founder's **Business updates** with Remove / Clear all (readings set aside, not deleted). **Users** shows each person's company (staff: Growth Goaled), and admins can delete people (optionally with a company only they belonged to). Data requests can be deleted one by one or all at once.
 
+### AI CRO (Nov 23, 2026): ask, decide, commit, follow up
+
+Brief: `docs/briefs/2026-11-23-ai-cro-sprint.md` (from the AI CRO Product Audit). Supersedes the menu order and the Overview's top half described in the sections below.
+
+- **Conversation first.** The menu starts with **Ask your CRO** (`/whats-next`; `/chat` redirects). The Overview opens with **"What are you working through?"** (`components/chat/AskBox.tsx`): the founder's own words (topic "other") or a common question as a chip; then **Pick up where you left off** (latest 3 conversations) and **Your commitments**. On the advisor's company view the first item is **Conversations** (the founder's questions, on the company page).
+- **The CRO sees the work.** `chatContext()` (`lib/chat/context.ts`) sends, besides profile, figures and facts: `open_work` (open growth projects and the last two completed, open commitments plus the last five closed with overdue flags, this week's advisor priorities, approved results) and `earlier_conversations` (latest 10 other conversations: question, latest recommendation, whether it was committed). The legacy use-case `plan_actions` are no longer sent. The CRO prompt says to connect questions to the work under way, not re-recommend what's committed, and ask about overdue commitments.
+- **Commit to this.** Under the latest decision card (`components/chat/CommitToThis.tsx`): its next steps (up to 5) become commitments with owner (the founder by default), due date (a week apart) and "worked if" measure, into a new growth project (named from the card's takeaway, linked to the conversation and card) or an open one. The card is then marked committed (`recommendations.status`) and links to the project. Data: `commitments` table (migration 0036), `lib/data/commitments.ts`, `lib/commitments.ts`.
+- **Tracking.** Founders tick commitments done, drop or reopen them on the Overview and the project page (`components/projects/CommitmentList.tsx`); the project page links back to the conversation it came from. Advisors see each project's commitments, read-only, on the company's Growth projects page.
+- Not yet: weekly check-in emails, outcomes per commitment, advisor approval of commitments, carrying the website chat into the account.
+
 ### Founder View (redesign, Nov 16, 2026): the advisor owns the work, the founder views it
 
 The founder view is an executive dashboard, not a project tool. Advisors run everything from **Growth projects** on the advisor's company page (`/advisor/companies/[id]/projects`, `lib/data/projects.ts`, migration 0035); founders only view it.

@@ -10,6 +10,7 @@ import { attachFiles, FEEDBACK_KINDS, giveFeedback, removeFact, retryLastMessage
 import { answerStep, createPlanCheckout, PlanCheckoutError, requestPlanUpdate, setPlanTargets, setStepAssignee, setStepStatus, startPlan, submitPlan, updateStep, writePlan } from "@/lib/data/action-plans";
 import { processInboxDocument, registerDocument } from "@/lib/data/documents";
 import { stripeConfigured } from "@/lib/stripe";
+import { commitRecommendation, setCommitmentStatus } from "@/lib/data/commitments";
 
 /** The signed-in founder and their company: conversations are only ever read or changed within it. */
 async function founderCompany() {
@@ -245,4 +246,39 @@ export async function attachFilesAction(conversationId: string, files: z.infer<t
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Upload failed." };
   }
+}
+
+export type CommitState = { error?: string; projectId?: string };
+
+/**
+ * "Commit to this": the decision card's next steps become commitments in a growth project (new, or an
+ * open one). The form sends one row per proposed commitment: keep_N, title_N, owner_N, due_N, measure_N.
+ */
+export async function commitRecommendationAction(recommendationId: string, _prev: CommitState, formData: FormData): Promise<CommitState> {
+  const { user, company } = await founderCompany();
+  if (!id.safeParse(recommendationId).success) return { error: "That recommendation wasn't found." };
+  const str = (k: string) => {
+    const v = formData.get(k);
+    return typeof v === "string" ? v : "";
+  };
+  const existing = str("project");
+  const project = existing && existing !== "new" ? (id.safeParse(existing).success ? { kind: "existing" as const, id: existing } : null) : { kind: "new" as const, name: str("project_name") };
+  if (!project) return { error: "That project wasn't found." };
+  const rows = Number(str("rows")) || 0;
+  const items = Array.from({ length: Math.min(rows, 10) }, (_, n) => n)
+    .filter((n) => formData.get(`keep_${n}`) === "on")
+    .map((n) => ({ title: str(`title_${n}`), owner: str(`owner_${n}`), dueOn: str(`due_${n}`) || null, measure: str(`measure_${n}`) || null }));
+  const result = await commitRecommendation(user, company, recommendationId, { project, items });
+  if (!result.ok) return { error: result.error };
+  revalidatePath("/", "layout");
+  return { projectId: result.projectId };
+}
+
+/** Tick a commitment done, drop it, or reopen it (Overview and project pages). */
+export async function commitmentStatusAction(commitmentId: string, status: "open" | "done" | "dropped"): Promise<{ ok: boolean; error?: string }> {
+  const { user, company } = await founderCompany();
+  if (!id.safeParse(commitmentId).success || !["open", "done", "dropped"].includes(status)) return { ok: false, error: "That commitment wasn't found." };
+  const result = await setCommitmentStatus(user, company, commitmentId, status);
+  if (result.ok) revalidatePath("/", "layout");
+  return result.ok ? { ok: true } : { ok: false, error: result.error };
 }

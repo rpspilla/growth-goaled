@@ -24,3 +24,25 @@ export function projectNameFrom(takeaway: string, fallback: string): string {
 
 /** Overdue: open and due before today. */
 export const isOverdue = (c: { status: string; dueOn: string | null }, today: string) => c.status === "open" && c.dueOn !== null && c.dueOn < today;
+
+const dayLabel = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+
+/** Rows for the commitments list (Overview, project page, advisor). */
+export function commitmentItems(
+  rows: { id: string; title: string; owner: string; dueOn: string | null; measure: string | null; status: "open" | "done" | "dropped"; projectId: string; conversationId: string | null }[],
+  projects: Map<string, string>,
+  today: string,
+  opts: { withProject?: boolean } = {},
+): import("@/components/projects/CommitmentList").CommitmentItem[] {
+  return rows.map((c) => ({
+    id: c.id,
+    title: c.title,
+    owner: c.owner,
+    dueLabel: c.dueOn ? dayLabel(c.dueOn) : null,
+    overdue: isOverdue(c, today),
+    measure: c.measure,
+    status: c.status,
+    project: opts.withProject !== false && projects.has(c.projectId) ? { id: c.projectId, name: projects.get(c.projectId)! } : null,
+    conversationId: c.conversationId,
+  }));
+}

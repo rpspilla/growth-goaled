@@ -327,9 +327,9 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
         </section>
       )}
 
-      <section id="whats-next" aria-label="What's Next?" className="rounded-xl border p-5 space-y-3 scroll-mt-6" style={card}>
+      <section id="whats-next" aria-label="Conversations" className="rounded-xl border p-5 space-y-3 scroll-mt-6" style={card}>
         <div>
-          <h2 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>What&apos;s Next?</h2>
+          <h2 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>Conversations with their AI CRO</h2>
           <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>The questions {company.name} has asked, newest first.</p>
         </div>
         {questions.length ? (

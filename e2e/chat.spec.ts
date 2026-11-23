@@ -19,18 +19,19 @@ test("a founder talks a decision through and gets a recommendation card", async 
   const ctx = await browser.newContext();
   await ctx.addCookies([{ name: "gg_e2e_user", value: "chat@e2e.test", domain: "localhost", path: "/" }]);
   const page = await ctx.newPage();
-  // The Overview no longer lists the starters; What's Next? does, in the owner's words.
+  // The Overview opens with the AI CRO: the founder's own words first, the common questions under it.
   await page.goto("/overview");
-  await expect(page.getByRole("button", { name: "How do I build a repeatable revenue engine?" })).toHaveCount(0);
-  // The old Strategic Growth Questions address lands on What's Next?.
+  await expect(page.getByRole("heading", { name: "What are you working through?" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Common questions" }).getByRole("button", { name: "How do I build a repeatable revenue engine?" })).toBeVisible();
+  // The old Strategic Growth Questions address lands on Ask your CRO.
   await page.goto("/chat");
   await expect(page).toHaveURL(/\/whats-next$/);
-  await expect(page.getByRole("heading", { name: "What's Next?", level: 1 })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "What strategic growth question is next?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ask your CRO", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What are you working through?" })).toBeVisible();
   // Growth projects are started from Growth Projects now; past questions sit in History.
   await expect(page.getByRole("heading", { name: "Start a growth project" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
-  for (const s of ["How do I build a repeatable revenue engine?", "Who should my first GTM hire be?", "How much equity should I give my first sales hire?", "Are we ready to raise our next round?", "How can we improve retention and revenue efficiency?", "Something else."]) {
+  for (const s of ["How do I build a repeatable revenue engine?", "Who should my first GTM hire be?", "How much equity should I give my first sales hire?", "Are we ready to raise our next round?", "How can we improve retention and revenue efficiency?"]) {
     await expect(page.getByRole("button", { name: s })).toBeVisible();
   }
 
@@ -127,11 +128,10 @@ test("a founder talks a decision through and gets a recommendation card", async 
   await expect(facts).toContainText("4");
   await expect(page.getByRole("link", { name: "Should we hire more salespeople?" })).toBeVisible();
 
-  // "Something else" uses the founder's own words.
+  // The founder's own words open a conversation too.
   await page.goto("/chat");
-  await page.getByRole("button", { name: "Something else." }).click();
-  await page.getByLabel("What's on your mind?").fill("Should we raise prices before hiring?");
-  await page.getByRole("button", { name: "Ask" }).click();
+  await page.getByRole("textbox", { name: "What are you working through?" }).fill("Should we raise prices before hiring?");
+  await page.getByRole("button", { name: "Ask", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Should we raise prices before hiring?" })).toBeVisible();
   await expect(page.getByText(/Recent strategic growth questions/)).toHaveCount(0);
   // The chat keeps going; from the sixth exchange it gently points at talking to Growth Goaled.
