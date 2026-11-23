@@ -330,7 +330,7 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
       <section id="whats-next" aria-label="Conversations" className="rounded-xl border p-5 space-y-3 scroll-mt-6" style={card}>
         <div>
           <h2 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>Conversations with their AI CRO</h2>
-          <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>The questions {company.name} has asked, newest first.</p>
+          <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>The questions {company.name} has asked, newest first. Open one to read it and add a note: the AI CRO follows your direction and the founder is emailed.</p>
         </div>
         {questions.length ? (
           <ul aria-label="Questions asked" className="divide-y text-sm" style={{ borderColor: "var(--border)" }}>
@@ -338,7 +338,7 @@ export default async function CompanyOverviewPage({ params }: { params: Promise<
               const plan = plansByConversation.get(q.id);
               return (
                 <li key={q.id} className="py-2.5 flex items-center gap-4 flex-wrap" style={{ borderColor: "var(--border)" }}>
-                  <span className="flex-1 min-w-[12rem] font-medium" style={{ color: "var(--foreground)" }}>{q.title}</span>
+                  <Link href={`${base}/conversations/${q.id}`} className="flex-1 min-w-[12rem] font-medium link">{q.title}</Link>
                   <span style={{ color: "var(--muted-foreground)" }}>{day(q.updatedAt)}</span>
                   {plan ? <Link href={`/advisor/plans/${plan}`} className="link">Open the action plan →</Link> : <span style={{ color: "var(--muted-foreground)" }}>No plan</span>}
                 </li>

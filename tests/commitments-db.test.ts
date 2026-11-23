@@ -153,7 +153,7 @@ describe("the context the CRO sees", () => {
 
     const ctx = await chatContext(co, { compensation: false });
     expect(ctx.work.projects).toEqual([{ name: "Hire the first AE", status: "open", started: today(), completed: null, from_conversation: "Should we hire more salespeople?" }]);
-    expect(ctx.work.commitments).toEqual([{ title: "Write the AE scorecard", owner: "Fran", due: "2020-01-06", measure: "Scorecard agreed", status: "open", overdue: true, project: "Hire the first AE" }]);
+    expect(ctx.work.commitments).toEqual([{ title: "Write the AE scorecard", owner: "Fran", due: "2020-01-06", measure: "Scorecard agreed", status: "open", overdue: true, project: "Hire the first AE", outcome: null, outcome_note: null }]);
     expect(ctx.work.priorities).toMatchObject({ current: true, items: [{ title: "Close the AE hire", action: "Send the offer", due: null }] });
     expect(ctx.work.results).toEqual([{ project: "Hire the first AE", label: "Pipeline added", value: "$90k", note: null }]);
     expect(ctx.earlierConversations).toEqual([{ date: expect.any(String), question: "Should we hire more salespeople?", takeaway: "Test mode takeaway for Should we hire more salespeople?", recommendation: "Test mode recommendation.", committed: true }]);

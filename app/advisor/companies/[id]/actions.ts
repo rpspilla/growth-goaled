@@ -19,6 +19,7 @@ import { createDataRequest, deleteDataRequest, setCurrentPlan } from "@/lib/data
 import { clearBusinessUpdate, setBusinessUpdateDate } from "@/lib/data/business-metrics";
 import { createContract, createContractFromFile, readContractFile, removeContract, updateContract, updateContractDetails } from "@/lib/data/contracts";
 import { after } from "next/server";
+import { postAdvisorNote } from "@/lib/data/chat";
 import { processDocument } from "@/lib/data/documents";
 import { db, schema } from "@/lib/db";
 import { and, eq } from "drizzle-orm";
@@ -326,4 +327,17 @@ export async function rereadDocumentAction(companyId: string, documentId: string
   await db.update(schema.documents).set({ status: "analyzing", error: null }).where(eq(schema.documents.id, doc.id));
   after(() => processDocument(doc.id));
   refresh(companyId);
+}
+
+/** The advisor's note in one of the company's conversations (any conversation, not only supported plans). */
+export async function advisorNoteAction(companyId: string, conversationId: string, _prev: { ok: true } | { ok: false; error: string } | null, form: FormData): Promise<{ ok: true } | { ok: false; error: string }> {
+  const ctx = await managed(companyId);
+  if (!ctx) return { ok: false, error: "That company isn't available." };
+  if (!z.uuid().safeParse(conversationId).success) return { ok: false, error: "Conversation not found." };
+  const result = await postAdvisorNote(ctx.user, ctx.company, conversationId, String(form.get("note") ?? ""), process.env.APP_URL ?? "https://app.growthgoaled.com");
+  if (result.ok) {
+    revalidatePath(`/advisor/companies/${companyId}/conversations/${conversationId}`);
+    revalidatePath(`/chat/${conversationId}`);
+  }
+  return result.ok ? { ok: true } : { ok: false, error: result.error };
 }

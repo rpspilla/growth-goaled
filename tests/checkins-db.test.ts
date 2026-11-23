@@ -141,3 +141,21 @@ describe("the weekly check-in", () => {
     expect(email.text).toContain("Due this week:\n- Due Friday (Fran, by Fri, Nov 27)");
   });
 });
+
+describe("advisor notes in any conversation", () => {
+  it("post in the company's conversations only, and email the founders once an hour", async () => {
+    const { postAdvisorNote } = await import("@/lib/data/chat");
+    const [adv] = await db().insert(schema.users).values({ email: "adv@gg.test", authUserId: "adv-note", role: "advisor", name: "Ada Advisor" }).returning();
+    const [conv] = await db().insert(schema.conversations).values({ companyId: co.id, topic: "other", title: "Should we hire?" }).returning();
+    expect(await postAdvisorNote(adv!, sample, conv!.id, "Hi", "https://app.test")).toEqual({ ok: false, error: "Conversation not found." });
+    expect(await postAdvisorNote(adv!, co, conv!.id, "  ", "https://app.test")).toEqual({ ok: false, error: "Type a message first." });
+    expect(await postAdvisorNote(adv!, co, conv!.id, "Let's look at your last 20 deals first.", "https://app.test")).toEqual({ ok: true });
+    expect(h.sent.map((m) => m.to).sort()).toEqual(["fran@co.test", "sam@co.test"]);
+    expect(h.sent[0]).toMatchObject({ subject: "Ada Advisor added a note: Should we hire?" });
+    expect(h.sent[0]!.text).toContain(`https://app.test/chat/${conv!.id}`);
+    expect(await postAdvisorNote(adv!, co, conv!.id, "And bring the pipeline export.", "https://app.test")).toEqual({ ok: true });
+    expect(h.sent).toHaveLength(2);
+    const msgs = await db().select().from(schema.conversationMessages).where(eq(schema.conversationMessages.conversationId, conv!.id));
+    expect(msgs.map((m) => [m.role, m.authorId])).toEqual([["advisor", adv!.id], ["advisor", adv!.id]]);
+  });
+});

@@ -9,6 +9,7 @@ import { characteristics, chatContext } from "@/lib/chat/context";
 import { CHAT_METHODOLOGY_VERSION, getChatTopic } from "@/lib/chat/topics";
 import { track } from "@/lib/events";
 import { registerDocument } from "./documents";
+import { sendEmail } from "@/lib/email";
 import { intelligenceFor, publishedCro } from "./cro";
 
 /** Founder messages per company per rolling 24 hours (CHAT_DAILY_LIMIT, default 80): chat is free, so it's capped. */
@@ -91,6 +92,8 @@ function cardFrom(output: NonNullable<ChatOutput["recommendation"]>, sources: { 
     successMeasures: output.success_measures,
     plan: { days30: output.plan_30, days60: output.plan_60, days90: output.plan_90 },
     missing: output.missing,
+    tradeoffs: output.tradeoffs.slice(0, 4),
+    alternatives: output.alternatives.slice(0, 4).map((a) => ({ option: a.option, whyNot: a.why_not })),
     ...(output.perspectives.length ? { perspectives: output.perspectives.slice(0, 4) } : {}),
     ...(sources.length ? { sources } : {}),
   };
@@ -282,4 +285,55 @@ export async function attachFiles(
   await db.insert(schema.conversationMessages).values({ conversationId, role: "user", content: `Shared ${files.length === 1 ? "a file" : "files"}: ${names}`, documentIds: ids });
   await db.update(schema.conversations).set({ updatedAt: new Date() }).where(eq(schema.conversations.id, conversationId));
   return { ok: true, process };
+}
+
+/**
+ * An advisor's note in any conversation of a company they manage (Nov 24, 2026; before, only on
+ * supported plans). The AI CRO sees it as the advisor's and follows it. The company's founders are
+ * emailed a link, unless the advisor wrote it in the last hour already (one note, one email).
+ */
+export async function postAdvisorNote(advisor: Pick<User, "id" | "name" | "email">, company: Pick<Company, "id" | "name">, conversationId: string, raw: string, appUrl: string): Promise<ChatResult> {
+  const text = raw.trim();
+  if (!text) return { ok: false, error: "Type a message first." };
+  if (text.length > MAX_MESSAGE_LENGTH) return { ok: false, error: `Keep messages under ${MAX_MESSAGE_LENGTH.toLocaleString("en-US")} characters.` };
+  const [conversation] = await db
+    .select({ id: schema.conversations.id, title: schema.conversations.title })
+    .from(schema.conversations)
+    .where(and(eq(schema.conversations.id, conversationId), eq(schema.conversations.companyId, company.id)))
+    .limit(1);
+  if (!conversation) return { ok: false, error: "Conversation not found." };
+  const since = new Date(Date.now() - 60 * 60 * 1000);
+  const [recent] = await db
+    .select({ id: schema.conversationMessages.id })
+    .from(schema.conversationMessages)
+    .where(and(eq(schema.conversationMessages.conversationId, conversation.id), eq(schema.conversationMessages.role, "advisor"), eq(schema.conversationMessages.authorId, advisor.id), gte(schema.conversationMessages.createdAt, since)))
+    .limit(1);
+  await db.insert(schema.conversationMessages).values({ conversationId: conversation.id, role: "advisor", content: text, authorId: advisor.id });
+  await db.update(schema.conversations).set({ updatedAt: new Date() }).where(eq(schema.conversations.id, conversation.id));
+  await track("advisor_message", { userId: advisor.id, companyId: company.id, props: { anyConversation: true } });
+  if (!recent) {
+    const founders = await db
+      .select({ email: schema.users.email, name: schema.users.name })
+      .from(schema.companyMembers)
+      .innerJoin(schema.users, eq(schema.users.id, schema.companyMembers.userId))
+      .where(and(eq(schema.companyMembers.companyId, company.id), eq(schema.users.role, "founder")));
+    const who = advisor.name?.trim() || "Your Growth Goaled advisor";
+    const url = `${appUrl.replace(/\/$/, "")}/chat/${conversation.id}`;
+    for (const f of founders) {
+      await sendEmail(advisorNoteEmail({ to: f.email, name: f.name, who, title: conversation.title, note: text, url }));
+    }
+  }
+  return { ok: true };
+}
+
+const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+export function advisorNoteEmail(p: { to: string; name: string | null; who: string; title: string; note: string; url: string }) {
+  const first = p.name?.split(" ")[0];
+  const excerpt = p.note.length > 400 ? `${p.note.slice(0, 397)}…` : p.note;
+  return {
+    to: p.to,
+    subject: `${p.who} added a note: ${p.title.slice(0, 80)}`,
+    text: `${first ? `Hi ${first},\n\n` : ""}${p.who} added a note to your conversation "${p.title}":\n\n${excerpt}\n\nReply or keep going with your CRO: ${p.url}`,
+    html: `<div style="font-family:Inter,Arial,sans-serif;color:#0D1B2A;max-width:520px">${first ? `<p style="font-size:15px">Hi ${esc(first)},</p>` : ""}<p style="font-size:15px"><strong>${esc(p.who)}</strong> added a note to your conversation <strong>${esc(p.title)}</strong>:</p><blockquote style="margin:12px 0;padding:8px 14px;border-left:3px solid #155A3C;font-size:15px;white-space:pre-wrap">${esc(excerpt)}</blockquote><p><a href="${esc(p.url)}" style="display:inline-block;background:#155A3C;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600">Open the conversation</a></p></div>`,
+  };
 }

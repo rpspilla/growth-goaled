@@ -184,6 +184,8 @@ async function aiTurn(g: Pick<GuestSession, "id" | "profile" | "messages" | "aiT
         successMeasures: output.recommendation.success_measures,
         plan: { days30: output.recommendation.plan_30, days60: output.recommendation.plan_60, days90: output.recommendation.plan_90 },
         missing: output.recommendation.missing,
+        tradeoffs: output.recommendation.tradeoffs.slice(0, 4),
+        alternatives: output.recommendation.alternatives.slice(0, 4).map((a) => ({ option: a.option, whyNot: a.why_not })),
       }
     : null;
   // Answering the follow-up questions refines the recommendation; an answer without a new card keeps the last one.

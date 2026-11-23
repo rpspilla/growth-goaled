@@ -23,6 +23,8 @@ const cardSchema = z.object({
   plan_60: z.array(z.string()),
   plan_90: z.array(z.string()),
   missing: z.array(z.string()),
+  tradeoffs: z.array(z.string()),
+  alternatives: z.array(z.object({ option: z.string(), why_not: z.string() })),
   perspectives: z.array(z.object({ view: z.string(), held_by: z.string(), assumptions: z.string(), fits: z.boolean() })),
 });
 
@@ -66,7 +68,7 @@ Output fields:
 - intelligence_used: when CRO INTELLIGENCE is present, every record you relied on this turn: its id exactly as given, and how you used it (a short phrase). [] when none.
 - perspectives (on the card): only in the Collective, when CROs' views materially differ: each view, whose it is, the assumption behind it, and fits (true for the one you recommend for this company). Otherwise [].
 - plan_needs: only when ACTION PLAN says it's being built: the specific information still missing for a strong 30/60/90-day plan (each a short phrase, most important first), or [] when you have enough. Otherwise [].
-- recommendation: give one when you have enough to recommend something useful, even with caveats (often by the second or third turn; at once when the context already covers it). Otherwise null. When you give one, it's the founder's decision card: takeaway (one sentence), diagnosis, evidence (each item marked fact/figure/assumption/hypothesis), confidence (high/medium/low and why, by the CONFIDENCE rule below), priority, recommendation, next_steps, success_measures, a 30/60/90-day plan, and missing (what would raise confidence). Keep every field short and scannable. Give an updated card when new information changes your view.
+- recommendation: give one when you have enough to recommend something useful, even with caveats (often by the second or third turn; at once when the context already covers it). Otherwise null. When you give one, it's the founder's decision card: takeaway (one sentence), diagnosis, evidence (each item marked fact/figure/assumption/hypothesis), confidence (high/medium/low and why, by the CONFIDENCE rule below), priority, recommendation, next_steps, success_measures, a 30/60/90-day plan, missing (what would raise confidence), tradeoffs (what this choice costs or risks: time, cash, focus, what gets delayed; one to three, specific to this company) and alternatives (one to three real options you considered, each with why_not: why it's worse for this company now). Keep every field short and scannable. Give an updated card when new information changes your view.
 
 CONFIDENCE (founders see this rule, so apply it exactly):
 - high: ${CONFIDENCE_RULES.high}
@@ -76,7 +78,9 @@ The why says which inputs are known and which are assumed.
 
 When ACTION PLAN is present, the founder has bought a plan for this question:
 - While it's being collected, your job is to gather what the plan needs: ask for the most important missing information first, invite them to attach files (CRM exports, revenue by customer, org chart, comp plans) in the chat, and say when you have enough for them to submit it. An advisor reviews the plan before it's delivered (expect up to 24 hours).
-- On the supported plan, a CRO-level advisor takes part in this conversation. Their messages are marked ADVISOR; follow their direction, and don't contradict them without saying why.`;
+- On the supported plan, a CRO-level advisor takes part in this conversation.
+
+ADVISOR messages (in any conversation) come from the founder's human Growth Goaled advisor. Follow their direction, build on it, and don't contradict them without saying why.`;
 
 function contextBlock(input: ChatInput): string {
   const { topic, context } = input;
@@ -198,6 +202,8 @@ function fakeTurnBase(input: ChatInput): Omit<ChatOutput, "intelligence_used"> {
       plan_60: ["Test 60-day step"],
       plan_90: ["Test 90-day step"],
       missing: ["Pipeline export"],
+      tradeoffs: ["Test tradeoff: slows the next hire by a quarter"],
+      alternatives: [{ option: "Test alternative", why_not: "Test reason it's worse now" }],
       perspectives: [],
     },
     plan_needs: input.plan?.status === "collecting" ? (/attached|export/i.test(last) ? [] : ["Closed deals export"]) : [],

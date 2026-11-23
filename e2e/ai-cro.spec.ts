@@ -42,7 +42,13 @@ test("ask on the Overview, commit to the recommendation, track the commitments",
   // The second answer gives the decision card, and the way to commit to it.
   await f.page.getByLabel("Your reply").fill("Two of us sell today; deals are about $25k.");
   await f.page.getByRole("button", { name: "Send", exact: true }).click();
-  await expect(f.page.getByRole("article", { name: "Recommendation" })).toBeVisible();
+  const card = f.page.getByRole("article", { name: "Recommendation" });
+  await expect(card).toBeVisible();
+  // The card weighs the choice: what it costs, and what was considered instead.
+  await card.getByText("Show the full recommendation").click();
+  await expect(card).toContainText("Test tradeoff: slows the next hire by a quarter");
+  await expect(card.getByText("Considered instead")).toBeVisible();
+  await expect(card).toContainText("Test alternative");
   await f.page.getByRole("button", { name: "Commit to this" }).click();
   const form = f.page.getByRole("form", { name: "Commit to this recommendation" });
   await expect(form.getByLabel("Commitment 1", { exact: true })).toHaveValue("First test step");
@@ -91,6 +97,18 @@ test("ask on the Overview, commit to the recommendation, track the commitments",
   // The advisor's menu starts with the founder's conversations.
   await adv.page.goto(`/advisor/companies/${company}`);
   await expect(adv.page.getByRole("navigation", { name: "Menu" }).getByRole("link").first()).toHaveText("Conversations");
+  // The advisor reads the conversation and adds a note; the founder sees it there.
+  await adv.page.getByRole("list", { name: "Questions asked" }).getByRole("link", { name: "Should we hire our first AE now?" }).click();
+  await expect(adv.page.getByRole("list", { name: "Conversation", exact: true })).toContainText("Two of us sell");
+  await expect(adv.page.getByRole("list", { name: "Committed from this conversation" })).toContainText("Write the AE scorecard");
+  const note = adv.page.getByRole("form", { name: "Advisor note" });
+  await note.getByLabel("Note").fill("Before hiring, let's look at your last 20 closed deals together.");
+  await note.getByRole("button", { name: "Post note" }).click();
+  await expect(note.getByRole("status")).toContainText("Saved");
+  await expect(adv.page.getByRole("list", { name: "Conversation", exact: true })).toContainText("Advisor · Ada Advisor");
+  await f.page.goto(conversationUrl);
+  await expect(f.page.getByText("Before hiring, let's look at your last 20 closed deals together.")).toBeVisible();
+  await expect(f.page.getByText(/Your advisor · Ada Advisor/)).toBeVisible();
 
   await adv.ctx.close();
   await f.ctx.close();

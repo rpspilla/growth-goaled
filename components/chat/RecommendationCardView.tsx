@@ -107,6 +107,24 @@ export function RecommendationCardView({
         </div>
       )}
 
+      {((card.tradeoffs?.length ?? 0) > 0 || (card.alternatives?.length ?? 0) > 0) && (
+        <div className="grid sm:grid-cols-2 gap-5">
+          <List title="The tradeoffs" items={card.tradeoffs ?? []} />
+          {card.alternatives && card.alternatives.length > 0 && (
+            <div>
+              <h4 className="label mb-1">Considered instead</h4>
+              <ul className="space-y-1 text-base" style={fg}>
+                {card.alternatives.map((a, i) => (
+                  <li key={i}>
+                    <span className="font-semibold">{a.option}</span> <span style={muted}>· {a.whyNot}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
       {card.perspectives && card.perspectives.length > 0 && (
         <div aria-label="Where our CROs differ">
           <h4 className="label mb-1">Where our CROs see it differently</h4>

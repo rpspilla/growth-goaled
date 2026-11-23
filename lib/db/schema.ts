@@ -1051,6 +1051,9 @@ export type RecommendationCard = {
   successMeasures: string[];
   plan: { days30: string[]; days60: string[]; days90: string[] };
   missing: string[];
+  /** What the choice costs or risks, and the options considered instead (Nov 24, 2026; older cards have none). */
+  tradeoffs?: string[];
+  alternatives?: { option: string; whyNot: string }[];
   /** Collective mode: where CROs in the network see it differently, and which view fits this company. */
   perspectives?: { view: string; held_by: string; assumptions: string; fits: boolean }[];
   /** The CRO intelligence records the card drew on, with how each was used. */
