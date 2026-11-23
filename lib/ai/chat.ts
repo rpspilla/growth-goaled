@@ -7,6 +7,7 @@ import { CONFIDENCE_RULES } from "@/lib/chat/legend";
 import type { ChatContext } from "@/lib/chat/context";
 import type { ChatTopic } from "@/lib/chat/topics";
 import { e2eEnabled } from "@/lib/e2e";
+import { disagreements, intelligenceBlock, type IntelligenceBundle } from "@/lib/cro";
 import { AI_MODEL, anthropic } from "./config";
 
 const cardSchema = z.object({
@@ -22,6 +23,7 @@ const cardSchema = z.object({
   plan_60: z.array(z.string()),
   plan_90: z.array(z.string()),
   missing: z.array(z.string()),
+  perspectives: z.array(z.object({ view: z.string(), held_by: z.string(), assumptions: z.string(), fits: z.boolean() })),
 });
 
 export const chatOutputSchema = z.object({
@@ -30,6 +32,7 @@ export const chatOutputSchema = z.object({
   facts: z.array(z.object({ key: z.string(), label: z.string(), value: z.string(), status: z.enum(["stated", "assumption"]) })),
   recommendation: cardSchema.nullable(),
   plan_needs: z.array(z.string()),
+  intelligence_used: z.array(z.object({ id: z.string(), how: z.string() })),
 });
 
 export type ChatOutput = z.infer<typeof chatOutputSchema>;
@@ -38,7 +41,8 @@ export type ChatTurn = { role: "user" | "assistant" | "advisor"; content: string
 export type PlanMode = { tier: "plan" | "supported"; status: string; needs: string[] };
 /** guest: a visitor on the sign-in page who hasn't signed up; give the recommendation early. */
 /** nudge: six or more exchanges without a plan; this reply gently suggests the next step (see lib/chat/nudge). */
-export type ChatInput = { topic: ChatTopic; context: ChatContext; history: ChatTurn[]; plan?: PlanMode | null; guest?: boolean; nudge?: boolean };
+/** intelligence: the CRO network's records for this turn (lib/cro), when there are any. */
+export type ChatInput = { topic: ChatTopic; context: ChatContext; history: ChatTurn[]; plan?: PlanMode | null; guest?: boolean; nudge?: boolean; intelligence?: IntelligenceBundle | null };
 
 const SYSTEM = `You are Growth Goaled: an experienced CRO advising founders of Seed and Series A B2B SaaS companies on commercial decisions. Talk like a strong CRO in a one-to-one conversation: direct, plain English, short paragraphs. Not a survey, not a report.
 
@@ -59,6 +63,8 @@ Output fields:
 - reply: what you say this turn (plain text, no markdown headings; short lists are fine). Don't repeat the recommendation card's content in it.
 - questions: the one or two questions you're asking now (also woven into the reply), or [] when you aren't asking.
 - facts: anything new the founder stated about their company this turn that's worth remembering (team size, ACV, sales cycle, target, plans…). key: short snake_case id, reusing an existing fact key when updating one. status: "stated" when they said it as fact, "assumption" when they said they're guessing. [] when nothing new.
+- intelligence_used: when CRO INTELLIGENCE is present, every record you relied on this turn: its id exactly as given, and how you used it (a short phrase). [] when none.
+- perspectives (on the card): only in the Collective, when CROs' views materially differ: each view, whose it is, the assumption behind it, and fits (true for the one you recommend for this company). Otherwise [].
 - plan_needs: only when ACTION PLAN says it's being built: the specific information still missing for a strong 30/60/90-day plan (each a short phrase, most important first), or [] when you have enough. Otherwise [].
 - recommendation: give one when you have enough to recommend something useful, even with caveats (often by the second or third turn; at once when the context already covers it). Otherwise null. When you give one, it's the founder's decision card: takeaway (one sentence), diagnosis, evidence (each item marked fact/figure/assumption/hypothesis), confidence (high/medium/low and why, by the CONFIDENCE rule below), priority, recommendation, next_steps, success_measures, a 30/60/90-day plan, and missing (what would raise confidence). Keep every field short and scannable. Give an updated card when new information changes your view.
 
@@ -82,6 +88,7 @@ function contextBlock(input: ChatInput): string {
     "",
     `COMPANY CONTEXT (JSON):\n${JSON.stringify({ company: context.company, profile_answers: context.answers, figures: context.figures, saved_facts: context.facts, open_work: context.work, earlier_conversations: context.earlierConversations })}`,
     topic.usesCompensationData ? `\nCOMPENSATION DATA (JSON; empty means none on file yet):\n${JSON.stringify(context.compensationData)}` : "",
+    input.intelligence ? `\n${intelligenceBlock(input.intelligence)}` : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -144,6 +151,23 @@ export function fakeChat(input: ChatInput): ChatOutput {
 }
 
 function fakeTurn(input: ChatInput): ChatOutput {
+  const out = fakeTurnBase(input);
+  // Test mode cites the first two records it was given, and names a disagreement in the Collective.
+  const records = input.intelligence?.records ?? [];
+  const used = records.slice(0, 2).map((r) => ({ id: r.id, how: `Test mode: used "${r.title}"` }));
+  const split = input.intelligence?.mode === "collective" ? disagreements(records)[0] : undefined;
+  const lead = input.intelligence?.mode === "individual" ? `Test mode (${input.intelligence.cro.name}'s AI): ` : "";
+  return {
+    ...out,
+    reply: `${lead}${out.reply}`,
+    intelligence_used: used,
+    recommendation: out.recommendation
+      ? { ...out.recommendation, perspectives: split ? [{ view: split.title, held_by: split.heldBy, assumptions: "Test mode assumption", fits: false }, { view: split.why ?? "The other view", held_by: split.disputedBy, assumptions: "Test mode assumption", fits: true }] : [] }
+      : null,
+  };
+}
+
+function fakeTurnBase(input: ChatInput): Omit<ChatOutput, "intelligence_used"> {
   const last = input.history.at(-1)?.content ?? "";
   const turn = input.history.filter((t) => t.role === "user").length;
   const reps = last.match(/(\d+)\s+(?:sales\s*people|salespeople|reps|AEs)/i);
@@ -174,6 +198,7 @@ function fakeTurn(input: ChatInput): ChatOutput {
       plan_60: ["Test 60-day step"],
       plan_90: ["Test 90-day step"],
       missing: ["Pipeline export"],
+      perspectives: [],
     },
     plan_needs: input.plan?.status === "collecting" ? (/attached|export/i.test(last) ? [] : ["Closed deals export"]) : [],
   };

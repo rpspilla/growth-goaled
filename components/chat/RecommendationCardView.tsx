@@ -39,6 +39,7 @@ export function RecommendationCardView({
   deeper,
   feedback,
   compact = false,
+  informedBy = [],
 }: {
   id: string;
   card: RecommendationCard;
@@ -48,6 +49,8 @@ export function RecommendationCardView({
   feedback?: (recommendationId: string, kind: string, note: string | null) => Promise<{ ok: boolean; error?: string }>;
   /** Just the headline and how sure we are; the rest folds away behind "Show the full recommendation". */
   compact?: boolean;
+  /** The CRO intelligence it drew on, attributed (multi-CRO intelligence, Nov 23, 2026). */
+  informedBy?: { title: string; cro: string; how: string }[];
 }) {
   const c = CONFIDENCE[card.confidence.level];
   const full = (
@@ -101,6 +104,39 @@ export function RecommendationCardView({
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {card.perspectives && card.perspectives.length > 0 && (
+        <div aria-label="Where our CROs differ">
+          <h4 className="label mb-1">Where our CROs see it differently</h4>
+          <ul className="space-y-2">
+            {card.perspectives.map((p, i) => (
+              <li key={i} className="rounded-xl p-3 text-base" style={{ border: `1px solid ${p.fits ? "var(--green)" : "var(--border)"}` }}>
+                <div style={fg}>
+                  <span className="font-semibold">{p.held_by}:</span> {p.view}
+                </div>
+                <div className="text-sm mt-0.5" style={muted}>
+                  Assumes: {p.assumptions}
+                  {p.fits ? " · the view that fits your company" : ""}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {informedBy.length > 0 && (
+        <div aria-label="Informed by">
+          <h4 className="label mb-1">Informed by</h4>
+          <ul className="space-y-1 text-sm" style={muted}>
+            {informedBy.map((s, i) => (
+              <li key={i}>
+                <span className="font-semibold" style={fg}>{s.cro}</span> · {s.title}
+                {s.how ? ` (${s.how})` : ""}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

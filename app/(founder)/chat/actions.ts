@@ -26,8 +26,9 @@ export async function startChatAction(_prev: StartState, formData: FormData): Pr
   const { user, company } = await founderCompany();
   const topic = z.string().max(40).safeParse(formData.get("topic"));
   const text = formData.get("text");
+  const cro = z.uuid().safeParse(formData.get("cro"));
   if (!topic.success) return { error: "Pick a question." };
-  const result = await startConversation(user, company, topic.data, typeof text === "string" ? text : null);
+  const result = await startConversation(user, company, topic.data, typeof text === "string" ? text : null, cro.success ? cro.data : null);
   if (!result.ok) return { error: result.error };
   revalidatePath("/", "layout");
   redirect(`/chat/${result.conversationId}`);

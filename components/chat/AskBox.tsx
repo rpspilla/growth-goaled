@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import type { StartState } from "@/app/(founder)/chat/actions";
@@ -38,7 +39,21 @@ function StarterChip({ s }: { s: Starter }) {
  * founder's own words first, the common questions as chips under it. Either opens a conversation,
  * already answered with what Growth Goaled knows about the company.
  */
-export function AskBox({ starters, start, lead }: { starters: Starter[]; start: (prev: StartState, formData: FormData) => Promise<StartState>; lead?: string }) {
+export function AskBox({
+  starters,
+  start,
+  lead,
+  cros = [],
+  fixedCro,
+}: {
+  starters: Starter[];
+  start: (prev: StartState, formData: FormData) => Promise<StartState>;
+  lead?: string;
+  /** Published CROs the founder can talk to instead of the Collective. */
+  cros?: { id: string; name: string }[];
+  /** On a CRO's page: always that CRO's AI. */
+  fixedCro?: { id: string; name: string };
+}) {
   const [state, action] = useActionState(start, {});
   const [text, setText] = useState("");
   const common = starters.filter((s) => s.id !== "other");
@@ -53,6 +68,24 @@ export function AskBox({ starters, start, lead }: { starters: Starter[]; start: 
         </p>
       </div>
       <form action={action} className="space-y-3">
+        {fixedCro ? (
+          <input type="hidden" name="cro" value={fixedCro.id} />
+        ) : (
+          cros.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap text-sm">
+              <span className="font-semibold" style={{ color: "var(--foreground)" }}>Ask</span>
+              <select name="cro" defaultValue="" className="field py-1.5" aria-label="Who to ask">
+                <option value="">The Growth Goaled Collective (all our CROs)</option>
+                {cros.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}&apos;s AI CRO
+                  </option>
+                ))}
+              </select>
+              <Link href="/cros" className="link">Meet the CROs</Link>
+            </div>
+          )
+        )}
         <label htmlFor="ask-text" className="sr-only">What are you working through?</label>
         <textarea
           id="ask-text"

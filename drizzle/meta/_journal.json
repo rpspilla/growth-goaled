@@ -260,6 +260,13 @@
       "when": 1795449993383,
       "tag": "0036_ai_cro_commitments",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1795453731948,
+      "tag": "0037_multi_cro_intelligence",
+      "breakpoints": true
     }
   ]
 }

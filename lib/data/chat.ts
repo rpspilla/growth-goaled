@@ -9,6 +9,7 @@ import { characteristics, chatContext } from "@/lib/chat/context";
 import { CHAT_METHODOLOGY_VERSION, getChatTopic } from "@/lib/chat/topics";
 import { track } from "@/lib/events";
 import { registerDocument } from "./documents";
+import { intelligenceFor, publishedCro } from "./cro";
 
 /** Founder messages per company per rolling 24 hours (CHAT_DAILY_LIMIT, default 80): chat is free, so it's capped. */
 export const chatDailyLimit = () => {
@@ -78,7 +79,7 @@ async function messagesToday(company: Pick<Company, "id">): Promise<number> {
   return row?.n ?? 0;
 }
 
-function cardFrom(output: NonNullable<ChatOutput["recommendation"]>): RecommendationCard {
+function cardFrom(output: NonNullable<ChatOutput["recommendation"]>, sources: { id: string; how: string }[]): RecommendationCard {
   return {
     takeaway: output.takeaway,
     diagnosis: output.diagnosis,
@@ -90,6 +91,8 @@ function cardFrom(output: NonNullable<ChatOutput["recommendation"]>): Recommenda
     successMeasures: output.success_measures,
     plan: { days30: output.plan_30, days60: output.plan_60, days90: output.plan_90 },
     missing: output.missing,
+    ...(output.perspectives.length ? { perspectives: output.perspectives.slice(0, 4) } : {}),
+    ...(sources.length ? { sources } : {}),
   };
 }
 
@@ -101,14 +104,18 @@ export async function startConversation(
   company: Company,
   topicId: string,
   text: string | null,
+  /** A published CRO's AI representation; null for the Growth Goaled Collective. */
+  croId: string | null = null,
 ): Promise<{ ok: false; error: string } | { ok: true; conversationId: string; error: string | null }> {
   const topic = getChatTopic(topicId);
   if (!topic) return { ok: false, error: "Unknown question." };
+  const cro = croId ? await publishedCro(croId) : null;
+  if (croId && !cro) return { ok: false, error: "That CRO isn't available." };
   const first = topic.id === "other" ? (text ?? "").trim() : topic.starter;
   if (!first) return { ok: false, error: "Tell us what you'd like to work through." };
   const title = (topic.id === "other" ? first : topic.starter).slice(0, 120);
-  const [conversation] = await db.insert(schema.conversations).values({ companyId: company.id, userId: user.id, topic: topic.id, title }).returning({ id: schema.conversations.id });
-  await track("conversation_started", { userId: user.id, companyId: company.id, props: { topic: topic.id } });
+  const [conversation] = await db.insert(schema.conversations).values({ companyId: company.id, userId: user.id, topic: topic.id, title, croId: cro?.id ?? null }).returning({ id: schema.conversations.id });
+  await track("conversation_started", { userId: user.id, companyId: company.id, props: { topic: topic.id, cro: cro ? cro.slug : "collective" } });
   const sent = await sendMessage(user, company, conversation!.id, first);
   // The conversation exists either way; a failed first answer can be retried from its page.
   return { ok: true, conversationId: conversation!.id, error: sent.ok ? null : sent.error };
@@ -130,16 +137,21 @@ export async function sendMessage(user: User, company: Company, conversationId: 
   const history = [...view.messages.map((m) => ({ role: m.role, content: m.content, author: m.authorId ? (view.authors.get(m.authorId) ?? null) : null })), { role: "user" as const, content: text }];
   const context = await chatContext(company, { compensation: Boolean(topic.usesCompensationData), conversationId });
   const plan = view.plan && view.plan.status !== "pending_payment" ? { tier: view.plan.tier, status: view.plan.status, needs: view.plan.needs } : null;
+  // The CRO intelligence for this turn: the chosen CRO's, or the Collective's most relevant.
+  const intelligence = await intelligenceFor(company, view.conversation.croId, { text: `${view.conversation.title}\n${text}`, topicId: topic.id });
 
   let result;
   try {
-    result = await chatTurn({ topic, context, history, plan, nudge: nudgeDue(history.filter((t) => t.role === "user").length, Boolean(plan)) });
+    result = await chatTurn({ topic, context, history, plan, intelligence, nudge: nudgeDue(history.filter((t) => t.role === "user").length, Boolean(plan)) });
   } catch (err) {
     console.error("[chat] Turn failed", err);
     const error = err instanceof ChatError ? err.message : isAiConfigError(err) ? "Answers aren't available right now. Your message is saved; try again shortly." : "Something went wrong. Your message is saved; try again.";
     return { ok: false, error };
   }
   const { output } = result;
+  // Attribution: only records actually given to the model count (an invented id is dropped).
+  const given = new Set(intelligence?.records.map((r) => r.id) ?? []);
+  const used = output.intelligence_used.filter((u, i, all) => given.has(u.id) && all.findIndex((x) => x.id === u.id) === i).map((u) => ({ id: u.id, how: u.how.slice(0, 300) }));
 
   // Sequential writes: the production driver (neon-http) has no transactions. The answer is
   // written last, so a failure part-way leaves the founder's message unanswered and retryable.
@@ -153,7 +165,7 @@ export async function sendMessage(user: User, company: Company, conversationId: 
         topic: topic.id,
         question: view.conversation.title,
         context: characteristics(company),
-        card: cardFrom(output.recommendation),
+        card: cardFrom(output.recommendation, used),
         confidence: output.recommendation.confidence.level,
         methodologyVersion: CHAT_METHODOLOGY_VERSION,
         model: result.model,
@@ -180,6 +192,7 @@ export async function sendMessage(user: User, company: Company, conversationId: 
     content: output.reply,
     questions: output.questions,
     recommendationId,
+    intelligenceIds: used.length ? used.map((u) => u.id) : null,
     model: result.model,
     tokensIn: result.tokensIn,
     tokensOut: result.tokensOut,

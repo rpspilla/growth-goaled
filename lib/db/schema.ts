@@ -988,6 +988,8 @@ export const conversations = pgTable(
     // Starter topic id (lib/chat/topics.ts); "other" for "Something else"
     topic: text("topic").notNull(),
     title: text("title").notNull(),
+    // Who the founder is talking to: one CRO's AI representation, or (null) the Growth Goaled Collective
+    croId: uuid("cro_id").references(() => croProfiles.id, { onDelete: "set null" }),
     ...timestamps,
   },
   (t) => [index("conversations_company_idx").on(t.companyId, t.updatedAt)],
@@ -1009,6 +1011,8 @@ export const conversationMessages = pgTable(
     // Assistant turns: follow-up questions asked, and the recommendation card when one was given
     questions: jsonb("questions").$type<string[]>(),
     recommendationId: uuid("recommendation_id"),
+    // The CRO intelligence records this answer drew on (attribution is never lost)
+    intelligenceIds: jsonb("intelligence_ids").$type<string[]>(),
     model: text("model"),
     tokensIn: integer("tokens_in"),
     tokensOut: integer("tokens_out"),
@@ -1047,6 +1051,10 @@ export type RecommendationCard = {
   successMeasures: string[];
   plan: { days30: string[]; days60: string[]; days90: string[] };
   missing: string[];
+  /** Collective mode: where CROs in the network see it differently, and which view fits this company. */
+  perspectives?: { view: string; held_by: string; assumptions: string; fits: boolean }[];
+  /** The CRO intelligence records the card drew on, with how each was used. */
+  sources?: { id: string; how: string }[];
 };
 
 /** Where a decision card stands: given, or turned into commitments by the founder (AI CRO sprint, Nov 23, 2026). */
@@ -1640,3 +1648,125 @@ export type GrowthProject = typeof growthProjects.$inferSelect;
 export type ProjectDocument = typeof projectDocuments.$inferSelect;
 export type ProjectResult = typeof projectResults.$inferSelect;
 export type WeeklyPriority = typeof weeklyPriorities.$inferSelect;
+
+// ---------------------------------------------------------------------------
+// Multi-CRO intelligence (Nov 23, 2026)
+// Every CRO in the network has a profile and their own intelligence records; founders talk to one
+// CRO's AI representation or to the Growth Goaled Collective, which draws on everyone's validated
+// records. Attribution is kept on every record and every answer that uses one.
+// ---------------------------------------------------------------------------
+
+export const croProfileStatus = pgEnum("cro_profile_status", ["draft", "published"]);
+
+/** Free-text sections a CRO writes in their own words (all optional). */
+export type CroPhilosophy = Partial<Record<"coreBeliefs" | "growth" | "decisionPrinciples" | "leadership" | "sales" | "gtm" | "hiring" | "capital" | "scaling" | "founderChallenges", string>>;
+/** How the CRO communicates, as they describe it, with an example in their own words. */
+export type CroStyle = Partial<Record<"communication" | "directness" | "coaching" | "challenge" | "analyticalVsIntuitive" | "strategicVsTactical" | "diagnosticMethods" | "decisionApproach" | "exampleInTheirWords", string>>;
+
+export const croProfiles = pgTable(
+  "cro_profiles",
+  {
+    id: id(),
+    // The CRO's own login, when they have one (they can then edit their profile and submit intelligence)
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    slug: text("slug").notNull(),
+    name: text("name").notNull(),
+    headline: text("headline"),
+    photoUrl: text("photo_url"),
+    bio: text("bio"),
+    careerHistory: text("career_history"),
+    accomplishments: text("accomplishments"),
+    industries: text("industries").array().notNull().default(sql`'{}'::text[]`),
+    stages: text("stages").array().notNull().default(sql`'{}'::text[]`),
+    companyTypes: text("company_types").array().notNull().default(sql`'{}'::text[]`),
+    functions: text("functions").array().notNull().default(sql`'{}'::text[]`),
+    expertise: text("expertise").array().notNull().default(sql`'{}'::text[]`),
+    websiteUrl: text("website_url"),
+    availableForAdvisory: boolean("available_for_advisory").notNull().default(false),
+    philosophy: jsonb("philosophy").$type<CroPhilosophy>().notNull().default({}),
+    style: jsonb("style").$type<CroStyle>().notNull().default({}),
+    // Founders see and can talk to published CROs only; a CRO can also stay out of the Collective
+    status: croProfileStatus("status").notNull().default("draft"),
+    inCollective: boolean("in_collective").notNull().default(true),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("cro_profiles_slug_idx").on(t.slug), uniqueIndex("cro_profiles_user_idx").on(t.userId)],
+);
+
+export const intelligenceType = pgEnum("intelligence_type", [
+  "principle",
+  "behavioral_rule",
+  "diagnostic_framework",
+  "decision_framework",
+  "scenario",
+  "conversation_example",
+  "case_study",
+  "benchmark",
+  "outcome",
+  "correction",
+  "lesson_learned",
+  "perspective",
+]);
+/** individual: one CRO's view; collective: Growth Goaled's network position; multi: several CROs' joint work. */
+export const intelligenceClassification = pgEnum("intelligence_classification", ["individual", "collective", "multi"]);
+export const intelligenceStatus = pgEnum("intelligence_status", ["draft", "submitted", "validated", "rejected", "retired"]);
+export const evidenceLevel = pgEnum("evidence_level", ["opinion", "experience", "case_evidence", "data"]);
+export const intelligenceMode = pgEnum("intelligence_mode", ["individual", "collective"]);
+
+/** One piece of CRO intelligence: a principle, framework, scenario, case, lesson… with who it came from and how well it's backed. */
+export const croIntelligence = pgTable(
+  "cro_intelligence",
+  {
+    id: id(),
+    type: intelligenceType("type").notNull(),
+    category: text("category"),
+    title: text("title").notNull(),
+    content: text("content").notNull(),
+    tags: text("tags").array().notNull().default(sql`'{}'::text[]`),
+    stages: text("stages").array().notNull().default(sql`'{}'::text[]`),
+    industries: text("industries").array().notNull().default(sql`'{}'::text[]`),
+    companyTypes: text("company_types").array().notNull().default(sql`'{}'::text[]`),
+    expertise: text("expertise").array().notNull().default(sql`'{}'::text[]`),
+    // The CRO it's primarily attributed to (null: a collective position of the network)
+    primaryCroId: uuid("primary_cro_id").references(() => croProfiles.id, { onDelete: "set null" }),
+    classification: intelligenceClassification("classification").notNull().default("individual"),
+    source: text("source"),
+    status: intelligenceStatus("status").notNull().default("draft"),
+    evidence: evidenceLevel("evidence").notNull().default("opinion"),
+    validatedBy: uuid("validated_by").references(() => users.id, { onDelete: "set null" }),
+    validatedAt: timestamp("validated_at", { withTimezone: true }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    version: integer("version").notNull().default(1),
+    relatedIds: jsonb("related_ids").$type<string[]>().notNull().default([]),
+    // Where it may be used: an individual CRO's conversations, the Collective, or both
+    modes: intelligenceMode("modes").array().notNull().default(sql`'{individual,collective}'::intelligence_mode[]`),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [index("cro_intelligence_cro_idx").on(t.primaryCroId), index("cro_intelligence_status_idx").on(t.status, t.type)],
+);
+
+/** author / co-author: wrote it; endorses: independently agrees; disputes: sees it differently (with why). */
+export const intelligenceStance = pgEnum("intelligence_stance", ["author", "co_author", "endorses", "disputes"]);
+
+export const croIntelligenceContributors = pgTable(
+  "cro_intelligence_contributors",
+  {
+    id: id(),
+    recordId: uuid("record_id")
+      .notNull()
+      .references(() => croIntelligence.id, { onDelete: "cascade" }),
+    croId: uuid("cro_id")
+      .notNull()
+      .references(() => croProfiles.id, { onDelete: "cascade" }),
+    stance: intelligenceStance("stance").notNull(),
+    note: text("note"),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("cro_intelligence_contributors_idx").on(t.recordId, t.croId), index("cro_intelligence_contributors_cro_idx").on(t.croId)],
+);
+
+export type CroProfile = typeof croProfiles.$inferSelect;
+export type CroIntelligence = typeof croIntelligence.$inferSelect;
+export type CroIntelligenceContributor = typeof croIntelligenceContributors.$inferSelect;

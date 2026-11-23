@@ -5,6 +5,7 @@ import { AskBox } from "@/components/chat/AskBox";
 import { FactsEditor } from "@/components/chat/FactsEditor";
 import { Section } from "@/components/ui/Section";
 import { listConversations, listFacts } from "@/lib/data/chat";
+import { listCroProfiles } from "@/lib/data/cro";
 import { founderContext } from "@/lib/data/founder-context";
 import { CHAT_TOPICS } from "@/lib/chat/topics";
 import { removeFactAction, startChatAction, updateFactAction } from "../chat/actions";
@@ -21,12 +22,12 @@ export const metadata = { title: "Ask your CRO" };
 export default async function WhatsNextPage() {
   const { company } = await founderContext();
   if (!company) redirect("/welcome");
-  const [conversations, facts] = await Promise.all([listConversations(company, 50), listFacts(company)]);
+  const [conversations, facts, cros] = await Promise.all([listConversations(company, 50), listFacts(company), listCroProfiles({ published: true })]);
   return (
     <div className="page space-y-12">
       <PageHeader title="Ask your CRO" subtitle="Any growth decision, in your own words. Answers use what you've already shared and the work under way." />
 
-      <AskBox starters={CHAT_TOPICS.map((t) => ({ id: t.id, starter: t.starter }))} start={startChatAction} />
+      <AskBox starters={CHAT_TOPICS.map((t) => ({ id: t.id, starter: t.starter }))} start={startChatAction} cros={cros.map((c) => ({ id: c.id, name: c.name }))} />
 
       <div id="facts" className="scroll-mt-24">
         <Section id="facts-title" title="History" lead="The questions you've asked, and what we remember about your company from them.">

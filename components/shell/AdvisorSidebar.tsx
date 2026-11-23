@@ -24,6 +24,14 @@ const ADVISOR_NAV: { title: string; items: Item[] }[] = [
     items: [{ href: "/advisor/crm", label: "CRM" }],
   },
   {
+    // The CROs behind the AI: their profiles and their intelligence (Nov 23, 2026)
+    title: "CRO network",
+    items: [
+      { href: "/advisor/cros", label: "CROs" },
+      { href: "/advisor/intelligence", label: "Intelligence library" },
+    ],
+  },
+  {
     // Reference data and settings; no heading.
     title: "",
     items: [

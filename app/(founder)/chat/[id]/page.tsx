@@ -14,6 +14,7 @@ import { RecommendationCardView } from "@/components/chat/RecommendationCardView
 import { CommitToThis } from "@/components/chat/CommitToThis";
 import { projectNameFrom, proposeCommitments } from "@/lib/commitments";
 import { committedProjects } from "@/lib/data/commitments";
+import { attributionFor, getCroProfile, listCroProfiles } from "@/lib/data/cro";
 import { companyProjects, today } from "@/lib/data/projects";
 import { db, schema } from "@/lib/db";
 import { planSessionsFor, REVIEW_HOURS } from "@/lib/data/action-plans";
@@ -60,6 +61,16 @@ export default async function ConversationPage({ params, searchParams }: { param
   const offer = !plan && stripeConfigured();
   const { actionPlanCents, supportedMonthlyCents } = pricing();
   const [advisor] = company.advisorId ? await db.select({ name: schema.users.name, email: schema.users.email }).from(schema.users).where(eq(schema.users.id, company.advisorId)).limit(1) : [];
+
+  // Who the founder is talking to, and what each card drew on (attribution is never lost).
+  const [cro, network] = await Promise.all([view.conversation.croId ? getCroProfile(view.conversation.croId) : Promise.resolve(null), view.conversation.croId ? Promise.resolve([]) : listCroProfiles({ published: true })]);
+  const sources = await attributionFor([...view.recommendations.values()].flatMap((r) => (r.card.sources ?? []).map((x) => x.id)));
+  const informedBy = (card: { sources?: { id: string; how: string }[] }) =>
+    (card.sources ?? []).flatMap((x) => {
+      const a = sources.get(x.id);
+      return a ? [{ title: a.title, cro: a.cro ?? "Growth Goaled network", how: x.how }] : [];
+    });
+  const inCollective = network.filter((c) => c.inCollective).length;
 
   // "Commit to this" on the latest card: its next steps as commitments, into a new or an open growth project.
   const [committed, openProjects] = trailing ? await Promise.all([committedProjects(company, [trailing.id]), companyProjects(company)]) : [new Map(), []];
@@ -110,6 +121,15 @@ export default async function ConversationPage({ params, searchParams }: { param
       <div>
         <Link href="/whats-next" className="link text-sm">← Ask your CRO</Link>
         <h1 className="font-display text-3xl font-normal mt-2" style={fg}>{view.conversation.title}</h1>
+        <p aria-label="Who you're talking to" className="text-sm mt-1" style={muted}>
+          {cro ? (
+            <>
+              With <Link href={`/cros/${cro.slug}`} className="link">{cro.name}&apos;s AI CRO</Link>: an AI built from {cro.name}&apos;s documented expertise and judgment, not {cro.name.split(" ")[0]} in person.
+            </>
+          ) : (
+            <>With the Growth Goaled Collective{inCollective > 0 ? `: draws on ${inCollective} CRO${inCollective === 1 ? "" : "s"} in our network` : ""}. <Link href="/cros" className="link">Meet the CROs</Link></>
+          )}
+        </p>
         <div className="mt-3">
           <HumanPresence advisorName={advisor ? advisor.name || advisor.email : null} />
         </div>
@@ -170,6 +190,7 @@ export default async function ConversationPage({ params, searchParams }: { param
                   deeper={null}
                   feedback={feedbackAction}
                   compact
+                  informedBy={informedBy(rec.card)}
                 />
               )}
               {rec && rec !== trailing && offer && rec.id === lastCardId && (
@@ -193,7 +214,7 @@ export default async function ConversationPage({ params, searchParams }: { param
       {showNudge(view.messages.filter((m) => m.role === "user").length, Boolean(plan)) && <AdvisorNudge bookHref="/advisory/book?kind=review&offer=nudge" />}
       {trailing && (
         <div className="space-y-4">
-          <RecommendationCardView id={trailing.id} card={trailing.card} given={(view.feedback.get(trailing.id) ?? []).map((f) => f.kind)} deeper={null} feedback={feedbackAction} compact />
+          <RecommendationCardView id={trailing.id} card={trailing.card} given={(view.feedback.get(trailing.id) ?? []).map((f) => f.kind)} deeper={null} feedback={feedbackAction} compact informedBy={informedBy(trailing.card)} />
           {commit && <CommitToThis {...commit} commit={commitRecommendationAction.bind(null, trailing.id)} />}
           {offer && trailing.id === lastCardId && (
             <PlanOffer conversationId={view.conversation.id} planPrice={formatPrice(actionPlanCents)} supportedPrice={formatPrice(supportedMonthlyCents)} buy={buyPlanAction} bookHref="/advisory/book?kind=review" />

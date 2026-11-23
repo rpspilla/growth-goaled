@@ -26,6 +26,7 @@ import { CHAT_TOPICS } from "@/lib/chat/topics";
 import { commitmentItems } from "@/lib/commitments";
 import { listConversations } from "@/lib/data/chat";
 import { companyCommitments } from "@/lib/data/commitments";
+import { listCroProfiles } from "@/lib/data/cro";
 import { today } from "@/lib/data/projects";
 import { commitmentStatusAction, startChatAction } from "../chat/actions";
 
@@ -63,7 +64,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   const { welcome } = await searchParams;
   const { user, company } = await founderContext();
   if (!company) redirect("/welcome");
-  const [perf, peers, site, projects, priorities, conversations, commitments] = await Promise.all([
+  const [perf, peers, site, projects, priorities, conversations, commitments, cros] = await Promise.all([
     companyPerformance(company),
     getIntakeAnswers(company).then((a) => snapshotPeers(company, a)),
     companySite(company),
@@ -71,6 +72,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
     currentPriorities(company),
     listConversations(company, 3),
     companyCommitments(company, { status: ["open"] }),
+    listCroProfiles({ published: true }),
   ]);
   const projectNames = new Map(projects.map((p) => [p.id, p.name]));
   const firstName = user.name?.split(" ")[0];
@@ -109,7 +111,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
       )}
 
 
-      <AskBox starters={CHAT_TOPICS.map((t) => ({ id: t.id, starter: t.starter }))} start={startChatAction} />
+      <AskBox starters={CHAT_TOPICS.map((t) => ({ id: t.id, starter: t.starter }))} start={startChatAction} cros={cros.map((c) => ({ id: c.id, name: c.name }))} />
 
       {conversations.length > 0 && (
         <Section id="conversations" title="Pick up where you left off" aside={<Link href="/whats-next" className="link text-sm">All conversations →</Link>}>
