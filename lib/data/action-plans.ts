@@ -169,7 +169,7 @@ export async function writePlan(planId: string, opts: { onlyIfEmpty?: boolean } 
   try {
     const [company] = await db.select().from(schema.companies).where(eq(schema.companies.id, plan.companyId)).limit(1);
     const topic = getChatTopic(plan.topic) ?? getChatTopic("other")!;
-    const context = await chatContext(company!, { compensation: Boolean(topic.usesCompensationData) });
+    const context = await chatContext(company!, { compensation: Boolean(topic.usesCompensationData), conversationId: plan.conversationId });
     const { plan: drafted } = await draftPlan({ topic, context, transcript: await transcript(plan.conversationId), current: plan.content });
     // Deadlines and targets carry over a rewrite; a live plan's new milestones get the end of their period.
     const carried = carryDues(drafted, plan.content);

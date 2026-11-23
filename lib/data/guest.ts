@@ -63,8 +63,8 @@ function guestContext(profile: Record<string, string>): ChatContext {
     answers: [],
     figures: [],
     facts: [],
-    plan: [],
-    pastRecommendations: [],
+    work: { projects: [], commitments: [], priorities: null, results: [] },
+    earlierConversations: [],
     compensationData: [],
   };
 }

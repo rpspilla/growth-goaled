@@ -40,6 +40,8 @@ export type EventName =
   | "plan_started"
   | "plan_input_answered"
   | "growth_project_created"
+  | "recommendation_committed"
+  | "commitment_status"
   | "project_document_shared"
   | "project_result_approved"
   | "weekly_priorities_saved"

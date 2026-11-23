@@ -253,6 +253,13 @@
       "when": 1794857234393,
       "tag": "0035_advisor_projects",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1795449993383,
+      "tag": "0036_ai_cro_commitments",
+      "breakpoints": true
     }
   ]
 }

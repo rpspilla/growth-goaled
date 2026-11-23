@@ -1,11 +1,14 @@
 import "server-only";
-import { and, desc, eq, inArray, like, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, like, ne, or } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { Company } from "@/lib/db/schema";
 import { getIntakeAnswers } from "@/lib/data/intake";
 import { companyPerformance } from "@/lib/data/performance";
 import { answerKey, INTAKE_SECTIONS } from "@/lib/intake";
 import { formatMetric, METRICS } from "@/lib/metrics";
+import { isOverdue } from "@/lib/commitments";
+import { companyCommitments } from "@/lib/data/commitments";
+import { currentPriorities, today } from "@/lib/data/projects";
 
 /** Pay and equity records in the Benchmark Library use these metric-id prefixes (e.g. comp_ae_base, equity_first_sales_hire). */
 export const COMPENSATION_METRIC_PREFIXES = ["comp_", "equity_"] as const;
@@ -15,8 +18,15 @@ export type ChatContext = {
   answers: { question: string; answer: string }[];
   figures: { metric: string; value: string; period: string | null; basis: string }[];
   facts: { key: string; label: string; value: string; status: string }[];
-  plan: { action: string; status: string; timing: string | null }[];
-  pastRecommendations: { topic: string; takeaway: string; date: string }[];
+  /** The work under way (AI CRO sprint): growth projects, the commitments in them, this week's priorities, approved results. */
+  work: {
+    projects: { name: string; status: string; started: string; completed: string | null; from_conversation: string | null }[];
+    commitments: { title: string; owner: string; due: string | null; measure: string | null; status: string; overdue: boolean; project: string }[];
+    priorities: { week: string; current: boolean; items: { title: string; action: string; due: string | null }[] } | null;
+    results: { project: string; label: string; value: string | null; note: string | null }[];
+  };
+  /** Earlier conversations, newest first (not the current one): what was asked and decided. */
+  earlierConversations: { date: string; question: string; takeaway: string | null; recommendation: string | null; committed: boolean }[];
   compensationData: {
     source: string;
     metric: string;
@@ -46,23 +56,13 @@ export function characteristics(company: Company): Record<string, string | numbe
 const display = (v: unknown) => (typeof v === "number" ? String(v) : typeof v === "string" ? v : "");
 
 /** Everything Growth Goaled already knows about one company, compact enough to send with each turn. */
-export async function chatContext(company: Company, opts: { compensation: boolean }): Promise<ChatContext> {
-  const [answers, perf, facts, plan, past, comp] = await Promise.all([
+export async function chatContext(company: Company, opts: { compensation: boolean; conversationId?: string }): Promise<ChatContext> {
+  const [answers, perf, facts, work, earlier, comp] = await Promise.all([
     getIntakeAnswers(company),
     companyPerformance(company),
     db.select().from(schema.companyFacts).where(eq(schema.companyFacts.companyId, company.id)).orderBy(schema.companyFacts.key),
-    db
-      .select({ action: schema.planActions.action, status: schema.planActions.status, timing: schema.planActions.timing })
-      .from(schema.planActions)
-      .where(and(eq(schema.planActions.companyId, company.id), inArray(schema.planActions.status, ["not_started", "in_progress"])))
-      .orderBy(schema.planActions.priority)
-      .limit(10),
-    db
-      .select({ topic: schema.recommendations.topic, card: schema.recommendations.card, createdAt: schema.recommendations.createdAt })
-      .from(schema.recommendations)
-      .where(eq(schema.recommendations.companyId, company.id))
-      .orderBy(desc(schema.recommendations.createdAt))
-      .limit(5),
+    openWork(company),
+    earlierConversations(company, opts.conversationId ?? null),
     opts.compensation ? compensationRecords() : Promise.resolve([]),
   ]);
 
@@ -84,10 +84,71 @@ export async function chatContext(company: Company, opts: { compensation: boolea
       basis: m.origin === "calculated" ? `calculated from their files${m.method ? ` (${m.method})` : ""}` : m.origin === "manual" ? "entered by the founder" : "read from their files",
     })),
     facts: facts.map((f) => ({ key: f.key, label: f.label, value: f.value, status: f.status })),
-    plan,
-    pastRecommendations: past.map((r) => ({ topic: r.topic, takeaway: r.card.takeaway, date: r.createdAt.toISOString().slice(0, 10) })),
+    work,
+    earlierConversations: earlier,
     compensationData: comp,
   };
+}
+
+/** Open projects (and the last two completed), open commitments plus the last five closed, this week's priorities, approved results. */
+async function openWork(company: Company): Promise<ChatContext["work"]> {
+  const on = today();
+  const [projects, priorities] = await Promise.all([
+    db.select().from(schema.growthProjects).where(eq(schema.growthProjects.companyId, company.id)).orderBy(desc(schema.growthProjects.startedOn)),
+    currentPriorities(company, on),
+  ]);
+  const shown = [...projects.filter((p) => p.status === "open").slice(0, 10), ...projects.filter((p) => p.status === "completed").slice(0, 2)];
+  const ids = shown.map((p) => p.id);
+  const sourceIds = shown.flatMap((p) => (p.conversationId ? [p.conversationId] : []));
+  const [commitments, results, sources] = await Promise.all([
+    companyCommitments(company, { projectIds: ids }),
+    ids.length
+      ? db
+          .select()
+          .from(schema.projectResults)
+          .where(and(inArray(schema.projectResults.projectId, ids), isNotNull(schema.projectResults.approvedAt)))
+          .limit(20)
+      : Promise.resolve([]),
+    sourceIds.length
+      ? db.select({ id: schema.conversations.id, title: schema.conversations.title }).from(schema.conversations).where(inArray(schema.conversations.id, sourceIds))
+      : Promise.resolve([]),
+  ]);
+  const name = new Map(shown.map((p) => [p.id, p.name]));
+  const titles = new Map(sources.map((c) => [c.id, c.title]));
+  const open = commitments.filter((c) => c.status === "open").slice(0, 15);
+  const closed = commitments.filter((c) => c.status !== "open").slice(0, 5);
+  return {
+    projects: shown.map((p) => ({ name: p.name, status: p.status, started: p.startedOn, completed: p.completedOn, from_conversation: p.conversationId ? (titles.get(p.conversationId) ?? null) : null })),
+    commitments: [...open, ...closed].map((c) => ({ title: c.title, owner: c.owner, due: c.dueOn, measure: c.measure, status: c.status, overdue: isOverdue(c, on), project: name.get(c.projectId) ?? "" })),
+    priorities: priorities ? { week: priorities.weekStart, current: priorities.current, items: priorities.items.map((p) => ({ title: p.title, action: p.action, due: p.dueOn })) } : null,
+    results: results.map((r) => ({ project: name.get(r.projectId) ?? "", label: r.label, value: r.value, note: r.note })),
+  };
+}
+
+/** The latest ten other conversations: the question, and the latest recommendation in each (if any) and whether it was committed. */
+async function earlierConversations(company: Company, current: string | null): Promise<ChatContext["earlierConversations"]> {
+  const convs = await db
+    .select({ id: schema.conversations.id, title: schema.conversations.title, updatedAt: schema.conversations.updatedAt })
+    .from(schema.conversations)
+    .where(and(eq(schema.conversations.companyId, company.id), ...(current ? [ne(schema.conversations.id, current)] : [])))
+    .orderBy(desc(schema.conversations.updatedAt))
+    .limit(10);
+  if (!convs.length) return [];
+  const recs = await db
+    .select({ conversationId: schema.recommendations.conversationId, card: schema.recommendations.card, status: schema.recommendations.status, createdAt: schema.recommendations.createdAt })
+    .from(schema.recommendations)
+    .where(inArray(schema.recommendations.conversationId, convs.map((c) => c.id)))
+    .orderBy(desc(schema.recommendations.createdAt));
+  return convs.map((c) => {
+    const rec = recs.find((r) => r.conversationId === c.id);
+    return {
+      date: c.updatedAt.toISOString().slice(0, 10),
+      question: c.title,
+      takeaway: rec?.card.takeaway ?? null,
+      recommendation: rec?.card.recommendation ?? null,
+      committed: recs.some((r) => r.conversationId === c.id && r.status === "committed"),
+    };
+  });
 }
 
 /** Published pay and equity records from sources whose licence allows showing them to customers (e.g. Wellfound, Carta). */

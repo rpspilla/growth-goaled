@@ -76,7 +76,7 @@ export async function draftPlan(input: PlanInput): Promise<{ plan: ActionPlanCon
         content: [
           `QUESTION: ${input.topic.starter}`,
           `A complete answer gives: ${input.topic.output}.`,
-          `COMPANY CONTEXT (JSON): ${JSON.stringify({ company: input.context.company, profile_answers: input.context.answers, figures: input.context.figures, saved_facts: input.context.facts })}`,
+          `COMPANY CONTEXT (JSON): ${JSON.stringify({ company: input.context.company, profile_answers: input.context.answers, figures: input.context.figures, saved_facts: input.context.facts, open_work: input.context.work })}`,
           input.current ? `CURRENT PLAN (JSON): ${JSON.stringify(input.current)}` : "",
           `CONVERSATION:\n${input.transcript}`,
           input.current ? "Update the plan." : "Write the plan.",

@@ -1049,6 +1049,9 @@ export type RecommendationCard = {
   missing: string[];
 };
 
+/** Where a decision card stands: given, or turned into commitments by the founder (AI CRO sprint, Nov 23, 2026). */
+export const recommendationStatus = pgEnum("recommendation_status", ["proposed", "committed"]);
+
 /** One recommendation as a record: what was asked, about which company, what we said and on what basis. */
 export const recommendations = pgTable(
   "recommendations",
@@ -1066,6 +1069,7 @@ export const recommendations = pgTable(
     confidence: confidence("confidence").notNull(),
     methodologyVersion: text("methodology_version").notNull(),
     model: text("model"),
+    status: recommendationStatus("status").notNull().default("proposed"),
     ...timestamps,
   },
   (t) => [index("recommendations_company_idx").on(t.companyId, t.createdAt), index("recommendations_topic_idx").on(t.topic)],
@@ -1521,6 +1525,9 @@ export const growthProjects = pgTable(
     completedOn: date("completed_on"),
     // The use case it grew out of, for projects carried over from the earlier growth projects
     companyUseCaseId: uuid("company_use_case_id").references(() => companyUseCases.id, { onDelete: "set null" }),
+    // The conversation and decision card it was committed from ("Commit to this"), if any
+    conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
+    recommendationId: uuid("recommendation_id").references(() => recommendations.id, { onDelete: "set null" }),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     ...timestamps,
   },
@@ -1596,6 +1603,39 @@ export const weeklyPriorities = pgTable(
   (t) => [index("weekly_priorities_company_week_idx").on(t.companyId, t.weekStart)],
 );
 
+export const commitmentStatus = pgEnum("commitment_status", ["open", "done", "dropped"]);
+
+/**
+ * Something the company committed to do, inside a growth project (AI CRO sprint, Nov 23, 2026): made
+ * from a decision card's next steps with "Commit to this". Who does it, by when, and how they'll
+ * know it worked. The founder ticks it off; the AI CRO sees it in every conversation.
+ */
+export const commitments = pgTable(
+  "commitments",
+  {
+    id: id(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => growthProjects.id, { onDelete: "cascade" }),
+    recommendationId: uuid("recommendation_id").references(() => recommendations.id, { onDelete: "set null" }),
+    conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    owner: text("owner").notNull(),
+    dueOn: date("due_on"),
+    measure: text("measure"),
+    status: commitmentStatus("status").notNull().default("open"),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    position: integer("position").notNull().default(0),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [index("commitments_company_status_idx").on(t.companyId, t.status), index("commitments_project_idx").on(t.projectId)],
+);
+
+export type Commitment = typeof commitments.$inferSelect;
 export type GrowthProject = typeof growthProjects.$inferSelect;
 export type ProjectDocument = typeof projectDocuments.$inferSelect;
 export type ProjectResult = typeof projectResults.$inferSelect;

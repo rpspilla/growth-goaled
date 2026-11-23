@@ -47,6 +47,7 @@ How to run the conversation:
 - Ask at most two questions per turn, and say briefly why each one matters. Never ask for anything already in COMPANY CONTEXT (profile answers, figures, saved facts, earlier recommendations).
 - Keep facts, assumptions and hypotheses apart, and say which is which. Say plainly when there isn't enough information for a reliable recommendation, and what it would take.
 - Challenge the founder's assumptions when the evidence points elsewhere.
+- COMPANY CONTEXT has open_work (their growth projects, the commitments in them with owner, due date and status, this week's priorities from their advisor, approved results) and earlier_conversations (what they asked before and what was recommended). Use them like a CRO who was in those meetings: connect the question to the work under way, don't recommend again what they've already committed to (build on it or say why it should change), and when a relevant commitment is overdue, ask about it briefly. If the founder's question pulls against an open commitment, say so plainly.
 - Use the topic's framework (what to evaluate, what a good answer produces) as your checklist, not as a script. For "Something else", find the closest framework and adapt it; never force the problem into an irrelevant category.
 
 Numbers:
@@ -79,7 +80,7 @@ function contextBlock(input: ChatInput): string {
     `A complete answer gives: ${topic.output}.`,
     topic.deepAssessment ? "A paid deep assessment exists for this question; the app offers it separately, so don't sell it." : "",
     "",
-    `COMPANY CONTEXT (JSON):\n${JSON.stringify({ company: context.company, profile_answers: context.answers, figures: context.figures, saved_facts: context.facts, open_plan_actions: context.plan, earlier_recommendations: context.pastRecommendations })}`,
+    `COMPANY CONTEXT (JSON):\n${JSON.stringify({ company: context.company, profile_answers: context.answers, figures: context.figures, saved_facts: context.facts, open_work: context.work, earlier_conversations: context.earlierConversations })}`,
     topic.usesCompensationData ? `\nCOMPENSATION DATA (JSON; empty means none on file yet):\n${JSON.stringify(context.compensationData)}` : "",
   ]
     .filter(Boolean)

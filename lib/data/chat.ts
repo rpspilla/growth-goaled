@@ -128,7 +128,7 @@ export async function sendMessage(user: User, company: Company, conversationId: 
 
   await db.insert(schema.conversationMessages).values({ conversationId, role: "user", content: text });
   const history = [...view.messages.map((m) => ({ role: m.role, content: m.content, author: m.authorId ? (view.authors.get(m.authorId) ?? null) : null })), { role: "user" as const, content: text }];
-  const context = await chatContext(company, { compensation: Boolean(topic.usesCompensationData) });
+  const context = await chatContext(company, { compensation: Boolean(topic.usesCompensationData), conversationId });
   const plan = view.plan && view.plan.status !== "pending_payment" ? { tier: view.plan.tier, status: view.plan.status, needs: view.plan.needs } : null;
 
   let result;
