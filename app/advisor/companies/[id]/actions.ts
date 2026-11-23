@@ -20,6 +20,7 @@ import { clearBusinessUpdate, setBusinessUpdateDate } from "@/lib/data/business-
 import { createContract, createContractFromFile, readContractFile, removeContract, updateContract, updateContractDetails } from "@/lib/data/contracts";
 import { after } from "next/server";
 import { postAdvisorNote } from "@/lib/data/chat";
+import { createCorrection } from "@/lib/data/cro";
 import { processDocument } from "@/lib/data/documents";
 import { db, schema } from "@/lib/db";
 import { and, eq } from "drizzle-orm";
@@ -339,5 +340,15 @@ export async function advisorNoteAction(companyId: string, conversationId: strin
     revalidatePath(`/advisor/companies/${companyId}/conversations/${conversationId}`);
     revalidatePath(`/chat/${conversationId}`);
   }
+  return result.ok ? { ok: true } : { ok: false, error: result.error };
+}
+
+/** Correct one AI answer: becomes a Correction record (submitted for review) the AI follows once validated. */
+export async function correctionAction(companyId: string, messageId: string, _prev: { ok: true } | { ok: false; error: string } | null, form: FormData): Promise<{ ok: true } | { ok: false; error: string }> {
+  const ctx = await managed(companyId);
+  if (!ctx) return { ok: false, error: "That company isn't available." };
+  if (!z.uuid().safeParse(messageId).success) return { ok: false, error: "That answer wasn't found." };
+  const result = await createCorrection(ctx.user, ctx.company, messageId, { wrong: String(form.get("wrong") ?? ""), right: String(form.get("right") ?? "") });
+  if (result.ok) revalidatePath("/advisor/intelligence", "layout");
   return result.ok ? { ok: true } : { ok: false, error: result.error };
 }

@@ -22,11 +22,12 @@ export type QualityRow = {
   didnt: number;
 };
 export type RecordUse = { id: string; title: string; cro: string; uses: number; worked: number; partly: number; didnt: number };
+export type Contribution = { croId: string; name: string; records: number; validated: number; awaitingReview: number; corrections: number; uses: number; worked: number; partly: number; didnt: number };
 
 const empty = (key: string, label: string): QualityRow => ({ key, label, conversations: 0, recommendations: 0, committed: 0, helpful: 0, pushback: 0, worked: 0, partly: 0, didnt: 0 });
 const PUSHBACK = new Set(["incorrect", "incomplete", "not_relevant", "disagree"]);
 
-export async function qualityReport(): Promise<{ topics: QualityRow[]; cros: QualityRow[]; records: RecordUse[] }> {
+export async function qualityReport(): Promise<{ topics: QualityRow[]; cros: QualityRow[]; records: RecordUse[]; contributions: Contribution[] }> {
   const [convs, recs, feedback, commitments, messages, records, cros] = await Promise.all([
     db
       .select({ id: schema.conversations.id, topic: schema.conversations.topic, croId: schema.conversations.croId, sample: schema.companies.isSample })
@@ -36,7 +37,10 @@ export async function qualityReport(): Promise<{ topics: QualityRow[]; cros: Qua
     db.select({ recommendationId: schema.recommendationFeedback.recommendationId, kind: schema.recommendationFeedback.kind }).from(schema.recommendationFeedback),
     db.select({ recommendationId: schema.commitments.recommendationId, outcome: schema.commitments.outcome }).from(schema.commitments).where(isNotNull(schema.commitments.outcome)),
     db.select({ conversationId: schema.conversationMessages.conversationId, ids: schema.conversationMessages.intelligenceIds }).from(schema.conversationMessages).where(isNotNull(schema.conversationMessages.intelligenceIds)),
-    db.select({ id: schema.croIntelligence.id, title: schema.croIntelligence.title, cro: schema.croProfiles.name }).from(schema.croIntelligence).leftJoin(schema.croProfiles, eq(schema.croProfiles.id, schema.croIntelligence.primaryCroId)),
+    db
+      .select({ id: schema.croIntelligence.id, title: schema.croIntelligence.title, cro: schema.croProfiles.name, croId: schema.croIntelligence.primaryCroId, status: schema.croIntelligence.status, type: schema.croIntelligence.type })
+      .from(schema.croIntelligence)
+      .leftJoin(schema.croProfiles, eq(schema.croProfiles.id, schema.croIntelligence.primaryCroId)),
     db.select({ id: schema.croProfiles.id, name: schema.croProfiles.name }).from(schema.croProfiles),
   ]);
   const real = new Map(convs.filter((c) => !c.sample).map((c) => [c.id, c]));
@@ -81,6 +85,25 @@ export async function qualityReport(): Promise<{ topics: QualityRow[]; cros: Qua
     .map((r) => ({ id: r.id, title: r.title, cro: r.cro ?? "Network position", uses: uses.get(r.id) ?? 0, ...(outcomesByRec.get(r.id) ?? { worked: 0, partly: 0, didnt: 0 }) }))
     .filter((r) => r.uses > 0)
     .sort((a, b) => b.uses - a.uses);
+  // Each CRO's contribution: their records, how many are validated or waiting, corrections, and how answers used them.
+  const contributions: Contribution[] = cros
+    .map((c) => {
+      const theirs = records.filter((r) => r.croId === c.id);
+      const used = theirs.map((r) => ({ uses: uses.get(r.id) ?? 0, ...(outcomesByRec.get(r.id) ?? { worked: 0, partly: 0, didnt: 0 }) }));
+      return {
+        croId: c.id,
+        name: c.name,
+        records: theirs.length,
+        validated: theirs.filter((r) => r.status === "validated").length,
+        awaitingReview: theirs.filter((r) => r.status === "submitted").length,
+        corrections: theirs.filter((r) => r.type === "correction").length,
+        uses: used.reduce((a, u) => a + u.uses, 0),
+        worked: used.reduce((a, u) => a + u.worked, 0),
+        partly: used.reduce((a, u) => a + u.partly, 0),
+        didnt: used.reduce((a, u) => a + u.didnt, 0),
+      };
+    })
+    .sort((a, b) => b.uses - a.uses || b.records - a.records);
   const sort = (m: Map<string, QualityRow>) => [...m.values()].sort((a, b) => b.conversations - a.conversations);
-  return { topics: sort(topics), cros: sort(byCro), records: recordRows };
+  return { topics: sort(topics), cros: sort(byCro), records: recordRows, contributions };
 }

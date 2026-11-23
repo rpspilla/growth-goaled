@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne, or } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { Company, CroIntelligence, CroPhilosophy, CroProfile, CroStyle, User } from "@/lib/db/schema";
 import { track } from "@/lib/events";
@@ -338,7 +338,12 @@ export async function setStance(actor: Actor, recordId: string, stance: "endorse
 export async function intelligenceFor(company: Pick<Company, "stage" | "industry">, croId: string | null, q: Omit<Query, "stage" | "industry">): Promise<IntelligenceBundle | null> {
   const query: Query = { ...q, stage: company.stage, industry: company.industry };
   const cro = croId ? await publishedCro(croId) : null;
-  const validated = await listIntelligence({ status: "validated" });
+  const [allValidated, confirmed] = await Promise.all([listIntelligence({ status: "validated" }), db.select().from(schema.croIntelligenceConflicts).where(eq(schema.croIntelligenceConflicts.status, "confirmed"))]);
+  // Each record carries its confirmed conflicts (both ways), for the Collective to name.
+  const validated = allValidated.map((r) => ({
+    ...r,
+    conflicts: confirmed.flatMap((c) => (c.recordId === r.id ? [{ otherId: c.otherId, why: c.why }] : c.otherId === r.id ? [{ otherId: c.recordId, why: c.why }] : [])),
+  }));
   const profiles = await listCroProfiles({ published: true });
   const inCollective = new Set(profiles.filter((p) => p.inCollective).map((p) => p.id));
   const asRetrieval = (r: RecordView): RecordForRetrieval => r;
@@ -433,4 +438,103 @@ export async function strongestCros(company: Pick<Company, "stage" | "industry">
   if (!profiles.length) return [];
   const ids = matchCros(validated, profiles.map((p) => p.id), { ...q, stage: company.stage, industry: company.industry }, limit);
   return ids.map((id) => profiles.find((p) => p.id === id)!);
+}
+
+// ---------------------------------------------------------------------------
+// Corrections and conflicts (Nov 24, 2026)
+// ---------------------------------------------------------------------------
+
+/**
+ * A correction of one AI answer, by an advisor or CRO: what was wrong and the right guidance. It
+ * becomes a Correction record (attributed to the corrector's CRO profile, or the network for an
+ * admin without one), submitted for review; once validated it ranks above other records on the topic.
+ */
+export async function createCorrection(actor: Pick<User, "id" | "role">, company: Pick<Company, "id" | "stage" | "industry" | "name">, messageId: string, input: { wrong: string; right: string }): Promise<Result<{ id: string }>> {
+  const wrong = clean(input.wrong, 2000);
+  const right = clean(input.right, 4000);
+  if (!wrong || !right) return { ok: false, error: "Say what was wrong and what the right guidance is." };
+  const mine = await croForUser(actor.id);
+  if (!mine && actor.role !== "admin") return { ok: false, error: "Your login isn't linked to a CRO profile yet. Ask an admin." };
+  const [m] = await db
+    .select({ id: schema.conversationMessages.id, role: schema.conversationMessages.role, content: schema.conversationMessages.content, createdAt: schema.conversationMessages.createdAt, conversationId: schema.conversations.id, title: schema.conversations.title, topic: schema.conversations.topic })
+    .from(schema.conversationMessages)
+    .innerJoin(schema.conversations, eq(schema.conversations.id, schema.conversationMessages.conversationId))
+    .where(and(eq(schema.conversationMessages.id, messageId), eq(schema.conversations.companyId, company.id)))
+    .limit(1);
+  if (!m || m.role !== "assistant") return { ok: false, error: "That answer wasn't found." };
+  const scrubbed = (t: string) => (company.name.trim().length >= 3 ? t.replace(new RegExp(company.name.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), "the company") : t);
+  const content = [
+    `Founder question: ${scrubbed(m.title)}`,
+    `What the AI said: ${scrubbed(m.content).slice(0, 800)}`,
+    `What was wrong: ${wrong}`,
+    `The right guidance: ${right}`,
+  ].join("\n");
+  const [r] = await db
+    .insert(schema.croIntelligence)
+    .values({
+      type: "correction",
+      category: "Correction",
+      title: `Correction: ${scrubbed(m.title)}`.slice(0, 200),
+      content,
+      expertise: [...(TOPIC_EXPERTISE[m.topic] ?? [])],
+      stages: company.stage ? [company.stage] : [],
+      industries: company.industry ? [company.industry] : [],
+      primaryCroId: mine?.id ?? null,
+      classification: mine ? "individual" : "collective",
+      source: "A correction of an AI answer",
+      status: "submitted",
+      evidence: "experience",
+      fromMessageId: m.id,
+      createdBy: actor.id,
+    })
+    .returning({ id: schema.croIntelligence.id });
+  if (mine) await db.insert(schema.croIntelligenceContributors).values({ recordId: r!.id, croId: mine.id, stance: "author" });
+  await track("cro_correction", { userId: actor.id, companyId: company.id, props: {} });
+  return { ok: true, id: r!.id };
+}
+
+export type ConflictView = { id: string; otherId: string; otherTitle: string; otherCro: string; why: string; status: "suggested" | "confirmed" | "dismissed" };
+
+/** A record's conflicts, either way round (the other record's title and CRO). */
+export async function conflictsFor(recordId: string): Promise<ConflictView[]> {
+  const rows = await db.select().from(schema.croIntelligenceConflicts).where(or(eq(schema.croIntelligenceConflicts.recordId, recordId), eq(schema.croIntelligenceConflicts.otherId, recordId)));
+  if (!rows.length) return [];
+  const others = await listIntelligence({ ids: rows.map((r) => (r.recordId === recordId ? r.otherId : r.recordId)) });
+  return rows.flatMap((r) => {
+    const otherId = r.recordId === recordId ? r.otherId : r.recordId;
+    const o = others.find((x) => x.id === otherId);
+    return o ? [{ id: r.id, otherId, otherTitle: o.title, otherCro: o.primaryCroName ?? "Network position", why: r.why, status: r.status }] : [];
+  });
+}
+
+/**
+ * After a record is validated: ask the AI which validated records from other CROs give opposing
+ * guidance for the same situation, and store each as a suggested conflict (once per pair).
+ */
+export async function detectConflicts(recordId: string): Promise<number> {
+  const record = await getIntelligence(recordId);
+  if (!record || record.status !== "validated") return 0;
+  const { findConflicts } = await import("@/lib/ai/conflicts");
+  const others = (await listIntelligence({ status: "validated" })).filter(
+    (o) =>
+      o.id !== record.id &&
+      o.primaryCroId !== record.primaryCroId &&
+      ((o.category && o.category === record.category) || o.expertise.some((e) => record.expertise.includes(e)) || o.tags.some((t) => record.tags.includes(t))),
+  );
+  if (!others.length) return 0;
+  const existing = await conflictsFor(record.id);
+  const known = new Set(existing.map((e) => e.otherId));
+  const brief = (r: RecordView) => ({ id: r.id, cro: r.primaryCroName ?? "Network position", title: r.title, content: r.content, category: r.category });
+  const found = await findConflicts(brief(record), others.filter((o) => !known.has(o.id)).slice(0, 15).map(brief));
+  for (const f of found) await db.insert(schema.croIntelligenceConflicts).values({ recordId: record.id, otherId: f.id, why: f.why }).onConflictDoNothing();
+  return found.length;
+}
+
+/** A CRO or an admin confirms a flagged conflict (the Collective then names the disagreement) or dismisses it. */
+export async function decideConflict(actor: Pick<User, "id" | "role">, conflictId: string, decision: "confirmed" | "dismissed"): Promise<Result> {
+  if (actor.role !== "admin" && !(await croForUser(actor.id))) return { ok: false, error: "Only CROs and admins review conflicts." };
+  const updated = await db.update(schema.croIntelligenceConflicts).set({ status: decision, decidedBy: actor.id, updatedAt: new Date() }).where(eq(schema.croIntelligenceConflicts.id, conflictId)).returning({ id: schema.croIntelligenceConflicts.id });
+  if (!updated.length) return { ok: false, error: "That conflict wasn't found." };
+  await track("cro_conflict_decided", { userId: actor.id, props: { decision } });
+  return { ok: true };
 }

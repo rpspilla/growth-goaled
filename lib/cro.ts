@@ -109,6 +109,8 @@ export type Stance = { croId: string; croName: string; stance: "author" | "co_au
 export type RecordForRetrieval = Pick<CroIntelligence, "id" | "type" | "title" | "content" | "tags" | "stages" | "industries" | "expertise" | "primaryCroId" | "classification" | "evidence" | "modes" | "status" | "relatedIds" | "category"> & {
   primaryCroName: string | null;
   stances: Stance[];
+  /** Confirmed conflicts with other records (opposing guidance for the same situation). */
+  conflicts?: { otherId: string; why: string }[];
 };
 export type Mode = { kind: "collective" } | { kind: "individual"; croId: string };
 export type Query = { text: string; topicId: string; stage: string | null; industry: string | null };
@@ -137,6 +139,8 @@ export function relevance(r: RecordForRetrieval, q: Query): number {
   if (score === 0) return 0;
   if (q.stage && r.stages.some((s) => norm(s) === norm(q.stage!))) score += 2;
   if (q.industry && r.industries.some((s) => norm(s) === norm(q.industry!))) score += 2;
+  // A validated correction of an earlier answer outranks other advice on the same topic.
+  if (r.type === "correction") score += 3;
   const endorsements = r.stances.filter((s) => s.stance === "endorses").length;
   return score + EVIDENCE_WEIGHT[r.evidence] + Math.min(endorsements, 2) * 0.5;
 }
@@ -169,11 +173,19 @@ export function selectIntelligence(records: RecordForRetrieval[], mode: Mode, q:
 
 /** Where CROs see it differently among the chosen records: a dispute on a record, with who and why. */
 export function disagreements(chosen: RecordForRetrieval[]): { recordId: string; title: string; heldBy: string; disputedBy: string; why: string | null }[] {
-  return chosen.flatMap((r) =>
+  const byId = new Map(chosen.map((r) => [r.id, r]));
+  const disputes = chosen.flatMap((r) =>
     r.stances
       .filter((s) => s.stance === "disputes")
       .map((s) => ({ recordId: r.id, title: r.title, heldBy: r.primaryCroName ?? "Growth Goaled network", disputedBy: s.croName, why: s.note })),
   );
+  // Confirmed conflicts between two chosen records, once per pair.
+  const conflicts = chosen.flatMap((r) =>
+    (r.conflicts ?? [])
+      .filter((c) => byId.has(c.otherId) && r.id < c.otherId)
+      .map((c) => ({ recordId: r.id, title: r.title, heldBy: r.primaryCroName ?? "Growth Goaled network", disputedBy: byId.get(c.otherId)!.primaryCroName ?? "Growth Goaled network", why: c.why })),
+  );
+  return [...disputes, ...conflicts];
 }
 
 // ---------------------------------------------------------------------------
@@ -201,11 +213,13 @@ const recordJson = (r: RecordForRetrieval) => ({
 export const INDIVIDUAL_RULES = (name: string) => `CRO MODE: the founder chose to talk to ${name}'s AI representation. You are an AI informed by ${name}'s documented expertise, not ${name} personally; never claim to be them.
 - ${name}'s profile, philosophy, communication style and records below are your primary source of judgment. Reason the way they do, in their style.
 - Use only what's documented. Never invent experiences, clients, companies, credentials, numbers or opinions for ${name}. You may say "${name}'s view is…" or "in ${name}'s experience…" only when a record or the profile says so.
+- A Correction record is ${name}'s fix to an earlier AI answer: follow its "right guidance".
 - When their documented intelligence doesn't cover the question, say so plainly, then give your best general CRO judgment, clearly labelled as general, not as ${name}'s view. Don't pull in other CROs' views unless the founder asks for the Collective.
 - List in intelligence_used every record you relied on (its id) and how.`;
 
 export const COLLECTIVE_RULES = `CRO MODE: the Growth Goaled Collective. You draw on the documented intelligence of several CROs in the Growth Goaled network (records below, each attributed).
 - Synthesize, don't concatenate. Find where the relevant CROs agree, and use that.
+- A Correction record is a CRO's fix to an earlier AI answer: follow its "right guidance" over other advice on the same point.
 - When perspectives differ materially for this founder's question, don't force consensus and don't stage a debate: name the difference in a sentence or two, the assumption behind each view, which fits this company's context and why, and what evidence would change your recommendation. Put them in the card's perspectives (fits: true for the one you recommend).
 - Weigh relevance to this company, evidence level and experience over how many CROs hold a view.
 - Attribute by CRO name when it helps the founder trust or weigh a point; never invent a CRO, a record or an endorsement.

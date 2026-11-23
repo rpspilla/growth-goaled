@@ -46,7 +46,7 @@ function Table({ label, first, rows }: { label: string; first: string; rows: Qua
  */
 export default async function QualityPage() {
   await requireRole(["advisor", "admin"]);
-  const { topics, cros, records } = await qualityReport();
+  const { topics, cros, records, contributions } = await qualityReport();
   return (
     <div className="page space-y-8">
       <header>
@@ -63,6 +63,40 @@ export default async function QualityPage() {
         <h2 className="text-lg font-semibold" style={fg}>By CRO</h2>
         <Table label="By CRO" first="Who answered" rows={cros} />
       </section>
+      <section className="space-y-2">
+        <h2 className="text-lg font-semibold" style={fg}>Contributions by CRO</h2>
+        {contributions.length ? (
+          <div className="surface overflow-x-auto">
+            <table aria-label="Contributions by CRO" className="w-full text-sm">
+              <thead>
+                <tr className="text-left" style={muted}>
+                  {["CRO", "Records", "Validated", "Awaiting review", "Corrections", "Answers that used them", "Worked", "Partly", "Didn't"].map((h) => (
+                    <th key={h} className="px-3 py-2 font-semibold whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {contributions.map((c) => (
+                  <tr key={c.croId} className="border-t" style={{ borderColor: "var(--border)" }}>
+                    <td className="px-3 py-2"><Link href={`/advisor/cros/${c.croId}`} className="link">{c.name}</Link></td>
+                    <td className="px-3 py-2 font-mono">{c.records}</td>
+                    <td className="px-3 py-2 font-mono">{c.validated}</td>
+                    <td className="px-3 py-2 font-mono" style={c.awaitingReview ? { color: "var(--amber)" } : undefined}>{c.awaitingReview}</td>
+                    <td className="px-3 py-2 font-mono">{c.corrections}</td>
+                    <td className="px-3 py-2 font-mono">{c.uses}</td>
+                    <td className="px-3 py-2 font-mono" style={{ color: "var(--green)" }}>{c.worked}</td>
+                    <td className="px-3 py-2 font-mono">{c.partly}</td>
+                    <td className="px-3 py-2 font-mono" style={c.didnt ? { color: "var(--red)" } : undefined}>{c.didnt}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="surface p-4 text-sm" style={muted}>No CROs yet.</p>
+        )}
+      </section>
+
       <section className="space-y-2">
         <h2 className="text-lg font-semibold" style={fg}>Intelligence records in use</h2>
         {records.length ? (

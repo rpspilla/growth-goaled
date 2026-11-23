@@ -1760,12 +1760,17 @@ export const croIntelligence = pgTable(
     relatedIds: jsonb("related_ids").$type<string[]>().notNull().default([]),
     // Drafted from a founder's commitment outcome, for a CRO to check (anonymised) and submit
     fromCommitmentId: uuid("from_commitment_id").references(() => commitments.id, { onDelete: "set null" }),
+    // A correction of one AI answer (the message it corrects)
+    fromMessageId: uuid("from_message_id").references((): AnyPgColumn => conversationMessages.id, { onDelete: "set null" }),
+    // Where an imported record came from in its source (e.g. the workbook's scenario id "GG-001"):
+    // re-importing updates the same record instead of adding another
+    sourceKey: text("source_key"),
     // Where it may be used: an individual CRO's conversations, the Collective, or both
     modes: intelligenceMode("modes").array().notNull().default(sql`'{individual,collective}'::intelligence_mode[]`),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     ...timestamps,
   },
-  (t) => [index("cro_intelligence_cro_idx").on(t.primaryCroId), index("cro_intelligence_status_idx").on(t.status, t.type)],
+  (t) => [index("cro_intelligence_cro_idx").on(t.primaryCroId), index("cro_intelligence_status_idx").on(t.status, t.type), uniqueIndex("cro_intelligence_source_key_idx").on(t.primaryCroId, t.sourceKey)],
 );
 
 /** author / co-author: wrote it; endorses: independently agrees; disputes: sees it differently (with why). */
@@ -1788,6 +1793,32 @@ export const croIntelligenceContributors = pgTable(
   (t) => [uniqueIndex("cro_intelligence_contributors_idx").on(t.recordId, t.croId), index("cro_intelligence_contributors_cro_idx").on(t.croId)],
 );
 
+export const conflictStatus = pgEnum("intelligence_conflict_status", ["suggested", "confirmed", "dismissed"]);
+
+/**
+ * Two validated records from different CROs that may give opposing guidance on the same situation:
+ * flagged by the AI when a record is validated, then confirmed (the Collective treats them as a
+ * disagreement) or dismissed by a CRO or an admin.
+ */
+export const croIntelligenceConflicts = pgTable(
+  "cro_intelligence_conflicts",
+  {
+    id: id(),
+    recordId: uuid("record_id")
+      .notNull()
+      .references(() => croIntelligence.id, { onDelete: "cascade" }),
+    otherId: uuid("other_id")
+      .notNull()
+      .references(() => croIntelligence.id, { onDelete: "cascade" }),
+    why: text("why").notNull(),
+    status: conflictStatus("status").notNull().default("suggested"),
+    decidedBy: uuid("decided_by").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("cro_intelligence_conflicts_pair_idx").on(t.recordId, t.otherId)],
+);
+
+export type CroIntelligenceConflict = typeof croIntelligenceConflicts.$inferSelect;
 export type CroProfile = typeof croProfiles.$inferSelect;
 export type CroIntelligence = typeof croIntelligence.$inferSelect;
 export type CroIntelligenceContributor = typeof croIntelligenceContributors.$inferSelect;

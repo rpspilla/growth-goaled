@@ -6,6 +6,7 @@ import { EVIDENCE_LEVELS, INTELLIGENCE_STATUSES, INTELLIGENCE_TYPES } from "@/li
 import { croForUser, listCroProfiles, listIntelligence } from "@/lib/data/cro";
 import type { CroIntelligence } from "@/lib/db/schema";
 import { createRecordAction } from "../cros/actions";
+import { db, schema } from "@/lib/db";
 
 export const metadata = { title: "CRO intelligence library" };
 
@@ -28,7 +29,14 @@ export default async function IntelligencePage({ searchParams }: { searchParams:
   const user = await requireRole(["advisor", "admin"]);
   const f = await searchParams;
   const status = f.status && f.status in INTELLIGENCE_STATUSES ? (f.status as CroIntelligence["status"]) : undefined;
-  const [records, cros, mine, all] = await Promise.all([listIntelligence({ type: f.type, croId: f.cro, status }), listCroProfiles(), croForUser(user.id), listIntelligence()]);
+  const [records, cros, mine, all, conflictRows] = await Promise.all([
+    listIntelligence({ type: f.type, croId: f.cro, status }),
+    listCroProfiles(),
+    croForUser(user.id),
+    listIntelligence(),
+    db.select({ recordId: schema.croIntelligenceConflicts.recordId, otherId: schema.croIntelligenceConflicts.otherId, status: schema.croIntelligenceConflicts.status }).from(schema.croIntelligenceConflicts),
+  ]);
+  const conflictCount = (id: string, st: "suggested" | "confirmed") => conflictRows.filter((c) => c.status === st && (c.recordId === id || c.otherId === id)).length;
   const canWrite = user.role === "admin" || Boolean(mine);
 
   return (
@@ -40,7 +48,10 @@ export default async function IntelligencePage({ searchParams }: { searchParams:
             Each record belongs to a CRO (or is a network position), with its evidence, and who endorses or disputes it. Records reach founders&apos; conversations only once validated by another CRO or an admin.
           </p>
         </div>
-        <Link href="/advisor/cros" className="link text-sm">CRO network →</Link>
+        <div className="flex gap-4 flex-wrap">
+          <Link href="/advisor/intelligence/import" className="btn btn-secondary text-sm">Import a training workbook</Link>
+          <Link href="/advisor/cros" className="link text-sm">CRO network →</Link>
+        </div>
       </header>
 
       <form className="flex gap-2 flex-wrap items-end" aria-label="Filter records">
@@ -86,6 +97,8 @@ export default async function IntelligencePage({ searchParams }: { searchParams:
                     </div>
                   )}
                 </div>
+                {conflictCount(r.id, "suggested") > 0 && <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "var(--blue-muted)", color: "var(--blue)" }}>Possible conflict</span>}
+                {conflictCount(r.id, "confirmed") > 0 && <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "var(--amber-muted)", color: "var(--amber)" }}>CROs differ</span>}
                 <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={STATUS_TONE[r.status]}>{INTELLIGENCE_STATUSES[r.status]}</span>
               </li>
             );

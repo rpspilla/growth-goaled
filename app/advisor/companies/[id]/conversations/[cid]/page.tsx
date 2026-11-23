@@ -9,7 +9,7 @@ import { companyCommitments } from "@/lib/data/commitments";
 import { attributionFor, getCroProfile } from "@/lib/data/cro";
 import { companyProjects, today } from "@/lib/data/projects";
 import { companyContext } from "../../context";
-import { advisorNoteAction } from "../../actions";
+import { advisorNoteAction, correctionAction } from "../../actions";
 
 export const metadata = { title: "Conversation" };
 
@@ -60,6 +60,16 @@ export default async function AdvisorConversationPage({ params }: { params: Prom
                   {m.role === "user" ? "Founder" : m.role === "advisor" ? `Advisor${m.authorId && view.authors.get(m.authorId) ? ` · ${view.authors.get(m.authorId)}` : ""}` : cro ? `${cro.name}'s AI CRO` : "AI CRO"}
                 </div>
                 <div className="text-base whitespace-pre-wrap" style={fg}>{m.content}</div>
+                {m.role === "assistant" && (
+                  <details className="mt-2">
+                    <summary className="text-sm link cursor-pointer">Correct this answer</summary>
+                    <ActionForm action={correctionAction.bind(null, company.id, m.id)} submit="Save correction" label="Correct this answer" resetOnSuccess className="space-y-2 mt-2">
+                      <textarea name="wrong" rows={2} maxLength={2000} required aria-label="What was wrong" placeholder="What was wrong" className="field w-full" />
+                      <textarea name="right" rows={3} maxLength={4000} required aria-label="The right guidance" placeholder="The right guidance, as you'd give it" className="field w-full" />
+                      <p className="text-xs" style={muted}>Becomes a Correction record, attributed to you and submitted for review. Once validated, the AI follows it on this topic.</p>
+                    </ActionForm>
+                  </details>
+                )}
               </div>
               {rec && <RecommendationCardView id={rec.id} card={rec.card} given={(view.feedback.get(rec.id) ?? []).map((f) => f.kind)} deeper={null} compact informedBy={informedBy(rec.card)} />}
             </li>

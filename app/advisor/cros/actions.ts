@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireRole } from "@/lib/auth/session";
 import { parseTags, PHILOSOPHY_FIELDS, STYLE_FIELDS } from "@/lib/cro";
-import { saveCroProfile, saveIntelligence, setCroProfileAdmin, setIntelligenceStatus, setStance, type ProfileInput, type RecordInput, type Result } from "@/lib/data/cro";
+import { decideConflict, detectConflicts, saveCroProfile, saveIntelligence, setCroProfileAdmin, setIntelligenceStatus, setStance, type ProfileInput, type RecordInput, type Result } from "@/lib/data/cro";
+import { after } from "next/server";
 
 // The CRO network is run by Growth Goaled staff (advisors and admins); what each may change is checked in lib/data/cro.
 const staff = () => requireRole(["advisor", "admin"]);
@@ -109,6 +110,8 @@ export async function recordStatusAction(recordId: string, status: "draft" | "su
   if (!uuid(recordId)) return { ok: false, error: "That record wasn't found." };
   const r = await setIntelligenceStatus(user, recordId, status);
   if (r.ok) refresh();
+  // A newly validated record: look for other CROs' records that give opposing guidance.
+  if (r.ok && status === "validated") after(() => detectConflicts(recordId).catch((err) => console.error("[cro] Conflict check failed", err)));
   return r;
 }
 
@@ -117,6 +120,52 @@ export async function stanceAction(recordId: string, _prev: Result | null, f: Fo
   if (!uuid(recordId)) return { ok: false, error: "That record wasn't found." };
   const s = str(f, "stance");
   const r = await setStance(user, recordId, s === "endorses" || s === "disputes" ? s : null, str(f, "note"));
+  if (r.ok) refresh();
+  return r;
+}
+
+export type ImportState = { error?: string; summary?: Omit<Extract<import("@/lib/data/workbook-import").ImportResult, { ok: true }>, "ok"> } | null;
+
+/** Import a CRO Training Workbook (.csv or .xlsx): scenarios become attributed Scenario records, submitted for review. */
+export async function importWorkbookAction(_prev: ImportState, f: FormData): Promise<ImportState> {
+  const user = await staff();
+  const file = f.get("file");
+  if (!(file instanceof File) || !file.size) return { error: "Choose the workbook file." };
+  const respondent = str(f, "respondentCroId");
+  const { importWorkbook, workbookRows } = await import("@/lib/data/workbook-import");
+  const { WorkbookError } = await import("@/lib/workbook");
+  let rows: string[][];
+  try {
+    rows = await workbookRows(file.name, Buffer.from(await file.arrayBuffer()));
+  } catch (err) {
+    if (err instanceof WorkbookError) return { error: err.message };
+    console.error("[workbook] Read failed", err);
+    return { error: "That file couldn't be read. Save it as .csv or .xlsx and try again." };
+  }
+  const result = await importWorkbook(user, { filename: file.name, rows, respondentCroId: uuid(respondent) ? respondent : null });
+  if (!result.ok) return { error: result.error };
+  refresh();
+  return { summary: { scenarios: result.scenarios, created: result.created, updated: result.updated, unchanged: result.unchanged, unanswered: result.unanswered, skippedNames: result.skippedNames, recordIds: result.recordIds } };
+}
+
+/** Validate an import's submitted records at once (never the author's own, unless an admin). */
+export async function validateImportedAction(recordIds: string[]): Promise<{ validated: number; refused: number }> {
+  const user = await staff();
+  const { validateImported } = await import("@/lib/data/workbook-import");
+  const ids = Array.isArray(recordIds) ? recordIds.filter(uuid) : [];
+  const result = await validateImported(user, ids);
+  refresh();
+  after(async () => {
+    for (const id of ids) await detectConflicts(id).catch((err) => console.error("[cro] Conflict check failed", err));
+  });
+  return result;
+}
+
+/** Confirm a flagged conflict (the Collective names the disagreement) or dismiss it. */
+export async function decideConflictAction(conflictId: string, decision: "confirmed" | "dismissed"): Promise<Result> {
+  const user = await staff();
+  if (!uuid(conflictId) || (decision !== "confirmed" && decision !== "dismissed")) return { ok: false, error: "That conflict wasn't found." };
+  const r = await decideConflict(user, conflictId, decision);
   if (r.ok) refresh();
   return r;
 }

@@ -4,8 +4,8 @@ import { ActionForm } from "@/components/advisor/ActionForm";
 import { IntelligenceFields } from "@/components/advisor/IntelligenceFields";
 import { requireRole } from "@/lib/auth/session";
 import { CLASSIFICATIONS, EVIDENCE_LEVELS, INTELLIGENCE_STATUSES, INTELLIGENCE_TYPES } from "@/lib/cro";
-import { croForUser, getIntelligence, listCroProfiles, listIntelligence } from "@/lib/data/cro";
-import { recordStatusAction, saveRecordAction, stanceAction } from "../../cros/actions";
+import { conflictsFor, croForUser, getIntelligence, listCroProfiles, listIntelligence } from "@/lib/data/cro";
+import { decideConflictAction, recordStatusAction, saveRecordAction, stanceAction } from "../../cros/actions";
 
 export const metadata = { title: "Intelligence record" };
 
@@ -19,7 +19,7 @@ export default async function IntelligenceRecordPage({ params }: { params: Promi
   const { id } = await params;
   const r = await getIntelligence(id);
   if (!r) notFound();
-  const [cros, mine, all] = await Promise.all([listCroProfiles(), croForUser(user.id), listIntelligence()]);
+  const [cros, mine, all, conflicts] = await Promise.all([listCroProfiles(), croForUser(user.id), listIntelligence(), conflictsFor(id)]);
   const isAuthor = Boolean(mine && r.stances.some((s) => s.croId === mine.id && (s.stance === "author" || s.stance === "co_author")));
   const canEdit = user.role === "admin" || (mine !== null && r.primaryCroId === mine.id);
   const canReview = user.role === "admin" || (Boolean(mine) && !isAuthor);
@@ -84,6 +84,33 @@ export default async function IntelligenceRecordPage({ params }: { params: Promi
           </ActionForm>
         )}
       </section>
+
+      {conflicts.length > 0 && (
+        <section className="space-y-2" aria-label="Possible conflicts">
+          <h2 className="text-lg font-semibold" style={fg}>Conflicts with other CROs&apos; records</h2>
+          <p className="text-sm" style={muted}>Flagged by the AI when a record is validated. Confirm one and the Collective names the disagreement and says which view fits each founder; dismiss it if the advice doesn&apos;t really oppose.</p>
+          <ul className="surface divide-y text-sm" style={{ borderColor: "var(--border)" }}>
+            {conflicts.map((c) => (
+              <li key={c.id} className="p-3 space-y-1" style={{ borderColor: "var(--border)" }}>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Link href={`/advisor/intelligence/${c.otherId}`} className="link font-semibold">{c.otherTitle}</Link>
+                  <span style={muted}>· {c.otherCro}</span>
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={c.status === "confirmed" ? { background: "var(--amber-muted)", color: "var(--amber)" } : c.status === "dismissed" ? { background: "var(--muted)", color: "var(--muted-foreground)" } : { background: "var(--blue-muted)", color: "var(--blue)" }}>
+                    {c.status === "confirmed" ? "Confirmed: CROs differ" : c.status === "dismissed" ? "Dismissed" : "Possible conflict"}
+                  </span>
+                </div>
+                <p style={fg}>{c.why}</p>
+                {(mine || user.role === "admin") && c.status === "suggested" && (
+                  <div className="flex gap-2">
+                    <ActionForm action={decideConflictAction.bind(null, c.id, "confirmed")} submit="Confirm" label={`Confirm conflict with ${c.otherTitle}`} className="inline-flex"><></></ActionForm>
+                    <ActionForm action={decideConflictAction.bind(null, c.id, "dismissed")} submit="Dismiss" label={`Dismiss conflict with ${c.otherTitle}`} className="inline-flex"><></></ActionForm>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {related.length > 0 && (
         <section className="space-y-2">
