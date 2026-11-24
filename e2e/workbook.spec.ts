@@ -34,7 +34,23 @@ test("import a training workbook, review a conflict, correct an AI answer", asyn
   await expect(page.getByRole("heading", { name: "CRO intelligence library" })).toBeVisible({ timeout: 120_000 });
   await page.getByRole("link", { name: "Import a training workbook" }).click();
   const form = page.getByRole("form", { name: "Import a workbook" });
-  await form.getByLabel("Workbook file").setInputFiles({ name: "workbook.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
+  // Nothing chosen yet: the form says so. A file that isn't a workbook is refused before upload.
+  await form.getByRole("button", { name: "Import" }).click();
+  await expect(form.getByRole("alert")).toHaveText("Choose the workbook file.");
+  const drop = form.getByLabel("Drop the workbook here");
+  const dropFile = async (name: string, type: string, text: string) => {
+    const dt = await page.evaluateHandle(({ n, t, body }) => {
+      const d = new DataTransfer();
+      d.items.add(new File([body], n, { type: t }));
+      return d;
+    }, { n: name, t: type, body: text });
+    await drop.dispatchEvent("drop", { dataTransfer: dt });
+  };
+  await dropFile("notes.pdf", "application/pdf", "x");
+  await expect(form.getByText(/Use the workbook as \.xlsx or \.csv/)).toBeVisible();
+  // Dragged onto the box
+  await dropFile("workbook.csv", "text/csv", csv);
+  await expect(drop).toContainText("workbook.csv ready to import");
   await form.getByLabel("Respondent").selectOption({ label: "Wanda Workbook" });
   await form.getByRole("button", { name: "Import" }).click();
   const result = page.getByRole("status", { name: "Import result" });

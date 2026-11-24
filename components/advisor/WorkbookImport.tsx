@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState, useTransition } from "react";
+import { FileSpreadsheet } from "lucide-react";
+import { useActionState, useRef, useState, useTransition } from "react";
 import type { ImportState } from "@/app/advisor/cros/actions";
 
 /**
@@ -29,10 +30,7 @@ export function WorkbookImport({
   return (
     <div className="space-y-5">
       <form action={run} aria-label="Import a workbook" className="surface p-5 space-y-4">
-        <label className="block">
-          <span className="label">Workbook (.csv or .xlsx)</span>
-          <input type="file" name="file" accept=".csv,.xlsx" required className="block mt-1 text-sm" aria-label="Workbook file" />
-        </label>
+        <WorkbookDrop />
         <label className="block">
           <span className="label">Whose answers are in the &ldquo;Your …&rdquo; columns</span>
           {lockedCroId ? (
@@ -82,6 +80,64 @@ export function WorkbookImport({
           </div>
         </section>
       )}
+    </div>
+  );
+}
+
+/** The workbook file: dropped onto the box or chosen (the file input stays the form field). */
+function WorkbookDrop() {
+  const input = useRef<HTMLInputElement>(null);
+  const [name, setName] = useState<string | null>(null);
+  const [over, setOver] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const take = (files: FileList | null) => {
+    const f = files?.[0];
+    setError(null);
+    if (!f) return setName(null);
+    if (!/\.(csv|xlsx)$/i.test(f.name)) {
+      setName(null);
+      if (input.current) input.current.value = "";
+      return setError("Use the workbook as .xlsx or .csv (in Google Sheets: File → Download).");
+    }
+    setName(f.name);
+  };
+  return (
+    <div className="space-y-1">
+      <span className="label">Workbook (.xlsx or .csv)</span>
+      <label
+        onDragOver={(e) => {
+          e.preventDefault();
+          setOver(true);
+        }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setOver(false);
+          if (!input.current || !e.dataTransfer.files.length) return;
+          const dt = new DataTransfer();
+          dt.items.add(e.dataTransfer.files[0]!);
+          input.current.files = dt.files;
+          take(dt.files);
+        }}
+        aria-label="Drop the workbook here"
+        className="mt-1 flex items-center gap-3 rounded-xl border-2 border-dashed px-4 py-6 cursor-pointer transition-colors"
+        style={{ borderColor: over ? "var(--primary)" : "var(--border)", background: over ? "var(--muted)" : "transparent" }}
+      >
+        <FileSpreadsheet aria-hidden className="w-7 h-7 shrink-0" style={{ color: name ? "var(--green)" : "var(--muted-foreground)" }} />
+        <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+          {name ? (
+            <>
+              <span className="font-semibold" style={{ color: "var(--foreground)" }}>{name}</span> ready to import. Drop another file or click to change it.
+            </>
+          ) : (
+            <>
+              <span className="font-semibold" style={{ color: "var(--foreground)" }}>Drag the workbook here</span>, or click to choose it. In Google Sheets: File → Download → Microsoft Excel (.xlsx).
+            </>
+          )}
+        </span>
+        <input ref={input} type="file" name="file" accept=".csv,.xlsx" className="sr-only" aria-label="Workbook file" onChange={(e) => take(e.target.files)} />
+      </label>
+      {error && <p role="alert" className="text-sm" style={{ color: "var(--red)" }}>{error}</p>}
     </div>
   );
 }
