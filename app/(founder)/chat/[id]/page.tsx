@@ -12,6 +12,7 @@ import { CroIdentity, toCroCard } from "@/components/chat/CroIdentity";
 import { RichReply } from "@/components/chat/RichReply";
 import { ListenButton } from "@/components/chat/Speaker";
 import { voiceConfigured } from "@/lib/ai/voice";
+import { rallyVoice } from "@/lib/data/voice";
 import { AnswerFeedback, FullReasoning } from "@/components/chat/AnswerFeedback";
 import { isBeta } from "@/lib/beta";
 import { PlanPanel, type PlanPanelData } from "@/components/chat/PlanPanel";
@@ -92,7 +93,7 @@ export default async function ConversationPage({ params, searchParams }: { param
   // Spoken answers: in the voice of the CRO who gave it, when they've set one up (lib/data/voice).
   // Answers without their own CRO's voice speak in Rally's (a CRO's, by their choice), if there is one.
   const voiced = new Map(network.filter((c) => c.voiceId && c.voiceConsentAt).map((c) => [c.id, c.name]));
-  const rally = network.find((c) => c.rallyVoice && c.voiceId && c.voiceConsentAt) ?? null;
+  const rally = await rallyVoice();
   const spoken = (m: { id: string; content: string; croId: string | null }) => {
     const own = m.croId ? voiced.get(m.croId) : undefined;
     return { id: m.id, text: m.content, voiced: Boolean(own || rally), who: own ?? rally?.name ?? null };

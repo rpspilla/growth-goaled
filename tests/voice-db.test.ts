@@ -126,6 +126,10 @@ describe("CRO voices", () => {
     expect(await speakableGuestMessage(token, 2)).toEqual({ text: "What's your name?", voiceId: "voice1abcdefghij" });
     expect(await speakableGuestMessage(token, 1)).toBeNull();
     expect(await speakableGuestMessage("b".repeat(40), 2)).toBeNull();
+    // Rally's voice speaks for Rally even while the CRO's own profile is a draft.
+    await setCroProfileAdmin(admin, cro, { status: "draft", inCollective: true, userId: ryan.id });
+    expect(await rallyVoice()).toMatchObject({ name: "Ryan Spillane" });
+    expect(await speakableAnswer(founder, collective)).toMatchObject({ voiceId: "voice1abcdefghij" });
     // Removing the voice ends it being Rally's.
     await removeCroVoice(ryan, cro);
     expect(await rallyVoice()).toBeNull();

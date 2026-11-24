@@ -83,12 +83,15 @@ export async function setRallyVoice(actor: Actor, croId: string, on: boolean): P
   return { ok: true };
 }
 
-/** Rally's own voice (a published CRO's, by their choice), if one is set up. */
+/**
+ * Rally's own voice (a CRO's, by their choice and with their consent), if one is set up. It speaks
+ * for Rally itself, so the CRO's own profile needn't be published.
+ */
 export async function rallyVoice(): Promise<{ voiceId: string; name: string } | null> {
   const [v] = await db
     .select({ voiceId: schema.croProfiles.voiceId, name: schema.croProfiles.name, consent: schema.croProfiles.voiceConsentAt })
     .from(schema.croProfiles)
-    .where(and(eq(schema.croProfiles.rallyVoice, true), eq(schema.croProfiles.status, "published")))
+    .where(eq(schema.croProfiles.rallyVoice, true))
     .limit(1);
   return v?.voiceId && v.consent ? { voiceId: v.voiceId, name: v.name } : null;
 }
