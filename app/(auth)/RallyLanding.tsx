@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { RALLY } from "@/components/brand/Rally";
 import { IntroVideo } from "@/components/brand/IntroVideo";
+import { INTRO_VIDEO } from "@/components/brand/intro";
 import { listCroProfiles } from "@/lib/data/cro";
 import { GUEST_COOKIE, guestByToken } from "@/lib/data/guest";
 import { AuthShell } from "./AuthShell";
@@ -28,6 +29,8 @@ export function CroFace({ name, photoUrl, size = 48, ring = "#152638" }: { name:
  */
 export async function RallyLanding({ cro }: { cro?: string }) {
   const [cros, guest] = await Promise.all([listCroProfiles({ published: true }), guestByToken((await cookies()).get(GUEST_COOKIE)?.value)]);
+  // The video's cover uses the speaker's own (published) profile photo.
+  const introPhoto = cros.find((c) => c.name === INTRO_VIDEO.who)?.photoUrl ?? null;
   const chatting = Boolean(cro) || Boolean(guest && !guest.claimedAt && guest.messages.some((m) => m.role === "user"));
   return (
     <AuthShell
@@ -44,7 +47,7 @@ export async function RallyLanding({ cro }: { cro?: string }) {
             </div>
             {/* Phones and tablets: a "Watch" row that opens the video in place. */}
             <div className="lg:hidden">
-              <IntroVideo compact />
+              <IntroVideo compact photoUrl={introPhoto} />
             </div>
             {cros.length > 0 && (
               <div className="hidden sm:block space-y-3" aria-label="The CROs behind Rally">
@@ -65,7 +68,7 @@ export async function RallyLanding({ cro }: { cro?: string }) {
             )}
           </div>
           <div className="hidden lg:block">
-            <IntroVideo />
+            <IntroVideo photoUrl={introPhoto} />
           </div>
         </div>
       }
