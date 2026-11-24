@@ -142,6 +142,42 @@ describe("guest chat", () => {
     expect(rec!.companyId).toBe(company!.id);
   });
 
+  it("signing up from the landing page (no email given in the chat) still brings the chat over, in this browser or another", async () => {
+    await startGuest(token, null);
+    await answerAll();
+    const [sam] = (await db().insert(schema.users).values({ email: "sam@acme.test", authUserId: "s", role: "founder" }).returning()) as [User];
+    // This browser: the chat's cookie is enough.
+    expect(await claimGuest(sam, token)).not.toBeNull();
+    const [member] = await db().select().from(schema.companyMembers).where(eq(schema.companyMembers.userId, sam.id));
+    expect(member).toBeDefined();
+
+    // Another browser (the email app's): the latest unclaimed chat under their email.
+    const other = newToken();
+    token = other;
+    await startGuest(other, null);
+    await answerAll();
+    await guestEmail(await current(), "lee@beta.test");
+    const [lee] = (await db().insert(schema.users).values({ email: "lee@beta.test", authUserId: "l", role: "founder" }).returning()) as [User];
+    expect(await claimGuest(lee, null)).not.toBeNull();
+  });
+
+  it("a chat that stopped before the basics stays unclaimed, so /welcome asks only the rest and the chat comes over after", async () => {
+    await startGuest(token, null);
+    for (const a of ["Our pipeline isn't converting.", "Sam Founder", "Acme"]) await say(a);
+    const [sam] = (await db().insert(schema.users).values({ email: "sam@acme.test", authUserId: "s", role: "founder" }).returning()) as [User];
+    expect(await claimGuest(sam, token)).toBeNull();
+    expect((await current()).claimedAt).toBeNull();
+    expect((await current()).profile).toMatchObject({ name: "Sam Founder", companyName: "Acme" });
+    // /welcome makes the company; then the claim brings the conversation over.
+    const companyId = crypto.randomUUID();
+    await db().insert(schema.companies).values({ id: companyId, name: "Acme", revenueBand: "1m_3m" });
+    await db().insert(schema.companyMembers).values({ companyId, userId: sam.id, memberRole: "owner" });
+    const claimed = await claimGuest(sam, token);
+    expect(claimed).not.toBeNull();
+    const [conv] = await db().select().from(schema.conversations).where(eq(schema.conversations.id, claimed!.conversationId));
+    expect(conv!.companyId).toBe(companyId);
+  });
+
   it("caps new guest chats per network per day", async () => {
     process.env.GUEST_DAILY_PER_IP = "2";
     expect("error" in (await startGuest(newToken(), "9.9.9.9"))).toBe(false);

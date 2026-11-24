@@ -4,6 +4,8 @@ import { requireUser } from "@/lib/auth/session";
 import { homePathFor } from "@/lib/access";
 import { needsOnboarding } from "@/lib/onboarding";
 import { getFounderCompany } from "@/lib/data/companies";
+import { cookies } from "next/headers";
+import { guestFor, GUEST_COOKIE } from "@/lib/data/guest";
 import { track } from "@/lib/events";
 import { AuthShell, Points } from "../(auth)/AuthShell";
 import { WelcomeForm } from "./WelcomeForm";
@@ -18,6 +20,10 @@ export default async function WelcomePage() {
   // Invited founders already have a company, so they only complete their profile.
   const company = isFounder ? await getFounderCompany(user) : null;
   const askCompany = isFounder && !company;
+  // What they already told Rally in the website chat, so nothing is asked twice.
+  const guest = askCompany ? await guestFor(user, (await cookies()).get(GUEST_COOKIE)?.value).catch(() => null) : null;
+  const known = guest?.profile ?? {};
+  const values = Object.fromEntries(["companyName", "revenueBand", "foundedYear", "vertical", "verticalOther", "stage", "aes", "bdrs", "cs"].filter((k) => known[k]).map((k) => [k, String(known[k])]));
   await track("welcome_viewed", { userId: user.id, props: { role: user.role, new_company: askCompany } });
 
   return (
@@ -41,7 +47,7 @@ export default async function WelcomePage() {
     >
       <h2 className="text-2xl sm:text-3xl font-semibold" style={{ color: "var(--foreground)", letterSpacing: "-0.01em" }}>{askCompany ? "Set up your company" : "Your profile"}</h2>
       <p className="text-base mt-2 mb-6" style={{ color: "var(--muted-foreground)" }}>{askCompany ? "Takes about a minute." : "One step and you're in."}</p>
-      <WelcomeForm isFounder={isFounder} askCompany={askCompany} defaultName={user.name ?? ""} />
+      <WelcomeForm isFounder={isFounder} askCompany={askCompany} defaultName={user.name ?? known.name ?? ""} known={values} />
     </AuthShell>
   );
 }

@@ -148,3 +148,30 @@ test("a visitor talks it through, unlocks the recommendation with an email, and 
   await expect(page.getByRole("banner").getByText("Guestly", { exact: true })).toBeVisible();
   await ctx.close();
 });
+
+/**
+ * Chatting on the landing page and then signing up with "Get Free Beta Access" (no email in the chat):
+ * whatever Rally already heard isn't asked again, and the conversation comes along.
+ */
+test("signing up from the landing page after a partial chat only asks what Rally hasn't heard", async ({ browser }) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await page.goto("/sign-in");
+  await page.getByText("Or ask Rally a question first").click();
+  const answer = async (text: string) => {
+    await page.getByLabel("Your answer").fill(text);
+    await page.getByRole("button", { name: "Send", exact: true }).click();
+  };
+  await answer("Should we hire our first AE?");
+  await expect(page.getByText("What's your name?")).toBeVisible();
+  await answer("Pat Partial");
+  await expect(page.getByText(/What's your company called\?/)).toBeVisible();
+  await answer("Halfway Co");
+  await expect(page.getByText(/annual revenue|ARR/i).last()).toBeVisible();
+  // The magic link from the landing form lands on /claim.
+  await ctx.addCookies([{ name: "gg_e2e_user", value: "pat@halfway.test", domain: "localhost", path: "/" }]);
+  await page.goto("/claim");
+  await expect(page).toHaveURL(/\/welcome/);
+  await expect(page.getByLabel("Your name")).toHaveValue("Pat Partial");
+  await expect(page.getByLabel(/Company name/)).toHaveValue("Halfway Co");
+});

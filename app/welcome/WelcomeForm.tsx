@@ -18,7 +18,7 @@ function Field({ id, label, hint, error, children }: { id: string; label: string
 }
 
 /** Only what's needed now. Values are kept if a field fails validation. */
-export function WelcomeForm({ isFounder, askCompany, defaultName }: { isFounder: boolean; askCompany: boolean; defaultName: string }) {
+export function WelcomeForm({ isFounder, askCompany, defaultName, known = {} }: { isFounder: boolean; askCompany: boolean; defaultName: string; known?: Record<string, string> }) {
   const [state, action, pending] = useActionState<OnboardingState, FormData>(completeOnboarding, {});
   const e = state.errors ?? {};
   const invalid = (k: string) => (e[k] ? { "aria-invalid": true, "aria-describedby": `${k}-error` } : {});
@@ -28,7 +28,7 @@ export function WelcomeForm({ isFounder, askCompany, defaultName }: { isFounder:
       <Field id="name" label="Your name" error={e.name}>
         <input id="name" name="name" defaultValue={state.values?.name ?? defaultName} autoComplete="name" required className="field" {...invalid("name")} />
       </Field>
-      {askCompany && <CompanyBasicsFields key={JSON.stringify(state.values ?? {})} errors={e} values={state.values} />}
+      {askCompany && <CompanyBasicsFields key={JSON.stringify(state.values ?? {})} errors={e} values={state.values ?? known} />}
       <Field id="title" label="Your title" hint={isFounder ? "optional" : undefined} error={e.title}>
         <input id="title" name="title" defaultValue={state.values?.title} placeholder={isFounder ? "CEO & Co-founder" : "Lead Advisor"} autoComplete="organization-title" required={!isFounder} className="field" {...invalid("title")} />
       </Field>

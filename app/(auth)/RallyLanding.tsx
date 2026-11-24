@@ -81,7 +81,7 @@ export async function RallyLanding({ cro }: { cro?: string }) {
               Free during Beta. Help shape the next generation of CRO support for founders: get free access to Rally, explore expert CRO intelligence, and help us make it better.
             </p>
           </div>
-          <MagicLinkForm mode="sign-up" cta="Get Free Beta Access" switchLink={false} />
+          <MagicLinkForm mode="sign-up" next="/claim" cta="Get Free Beta Access" switchLink={false} />
         </section>
         <details open={chatting} className="group/ask rounded-xl border px-4 py-3" style={{ borderColor: "var(--border)" }}>
           <summary className="cursor-pointer list-none flex items-center justify-between text-base font-semibold" style={{ color: "var(--foreground)" }}>

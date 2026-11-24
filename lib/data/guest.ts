@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { and, asc, count, eq, gte, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { GuestMessage, GuestSession, User } from "@/lib/db/schema";
 import { chatTurn, ChatError } from "@/lib/ai/chat";
@@ -295,9 +295,31 @@ export async function notifyNewLead(guestId: string, appUrl: string, opts: { for
  * After the sign-in link: the guest chat becomes the founder's company (from the sign-up answers),
  * their profile, and a saved conversation with its recommendation. Only for the email they gave.
  */
+/**
+ * The website chat that belongs to this person: the one in this browser (its cookie), unless it was
+ * given someone else's email; or, in another browser (an email app's), their latest unclaimed chat
+ * under the email they signed in with.
+ */
+export async function guestFor(user: Pick<User, "email">, token: string | undefined | null): Promise<GuestSession | null> {
+  const email = user.email.trim().toLowerCase();
+  const here = await guestByToken(token);
+  if (here && !here.claimedAt && (!here.email || here.email === email)) return here;
+  const [byEmail] = await db
+    .select()
+    .from(schema.guestSessions)
+    .where(and(eq(schema.guestSessions.email, email), isNull(schema.guestSessions.claimedAt)))
+    .orderBy(desc(schema.guestSessions.updatedAt))
+    .limit(1);
+  return byEmail ?? null;
+}
+
 export async function claimGuest(user: User, token: string | undefined | null): Promise<{ conversationId: string } | null> {
-  const g = await guestByToken(token);
-  if (!g || g.claimedAt || !g.email || g.email !== user.email.trim().toLowerCase() || user.role !== "founder") return null;
+  if (user.role !== "founder") return null;
+  const g = await guestFor(user, token);
+  if (!g) return null;
+  // A chat that stopped before the company basics can't make a company: /welcome asks for the rest
+  // (pre-filled from it), and the chat stays unclaimed so its conversation still comes over after.
+  if (!(await getFounderCompany(user)) && !basicsFrom(g.profile)) return null;
   const won = await db
     .update(schema.guestSessions)
     .set({ claimedBy: user.id, claimedAt: new Date(), updatedAt: new Date() })
