@@ -105,12 +105,13 @@ test("CROs contribute attributed intelligence; founders ask one CRO's AI or the 
   await expect(f.page.getByText("not Nora in person")).toBeVisible();
   await f.page.getByRole("group", { name: "Common questions" }).getByRole("button", { name: "Who should my first GTM hire be?" }).click();
   await expect(f.page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/);
-  await expect(f.page.getByLabel("Who you're talking to")).toContainText("Nora Network's AI CRO");
-  await expect(f.page.getByLabel("Who you're talking to")).toContainText("not Nora in person");
+  await expect(f.page.getByRole("group", { name: "Talking with Nora Network's AI CRO" })).toBeVisible();
+  await expect(f.page.getByText(/Rally is an AI built on Nora Network's documented CRO expertise and judgment; Nora isn't reviewing/)).toBeVisible();
   await expect(f.page.getByText(/Test mode \(Nora Network's AI\)/).first()).toBeVisible();
   await f.page.getByLabel("Your reply").fill("Two of us sell; inbound is strong.");
   await f.page.getByRole("button", { name: "Send", exact: true }).click();
   const card = f.page.getByRole("article", { name: "Recommendation" });
+  await f.page.getByText("See the full reasoning").last().click();
   await card.getByText("Show the full recommendation").click();
   const informed = card.getByLabel("Informed by");
   await expect(informed).toContainText("Nora Network · Founders sell until the motion repeats");
@@ -120,12 +121,13 @@ test("CROs contribute attributed intelligence; founders ask one CRO's AI or the 
   // --- The Collective: both CROs, with the disagreement named ---
   await f.page.goto("/whats-next");
   await expect(f.page.getByLabel("Who to ask")).toHaveValue("");
-  await f.page.getByRole("textbox", { name: "What are you working through?" }).fill("Should we hire a VP of Sales or keep founder-led sales?");
+  await f.page.getByRole("textbox", { name: "Ask Rally" }).fill("Should we hire a VP of Sales or keep founder-led sales?");
   await f.page.getByRole("button", { name: "Ask", exact: true }).click();
-  await expect(f.page.getByLabel("Who you're talking to")).toContainText("Growth Goaled Collective");
+  await expect(f.page.getByRole("group", { name: "Talking with the Growth Goaled Collective" })).toBeVisible();
   await f.page.getByLabel("Your reply").fill("We have strong inbound.");
   await f.page.getByRole("button", { name: "Send", exact: true }).click();
   const collective = f.page.getByRole("article", { name: "Recommendation" });
+  await f.page.getByText("See the full reasoning").last().click();
   await collective.getByText("Show the full recommendation").click();
   await expect(collective.getByLabel("Informed by")).toContainText("Nora Network");
   await expect(collective.getByLabel("Informed by")).toContainText("Omar Okafor");
@@ -149,20 +151,20 @@ test("CROs contribute attributed intelligence; founders ask one CRO's AI or the 
   await f.page.getByRole("textbox", { name: "What are you working through?" }).fill("How should we structure AE commission?");
   await f.page.getByRole("button", { name: "Ask", exact: true }).click();
   await expect(f.page.getByLabel("Continue with")).toHaveValue(/.+/);
-  await expect(f.page.getByLabel("Who you're talking to")).toContainText("Nora Network's AI CRO");
+  await expect(f.page.getByRole("group", { name: "Talking with Nora Network's AI CRO" })).toBeVisible();
   await f.page.getByLabel("Your reply").fill("Two AEs, $25k deals.");
   await f.page.getByRole("button", { name: "Send", exact: true }).click();
-  await expect(f.page.getByRole("article", { name: "Recommendation" })).toBeVisible();
+  await expect(f.page.getByText("See the full reasoning").last()).toBeVisible();
   await f.page.getByRole("button", { name: "Get a second opinion from the network" }).click();
   await expect(f.page.getByText("Second opinion from the Growth Goaled Collective")).toBeVisible();
-  await expect(f.page.getByLabel("Who you're talking to")).toContainText("Nora Network's AI CRO");
+  await expect(f.page.getByRole("group", { name: "Talking with Nora Network's AI CRO" })).toBeVisible();
   await expect(f.page.getByRole("button", { name: "Get a second opinion from the network" })).toHaveCount(0);
   // Switch to the Collective: the history stays, each answer credited to its perspective.
   await f.page.getByLabel("Continue with").selectOption("");
-  await expect(f.page.getByLabel("Who you're talking to")).toContainText("Growth Goaled Collective");
+  await expect(f.page.getByRole("group", { name: "Talking with the Growth Goaled Collective" })).toBeVisible();
   await f.page.getByLabel("Your reply").fill("And the Collective's view on quota?");
   await f.page.getByRole("button", { name: "Send", exact: true }).click();
-  const thread = f.page.getByRole("list", { name: "Conversation" });
+  const thread = f.page.getByRole("list", { name: "Conversation", exact: true });
   await expect(thread.getByText("Nora Network's AI CRO", { exact: true }).first()).toBeVisible();
   await expect(thread.getByText("Growth Goaled Collective", { exact: true }).last()).toBeVisible();
 
@@ -183,6 +185,7 @@ test("CROs contribute attributed intelligence; founders ask one CRO's AI or the 
   const visitor = await browser.newContext();
   const v = await visitor.newPage();
   await v.goto("/sign-in");
+  await v.getByText("Or ask Rally a question first").click();
   const who = v.getByRole("group", { name: "Who to talk to" });
   await expect(who.getByRole("button", { name: "The Growth Goaled Collective" })).toHaveAttribute("aria-pressed", "true");
   await who.getByRole("button", { name: "Nora Network's AI CRO" }).click();

@@ -16,7 +16,7 @@ export function ReturningSignIn({ next, open: startOpen = false, title = "Welcom
         </div>
       ) : (
         <p className="text-sm text-center" style={{ color: "var(--muted-foreground)" }}>
-          Already have an account?{" "}
+          Already have access?{" "}
           <button type="button" className="link font-semibold" onClick={() => setOpen(true)}>
             Sign in
           </button>

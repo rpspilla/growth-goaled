@@ -31,9 +31,10 @@ test("sign-up basics carry through, and every growth question opens its own page
   await expect(page.locator("#companyName")).toHaveValue("Deer in Headlights");
   await page.locator("#verticalOther").fill("Customer experience");
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  // Sign-up lands on the main entry: the conversation starters.
-  await expect(page).toHaveURL(/\/overview\?welcome=1$/);
-  await expect(page.getByText(/You're set up, Deer in Headlights\./)).toBeVisible();
+  // Sign-up lands in Rally: the first conversation.
+  await expect(page).toHaveURL(/\/whats-next$/);
+  await expect(page.getByRole("heading", { name: /What's the growth decision in front of you/ })).toBeVisible();
+  await page.goto("/overview");
   // The advisor runs the work: until they share a plan, the Overview says so; founders don't pick projects.
   await expect(page.getByText("Your advisor will share your plan here.")).toBeVisible();
   for (const label of ["ARR", "NRR", "Sales Cycle", "MoM Growth"]) await expect(page.getByLabel(label, { exact: true })).toContainText("Not available yet");

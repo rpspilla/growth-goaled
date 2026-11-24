@@ -24,6 +24,7 @@ function refresh() {
 function profileFrom(f: FormData): ProfileInput {
   return {
     name: str(f, "name"),
+    title: str(f, "title"),
     headline: str(f, "headline"),
     bio: str(f, "bio"),
     linkedinUrl: str(f, "linkedinUrl"),

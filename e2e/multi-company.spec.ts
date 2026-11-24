@@ -28,15 +28,15 @@ test("an allowed founder can run several company profiles, each with its own dat
   await page.getByLabel("Vertical").selectOption("HealthTech");
   await page.getByLabel("Account executives").fill("2");
   await page.getByRole("button", { name: "Create company and pick a question" }).click();
-  await expect(page).toHaveURL(/\/overview\?welcome=1/);
-  await expect(page.getByText(/You're set up, Second Co\./)).toBeVisible();
+  await expect(page).toHaveURL(/\/whats-next$/);
+  await expect(page.getByRole("heading", { name: /What's the growth decision in front of you/ })).toBeVisible();
 
   // Each company keeps its own profile: what's set on one doesn't show on the other.
   await page.goto("/profile/company");
   await expect(page.locator("#intake-name")).toHaveValue("Second Co");
   await page.getByLabel(/^Company: Second Co/).click();
   await page.getByRole("button", { name: "First Co" }).click();
-  await expect(page).toHaveURL(/\/overview/); // switching company opens that company's page
+  await expect(page).toHaveURL(/\/whats-next/); // switching company opens Rally for that company
   await expect(page.getByLabel(/^Company: First Co/)).toBeVisible();
   await page.goto("/profile/company");
   await expect(page.locator("#intake-name")).toHaveValue("First Co");
@@ -54,7 +54,7 @@ test("an allowed founder can run several company profiles, each with its own dat
     await check.end();
   }
   await page.getByRole("button", { name: "Switch to founder view" }).click();
-  await expect(page).toHaveURL(/\/overview$/);
+  await expect(page).toHaveURL(/\/whats-next$/);
   await expect(page.getByLabel(/^Company: First Co/)).toBeVisible();
   await ctx.close();
 

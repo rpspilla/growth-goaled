@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { isStaging } from "@/lib/env";
 import { formatMetric, isMetricKey } from "@/lib/metrics";
 import { progressIndex, currentStep } from "@/lib/phases";
@@ -40,7 +40,13 @@ describe("phases", () => {
 
 describe("nudge to talk to Growth Goaled", async () => {
   const { nudgeDue, showNudge } = await import("@/lib/chat/nudge");
-  it("starts at six exchanges, repeats every third, and never once there's a plan", () => {
+  afterEach(() => vi.unstubAllEnvs());
+  it("never during the Rally Beta", () => {
+    expect([6, 9, 12].map((n) => nudgeDue(n, false))).toEqual([false, false, false]);
+    expect(showNudge(7, false)).toBe(false);
+  });
+  it("(after the Beta) starts at six exchanges, repeats every third, and never once there's a plan", () => {
+    vi.stubEnv("RALLY_BETA", "off");
     expect([5, 6, 7, 8, 9, 12].map((n) => nudgeDue(n, false))).toEqual([false, true, false, false, true, true]);
     expect(nudgeDue(6, true)).toBe(false);
     expect([5, 6, 10].map((n) => showNudge(n, false))).toEqual([false, true, true]);

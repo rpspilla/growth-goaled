@@ -3,10 +3,10 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { safeNextPath } from "@/lib/invites";
 import { AuthShell, Positioning } from "../AuthShell";
-import { GuestEntry } from "../GuestEntry";
+import { RallyLanding } from "../RallyLanding";
 import { ReturningSignIn } from "../ReturningSignIn";
 
-export const metadata: Metadata = { title: "Growth Goaled · Your Seed & Series A Stage CRO" };
+export const metadata: Metadata = { title: "Rally · Your CRO. Ready when you are.", description: "Expert CRO judgment for the decisions that drive your growth. Free during Beta. By Growth Goaled." };
 // The guest chat's answers can take a little while.
 export const maxDuration = 300;
 
@@ -27,9 +27,5 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
       </AuthShell>
     );
   }
-  return (
-    <AuthShell brand={<Positioning compact />}>
-      <GuestEntry cro={cro} />
-    </AuthShell>
-  );
+  return <RallyLanding cro={cro} />;
 }

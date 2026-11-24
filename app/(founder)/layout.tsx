@@ -4,21 +4,21 @@ import { listFounderCompanies } from "@/lib/data/companies";
 import { canAddCompanies, canSwitchToAdvisor } from "@/lib/multi-company";
 import { CompanySwitcher } from "@/components/shell/CompanySwitcher";
 import { Shell, StagingBadge, UserMenu } from "@/components/shell/Shell";
-import { UseCaseSidebar } from "@/components/shell/UseCaseSidebar";
-import { selectUseCase } from "@/components/shell/actions";
-import { founderNav } from "@/lib/nav";
+import { RallyRail } from "@/components/shell/RallyRail";
+import { RallyLogo } from "@/components/brand/Rally";
+import { founderCompanyNav } from "@/lib/nav";
+import { listConversations } from "@/lib/data/chat";
 import { CompanyBrandBar } from "@/components/brand/CompanyBrandBar";
 import { companySite } from "@/lib/data/company-site";
 
 export default async function FounderLayout({ children }: { children: ReactNode }) {
   const { user, company } = await founderContext();
-  const [companies, site] = await Promise.all([listFounderCompanies(user), company ? companySite(company) : null]);
+  const [companies, site, recent] = await Promise.all([listFounderCompanies(user), company ? companySite(company) : null, company ? listConversations(company, 8) : Promise.resolve([])]);
 
   return (
     <Shell
-      sidebar={
-        <UseCaseSidebar items={founderNav()} options={[]} activeUseCase={null} select={selectUseCase} />
-      }
+      brand={<RallyLogo />}
+      sidebar={<RallyRail recent={recent.map((c) => ({ id: c.id, title: c.title }))} company={founderCompanyNav()} />}
       topbar={
         <>
           <div className="flex items-center gap-2 min-w-0">
@@ -39,7 +39,7 @@ export default async function FounderLayout({ children }: { children: ReactNode 
         </>
       }
     >
-      {company && <CompanyBrandBar name={company.name} logoUrl={site?.logoUrl ?? null} about={site?.about ?? null} website={site?.website ?? null} />}
+      {company && <CompanyBrandBar name={company.name} logoUrl={site?.logoUrl ?? null} about={site?.about ?? null} website={site?.website ?? null} hideOn={["/overview", "/whats-next", "/chat", "/feedback"]} />}
       {children}
     </Shell>
   );

@@ -46,6 +46,7 @@ export function GuestChat({
   restart,
   chooseCro,
   preferredCroId = null,
+  beta = false,
 }: {
   view: GuestViewData;
   reply: (text: string) => Promise<Result>;
@@ -54,6 +55,8 @@ export function GuestChat({
   chooseCro?: (croId: string | null) => Promise<Result>;
   /** From a public CRO page (?cro=): choose that CRO's AI once, if nothing's been chosen and the AI hasn't answered. */
   preferredCroId?: string | null;
+  /** The Rally Beta (lib/beta): no paid-plan prompts or "a real CRO reviews every action plan"; the way on is free Beta access. */
+  beta?: boolean;
 }) {
   const [text, setText] = useState("");
   // The message on its way, shown straight away (outside the transition, whose updates React holds
@@ -137,13 +140,13 @@ export function GuestChat({
       ) : (
         <>
           <h2 className="font-display text-3xl sm:text-4xl leading-tight" style={{ color: "var(--foreground)" }}>{view.messages[0]?.content}</h2>
-          <HumanPresence />
+          {!beta && <HumanPresence />}
           {view.cros.length > 0 && chooseCro && (
             <CroPicker cros={view.cros} croId={view.croId} locked={view.croLocked} choose={chooseCro} onError={setError} />
           )}
         </>
       )}
-      {view.card && !view.emailed && <GuestCard card={view.card} giveEmail={giveEmail} planIntent={planIntent} onSent={setLinkSent} cta={<PlanCta company={view.companyName} onIntent={() => setPlanIntent(true)} where="card" />} />}
+      {view.card && !view.emailed && <GuestCard card={view.card} giveEmail={giveEmail} planIntent={planIntent} onSent={setLinkSent} cta={<PlanCta company={view.companyName} onIntent={() => setPlanIntent(!beta)} where="card" beta={beta} />} />}
       {!locked && (
         <>
       <ol className="space-y-3" aria-label="Conversation">
@@ -186,7 +189,7 @@ export function GuestChat({
       </ol>
 
       {capped ? (
-        <ConvertOptions scope={capped} email={view.email} giveEmail={giveEmail} />
+        <ConvertOptions scope={capped} email={view.email} giveEmail={giveEmail} beta={beta} />
       ) : (
       <form onSubmit={submit} className="rounded-2xl p-2 pl-4 flex items-end gap-2 focus-within:ring-2 focus-within:ring-[var(--green)]" style={{ border: "1px solid var(--border)", background: "var(--card)", boxShadow: "0 1px 3px rgba(13,27,42,0.06)" }}>
         <label htmlFor="guest-input" className="sr-only">Your answer</label>
@@ -228,7 +231,7 @@ export function GuestChat({
           Start over
         </button>
       )}
-      {view.card && !view.emailed && <PlanCta company={view.companyName} onIntent={() => setPlanIntent(true)} where="chat" />}
+      {view.card && !view.emailed && <PlanCta company={view.companyName} onIntent={() => setPlanIntent(!beta)} where="chat" beta={beta} />}
       <div ref={end} />
     </div>
   );
@@ -441,8 +444,8 @@ async function sendSignInLink(address: string, intent: LinkIntent) {
  * "Get a CRO-built GTM action plan for <company>": under the recommendation and at the end of the chat.
  * It takes them to the email box; the sign-in link they get then opens at the plan offer.
  */
-function PlanCta({ company, onIntent, where }: { company: string | null; onIntent: () => void; where: "card" | "chat" }) {
-  const label = `Get a CRO-Built GTM action plan for ${company ?? "your company"}`;
+function PlanCta({ company, onIntent, where, beta }: { company: string | null; onIntent: () => void; where: "card" | "chat"; beta: boolean }) {
+  const label = beta ? "Save this and keep going: free Beta access" : `Get a CRO-Built GTM action plan for ${company ?? "your company"}`;
   const click = () => {
     onIntent();
     const box = document.getElementById("guest-email") as HTMLInputElement | null;
@@ -462,7 +465,7 @@ function PlanCta({ company, onIntent, where }: { company: string | null; onInten
  * The free questions are used up: say so plainly, and offer the two ways on. "Diagnose my growth"
  * sends the sign-in link that saves the chat and opens the growth projects library.
  */
-function ConvertOptions({ scope, email, giveEmail }: { scope: CapScope; email: string | null; giveEmail: (email: string) => Promise<Result> }) {
+function ConvertOptions({ scope, email, giveEmail, beta }: { scope: CapScope; email: string | null; giveEmail: (email: string) => Promise<Result>; beta: boolean }) {
   const [asking, setAsking] = useState(false);
   const [value, setValue] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "failed">("idle");
@@ -470,7 +473,7 @@ function ConvertOptions({ scope, email, giveEmail }: { scope: CapScope; email: s
   const router = useRouter();
   const diagnose = async (address: string) => {
     setStatus("sending");
-    setStatus(await sendSignInLink(address, "library").then(() => "sent" as const, () => "failed" as const));
+    setStatus(await sendSignInLink(address, beta ? null : "library").then(() => "sent" as const, () => "failed" as const));
   };
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -485,9 +488,16 @@ function ConvertOptions({ scope, email, giveEmail }: { scope: CapScope; email: s
       <div>
         <h3 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>You&apos;ve used your free questions</h3>
         <p className="text-base mt-1" style={{ color: "var(--muted-foreground)" }}>
-          {scope === "session" ? `That's the ${FREE_QUESTIONS.perSession} free questions for this conversation.` : `That's all ${FREE_QUESTIONS.perLifetime} of your free questions.`} To keep going, talk it through with an advisor, or diagnose your growth with your own numbers.
+          {scope === "session" ? `That's the ${FREE_QUESTIONS.perSession} free questions for this conversation.` : `That's all ${FREE_QUESTIONS.perLifetime} of your free questions.`} {beta ? "To keep going, get free access to Rally: it's free during Beta, and this conversation comes with you." : "To keep going, talk it through with an advisor, or diagnose your growth with your own numbers."}
         </p>
       </div>
+      {beta ? (
+        <div className="flex gap-2 flex-wrap">
+          <button type="button" className="btn btn-primary" disabled={status === "sending"} onClick={() => (email ? diagnose(email) : setAsking(true))}>
+            Get Free Beta Access
+          </button>
+        </div>
+      ) : (
       <div className="flex gap-2 flex-wrap">
         <a href={ADVISOR_CALENDLY} target="_blank" rel="noopener" className="btn btn-primary inline-flex items-center gap-2">
           <CalendarClock size={16} aria-hidden /> Talk to an advisor
@@ -496,6 +506,7 @@ function ConvertOptions({ scope, email, giveEmail }: { scope: CapScope; email: s
           <Stethoscope size={16} aria-hidden /> Diagnose my growth
         </button>
       </div>
+      )}
       {asking && !email && status !== "sent" && (
         <form onSubmit={submit} className="flex gap-2 flex-wrap items-end" aria-label="Email for your sign-in link">
           <label htmlFor="guest-cap-email" className="sr-only">Work email</label>
@@ -503,7 +514,7 @@ function ConvertOptions({ scope, email, giveEmail }: { scope: CapScope; email: s
           <button type="submit" className="btn btn-primary" disabled={status === "sending"}>Send my sign-in link</button>
         </form>
       )}
-      {status === "sent" && <p role="status" className="text-sm" style={{ color: "var(--green)" }}>Sign-in link sent{email ? ` to ${email}` : ""}. Open it to diagnose your growth; this conversation comes with you.</p>}
+      {status === "sent" && <p role="status" className="text-sm" style={{ color: "var(--green)" }}>Sign-in link sent{email ? ` to ${email}` : ""}. {beta ? "Open it to continue in Rally" : "Open it to diagnose your growth"}; this conversation comes with you.</p>}
       {status === "failed" && <p role="alert" className="text-sm" style={{ color: "var(--red)" }}>We couldn&apos;t send the link just now. Try again.</p>}
       {error && <p role="alert" className="text-sm" style={{ color: "var(--red)" }}>{error}</p>}
     </section>

@@ -30,7 +30,7 @@ export async function switchCompany(formData: FormData) {
   const id = z.uuid().safeParse(formData.get("companyId"));
   if (!id.success || !(await listFounderCompanies(user)).some((c) => c.id === id.data)) return;
   await workOn(id.data);
-  redirect("/overview");
+  redirect("/whats-next");
 }
 
 export type AddCompanyState = { errors?: Record<string, string>; values?: Record<string, string> };
@@ -56,5 +56,5 @@ export async function addCompany(_prev: AddCompanyState, formData: FormData): Pr
   await saveCompanyBasics(user, companyId, parsed.data);
   await track("company_added", { userId: user.id, companyId, props: { revenue_band: revenueBand } });
   await workOn(companyId);
-  redirect("/overview?welcome=1");
+  redirect("/whats-next");
 }

@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { z } from "zod";
 import { founderContext } from "@/lib/data/founder-context";
-import { attachFiles, FEEDBACK_KINDS, giveFeedback, removeFact, retryLastMessage, secondOpinion, sendMessage, setDefaultCro, startConversation, switchPerspective, updateFact, type ChatResult } from "@/lib/data/chat";
+import { attachFiles, FEEDBACK_KINDS, giveFeedback, rateAnswer, removeFact, retryLastMessage, secondOpinion, sendMessage, setDefaultCro, startConversation, switchPerspective, updateFact, type ChatResult } from "@/lib/data/chat";
 import { answerStep, createPlanCheckout, PlanCheckoutError, requestPlanUpdate, setPlanTargets, setStepAssignee, setStepStatus, startPlan, submitPlan, updateStep, writePlan } from "@/lib/data/action-plans";
 import { processInboxDocument, registerDocument } from "@/lib/data/documents";
 import { stripeConfigured } from "@/lib/stripe";
@@ -29,7 +29,8 @@ export async function startChatAction(_prev: StartState, formData: FormData): Pr
   // "cro" sent: the founder's choice ("" = the Collective); not sent: the company's default.
   const cro = formData.has("cro") ? (z.uuid().safeParse(formData.get("cro")).data ?? null) : undefined;
   if (!topic.success) return { error: "Pick a question." };
-  const result = await startConversation(user, company, topic.data, typeof text === "string" ? text : null, cro);
+  const question = formData.get("question");
+  const result = await startConversation(user, company, topic.data, typeof text === "string" ? text : null, cro, typeof question === "string" ? question : null);
   if (!result.ok) return { error: result.error };
   revalidatePath("/", "layout");
   redirect(`/chat/${result.conversationId}`);
@@ -328,4 +329,11 @@ export async function setDefaultCroAction(croId: string | null): Promise<ChatRes
   const result = await setDefaultCro(user, company, croId);
   if (result.ok) revalidatePath("/", "layout");
   return result;
+}
+
+/** Rally Beta: Helpful / Not helpful on one answer. */
+export async function rateAnswerAction(messageId: string, helpful: boolean, note: string | null) {
+  const { user, company } = await founderCompany();
+  if (!id.safeParse(messageId).success || typeof helpful !== "boolean") return { ok: false as const, error: "That answer wasn't found." };
+  return rateAnswer(user, company, messageId, helpful, typeof note === "string" ? note : null);
 }

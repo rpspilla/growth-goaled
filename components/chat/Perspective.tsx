@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -25,34 +24,18 @@ export function PerspectiveSwitch({ conversationId, current, cros, switchTo, str
     });
   const others = strongest.filter((c) => c.id !== current?.id);
   return (
-    <div aria-label="Who you're talking to" className="text-sm mt-1 space-y-1" style={{ color: "var(--muted-foreground)" }}>
-      <p>
-        {current ? (
-          <>
-            With{" "}
-            <Link href={`/cros/${current.slug}`} className="font-semibold link">
-              {current.name}&apos;s AI CRO
-            </Link>
-            : an AI built from {current.name}&apos;s documented expertise and judgment, not {current.name.split(" ")[0]} in person.
-          </>
-        ) : (
-          <>
-            With the <span className="font-semibold" style={{ color: "var(--foreground)" }}>Growth Goaled Collective</span>: the combined expertise of our CROs.
-          </>
-        )}{" "}
-        <Link href="/cros" className="link">Meet the CROs</Link>
-      </p>
+    <div aria-label="Change who you're talking to" className="text-sm space-y-1" style={{ color: "var(--muted-foreground)" }}>
       {cros.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <label htmlFor="perspective" className="font-semibold" style={{ color: "var(--foreground)" }}>Continue with</label>
-          <select id="perspective" aria-label="Continue with" value={current?.id ?? ""} disabled={pending} onChange={(e) => go(e.target.value || null)} className="field py-1">
-            <option value="">The Growth Goaled Collective</option>
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          <label htmlFor="perspective" className="sr-only">Continue with</label>
+          <select id="perspective" aria-label="Continue with" value={current?.id ?? ""} disabled={pending} onChange={(e) => go(e.target.value || null)} className="field py-1 text-sm">
+            <option value="">Growth Goaled Collective</option>
             {cros.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}&apos;s AI CRO</option>
+              <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
           {others.length > 0 && (
-            <span>
+            <span className="text-xs">
               Strongest on this:{" "}
               {others.map((c, i) => (
                 <span key={c.id}>

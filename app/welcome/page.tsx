@@ -8,7 +8,7 @@ import { track } from "@/lib/events";
 import { AuthShell, Points } from "../(auth)/AuthShell";
 import { WelcomeForm } from "./WelcomeForm";
 
-export const metadata: Metadata = { title: "Set up your company · Growth Goaled" };
+export const metadata: Metadata = { title: "Set up your company · Rally" };
 
 /** First sign-in: founders set up their company (step 2 of 3); advisors and invited founders confirm their profile. */
 export default async function WelcomePage() {
@@ -33,7 +33,7 @@ export default async function WelcomePage() {
         ) : (
           <>
             <div className="text-sm font-semibold mb-4" style={{ color: "#3DDC97" }}>{isFounder ? "Welcome" : user.role === "admin" ? "Admin" : "Advisor"}</div>
-            <h1 className="font-display text-4xl sm:text-5xl font-normal leading-[1.08] text-white">{company ? `Welcome to ${company.name}.` : "Welcome to Growth Goaled."}</h1>
+            <h1 className="font-display text-4xl sm:text-5xl font-normal leading-[1.08] text-white">{company ? `Welcome to ${company.name}.` : "Welcome to Rally."}</h1>
             <p className="text-lg mt-5" style={{ color: "#B7C5D4" }}>{isFounder ? "Confirm your name and you're in." : "Tell founders who's reviewing their analysis."}</p>
           </>
         )

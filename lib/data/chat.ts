@@ -62,6 +62,10 @@ export async function getConversation(company: Pick<Company, "id">, conversation
   // The CROs whose perspectives appear (the conversation's and each answer's), by name.
   const croIds = [...new Set([conversation.croId, ...messages.map((m) => m.croId)].filter((x): x is string => Boolean(x)))];
   const cros = croIds.length ? await db.select({ id: schema.croProfiles.id, name: schema.croProfiles.name }).from(schema.croProfiles).where(inArray(schema.croProfiles.id, croIds)) : [];
+  const answerIds = messages.filter((m) => m.role === "assistant").map((m) => m.id);
+  const rated = answerIds.length
+    ? await db.select({ messageId: schema.messageFeedback.messageId, helpful: schema.messageFeedback.helpful }).from(schema.messageFeedback).where(inArray(schema.messageFeedback.messageId, answerIds)).orderBy(asc(schema.messageFeedback.updatedAt))
+    : [];
   return {
     conversation,
     messages,
@@ -71,7 +75,65 @@ export async function getConversation(company: Pick<Company, "id">, conversation
     documents: new Map(docs.map((d) => [d.id, d])),
     recommendations: new Map(recs.map((r) => [r.id, r])),
     feedback: new Map(recIds.map((id) => [id, feedback.filter((f) => f.recommendationId === id)])),
+    // Helpful / Not helpful on each answer (the latest rating)
+    messageFeedback: new Map(rated.map((r) => [r.messageId, r.helpful])),
   };
+}
+
+/**
+ * Rally Beta: a founder rates one answer in their company's conversation (changing it updates the
+ * rating). prompt: true the first time they've rated two answers helpful and haven't been asked
+ * what would make Rally indispensable.
+ */
+export async function rateAnswer(user: User, company: Pick<Company, "id">, messageId: string, helpful: boolean, note: string | null): Promise<{ ok: true; prompt: boolean } | { ok: false; error: string }> {
+  const [m] = await db
+    .select({ id: schema.conversationMessages.id, role: schema.conversationMessages.role, croId: schema.conversationMessages.croId, topic: schema.conversations.topic })
+    .from(schema.conversationMessages)
+    .innerJoin(schema.conversations, eq(schema.conversations.id, schema.conversationMessages.conversationId))
+    .where(and(eq(schema.conversationMessages.id, messageId), eq(schema.conversations.companyId, company.id)))
+    .limit(1);
+  if (!m || m.role !== "assistant") return { ok: false, error: "That answer wasn't found." };
+  const clean = note?.trim().slice(0, 500) || null;
+  const now = new Date();
+  await db
+    .insert(schema.messageFeedback)
+    .values({ messageId, userId: user.id, companyId: company.id, helpful, note: clean })
+    .onConflictDoUpdate({ target: [schema.messageFeedback.messageId, schema.messageFeedback.userId], set: { helpful, ...(clean || helpful ? { note: clean } : {}), updatedAt: now } });
+  await track("answer_rated", { userId: user.id, companyId: company.id, props: { helpful, topic: m.topic, cro: m.croId ? "individual" : "collective", with_note: Boolean(clean) } });
+  let prompt = false;
+  if (helpful) {
+    const [{ n } = { n: 0 }] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.messageFeedback).where(and(eq(schema.messageFeedback.userId, user.id), eq(schema.messageFeedback.helpful, true)));
+    const [asked] = await db.select({ id: schema.events.id }).from(schema.events).where(and(eq(schema.events.userId, user.id), eq(schema.events.name, "beta_feedback_prompted"))).limit(1);
+    if (n >= 2 && !asked) {
+      prompt = true;
+      await track("beta_feedback_prompted", { userId: user.id, companyId: company.id });
+    }
+  }
+  return { ok: true, prompt };
+}
+
+export const BETA_QUESTIONS = {
+  most_valuable: "What do you find most valuable in Rally?",
+  missing: "What is Rally missing?",
+  wish: "What do you wish Rally could help you do?",
+  use_regularly: "Would you use Rally regularly?",
+  indispensable: "What would make Rally indispensable to your business?",
+} as const;
+
+/** Rally Beta: what a founder tells us about Rally itself. At least one answer is needed. */
+export async function saveBetaFeedback(user: User, company: Pick<Company, "id"> | null, answers: Partial<Record<keyof typeof BETA_QUESTIONS, string>>, source: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const clean = Object.fromEntries(
+    (Object.keys(BETA_QUESTIONS) as (keyof typeof BETA_QUESTIONS)[]).flatMap((k) => {
+      const v = answers[k]?.trim().slice(0, 2000);
+      if (!v) return [];
+      if (k === "use_regularly" && !["yes", "maybe", "no"].includes(v)) return [];
+      return [[k, v]];
+    }),
+  );
+  if (!Object.keys(clean).length) return { ok: false, error: "Answer at least one question." };
+  await db.insert(schema.betaFeedback).values({ userId: user.id, companyId: company?.id ?? null, answers: clean, source: source.slice(0, 40) });
+  await track("beta_feedback", { userId: user.id, companyId: company?.id, props: { source, answered: Object.keys(clean).length } });
+  return { ok: true };
 }
 
 async function messagesToday(company: Pick<Company, "id">): Promise<number> {
@@ -113,6 +175,8 @@ export async function startConversation(
   text: string | null,
   /** A published CRO's AI representation; null for the Growth Goaled Collective; undefined: the company's default. */
   croId?: string | null,
+  /** A suggested question's own words (Rally's suggestions), asked on its topic. */
+  question?: string | null,
 ): Promise<{ ok: false; error: string } | { ok: true; conversationId: string; error: string | null }> {
   const topic = getChatTopic(topicId);
   if (!topic) return { ok: false, error: "Unknown question." };
@@ -120,9 +184,9 @@ export async function startConversation(
   const cro = wanted ? await publishedCro(wanted) : null;
   // An explicit choice must be available; a stale default (unpublished since) falls back to the Collective.
   if (croId && !cro) return { ok: false, error: "That CRO isn't available." };
-  const first = topic.id === "other" ? (text ?? "").trim() : topic.starter;
+  const first = question?.trim() ? question.trim().slice(0, 300) : topic.id === "other" ? (text ?? "").trim() : topic.starter;
   if (!first) return { ok: false, error: "Tell us what you'd like to work through." };
-  const title = (topic.id === "other" ? first : topic.starter).slice(0, 120);
+  const title = (question?.trim() || topic.id === "other" ? first : topic.starter).slice(0, 120);
   const [conversation] = await db.insert(schema.conversations).values({ companyId: company.id, userId: user.id, topic: topic.id, title, croId: cro?.id ?? null }).returning({ id: schema.conversations.id });
   await track("conversation_started", { userId: user.id, companyId: company.id, props: { topic: topic.id, cro: cro ? cro.slug : "collective" } });
   const sent = await sendMessage(user, company, conversation!.id, first);

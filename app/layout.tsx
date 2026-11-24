@@ -12,8 +12,8 @@ const instrumentSerif = Instrument_Serif({
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains-mono" });
 
 export const metadata: Metadata = {
-  title: "Growth Goaled",
-  description: "Know where you stand. Know what to fix. Know what comes next.",
+  title: "Rally",
+  description: "Rally: your CRO, ready when you are. Expert CRO judgment for the decisions that drive your growth. By Growth Goaled.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

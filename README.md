@@ -134,6 +134,18 @@ Every resolution records who closed it, how and when, and emits `register_item_r
 
 Founders see progress on `/processing` (status only, never draft content) and the latest *published* version on `/benchmark`. Runs that haven't finished in 10 minutes show as stalled and can be restarted. Events: `review_decision`, `deliverable_published`, `deliverable_viewed`, `source_trail_opened`.
 
+### Rally Beta (Nov 24, 2026): the founder product
+
+Rally is the founder-facing product; Growth Goaled is the company behind it. Design and plan: https://claude.ai/artifact/TzwLVwhs2Mf3tyEm7AKHRg
+
+- **Beta switch** (`lib/beta.ts`, on unless `RALLY_BETA=off`): no founder-facing prices, plan offers, advisor-booking nudges or "talk to Growth Goaled" upsells, and the AI never mentions paid plans. Stripe, plans, payment links, billing and all staff tools are untouched; setting `RALLY_BETA=off` brings pricing back.
+- **Landing** (`app/(auth)/RallyLanding.tsx`, on `/sign-in` and `/sign-up`): "Your CRO. Ready when you are.", the published CROs' faces, and one action, Get Free Beta Access (magic link → `/welcome` → Rally). "Or ask Rally a question first" opens the website chat (open already when one is under way or from a CRO's public page).
+- **Founder shell**: Rally | Beta brand, a rail with New conversation, Recent conversations, "Your company" (the company pages and Our CROs) and Share feedback. Founders land on Rally (`/whats-next`).
+- **Entry** (`components/chat/RallyEntry.tsx`): who they're talking to (`CroIdentity`: photo, name, Title, credibility line = headline, up to three expertise tags; the Collective shows its CROs' faces), four suggestions by stage (`lib/chat/suggestions.ts`), their own question, and "Continue" for a conversation from the last week. New founders start with their company's default CRO or the Collective.
+- **Conversation**: the identity header stays pinned; answers follow position → why → up to three next steps → one question (`lib/ai/chat.ts`), rendered with light formatting (`RichReply`); the decision card sits behind "See the full reasoning"; "Save this recommendation" turns its next steps into tracked commitments.
+- **Feedback**: Helpful / Not helpful on every answer (`message_feedback`; a reason on Not helpful); after the second helpful answer, one invitation to `/feedback` (five optional questions, `beta_feedback`).
+- **Metrics** (`/advisor/beta`, `lib/data/beta-metrics.ts`): activation (signups, onboarding, first conversation, first answer, activated, time to first answer), repeat usage (weekly active, returning, second conversation, continued, per founder, Individual vs Collective) and helpfulness (ratings, return after a helpful answer, feedback), with the most common questions and founders' comments.
+
 ### The way in: a conversation on the sign-in page
 
 Owner decision, Nov 2026. `/sign-in` and `/sign-up` open on **"How can we help you grow?"** (`components/chat/GuestChat.tsx`, `lib/guest/steps.ts`, `lib/data/guest.ts`):

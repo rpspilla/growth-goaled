@@ -63,6 +63,7 @@ export type ProfileInput = {
   photoUrl?: string;
   bio?: string;
   linkedinUrl?: string;
+  title?: string;
   accomplishments?: string;
   industries?: string[];
   stages?: string[];
@@ -112,6 +113,7 @@ export async function saveCroProfile(actor: Actor, id: string | null, input: Pro
   if (!linkedin.ok || (linkedin.value && !/^https:\/\/([a-z]+\.)?linkedin\.com\//i.test(linkedin.value))) return { ok: false, error: "Use the CRO's LinkedIn profile link (https://www.linkedin.com/in/…)." };
   const values = {
     name,
+    ...(input.title !== undefined ? { title: clean(input.title, 120) } : {}),
     headline: clean(input.headline, 200),
     ...(photo.value !== undefined ? { photoUrl: photo.value } : {}),
     bio: clean(input.bio),

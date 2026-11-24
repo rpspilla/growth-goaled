@@ -8,6 +8,15 @@ const as = async (browser: Browser, email: string) => {
   return { ctx, page: await ctx.newPage() };
 };
 
+// Action plans are paid, so they're hidden during the Rally Beta: this spec runs the app as it
+// will be after the Beta (e2e-only switch; see lib/beta.ts), and switches the Beta back on after.
+test.beforeEach(async ({ request }) => {
+  expect((await request.post("/api/e2e/beta", { data: { off: true } })).ok()).toBe(true);
+});
+test.afterEach(async ({ request }) => {
+  await request.post("/api/e2e/beta", { data: { off: false } });
+});
+
 /** From a conversation's recommendation to an action plan: Diagnose ($499) approved by an advisor, and Execute & Monitor (monthly) with the advisor in the conversation. */
 test("a founder buys an action plan from the conversation; an advisor approves it or joins the conversation", async ({ browser }) => {
   const db = new Client({ connectionString: E2E_DATABASE_URL });
@@ -22,7 +31,7 @@ test("a founder buys an action plan from the conversation; an advisor approves i
   const page = founder.page;
 
   // --- $499: talk it through, see the card, buy the plan ---
-  await page.goto("/chat");
+  await page.goto("/overview");
   await page.getByRole("button", { name: "Should we hire more salespeople?" }).click();
   await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/);
   await expect(page.getByRole("region", { name: "Build my action plan" })).toHaveCount(0);
@@ -133,7 +142,7 @@ test("a founder buys an action plan from the conversation; an advisor approves i
   await expect(cro.page.getByText("Review and quote Growth Goaled's work on the plan (1 task)")).toHaveCount(0);
 
   // --- Execute & Monitor (monthly): the advisor is in the conversation ---
-  await page.goto("/chat");
+  await page.goto("/overview");
   await page.getByRole("button", { name: "Who should my first GTM hire be?" }).click();
   await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/);
   await page.getByLabel("Your reply").fill("We have 2 AEs.");

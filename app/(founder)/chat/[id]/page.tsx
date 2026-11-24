@@ -5,10 +5,13 @@ import { eq } from "drizzle-orm";
 import { Composer } from "@/components/chat/Composer";
 import { AdvisorNudge } from "@/components/chat/AdvisorNudge";
 import { showNudge } from "@/lib/chat/nudge";
-import { HumanPresence } from "@/components/brand/HumanPresence";
 import { FileProgress } from "@/components/chat/FileProgress";
 import { BuildingRefresh } from "@/components/deliverables/BuildingRefresh";
 import { PlanOffer } from "@/components/chat/PlanOffer";
+import { CroIdentity, toCroCard } from "@/components/chat/CroIdentity";
+import { RichReply } from "@/components/chat/RichReply";
+import { AnswerFeedback, FullReasoning } from "@/components/chat/AnswerFeedback";
+import { isBeta } from "@/lib/beta";
 import { PlanPanel, type PlanPanelData } from "@/components/chat/PlanPanel";
 import { RecommendationCardView } from "@/components/chat/RecommendationCardView";
 import { CommitToThis } from "@/components/chat/CommitToThis";
@@ -26,7 +29,7 @@ import { companyBlobPrefix } from "@/lib/data/documents";
 import { founderContext } from "@/lib/data/founder-context";
 import { formatPrice, pricing } from "@/lib/pricing";
 import { stripeConfigured } from "@/lib/stripe";
-import { commitRecommendationAction, secondOpinionAction, switchPerspectiveAction, attachFilesAction, buyPlanAction, feedbackAction, planTargetsAction, retryMessageAction, sendMessageAction, answerStepAction, answerStepFileAction, stepDetailsAction, stepStatusAction, startPlanAction, submitPlanAction, updatePlanAction } from "../actions";
+import { commitRecommendationAction, rateAnswerAction, secondOpinionAction, switchPerspectiveAction, attachFilesAction, buyPlanAction, feedbackAction, planTargetsAction, retryMessageAction, sendMessageAction, answerStepAction, answerStepFileAction, stepDetailsAction, stepStatusAction, startPlanAction, submitPlanAction, updatePlanAction } from "../actions";
 
 // Each answer is prepared while the founder waits.
 export const maxDuration = 300;
@@ -59,7 +62,8 @@ export default async function ConversationPage({ params, searchParams }: { param
   const trailing = lastCardId ? view.recommendations.get(lastCardId) : undefined;
   // Files still being read: keep the page refreshing until they're done.
   const reading = view.messages.some((m) => (m.documentIds ?? []).some((d) => ["uploaded", "analyzing"].includes(view.documents.get(d)?.status ?? "")));
-  const offer = !plan && stripeConfigured();
+  // No plan offers during the Rally Beta (lib/beta).
+  const offer = !plan && stripeConfigured() && !isBeta();
   const { actionPlanCents, supportedMonthlyCents } = pricing();
   const [advisor] = company.advisorId ? await db.select({ name: schema.users.name, email: schema.users.email }).from(schema.users).where(eq(schema.users.id, company.advisorId)).limit(1) : [];
 
@@ -76,6 +80,7 @@ export default async function ConversationPage({ params, searchParams }: { param
       return a ? [{ title: a.title, cro: a.cro ?? "Growth Goaled network", how: x.how }] : [];
     });
   const asCro = (c: { id: string; name: string; slug: string }) => ({ id: c.id, name: c.name, slug: c.slug });
+  const current = cro && cro.status === "published" ? cro : null;
   // Label each answer with its perspective once more than one has answered (a switch, or a second opinion).
   const perspectives = new Set(view.messages.filter((m) => m.role === "assistant").map((m) => m.croId ?? "collective"));
   const labelAnswers = perspectives.size > 1;
@@ -129,14 +134,16 @@ export default async function ConversationPage({ params, searchParams }: { param
   return (
     <div className="page">
     <div className="space-y-6 min-w-0">
-      <div>
-        <Link href="/whats-next" className="link text-sm">← Ask your CRO</Link>
-        <h1 className="font-display text-3xl font-normal mt-2" style={fg}>{view.conversation.title}</h1>
-        <PerspectiveSwitch conversationId={view.conversation.id} current={cro && cro.status === "published" ? asCro(cro) : null} cros={network.map(asCro)} switchTo={switchPerspectiveAction} strongest={strongest.map(asCro)} />
-        <div className="mt-3">
-          <HumanPresence advisorName={advisor ? advisor.name || advisor.email : null} />
+      {/* Who the founder is talking to stays in view (Rally Beta): face, title, expertise, and switching. */}
+      <div className="sticky top-0 z-10 -mx-4 sm:-mx-8 px-4 sm:px-8 py-3 border-b max-w-none" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+        <div className="max-w-4xl flex items-center gap-3 flex-wrap">
+          <div className="flex-1 min-w-[14rem]">
+            <CroIdentity cro={current ? toCroCard(current) : null} collective={network.filter((c) => c.inCollective).map(toCroCard)} />
+          </div>
+          <PerspectiveSwitch conversationId={view.conversation.id} current={current ? asCro(current) : null} cros={network.map(asCro)} switchTo={switchPerspectiveAction} strongest={strongest.map(asCro)} />
         </div>
       </div>
+      <h1 className="font-display text-2xl sm:text-3xl font-normal max-w-4xl" style={fg}>{view.conversation.title}</h1>
 
       {checkout && CHECKOUT[checkout] && (
         <p role="status" className="rounded-lg px-4 py-3 text-base" style={{ background: CHECKOUT[checkout]!.tone, color: "var(--foreground)" }}>
@@ -187,18 +194,21 @@ export default async function ConversationPage({ params, searchParams }: { param
               {(labelAnswers || m.secondOpinion) && (
                 <div className="text-sm font-semibold" style={{ color: m.secondOpinion ? "var(--blue)" : "var(--muted-foreground)" }}>{perspectiveOf(m)}</div>
               )}
-              <div className="text-base whitespace-pre-wrap leading-relaxed" style={fg}>{m.content}</div>
+              <RichReply text={m.content} />
               {rec && rec !== trailing && (
-                <RecommendationCardView
-                  id={rec.id}
-                  card={rec.card}
-                  given={(view.feedback.get(rec.id) ?? []).map((f) => f.kind)}
-                  deeper={null}
-                  feedback={feedbackAction}
-                  compact
-                  informedBy={informedBy(rec.card)}
-                />
+                <FullReasoning>
+                  <RecommendationCardView
+                    id={rec.id}
+                    card={rec.card}
+                    given={(view.feedback.get(rec.id) ?? []).map((f) => f.kind)}
+                    deeper={null}
+                    feedback={feedbackAction}
+                    compact
+                    informedBy={informedBy(rec.card)}
+                  />
+                </FullReasoning>
               )}
+              <AnswerFeedback messageId={m.id} given={view.messageFeedback.get(m.id) ?? null} rate={rateAnswerAction} />
               {rec && rec !== trailing && offer && rec.id === lastCardId && (
                 <PlanOffer conversationId={view.conversation.id} planPrice={formatPrice(actionPlanCents)} supportedPrice={formatPrice(supportedMonthlyCents)} buy={buyPlanAction} bookHref="/advisory/book?kind=review" />
               )}
@@ -220,7 +230,9 @@ export default async function ConversationPage({ params, searchParams }: { param
       {showNudge(view.messages.filter((m) => m.role === "user").length, Boolean(plan)) && <AdvisorNudge bookHref="/advisory/book?kind=review&offer=nudge" />}
       {trailing && (
         <div className="space-y-4">
-          <RecommendationCardView id={trailing.id} card={trailing.card} given={(view.feedback.get(trailing.id) ?? []).map((f) => f.kind)} deeper={null} feedback={feedbackAction} compact informedBy={informedBy(trailing.card)} />
+          <FullReasoning>
+            <RecommendationCardView id={trailing.id} card={trailing.card} given={(view.feedback.get(trailing.id) ?? []).map((f) => f.kind)} deeper={null} feedback={feedbackAction} compact informedBy={informedBy(trailing.card)} />
+          </FullReasoning>
           {commit && <CommitToThis {...commit} commit={commitRecommendationAction.bind(null, trailing.id)} />}
           {cro && cro.status === "published" && trailingMessage && !trailingMessage.secondOpinion && <SecondOpinion conversationId={view.conversation.id} cro={cro.name} ask={secondOpinionAction} />}
           {offer && trailing.id === lastCardId && (
@@ -228,7 +240,10 @@ export default async function ConversationPage({ params, searchParams }: { param
           )}
         </div>
       )}
-      <p className="text-sm" style={muted}>
+      <p className="text-sm max-w-4xl" style={muted}>
+        {current
+          ? `Rally is an AI built on ${current.name}'s documented CRO expertise and judgment; ${current.name.split(" ")[0]} isn't reviewing this conversation live. `
+          : "Rally's Collective answers draw on the documented expertise and judgment of the CROs in the Growth Goaled network; no one is reviewing this conversation live. "}
         Facts you mention are remembered for your company, so you won&apos;t be asked twice. <Link href="/whats-next#facts" className="link">See or correct them</Link>. Never shown to other
         companies; <Link href="/data-use" className="link">how we use your data</Link>.
       </p>

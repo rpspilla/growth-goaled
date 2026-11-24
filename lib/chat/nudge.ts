@@ -6,8 +6,10 @@
 export const NUDGE_AFTER = 6;
 export const NUDGE_EVERY = 3;
 
+import { isBeta } from "@/lib/beta";
+
 /** Whether this reply should include the gentle suggestion (userTurns counts the message being answered). */
-export const nudgeDue = (userTurns: number, hasPlan: boolean) => !hasPlan && userTurns >= NUDGE_AFTER && (userTurns - NUDGE_AFTER) % NUDGE_EVERY === 0;
+export const nudgeDue = (userTurns: number, hasPlan: boolean) => !isBeta() && !hasPlan && userTurns >= NUDGE_AFTER && (userTurns - NUDGE_AFTER) % NUDGE_EVERY === 0;
 
 /** Whether the conversation page shows the "talk to someone at Growth Goaled" bar. */
-export const showNudge = (userTurns: number, hasPlan: boolean) => !hasPlan && userTurns >= NUDGE_AFTER;
+export const showNudge = (userTurns: number, hasPlan: boolean) => !isBeta() && !hasPlan && userTurns >= NUDGE_AFTER;

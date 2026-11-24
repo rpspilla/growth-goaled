@@ -48,8 +48,8 @@ export async function completeOnboarding(_prev: OnboardingState, formData: FormD
     await saveCompanyBasics(user, companyId, parsed.data);
     await profileUpdate(name, title);
     await track("onboarding_completed", { userId: user.id, companyId, props: { revenue_band: revenueBand, stage: parsed.data.stage, vertical: parsed.data.vertical } });
-    // Straight to the main entry: the conversation starters.
-    redirect("/overview?welcome=1");
+    // Straight into Rally: the first conversation (Rally Beta).
+    redirect("/whats-next");
   }
 
   const parsed = (user.role === "founder" ? founderProfileSchema : staffProfileSchema).safeParse(raw);

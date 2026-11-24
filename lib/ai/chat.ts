@@ -1,4 +1,5 @@
 import "server-only";
+import { isBeta } from "@/lib/beta";
 import type Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
@@ -47,7 +48,7 @@ export type PlanMode = { tier: "plan" | "supported"; status: string; needs: stri
 /** secondOpinionOf: the founder asked the Collective for a second opinion on this CRO's latest card. */
 export type ChatInput = { topic: ChatTopic; context: ChatContext; history: ChatTurn[]; plan?: PlanMode | null; guest?: boolean; nudge?: boolean; intelligence?: IntelligenceBundle | null; secondOpinionOf?: { cro: string; card: unknown } | null; answerNow?: boolean };
 
-const SYSTEM = `You are Growth Goaled: an experienced CRO advising founders of Seed and Series A B2B SaaS companies on commercial decisions. Talk like a strong CRO in a one-to-one conversation: direct, plain English, short paragraphs. Not a survey, not a report.
+const SYSTEM = `You are Rally (by Growth Goaled): an experienced CRO advising founders of Seed and Series A B2B SaaS companies on commercial decisions. Talk like a strong CRO in a one-to-one conversation: direct, plain English, short paragraphs. Not a survey, not a report.
 
 How to run the conversation:
 - First understand the actual decision the founder faces. Then gather only the minimum context you need, give an initial useful view early, say what extra information would sharpen it, and update your view as you learn more.
@@ -63,7 +64,12 @@ Numbers:
 - Never invent benchmarks or present a small sample as representative.
 
 Output fields:
-- reply: what you say this turn (plain text, no markdown headings; short lists are fine). Don't repeat the recommendation card's content in it.
+- reply: what you say this turn, the way an exceptional CRO talks to a founder: concise, direct, specific to this company, usually under 180 words. Use this shape flexibly (skip a part that doesn't fit, never pad one):
+  1. Your perspective first: the most important insight or recommendation in one or two sentences, in **bold**. Take a position.
+  2. Why it matters: two or three sentences of the business logic, using this company's context (its figures, stage, what they told you before).
+  3. What you'd do next: one to three numbered actions, questions to answer, or decisions ("1. …"), each one line.
+  4. Only when you genuinely need more context: one focused question that moves the decision forward, as its own last line starting "One question:".
+  Formatting: **bold** for the one or two things that matter most and numbered lists; nothing else (no headings, tables or bullet walls). One strong insight beats ten average ones; never write an essay or a ten-item list. Phrases like "In my experience…", "The pattern I'd look for…" or "A common mistake at this stage…" only when CRO INTELLIGENCE supports them; say when a benchmark is industry practice and when something is your judgment or a hypothesis rather than fact. The recommendation card holds the full reasoning (diagnosis, evidence, plan, tradeoffs): don't repeat it in the reply.
 - questions: the one or two questions you're asking now (also woven into the reply), or [] when you aren't asking.
 - facts: anything new the founder stated about their company this turn that's worth remembering (team size, ACV, sales cycle, target, plans…). key: short snake_case id, reusing an existing fact key when updating one. status: "stated" when they said it as fact, "assumption" when they said they're guessing. [] when nothing new.
 - intelligence_used: when CRO INTELLIGENCE is present, every record you relied on this turn: its id exactly as given, and how you used it (a short phrase). [] when none.
@@ -89,7 +95,8 @@ function contextBlock(input: ChatInput): string {
     `TOPIC: ${topic.starter}`,
     `Evaluate: ${topic.evaluate.join("; ")}.`,
     `A complete answer gives: ${topic.output}.`,
-    topic.deepAssessment ? "A paid deep assessment exists for this question; the app offers it separately, so don't sell it." : "",
+    topic.deepAssessment && !isBeta() ? "A paid deep assessment exists for this question; the app offers it separately, so don't sell it." : "",
+    isBeta() ? "RALLY BETA: Rally is free during Beta. Never mention prices, paid plans, upgrades or paid services." : "",
     "",
     `COMPANY CONTEXT (JSON):\n${JSON.stringify({ company: context.company, profile_answers: context.answers, figures: context.figures, saved_facts: context.facts, open_work: context.work, earlier_conversations: context.earlierConversations })}`,
     topic.usesCompensationData ? `\nCOMPENSATION DATA (JSON; empty means none on file yet):\n${JSON.stringify(context.compensationData)}` : "",
@@ -193,7 +200,7 @@ function fakeTurnBase(input: ChatInput): Omit<ChatOutput, "intelligence_used"> {
     };
   }
   return {
-    reply: "Test mode: here's an initial view, based on what you've told me.",
+    reply: "Test mode: here's an initial view, based on what you've told me.\n\n**Fix conversion before adding volume.**\n\n1. Compare conversion by lead source.\n2. Review the last 10 lost deals.\n\nOne question: where do deals stall?",
     questions: [],
     facts,
     recommendation: {

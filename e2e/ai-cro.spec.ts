@@ -30,26 +30,27 @@ test("ask on the Overview, commit to the recommendation, track the commitments",
   await f.page.goto("/overview");
   // The first spec alphabetically: the dev server may still be compiling the Overview.
   await expect(f.page.getByRole("heading", { name: "What are you working through?" })).toBeVisible({ timeout: 120_000 });
-  await expect(f.page.getByRole("navigation", { name: "Menu" }).getByRole("link").first()).toHaveText("Ask your CRO");
+  await expect(f.page.getByRole("navigation", { name: "Menu" }).getByRole("link").first()).toHaveText("New conversation");
   await expect(f.page.getByRole("region", { name: "Your commitments" })).toHaveCount(0);
   await f.page.getByRole("textbox", { name: "What are you working through?" }).fill("Should we hire our first AE now?");
   await f.page.getByRole("button", { name: "Ask", exact: true }).click();
   await expect(f.page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/);
   const conversationUrl = f.page.url();
   await expect(f.page.getByRole("heading", { name: "Should we hire our first AE now?" })).toBeVisible();
-  await expect(f.page.getByRole("button", { name: "Commit to this" })).toHaveCount(0);
+  await expect(f.page.getByRole("button", { name: "Save this recommendation" })).toHaveCount(0);
 
   // The second answer gives the decision card, and the way to commit to it.
   await f.page.getByLabel("Your reply").fill("Two of us sell today; deals are about $25k.");
   await f.page.getByRole("button", { name: "Send", exact: true }).click();
   const card = f.page.getByRole("article", { name: "Recommendation" });
+  await f.page.getByText("See the full reasoning").last().click();
   await expect(card).toBeVisible();
   // The card weighs the choice: what it costs, and what was considered instead.
   await card.getByText("Show the full recommendation").click();
   await expect(card).toContainText("Test tradeoff: slows the next hire by a quarter");
   await expect(card.getByText("Considered instead")).toBeVisible();
   await expect(card).toContainText("Test alternative");
-  await f.page.getByRole("button", { name: "Commit to this" }).click();
+  await f.page.getByRole("button", { name: "Save this recommendation" }).click();
   const form = f.page.getByRole("form", { name: "Commit to this recommendation" });
   await expect(form.getByLabel("Commitment 1", { exact: true })).toHaveValue("First test step");
   await expect(form.getByLabel("Owner of commitment 1")).toHaveValue("Cora Founder");
@@ -58,13 +59,13 @@ test("ask on the Overview, commit to the recommendation, track the commitments",
   await form.getByLabel("Commitment 1", { exact: true }).fill("Write the AE scorecard");
   await form.getByLabel("Due date of commitment 1").fill("2020-01-06");
   await form.getByRole("button", { name: "Commit" }).click();
-  const done = f.page.getByRole("status").filter({ hasText: "Committed." });
+  const done = f.page.getByRole("status").filter({ hasText: "Saved." });
   await expect(done).toBeVisible();
   await expect(done.getByRole("link", { name: "Open the growth project →" })).toBeVisible();
   // Reloading keeps it committed: the button doesn't come back.
   await f.page.reload();
-  await expect(f.page.getByRole("button", { name: "Commit to this" })).toHaveCount(0);
-  await expect(f.page.getByRole("status").filter({ hasText: "Committed." })).toContainText("First AE hire");
+  await expect(f.page.getByRole("button", { name: "Save this recommendation" })).toHaveCount(0);
+  await expect(f.page.getByRole("status").filter({ hasText: "Saved." })).toContainText("First AE hire");
 
   // --- The Overview: the conversation to pick up, and the commitment, overdue ---
   await f.page.goto("/overview");

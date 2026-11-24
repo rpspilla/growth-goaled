@@ -6,7 +6,7 @@ import { E2E_DATABASE_URL } from "../playwright.config";
  * The main entry: a founder picks a conversation starter, answers a question, gets a decision card,
  * rates it, and corrects a remembered fact. Another founder can't open the conversation.
  */
-test("a founder talks a decision through and gets a recommendation card", async ({ browser }) => {
+test("Rally: a founder starts from a suggestion, gets a short CRO answer with the full reasoning behind it, and rates it", async ({ browser }) => {
   const db = new Client({ connectionString: E2E_DATABASE_URL });
   await db.connect();
   for (const [email, company] of [["chat@e2e.test", "Chatty Co"], ["nosy@e2e.test", "Nosy Co"]]) {
@@ -19,57 +19,55 @@ test("a founder talks a decision through and gets a recommendation card", async 
   const ctx = await browser.newContext();
   await ctx.addCookies([{ name: "gg_e2e_user", value: "chat@e2e.test", domain: "localhost", path: "/" }]);
   const page = await ctx.newPage();
-  // The Overview opens with the AI CRO: the founder's own words first, the common questions under it.
-  await page.goto("/overview");
-  await expect(page.getByRole("heading", { name: "What are you working through?" })).toBeVisible();
-  await expect(page.getByRole("group", { name: "Common questions" }).getByRole("button", { name: "How do I build a repeatable revenue engine?" })).toBeVisible();
-  // The old Strategic Growth Questions address lands on Ask your CRO.
+  // Rally is home: who you're talking to, four suggestions for the stage, and your own question.
+  await page.goto("/start");
+  await expect(page).toHaveURL(/\/whats-next$/);
+  await expect(page.getByRole("heading", { name: "What's the growth decision in front of you, Chris?", level: 1 })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole("group", { name: "Talking with the Growth Goaled Collective" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Suggested questions" }).getByRole("button")).toHaveText(["Where is our biggest growth constraint?", "Are we ready to hire our first salesperson?", "Why isn't our pipeline converting?", "How do we build a repeatable revenue engine?"]);
+  // The old Strategic Growth Questions address lands on Rally too.
   await page.goto("/chat");
   await expect(page).toHaveURL(/\/whats-next$/);
-  await expect(page.getByRole("heading", { name: "Ask your CRO", level: 1 })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "What are you working through?" })).toBeVisible();
-  // Growth projects are started from Growth Projects now; past questions sit in History.
-  await expect(page.getByRole("heading", { name: "Start a growth project" })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
-  for (const s of ["How do I build a repeatable revenue engine?", "Who should my first GTM hire be?", "How much equity should I give my first sales hire?", "Are we ready to raise our next round?", "How can we improve retention and revenue efficiency?"]) {
-    await expect(page.getByRole("button", { name: s })).toBeVisible();
-  }
+  await expect(page.getByRole("heading", { name: "Your conversations" })).toBeVisible();
+  // The menu: the conversation first; the company pages under "Your company".
+  const menu = page.getByRole("navigation", { name: "Menu" });
+  await expect(menu.getByRole("link", { name: "New conversation" })).toBeVisible();
+  await expect(menu.getByRole("link", { name: "Team" })).toBeHidden();
+  await menu.getByRole("button", { name: "Your company" }).click();
+  await expect(menu.getByRole("link", { name: "Team" })).toBeVisible();
+  // No prices anywhere during the Beta.
+  await expect(page.getByText(/\$\d/)).toHaveCount(0);
 
-  // A starter opens the conversation, already answered with at most two questions.
-  await page.getByRole("button", { name: "Should we hire more salespeople?" }).click();
+  // A suggestion opens the conversation in its own words, already answered.
+  await page.getByRole("button", { name: "Are we ready to hire our first salesperson?" }).click();
   await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/);
-  await expect(page.getByRole("heading", { name: "Should we hire more salespeople?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Are we ready to hire our first salesperson?" })).toBeVisible();
   await expect(page.getByText(/Test mode: let's work through/)).toBeVisible();
-  // A person is behind the conversation.
-  await expect(page.getByTestId("human-presence")).toContainText("A real CRO reviews every action plan");
-  await expect(page.getByTestId("human-presence")).not.toContainText("Ryan Spillane");
+  await expect(page.getByRole("group", { name: "Talking with the Growth Goaled Collective" })).toBeVisible();
+  await expect(page.getByText(/no one is reviewing this conversation live/)).toBeVisible();
+  await expect(page.getByTestId("human-presence")).toHaveCount(0);
   await expect(page.getByRole("article", { name: "Recommendation" })).toHaveCount(0);
   const url = page.url();
+  await expect(menu.getByRole("list", { name: "Rally conversations" })).toContainText("Are we ready to hire our first salesperson?");
 
-  // Answering gives the decision card, with the action plan offered alongside.
+  // The next answer reads like a CRO talking: the position in bold, numbered steps, one question;
+  // the full decision card is one click away. No plan offers during the Beta.
   await page.getByLabel("Your reply").fill("We have 3 reps and close about $20k deals.");
   await page.getByRole("button", { name: "Send" }).click();
+  const conversationList = page.getByRole("list", { name: "Conversation", exact: true });
+  await expect(conversationList.locator("strong", { hasText: "Fix conversion before adding volume." })).toBeVisible();
+  await expect(conversationList.locator("ol li")).toHaveText(["Compare conversion by lead source.", "Review the last 10 lost deals."]);
   const card = page.getByRole("article", { name: "Recommendation" });
+  await expect(card).toBeHidden();
+  await page.getByText("See the full reasoning").last().click();
   await expect(card).toBeVisible();
-  await expect(card).toContainText("Test mode takeaway for Should we hire more salespeople?");
+  await expect(card).toContainText("Test mode takeaway for Who should my first GTM hire be?");
   await expect(card).toContainText("Low confidence");
-  // Short by default: the headline and how sure we are; the rest is one click away.
-  await expect(card.getByText("Days 1–30")).toBeHidden();
   await card.getByText("Show the full recommendation").click();
   await expect(card.getByText("Days 1–30")).toBeVisible();
   await expect(card).toContainText("Assumption");
-  // Right under it: the packaging, each paid offer with "buy" and "talk to an advisor first".
-  const offer = page.getByRole("region", { name: "Build my action plan" });
-  await expect(offer.getByRole("group", { name: "Explore" })).toContainText("Free");
-  await expect(offer.getByRole("group", { name: "Diagnose" })).toContainText("$499");
-  await expect(offer.getByRole("group", { name: "Execute & Monitor" })).toContainText("$1,199");
-  await expect(offer.getByRole("group", { name: "Execute & Monitor" })).toContainText("Two hours of live CRO support each month");
-  await expect(offer.getByRole("group", { name: "Custom Projects" })).toContainText("Starting at $5,000");
-  await expect(offer.getByRole("group", { name: "Custom Projects" }).getByRole("link", { name: "Discuss a Project" })).toHaveAttribute("href", "https://calendly.com/spillane-ryan/new-meeting");
-  for (const name of ["Diagnose", "Execute & Monitor"]) {
-    await expect(offer.getByRole("group", { name }).getByRole("link", { name: "Talk to an advisor first" })).toHaveAttribute("href", /\/advisory\/book\?kind=review&offer=/);
-  }
-  await expect(page.getByRole("complementary", { name: "How to read your recommendation" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Build my action plan" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Save this recommendation" })).toBeVisible();
 
   // Files can be dragged anywhere onto the page and dropped into the conversation.
   await page.evaluate(() => {
@@ -100,25 +98,37 @@ test("a founder talks a decision through and gets a recommendation card", async 
   const y = async (l: import("@playwright/test").Locator) => (await l.boundingBox())!.y;
   const reply = page.getByLabel("Your reply");
   expect(await y(shared)).toBeLessThan(await y(reply));
-  expect(await y(reply)).toBeLessThan(await y(page.getByRole("article", { name: "Recommendation" })));
+  expect(await y(reply)).toBeLessThan(await y(page.getByText("See the full reasoning").last()));
   // When reading finishes the page updates by itself.
   await fdb.query("update documents set status = 'done' where id = $1", [doc.rows[0].id]);
   await fdb.end();
   await expect(page.getByText("✓ forecast.xlsx read")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole("progressbar", { name: "Reading forecast.xlsx" })).toHaveCount(0);
 
-  // Feedback is kept against the recommendation (in the full card).
+  // Helpful / Not helpful on the answer (a reason on Not helpful), kept after a reload.
+  const rating = page.getByRole("group", { name: "Was this helpful?" }).last();
+  await rating.getByRole("button", { name: "Not helpful" }).click();
+  await rating.getByLabel("What was missing or wrong?").fill("Didn't use our deal size");
+  await rating.getByRole("button", { name: "Send" }).click();
+  await expect(rating.getByRole("status")).toContainText("That helps us improve Rally");
+  await page.reload();
+  await expect(page.getByRole("group", { name: "Was this helpful?" }).last().getByRole("button", { name: "Not helpful" })).toHaveAttribute("aria-pressed", "true");
+
+  // Feedback is kept against the recommendation too (in the full card).
+  await page.getByText("See the full reasoning").last().click();
   const more = card.getByText("Show the full recommendation");
   if (await more.isVisible()) await more.click();
   await card.getByRole("button", { name: "Helpful" }).click();
   await expect(card.getByRole("button", { name: "Helpful" })).toHaveAttribute("aria-pressed", "true");
   await page.reload();
+  await page.getByText("See the full reasoning").last().click();
   await page.getByRole("article", { name: "Recommendation" }).getByText("Show the full recommendation").click();
   await expect(page.getByRole("article", { name: "Recommendation" }).getByRole("button", { name: "Helpful" })).toHaveAttribute("aria-pressed", "true");
 
   // What they said is remembered and can be corrected.
   await page.getByRole("link", { name: "See or correct them" }).click();
   const facts = page.locator("#facts");
+  await facts.getByText(/What Rally remembers/).click();
   await expect(facts).toContainText("Sales team size");
   await expect(facts).toContainText("You said");
   await facts.getByRole("button", { name: "Correct Sales team size" }).click();
@@ -126,27 +136,23 @@ test("a founder talks a decision through and gets a recommendation card", async 
   await facts.getByRole("button", { name: "Save" }).click();
   await expect(facts).toContainText("Confirmed");
   await expect(facts).toContainText("4");
-  await expect(page.getByRole("link", { name: "Should we hire more salespeople?" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Questions asked" }).getByRole("link", { name: "Are we ready to hire our first salesperson?" })).toBeVisible();
 
   // The founder's own words open a conversation too.
   await page.goto("/chat");
-  await page.getByRole("textbox", { name: "What are you working through?" }).fill("Should we raise prices before hiring?");
+  await page.getByRole("textbox", { name: "Ask Rally" }).fill("Should we raise prices before hiring?");
   await page.getByRole("button", { name: "Ask", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Should we raise prices before hiring?" })).toBeVisible();
   await expect(page.getByText(/Recent strategic growth questions/)).toHaveCount(0);
-  // The chat keeps going; from the sixth exchange it gently points at talking to Growth Goaled.
-  const conversation = page.getByRole("list", { name: "Conversation" });
+  // The chat keeps going; during the Beta it never points at paid help, even after six exchanges.
+  const conversation = page.getByRole("list", { name: "Conversation", exact: true });
   for (let i = 2; i <= 6; i++) {
-    await expect(page.getByRole("complementary", { name: "Talk to Growth Goaled" })).toHaveCount(0);
     await page.getByLabel("Your reply").fill(`Exchange ${i}`);
     await page.getByRole("button", { name: "Send" }).click();
     await expect(conversation.getByText(`Exchange ${i}`, { exact: true })).toBeVisible();
   }
-  const nudge = page.getByRole("complementary", { name: "Talk to Growth Goaled" });
-  await expect(nudge.getByRole("link", { name: "Book a free call" })).toHaveAttribute("href", "/advisory/book?kind=review&offer=nudge");
-  await expect(nudge.getByRole("link", { name: "Schedule time with an advisor" })).toHaveAttribute("href", "https://calendly.com/ryan-spillane-growthgoaled/30min");
-  await expect(nudge.getByText("See the plans")).toHaveCount(0);
-  await expect(conversation).toContainText("talk this through with someone at Growth Goaled");
+  await expect(page.getByRole("complementary", { name: "Talk to Growth Goaled" })).toHaveCount(0);
+  await expect(conversation).not.toContainText("talk this through with someone at Growth Goaled");
   await page.goto("/chat");
   await expect(page.getByRole("list", { name: "Questions asked" })).toContainText("Should we raise prices before hiring?");
   await ctx.close();

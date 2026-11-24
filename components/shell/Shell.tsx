@@ -6,12 +6,12 @@ import { initials } from "./initials";
 import { MobileNav } from "./MobileNav";
 
 /** Two-column app frame from the prototype: navy sidebar + top bar + scrolling content. */
-export function Shell({ sidebar, topbar, children }: { sidebar: ReactNode; topbar: ReactNode; children: ReactNode }) {
+export function Shell({ sidebar, topbar, children, brand }: { sidebar: ReactNode; topbar: ReactNode; children: ReactNode; /** Replaces the Growth Goaled mark (founders see Rally). */ brand?: ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden">
       <aside className="hidden md:flex flex-col w-64 shrink-0 h-full" style={{ background: "var(--navy)", color: "#C8D3E0" }}>
         <div className="px-5 pt-6 pb-5 border-b" style={{ borderColor: "#1E3347" }}>
-          <div className="flex items-center gap-2.5">
+          {brand ?? <div className="flex items-center gap-2.5">
             <div
               className="w-7 h-7 rounded-md flex items-center justify-center text-xs font-bold"
               style={{ background: "var(--green)", color: "#fff" }}
@@ -22,7 +22,7 @@ export function Shell({ sidebar, topbar, children }: { sidebar: ReactNode; topba
               <div className="font-semibold text-white text-base tracking-tight">Growth Goaled</div>
               <div className="text-xs" style={{ color: "#8FA3B8" }}>Your Seed &amp; Series A CRO</div>
             </div>
-          </div>
+          </div>}
         </div>
         {sidebar}
       </aside>

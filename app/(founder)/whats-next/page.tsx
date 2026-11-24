@@ -1,54 +1,68 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { PageHeader } from "@/components/PageHeader";
-import { AskBox } from "@/components/chat/AskBox";
 import { FactsEditor } from "@/components/chat/FactsEditor";
-import { Section } from "@/components/ui/Section";
+import { RallyEntry } from "@/components/chat/RallyEntry";
+import { toCroCard } from "@/components/chat/CroIdentity";
 import { listConversations, listFacts } from "@/lib/data/chat";
+import { companyCommitments } from "@/lib/data/commitments";
 import { listCroProfiles } from "@/lib/data/cro";
 import { founderContext } from "@/lib/data/founder-context";
-import { CHAT_TOPICS } from "@/lib/chat/topics";
+import { suggestionsFor } from "@/lib/chat/suggestions";
 import { removeFactAction, startChatAction, updateFactAction } from "../chat/actions";
 
 export const maxDuration = 300;
 
-export const metadata = { title: "Ask your CRO" };
+export const metadata = { title: "Rally" };
+
+const RECENT_DAYS = 7;
+const isRecent = (d: Date) => Date.now() - d.getTime() < RECENT_DAYS * 86_400_000;
 
 /**
- * Ask your CRO (was "What's Next?", and "Strategic Growth Questions" at /chat): the next question,
- * in the founder's own words, and History (the questions asked so far, and what Growth Goaled
- * remembers about the company).
+ * Rally (Rally Beta, Nov 24, 2026; was "Ask your CRO" and "What's Next?"): who the founder is talking
+ * to, four suggested questions for their stage, their own question, and "Continue" for a conversation
+ * from the last week. All conversations and what Rally remembers sit below.
  */
-export default async function WhatsNextPage() {
-  const { company } = await founderContext();
+export default async function RallyPage() {
+  const { user, company } = await founderContext();
   if (!company) redirect("/welcome");
-  const [conversations, facts, cros] = await Promise.all([listConversations(company, 50), listFacts(company), listCroProfiles({ published: true })]);
+  const [conversations, facts, cros, open] = await Promise.all([listConversations(company, 50), listFacts(company), listCroProfiles({ published: true }), companyCommitments(company, { status: ["open"] })]);
+  const latest = conversations[0];
+  const continueWith = latest && isRecent(latest.updatedAt) ? { id: latest.id, title: latest.title } : null;
   return (
-    <div className="page space-y-12">
-      <PageHeader title="Ask your CRO" subtitle="Any growth decision, in your own words. Answers use what you've already shared and the work under way." />
+    <div className="page max-w-3xl mx-auto space-y-14">
+      <RallyEntry
+        start={startChatAction}
+        cros={cros.map(toCroCard)}
+        collective={cros.filter((c) => c.inCollective).map(toCroCard)}
+        defaultCroId={company.defaultCroId}
+        suggestions={suggestionsFor({ stage: company.stage, openCommitments: open.length })}
+        firstName={user.name?.trim().split(/\s+/)[0] || null}
+        companyName={company.name}
+        continueWith={continueWith}
+      />
 
-      <AskBox starters={CHAT_TOPICS.map((t) => ({ id: t.id, starter: t.starter }))} start={startChatAction} cros={cros.map((c) => ({ id: c.id, name: c.name }))} defaultCroId={company.defaultCroId} />
-
-      <div id="facts" className="scroll-mt-24">
-        <Section id="facts-title" title="History" lead="The questions you've asked, and what we remember about your company from them.">
-          {conversations.length > 0 && (
-            <ul aria-label="Questions asked" className="surface divide-y mb-6" style={{ borderColor: "var(--border)" }}>
-              {conversations.map((c) => (
-                <li key={c.id} style={{ borderColor: "var(--border)" }}>
-                  <Link href={`/chat/${c.id}`} className="flex items-center gap-4 p-4 hover:bg-[var(--muted)] rounded-xl">
-                    <span className="flex-1 min-w-0 text-base font-semibold" style={{ color: "var(--foreground)" }}>{c.title}</span>
-                    <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>{c.updatedAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
-                    <span aria-hidden style={{ color: "var(--muted-foreground)" }}>→</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-          <h3 className="text-base font-semibold mb-1" style={{ color: "var(--foreground)" }}>What we remember</h3>
-          <p className="text-sm mb-3" style={{ color: "var(--muted-foreground)" }}>Correct anything that&apos;s wrong; corrected facts are marked confirmed and won&apos;t be overwritten.</p>
+      <section id="facts" aria-labelledby="history-title" className="scroll-mt-24 space-y-4">
+        <h2 id="history-title" className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>Your conversations</h2>
+        {conversations.length > 0 ? (
+          <ul aria-label="Questions asked" className="surface divide-y" style={{ borderColor: "var(--border)" }}>
+            {conversations.map((c) => (
+              <li key={c.id} style={{ borderColor: "var(--border)" }}>
+                <Link href={`/chat/${c.id}`} className="flex items-center gap-4 px-4 py-3 hover:bg-[var(--muted)] rounded-xl">
+                  <span className="flex-1 min-w-0 text-base" style={{ color: "var(--foreground)" }}>{c.title}</span>
+                  <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>{c.updatedAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>Your conversations will appear here.</p>
+        )}
+        <details className="surface px-4 py-3">
+          <summary className="cursor-pointer text-base font-semibold" style={{ color: "var(--foreground)" }}>What Rally remembers about {company.name}</summary>
+          <p className="text-sm mt-2 mb-3" style={{ color: "var(--muted-foreground)" }}>Correct anything that&apos;s wrong; corrected facts are marked confirmed and won&apos;t be overwritten.</p>
           <FactsEditor facts={facts.map((f) => ({ id: f.id, label: f.label, value: f.value, status: f.status }))} update={updateFactAction} remove={removeFactAction} />
-        </Section>
-      </div>
+        </details>
+      </section>
     </div>
   );
 }

@@ -42,7 +42,7 @@ export function CommitToThis({
   if (done) {
     return (
       <div role="status" className="rounded-xl px-4 py-3 text-base flex items-center gap-3 flex-wrap" style={{ background: "var(--green-muted)", color: "var(--foreground)" }}>
-        <span className="font-semibold" style={{ color: "var(--green)" }}>Committed.</span>
+        <span className="font-semibold" style={{ color: "var(--green)" }}>Saved.</span>
         <span>Your commitments are tracked on your Overview{done.name ? ` and in ${done.name}` : ""}.</span>
         <Link href={`/projects/${done.id}`} className="link">Open the growth project →</Link>
       </div>
@@ -52,10 +52,10 @@ export function CommitToThis({
   if (!open) {
     return (
       <div className="flex items-center gap-3 flex-wrap">
-        <button type="button" className="btn btn-primary" onClick={() => setOpen(true)}>
-          Commit to this
+        <button type="button" className="btn btn-secondary text-sm py-1.5" onClick={() => setOpen(true)}>
+          Save this recommendation
         </button>
-        <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>Turn the next steps into commitments your CRO follows up on.</span>
+        <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>Turn its next steps into actions Rally follows up on.</span>
       </div>
     );
   }

@@ -27,6 +27,7 @@ const ADVISOR_NAV: { title: string; items: Item[] }[] = [
     // The CROs behind the AI: their profiles and their intelligence (Nov 23, 2026)
     title: "CRO network",
     items: [
+      { href: "/advisor/beta", label: "Rally Beta" },
       { href: "/advisor/cros", label: "CROs" },
       { href: "/advisor/intelligence", label: "Intelligence library" },
       { href: "/advisor/quality", label: "AI CRO quality" },

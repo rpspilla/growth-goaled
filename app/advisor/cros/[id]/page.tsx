@@ -100,7 +100,8 @@ export default async function CroProfilePage({ params }: { params: Promise<{ id:
             <div className="grid md:grid-cols-2 gap-4">
               <CroPhotoUpload name={cro.name} photoUrl={cro.photoUrl} upload={uploadCroPhotoAction.bind(null, cro.id)} remove={removeCroPhotoAction.bind(null, cro.id)} />
               <Field name="name" label="Name" value={cro.name} />
-              <Field name="headline" label="Headline" value={cro.headline} />
+              <Field name="title" label="Title" value={cro.title} hint="Shown with their name in Rally, e.g. Cofounding CRO, Growth Goaled" />
+              <Field name="headline" label="Credibility line" value={cro.headline} hint="One sentence on why founders should listen, e.g. Built and scaled B2B revenue teams from Seed to Series C" />
               <Field name="linkedinUrl" label="Career history: LinkedIn profile link" value={cro.linkedinUrl} hint="e.g. https://www.linkedin.com/in/their-name" />
             </div>
             <CroBioFromLinkedIn key={`bio-${version}`} bio={cro.bio} hasLinkedin={Boolean(cro.linkedinUrl)} generate={generateBioAction.bind(null, cro.id)} />

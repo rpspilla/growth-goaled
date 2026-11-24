@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { isBeta } from "@/lib/beta";
 import { notFound, redirect } from "next/navigation";
 import { AskBox } from "@/components/chat/AskBox";
 import { CHAT_TOPICS } from "@/lib/chat/topics";
@@ -72,7 +73,7 @@ export default async function CroPage({ params }: { params: Promise<{ slug: stri
               ) : null,
             )}
           </dl>
-          {cro.availableForAdvisory && <p className="text-sm" style={{ color: "var(--green)" }}>Also available for advisory work in person: <Link href="/advisory/book" className="link">talk to Growth Goaled</Link>.</p>}
+          {cro.availableForAdvisory && !isBeta() && <p className="text-sm" style={{ color: "var(--green)" }}>Also available for advisory work in person: <Link href="/advisory/book" className="link">talk to Growth Goaled</Link>.</p>}
         </section>
       </div>
 

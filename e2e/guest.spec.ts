@@ -11,10 +11,15 @@ test("a visitor talks it through, unlocks the recommendation with an email, and 
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   await page.goto("/sign-in");
-  await expect(page.getByRole("heading", { name: "How can we help you grow?" })).toBeVisible();
-  await expect(page.getByTestId("human-presence")).toContainText("2,000+ startup investments");
-  await expect(page.getByLabel("Work email")).toHaveCount(0);
+  // The Rally landing: one action (free Beta access); the website chat is a click away.
+  await expect(page.getByRole("heading", { name: /Your CRO\.\s*Ready when you are\./ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Get Free Beta Access" })).toBeVisible();
+  await expect(page.getByText(/\$\d/)).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
+  await page.getByText("Or ask Rally a question first").click();
+  await expect(page.getByRole("heading", { name: "How can we help you grow?" })).toBeVisible();
+  await expect(page.getByTestId("human-presence")).toHaveCount(0);
+  await expect(page.getByRole("form", { name: "See your recommendation" })).toHaveCount(0);
 
   const answer = async (text: string) => {
     await page.getByLabel("Your answer").fill(text);
@@ -60,7 +65,7 @@ test("a visitor talks it through, unlocks the recommendation with an email, and 
 
   // The AI asks before it recommends; still no email asked for.
   await expect(page.getByText(/Test mode: let's work through/)).toBeVisible();
-  await expect(page.getByLabel("Work email")).toHaveCount(0);
+  await expect(page.getByRole("form", { name: "See your recommendation" })).toHaveCount(0);
   await page.getByLabel("Your answer").fill("We close about $20k deals.");
   await page.getByRole("button", { name: "Send" }).click();
 
@@ -73,10 +78,10 @@ test("a visitor talks it through, unlocks the recommendation with an email, and 
   await expect(gate).toBeVisible();
   await expect(page.getByRole("article", { name: "Recommendation" })).toHaveCount(0);
   // Until the email is given, only the recommendation shows: the conversation and the chat box are hidden.
-  await expect(page.getByRole("list", { name: "Conversation" })).toHaveCount(0);
+  await expect(page.getByRole("list", { name: "Conversation", exact: true })).toHaveCount(0);
   await expect(page.getByLabel("Your answer")).toHaveCount(0);
   // A conversion button under the recommendation and another at the end of the chat, by company name.
-  const cta = (where: string) => page.getByTestId(`plan-cta-${where}`).getByRole("button", { name: "Get a CRO-Built GTM action plan for Guestly" });
+  const cta = (where: string) => page.getByTestId(`plan-cta-${where}`).getByRole("button", { name: "Save this and keep going: free Beta access" });
   await expect(cta("card")).toBeVisible();
   await expect(cta("chat")).toBeVisible();
   // Before the email, it takes them to the email box.
@@ -91,10 +96,10 @@ test("a visitor talks it through, unlocks the recommendation with an email, and 
   await expect(inbox.getByRole("link", { name: /^Open (Gmail|Outlook)$/ }).first()).toBeVisible();
   await expect(page.getByRole("article", { name: "Recommendation" })).toHaveCount(0);
   // The conversation carries on after the email.
-  await expect(page.getByRole("list", { name: "Conversation" })).toContainText("We close about $20k deals.");
+  await expect(page.getByRole("list", { name: "Conversation", exact: true })).toContainText("We close about $20k deals.");
   await answer("What should my first AE's quota be?");
-  await expect(page.getByRole("list", { name: "Conversation" })).toContainText("What should my first AE's quota be?");
-  await expect(page.getByRole("list", { name: "Conversation" }).getByText(/Test mode/).last()).toBeVisible();
+  await expect(page.getByRole("list", { name: "Conversation", exact: true })).toContainText("What should my first AE's quota be?");
+  await expect(page.getByRole("list", { name: "Conversation", exact: true }).getByText(/Test mode/).last()).toBeVisible();
   // Coming back to the page keeps them on the inbox step.
   await page.reload();
   await expect(page.getByRole("region", { name: "Check your inbox" })).toBeVisible();
@@ -124,18 +129,19 @@ test("a visitor talks it through, unlocks the recommendation with an email, and 
   await page.reload();
   const cap = page.getByRole("region", { name: "Your free questions are used up" });
   await expect(cap).toContainText("You've used your free questions");
-  await expect(cap.getByRole("link", { name: "Talk to an advisor" })).toHaveAttribute("href", /calendly\.com/);
-  await expect(cap.getByRole("button", { name: "Diagnose my growth" })).toBeVisible();
+  await expect(cap.getByRole("link", { name: "Talk to an advisor" })).toHaveCount(0);
+  await expect(cap.getByRole("button", { name: "Get Free Beta Access" })).toBeVisible();
   await expect(page.getByLabel("Your answer")).toHaveCount(0);
 
   // Signing in (the link's landing, /claim) saves it as their account, company and conversation.
   await ctx.addCookies([{ name: "gg_e2e_user", value: "robin@guestly.test", domain: "localhost", path: "/" }]);
-  // The link from the action-plan button opens the saved conversation at the plan offer.
-  await page.goto("/claim?plan=1");
-  await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}#build-plan$/);
+  // The link opens the saved conversation in Rally, with no plan offer during the Beta.
+  await page.goto("/claim");
+  await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}/);
   await expect(page.getByRole("heading", { name: "Our pipeline isn't converting and I don't know whether to hire." })).toBeVisible();
+  await page.getByText("See the full reasoning").last().click();
   await expect(page.getByRole("article", { name: "Recommendation" })).toContainText("Test mode takeaway");
-  await expect(page.getByRole("region", { name: "Build my action plan" })).toContainText("$499");
+  await expect(page.getByRole("region", { name: "Build my action plan" })).toHaveCount(0);
   await expect(page.getByRole("banner").getByText("Guestly", { exact: true })).toBeVisible();
   await ctx.close();
 });

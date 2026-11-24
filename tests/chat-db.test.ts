@@ -1,5 +1,5 @@
 /** Founder conversations: turns, remembered facts, recommendation records, feedback, limits and company isolation (PGlite; model stubbed). */
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { eq } from "drizzle-orm";
 
 const h = vi.hoisted(() => ({ db: null as unknown as Record<string | symbol, unknown>, inputs: [] as unknown[] }));
@@ -121,7 +121,11 @@ describe("conversations", () => {
     expect(await listFacts(other)).toEqual([]);
   });
 
-  it("after six exchanges without a plan, the reply gently suggests talking to Growth Goaled (then every third reply)", async () => {
+  it("(after the Rally Beta) after six exchanges without a plan, the reply gently suggests talking to Growth Goaled (then every third reply)", async () => {
+    vi.stubEnv("RALLY_BETA", "off");
+    onTestFinished(() => {
+      vi.unstubAllEnvs();
+    });
     delete process.env.CHAT_DAILY_LIMIT;
     const id = await start(); // the starter is the first exchange
     const nudged: boolean[] = [];

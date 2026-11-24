@@ -2,6 +2,7 @@ import Link from "next/link";
 import { LegalLinks } from "@/components/legal/LegalLinks";
 import type { ReactNode } from "react";
 import { StagingBadge } from "@/components/shell/Shell";
+import { RallyLogo } from "@/components/brand/Rally";
 
 const Check = () => (
   <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden className="shrink-0 mt-0.5">
@@ -39,9 +40,8 @@ export function AuthShell({ brand, children }: { brand: ReactNode; children: Rea
           style={{ backgroundImage: "radial-gradient(ellipse 70% 55% at 20% 30%, rgba(21,90,60,0.32) 0%, transparent 70%)" }}
         />
         <div className="relative flex items-center gap-2.5">
-          <Link href="/sign-up" className="flex items-center gap-2.5" aria-label="Growth Goaled">
-            <span className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold" style={{ background: "var(--green)", color: "#fff" }}>G</span>
-            <span className="font-semibold text-white text-base tracking-tight">Growth Goaled</span>
+          <Link href="/sign-in" aria-label="Rally by Growth Goaled">
+            <RallyLogo />
           </Link>
           <StagingBadge />
         </div>

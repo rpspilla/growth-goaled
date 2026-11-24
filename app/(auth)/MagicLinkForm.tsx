@@ -22,7 +22,7 @@ function explain(error: { message?: string; status?: number } | null): { message
  * your name and company come next, after you've confirmed the address. `next` is where to land after
  * the link; `lockedEmail` fixes the address (invites only work for the invited email).
  */
-export function MagicLinkForm({ mode, next, lockedEmail, cta }: { mode: "sign-in" | "sign-up"; next?: string; lockedEmail?: string; cta?: string }) {
+export function MagicLinkForm({ mode, next, lockedEmail, cta, switchLink = true }: { mode: "sign-in" | "sign-up"; next?: string; lockedEmail?: string; cta?: string; /** The "Already have an account? / New here?" line (the Rally landing has its own). */ switchLink?: boolean }) {
   const [state, setState] = useState<State>({ status: "idle" });
   const [fieldError, setFieldError] = useState<string | null>(null);
   const started = useRef(false);
@@ -136,10 +136,10 @@ export function MagicLinkForm({ mode, next, lockedEmail, cta }: { mode: "sign-in
       </button>
       <p className="text-sm text-center" style={{ color: "var(--muted-foreground)" }}>No password needed. We&apos;ll email you a secure link.</p>
 
-      {!lockedEmail && (
+      {!lockedEmail && switchLink && (
         <p className="text-sm text-center pt-2" style={{ color: "var(--muted-foreground)" }}>
           {mode === "sign-in" ? (
-            <>New to Growth Goaled? <Link href="/sign-up" className="link">Create a free account</Link></>
+            <>New to Rally? <Link href="/sign-up" className="link">Get free Beta access</Link></>
           ) : (
             <>Already have an account? <Link href="/sign-in" className="link">Sign in</Link></>
           )}

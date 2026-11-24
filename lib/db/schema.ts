@@ -1691,6 +1691,8 @@ export const croProfiles = pgTable(
     slug: text("slug").notNull(),
     name: text("name").notNull(),
     headline: text("headline"),
+    // Their role, shown with their name in Rally: "Cofounding CRO, Growth Goaled" (the headline is the credibility line)
+    title: text("title"),
     photoUrl: text("photo_url"),
     bio: text("bio"),
     // Replaced on the form by linkedinUrl (Nov 24, 2026); kept for any text already entered
@@ -1902,3 +1904,41 @@ export const evalResults = pgTable(
 export type EvalScenario = typeof evalScenarios.$inferSelect;
 export type EvalRun = typeof evalRuns.$inferSelect;
 export type EvalResult = typeof evalResults.$inferSelect;
+
+/**
+ * Rally Beta feedback (Nov 24, 2026). A founder's Helpful / Not helpful on one AI answer (one per
+ * person per answer; changing it updates the row), with an optional reason.
+ */
+export const messageFeedback = pgTable(
+  "message_feedback",
+  {
+    id: id(),
+    messageId: uuid("message_id")
+      .notNull()
+      .references(() => conversationMessages.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    companyId: uuid("company_id").references(() => companies.id, { onDelete: "cascade" }),
+    helpful: boolean("helpful").notNull(),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("message_feedback_message_user_idx").on(t.messageId, t.userId)],
+);
+export type MessageFeedback = typeof messageFeedback.$inferSelect;
+
+/** What a Beta founder tells us about Rally itself ("Share feedback", or the one prompt after a good answer). */
+export const betaFeedback = pgTable("beta_feedback", {
+  id: id(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  companyId: uuid("company_id").references(() => companies.id, { onDelete: "set null" }),
+  // most_valuable, missing, wish, use_regularly (yes | maybe | no), indispensable
+  answers: jsonb("answers").$type<Partial<Record<"most_valuable" | "missing" | "wish" | "use_regularly" | "indispensable", string>>>().notNull(),
+  source: text("source").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export type BetaFeedback = typeof betaFeedback.$inferSelect;
