@@ -20,7 +20,13 @@ export const voiceConfigured = () => e2eEnabled() || Boolean(key());
 async function failure(res: Response, what: string): Promise<VoiceError> {
   const body = await res.text().catch(() => "");
   console.error(`[voice] ${what} failed`, res.status, body.slice(0, 500));
-  if (res.status === 401) return new VoiceError("The voice service rejected the API key. Check ELEVENLABS_API_KEY in Vercel.");
+  if (res.status === 401 || /authentication_error|invalid_api_key/.test(body)) {
+    return new VoiceError(
+      /api_key_id_used_as_api_key/.test(body)
+        ? "ELEVENLABS_API_KEY in Vercel holds the key's ID, not the key. In ElevenLabs create (or rotate) an API key, copy the key that starts with sk_, paste it into Vercel, and redeploy."
+        : "ElevenLabs rejected the API key. Check ELEVENLABS_API_KEY in Vercel (it starts with sk_) and redeploy.",
+    );
+  }
   if (res.status === 402 || /quota|plan|subscription/i.test(body)) return new VoiceError("The voice service plan doesn't allow this (voice cloning needs a paid ElevenLabs plan, and usage may be over its limit).");
   return new VoiceError(`The voice service couldn't ${what} (error ${res.status}). Try again.`);
 }

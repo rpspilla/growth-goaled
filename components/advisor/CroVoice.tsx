@@ -108,9 +108,17 @@ export function CroVoice({
     }
   }
 
-  const sample = () => {
-    const a = new Audio(`/api/cro-voice/${croId}?t=${Date.now()}`);
-    a.play().catch(() => setMsg({ kind: "error", text: "The sample couldn't play." }));
+  // Fetched first so a problem (e.g. the API key) can be shown in words, then played.
+  const sample = async () => {
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/cro-voice/${croId}?t=${Date.now()}`);
+      if (!res.ok) return setMsg({ kind: "error", text: (await res.text()) || "The sample couldn't play." });
+      const a = new Audio(URL.createObjectURL(await res.blob()));
+      await a.play();
+    } catch {
+      setMsg({ kind: "error", text: "The sample couldn't play. Check your sound and try again." });
+    }
   };
 
   const total = files.reduce((n, f) => n + f.size, 0);
