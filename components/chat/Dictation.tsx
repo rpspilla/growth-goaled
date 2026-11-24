@@ -2,6 +2,7 @@
 
 import { Mic, Square } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { stopSpeaking } from "./Speaker";
 
 /**
  * Talk to Rally (Nov 24, 2026). The browser's own speech recognition writes what the founder says
@@ -94,6 +95,8 @@ export function useDictation(text: string, setText: (t: string) => void, opts: {
   const start = ({ quiet = false } = {}) => {
     const R = recognitionClass();
     if (!R || rec.current) return;
+    // Talking over Rally stops it reading.
+    if (!quiet) stopSpeaking();
     setError(null);
     const id = ++session.current;
     const base = textRef.current.trimEnd();

@@ -208,3 +208,22 @@ export async function generateVoiceAction(croId: string, answers: { q1: string; 
   refresh();
   return r;
 }
+
+/** Use a voice the CRO already made in ElevenLabs. */
+export async function linkVoiceAction(croId: string, voiceId: string, consent: boolean) {
+  const user = await staff();
+  if (!uuid(croId)) return { ok: false as const, error: "That CRO wasn't found." };
+  const { linkCroVoice } = await import("@/lib/data/voice");
+  const r = await linkCroVoice(user, croId, { voiceId: String(voiceId ?? ""), consent: consent === true });
+  if (r.ok) refresh();
+  return r;
+}
+
+export async function removeVoiceAction(croId: string) {
+  const user = await staff();
+  if (!uuid(croId)) return { ok: false as const, error: "That CRO wasn't found." };
+  const { removeCroVoice } = await import("@/lib/data/voice");
+  const r = await removeCroVoice(user, croId);
+  if (r.ok) refresh();
+  return r;
+}

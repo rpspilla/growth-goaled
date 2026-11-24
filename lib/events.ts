@@ -27,6 +27,8 @@ export type EventName =
   | "conversation_message"
   | "recommendation_feedback"
   | "answer_rated"
+  | "cro_voice_set"
+  | "answer_spoken"
   | "beta_feedback"
   | "beta_feedback_prompted"
   | "intake_section_completed"

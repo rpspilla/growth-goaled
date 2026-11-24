@@ -7,7 +7,9 @@ import { requireRole } from "@/lib/auth/session";
 import { db, schema } from "@/lib/db";
 import { INTELLIGENCE_STATUSES, INTELLIGENCE_TYPES, PHILOSOPHY_FIELDS, STYLE_FIELDS, VOICE_QUESTIONS } from "@/lib/cro";
 import { getCroProfile, listIntelligence } from "@/lib/data/cro";
-import { croAdminAction, generateBioAction, generateVoiceAction, removeCroPhotoAction, saveCroAction, uploadCroPhotoAction } from "../actions";
+import { croAdminAction, generateBioAction, generateVoiceAction, linkVoiceAction, removeCroPhotoAction, removeVoiceAction, saveCroAction, uploadCroPhotoAction } from "../actions";
+import { CroVoice } from "@/components/advisor/CroVoice";
+import { voiceConfigured } from "@/lib/ai/voice";
 import { CroBioFromLinkedIn } from "@/components/advisor/CroBioFromLinkedIn";
 import { CroVoiceQuestions } from "@/components/advisor/CroVoiceQuestions";
 import { CroPhotoUpload } from "@/components/advisor/CroPhotoUpload";
@@ -146,6 +148,14 @@ export default async function CroProfilePage({ params }: { params: Promise<{ id:
         </ActionForm>
       ) : (
         <p className="surface p-5 text-sm" style={muted}>Only {cro.name} or an admin can edit this profile.</p>
+      )}
+
+      {cro.userId === user.id ? (
+        <CroVoice croId={cro.id} name={cro.name} voiceReady={Boolean(cro.voiceId)} configured={voiceConfigured()} link={linkVoiceAction} remove={removeVoiceAction} />
+      ) : (
+        <p className="surface p-4 text-sm" style={muted}>
+          {cro.voiceId ? `✓ ${cro.name}'s voice is set up: Rally reads their AI's answers in it.` : `Rally reads ${cro.name.split(" ")[0]}'s answers in a standard voice until they record their own (only they can, from their login).`}
+        </p>
       )}
 
       <section className="space-y-3" aria-label="Their intelligence">

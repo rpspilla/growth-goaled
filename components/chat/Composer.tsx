@@ -6,6 +6,7 @@ import { FileProgress } from "./FileProgress";
 import { upload } from "@vercel/blob/client";
 import { Paperclip, Upload } from "lucide-react";
 import { DictateButton, DictationStatus, useDictation, voiceMode } from "./Dictation";
+import { speak, speakingNow, stopSpeaking, type Spoken } from "./Speaker";
 import { contentTypeFor, INBOX_FOLDER, MAX_UPLOAD_BYTES } from "@/lib/documents";
 import { sha256 } from "@/components/readiness/hash";
 
@@ -18,6 +19,7 @@ export function Composer({
   send,
   retry,
   awaitingAnswer,
+  latestAnswer = null,
   attach,
   blobPrefix,
 }: {
@@ -26,6 +28,8 @@ export function Composer({
   retry: (conversationId: string) => Promise<Result>;
   /** The last message is the founder's and has no answer (an earlier turn failed). */
   awaitingAnswer: boolean;
+  /** The last answer: in voice mode Rally reads it aloud, then listens for the reply. */
+  latestAnswer?: Spoken | null;
   /** Files in the conversation: uploaded to the company's private store, then read like any upload. */
   attach?: Attach;
   blobPrefix?: string;
@@ -44,12 +48,21 @@ export function Composer({
       if (!pending) run(() => send(conversationId, said), said);
     },
   });
-  // Voice mode: once the answer is in, the microphone opens for the reply.
+  // Voice mode: once the answer is in, Rally reads it aloud, then the microphone opens for the reply.
   useEffect(() => {
-    if (!dictation.supported || pending || sent !== null || awaitingAnswer || text.trim()) return;
-    if (voiceMode.get()) dictation.start({ quiet: true });
+    if (!dictation.supported || pending || sent !== null || awaitingAnswer || text.trim() || speakingNow()) return;
+    if (!voiceMode.get()) return;
+    const key = latestAnswer ? `rally-spoken:${latestAnswer.id}` : null;
+    let read = true;
+    try {
+      read = !key || sessionStorage.getItem(key) === "1";
+      if (key) sessionStorage.setItem(key, "1");
+    } catch {}
+    const listen = () => voiceMode.get() && dictation.start({ quiet: true });
+    if (latestAnswer && !read) speak(latestAnswer, listen);
+    else listen();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dictation.supported, pending, sent, awaitingAnswer]);
+  }, [dictation.supported, pending, sent, awaitingAnswer, latestAnswer?.id]);
 
   // The message shows and the box clears straight away: updates inside the async transition are held
   // by React until the answer arrives, which made the page look frozen.
@@ -143,8 +156,9 @@ export function Composer({
   const submit = () => {
     const t = text.trim();
     if (!t || pending) return;
-    // Typed and sent: the microphone goes off and stays off.
+    // Typed and sent: the microphone goes off and stays off, and Rally stops reading.
     dictation.cancel();
+    stopSpeaking();
     voiceMode.off();
     run(() => send(conversationId, t), t);
   };

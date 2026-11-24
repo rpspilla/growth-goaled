@@ -1709,6 +1709,9 @@ export const croProfiles = pgTable(
     philosophy: jsonb("philosophy").$type<CroPhilosophy>().notNull().default({}),
     style: jsonb("style").$type<CroStyle>().notNull().default({}),
     // The CRO's answers to the two voice questions (lib/cro.ts VOICE_QUESTIONS); philosophy and style are drafted from them
+    // Their cloned voice (ElevenLabs voice id) for reading their AI's answers aloud, and when they consented
+    voiceId: text("voice_id"),
+    voiceConsentAt: timestamp("voice_consent_at", { withTimezone: true }),
     voiceAnswers: jsonb("voice_answers").$type<Partial<Record<"q1" | "q2", string>>>().notNull().default({}),
     // Founders see and can talk to published CROs only; a CRO can also stay out of the Collective
     status: croProfileStatus("status").notNull().default("draft"),

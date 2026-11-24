@@ -10,6 +10,7 @@ import { BuildingRefresh } from "@/components/deliverables/BuildingRefresh";
 import { PlanOffer } from "@/components/chat/PlanOffer";
 import { CroIdentity, toCroCard } from "@/components/chat/CroIdentity";
 import { RichReply } from "@/components/chat/RichReply";
+import { ListenButton } from "@/components/chat/Speaker";
 import { AnswerFeedback, FullReasoning } from "@/components/chat/AnswerFeedback";
 import { isBeta } from "@/lib/beta";
 import { PlanPanel, type PlanPanelData } from "@/components/chat/PlanPanel";
@@ -87,6 +88,10 @@ export default async function ConversationPage({ params, searchParams }: { param
   const perspectiveOf = (m: { croId: string | null; secondOpinion: boolean }) =>
     m.secondOpinion ? "Second opinion from the Growth Goaled Collective" : m.croId ? `${view.cros.get(m.croId) ?? "A CRO"}'s AI CRO` : "Growth Goaled Collective";
   const trailingMessage = lastCardId ? view.messages.find((m) => m.recommendationId === lastCardId) : undefined;
+  // Spoken answers: in the voice of the CRO who gave it, when they've set one up (lib/data/voice).
+  const voiced = new Map(network.filter((c) => c.voiceId && c.voiceConsentAt).map((c) => [c.id, c.name]));
+  const spoken = (m: { id: string; content: string; croId: string | null }) => ({ id: m.id, text: m.content, voiced: Boolean(m.croId && voiced.has(m.croId)), who: (m.croId && voiced.get(m.croId)) || null });
+  const lastAnswer = [...view.messages].reverse().find((m) => m.role === "assistant");
 
   // "Commit to this" on the latest card: its next steps as commitments, into a new or an open growth project.
   const [committed, openProjects] = trailing ? await Promise.all([committedProjects(company, [trailing.id]), companyProjects(company)]) : [new Map(), []];
@@ -208,7 +213,10 @@ export default async function ConversationPage({ params, searchParams }: { param
                   />
                 </FullReasoning>
               )}
-              <AnswerFeedback messageId={m.id} given={view.messageFeedback.get(m.id) ?? null} rate={rateAnswerAction} />
+              <div className="flex items-start gap-2 flex-wrap">
+                <ListenButton answer={spoken(m)} />
+                <AnswerFeedback messageId={m.id} given={view.messageFeedback.get(m.id) ?? null} rate={rateAnswerAction} />
+              </div>
               {rec && rec !== trailing && offer && rec.id === lastCardId && (
                 <PlanOffer conversationId={view.conversation.id} planPrice={formatPrice(actionPlanCents)} supportedPrice={formatPrice(supportedMonthlyCents)} buy={buyPlanAction} bookHref="/advisory/book?kind=review" />
               )}
@@ -219,6 +227,7 @@ export default async function ConversationPage({ params, searchParams }: { param
 
       <div className="max-w-4xl">
       <Composer
+        latestAnswer={lastAnswer && last?.role === "assistant" ? spoken(lastAnswer) : null}
         conversationId={view.conversation.id}
         send={sendMessageAction}
         retry={retryMessageAction}
