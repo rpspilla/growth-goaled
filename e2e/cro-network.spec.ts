@@ -41,7 +41,7 @@ test("CROs contribute attributed intelligence; founders ask one CRO's AI or the 
     await add.getByRole("button", { name: "Add CRO" }).click();
     await expect(admin.page.getByRole("heading", { name, level: 1 })).toBeVisible();
     const profile = admin.page.getByRole("form", { name: "CRO profile" });
-    await profile.getByLabel("Professional biography").fill(bio);
+    await profile.getByLabel("Professional biography text").fill(bio);
     await profile.getByLabel("Areas of expertise").fill(expertise);
     await profile.getByLabel("Views on hiring").fill(name === "Nora Network" ? "Founders sell first; hire when the motion repeats." : "Hire experienced AEs early when inbound is strong.");
     await profile.getByLabel("Level of directness").fill("Very direct");

@@ -39,7 +39,6 @@ export default async function PublicCroPage({ params }: { params: Promise<{ slug
           {cro.headline && <p className="text-lg mt-1" style={muted}>{cro.headline}</p>}
           <div className="flex gap-4 flex-wrap">
             {cro.linkedinUrl && <a href={cro.linkedinUrl} target="_blank" rel="noopener" className="link text-sm">Career history on LinkedIn</a>}
-            {cro.websiteUrl && <a href={cro.websiteUrl} target="_blank" rel="noopener" className="link text-sm">Website profile</a>}
           </div>
         </div>
       </header>

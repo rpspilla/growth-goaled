@@ -3,7 +3,8 @@ import { and, asc, desc, eq, inArray, ne, or } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { Company, CroIntelligence, CroPhilosophy, CroProfile, CroStyle, User } from "@/lib/db/schema";
 import { track } from "@/lib/events";
-import { INTELLIGENCE_TYPES, PHILOSOPHY_FIELDS, STYLE_FIELDS, TOPIC_EXPERTISE, matchCros, selectIntelligence, slugify, type IntelligenceBundle, type Query, type RecordForRetrieval } from "@/lib/cro";
+import { draftBio, draftVoice } from "@/lib/ai/cro-profile";
+import { INTELLIGENCE_TYPES, PHILOSOPHY_FIELDS, STYLE_FIELDS, TOPIC_EXPERTISE, VOICE_QUESTIONS, matchCros, selectIntelligence, slugify, type IntelligenceBundle, type Query, type RecordForRetrieval } from "@/lib/cro";
 
 /**
  * Multi-CRO intelligence (Nov 23, 2026). CRO profiles and their intelligence records.
@@ -72,6 +73,7 @@ export type ProfileInput = {
   availableForAdvisory?: boolean;
   philosophy?: CroPhilosophy;
   style?: CroStyle;
+  voiceAnswers?: Partial<Record<keyof typeof VOICE_QUESTIONS, string>>;
 };
 
 const httpsOrNull = (v: string | undefined) => {
@@ -124,6 +126,7 @@ export async function saveCroProfile(actor: Actor, id: string | null, input: Pro
     availableForAdvisory: Boolean(input.availableForAdvisory),
     philosophy: pickSections(input.philosophy, Object.keys(PHILOSOPHY_FIELDS) as (keyof typeof PHILOSOPHY_FIELDS)[]),
     style: pickSections(input.style, Object.keys(STYLE_FIELDS) as (keyof typeof STYLE_FIELDS)[]),
+    ...(input.voiceAnswers ? { voiceAnswers: pickSections(input.voiceAnswers, Object.keys(VOICE_QUESTIONS) as (keyof typeof VOICE_QUESTIONS)[]) } : {}),
     updatedAt: new Date(),
   };
   if (existing) {
@@ -595,4 +598,49 @@ export async function croPhoto(croId: string, viewer: Pick<User, "role"> | null)
   if (!row) return null;
   if (row.status !== "published" && viewer?.role !== "admin" && viewer?.role !== "advisor") return null;
   return { mime: row.mime, bytes: Buffer.from(row.data, "base64") };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Drafting the profile (Nov 24, 2026): the biography from the CRO's LinkedIn profile PDF, and the
+// philosophy and communication boxes from their answers to the two voice questions.
+
+export const MAX_LINKEDIN_PDF_BYTES = 5 * 1024 * 1024;
+
+export async function generateCroBio(actor: Actor, croId: string, pdf: Uint8Array): Promise<Result<{ bio: string }>> {
+  const cro = await getCroProfile(croId);
+  if (!cro) return { ok: false, error: "That CRO wasn't found." };
+  if (!canEditProfile(actor, cro)) return { ok: false, error: "Only an admin or the CRO can change this profile." };
+  if (!pdf.length || pdf.length > MAX_LINKEDIN_PDF_BYTES) return { ok: false, error: "Use the PDF LinkedIn makes (under 5 MB)." };
+  if (String.fromCharCode(...pdf.slice(0, 5)) !== "%PDF-") return { ok: false, error: "That isn't a PDF. On LinkedIn, open the profile, choose Resources (or More), then Save to PDF." };
+  let draft: { bio: string; headline: string };
+  try {
+    draft = await draftBio({ name: cro.name, linkedinUrl: cro.linkedinUrl, pdfBase64: Buffer.from(pdf).toString("base64") });
+  } catch (err) {
+    console.error("[cro] Biography draft failed", err);
+    return { ok: false, error: "The biography couldn't be written from that file. Try again, or write it in the box." };
+  }
+  await db
+    .update(schema.croProfiles)
+    .set({ bio: draft.bio, ...(!cro.headline && draft.headline ? { headline: draft.headline } : {}), updatedAt: new Date() })
+    .where(eq(schema.croProfiles.id, croId));
+  return { ok: true, bio: draft.bio };
+}
+
+export async function generateCroVoice(actor: Actor, croId: string, answers: { q1: string; q2: string }): Promise<Result> {
+  const cro = await getCroProfile(croId);
+  if (!cro) return { ok: false, error: "That CRO wasn't found." };
+  if (!canEditProfile(actor, cro)) return { ok: false, error: "Only an admin or the CRO can change this profile." };
+  const q1 = clean(answers.q1, 6000) ?? "";
+  const q2 = clean(answers.q2, 6000) ?? "";
+  if (q1.length < 40 || q2.length < 40) return { ok: false, error: "Answer both questions in a few sentences first." };
+  let draft: Awaited<ReturnType<typeof draftVoice>>;
+  try {
+    draft = await draftVoice({ name: cro.name, bio: cro.bio, answers: { q1, q2 } });
+  } catch (err) {
+    console.error("[cro] Voice draft failed", err);
+    await db.update(schema.croProfiles).set({ voiceAnswers: { q1, q2 }, updatedAt: new Date() }).where(eq(schema.croProfiles.id, croId));
+    return { ok: false, error: "Your answers are saved, but the boxes couldn't be filled in. Try again." };
+  }
+  await db.update(schema.croProfiles).set({ voiceAnswers: { q1, q2 }, philosophy: draft.philosophy, style: draft.style, updatedAt: new Date() }).where(eq(schema.croProfiles.id, croId));
+  return { ok: true };
 }

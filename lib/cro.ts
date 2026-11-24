@@ -62,6 +62,15 @@ export const PHILOSOPHY_FIELDS = {
   scaling: "Views on scaling",
   founderChallenges: "Approach to common founder challenges",
 } as const;
+/**
+ * The two questions every CRO answers in their own words (Nov 24, 2026). Their answers are the
+ * examples the AI drafts the philosophy and communication-style boxes from.
+ */
+export const VOICE_QUESTIONS = {
+  q1: "A Seed founder at $1.5M ARR still closes every deal. Their two reps are missing quota, they have 14 months of runway, and they ask you: \"Should I hire a VP of Sales now?\" Write what you'd actually say to them, the way you'd say it.",
+  q2: "A Series A founder plans to double ARR next year by hiring six reps and opening a new segment. Pipeline coverage is 2x and win rates are falling. What do you ask first, what do you push back on, and what do you tell them to do in the next 90 days?",
+} as const;
+
 export const STYLE_FIELDS = {
   communication: "Communication style",
   directness: "Level of directness",

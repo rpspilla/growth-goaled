@@ -1,12 +1,15 @@
+import { createHash } from "node:crypto";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, ne } from "drizzle-orm";
 import { ActionForm } from "@/components/advisor/ActionForm";
 import { requireRole } from "@/lib/auth/session";
 import { db, schema } from "@/lib/db";
-import { INTELLIGENCE_STATUSES, INTELLIGENCE_TYPES, PHILOSOPHY_FIELDS, STYLE_FIELDS } from "@/lib/cro";
+import { INTELLIGENCE_STATUSES, INTELLIGENCE_TYPES, PHILOSOPHY_FIELDS, STYLE_FIELDS, VOICE_QUESTIONS } from "@/lib/cro";
 import { getCroProfile, listIntelligence } from "@/lib/data/cro";
-import { croAdminAction, removeCroPhotoAction, saveCroAction, uploadCroPhotoAction } from "../actions";
+import { croAdminAction, generateBioAction, generateVoiceAction, removeCroPhotoAction, saveCroAction, uploadCroPhotoAction } from "../actions";
+import { CroBioFromLinkedIn } from "@/components/advisor/CroBioFromLinkedIn";
+import { CroVoiceQuestions } from "@/components/advisor/CroVoiceQuestions";
 import { CroPhotoUpload } from "@/components/advisor/CroPhotoUpload";
 
 export const metadata = { title: "CRO profile" };
@@ -25,9 +28,10 @@ function Field({ name, label, value, rows, hint }: { name: string; label: string
 }
 
 /**
- * One CRO's profile, in their own words: background, expertise (tagged), philosophy and how they
- * communicate. The AI representation uses exactly what's written here and their validated records,
- * nothing inferred. Admins also publish, keep in the Collective, and link the CRO's login.
+ * One CRO's profile: photo, LinkedIn, a biography written from their LinkedIn PDF, expertise (tagged),
+ * their answers to two founder questions, and the philosophy and communication boxes drafted from
+ * those answers (all editable). The AI uses exactly what's saved here and their validated records.
+ * Admins also publish, keep in the Collective, and link the CRO's login.
  */
 export default async function CroProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireRole(["advisor", "admin"]);
@@ -42,6 +46,9 @@ export default async function CroProfilePage({ params }: { params: Promise<{ id:
   ]);
   const [linked] = cro.userId ? await db.select({ name: schema.users.name, email: schema.users.email }).from(schema.users).where(eq(schema.users.id, cro.userId)).limit(1) : [];
   const save = saveCroAction.bind(null, cro.id);
+  // The drafted boxes remount only when their saved text changes (a draft from LinkedIn or the two
+  // answers), so a photo upload never clears what's being typed.
+  const version = createHash("sha1").update(JSON.stringify([cro.bio, cro.philosophy, cro.style])).digest("hex").slice(0, 12);
 
   return (
     <div className="page space-y-8">
@@ -95,10 +102,8 @@ export default async function CroProfilePage({ params }: { params: Promise<{ id:
               <Field name="name" label="Name" value={cro.name} />
               <Field name="headline" label="Headline" value={cro.headline} />
               <Field name="linkedinUrl" label="Career history: LinkedIn profile link" value={cro.linkedinUrl} hint="e.g. https://www.linkedin.com/in/their-name" />
-              <Field name="websiteUrl" label="Website profile (https link)" value={cro.websiteUrl} />
             </div>
-            <Field name="bio" label="Professional biography" value={cro.bio} rows={4} />
-            <Field name="accomplishments" label="Relevant accomplishments" value={cro.accomplishments} rows={3} />
+            <CroBioFromLinkedIn key={`bio-${version}`} bio={cro.bio} hasLinkedin={Boolean(cro.linkedinUrl)} generate={generateBioAction.bind(null, cro.id)} />
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" name="availableForAdvisory" defaultChecked={cro.availableForAdvisory} /> Available for human advisory engagements
             </label>
@@ -116,8 +121,11 @@ export default async function CroProfilePage({ params }: { params: Promise<{ id:
             </div>
           </section>
 
-          <section className="surface p-5 space-y-4">
+          <CroVoiceQuestions questions={VOICE_QUESTIONS} answers={cro.voiceAnswers} generate={generateVoiceAction.bind(null, cro.id)} />
+
+          <section key={`philosophy-${version}`} className="surface p-5 space-y-4">
             <h2 className="text-lg font-semibold" style={fg}>Philosophy, in their words</h2>
+            <p className="text-sm" style={muted}>Filled in from the two answers above; edit anything that isn&apos;t how they think.</p>
             <div className="grid md:grid-cols-2 gap-4">
               {Object.entries(PHILOSOPHY_FIELDS).map(([k, label]) => (
                 <Field key={k} name={`philosophy.${k}`} label={label} value={cro.philosophy[k as keyof typeof cro.philosophy]} rows={3} />
@@ -125,9 +133,9 @@ export default async function CroProfilePage({ params }: { params: Promise<{ id:
             </div>
           </section>
 
-          <section className="surface p-5 space-y-4">
+          <section key={`style-${version}`} className="surface p-5 space-y-4">
             <h2 className="text-lg font-semibold" style={fg}>How they communicate</h2>
-            <p className="text-sm" style={muted}>From the CRO&apos;s own description and examples, never inferred. The AI matches this style.</p>
+            <p className="text-sm" style={muted}>Filled in from the two answers above. The AI matches this style; edit anything that doesn&apos;t sound like them.</p>
             <div className="grid md:grid-cols-2 gap-4">
               {Object.entries(STYLE_FIELDS).map(([k, label]) => (
                 <Field key={k} name={`style.${k}`} label={label} value={cro.style[k as keyof typeof cro.style]} rows={k === "exampleInTheirWords" ? 5 : 2} />

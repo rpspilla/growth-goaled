@@ -1,0 +1,1 @@
+ALTER TABLE "cro_profiles" ADD COLUMN "voice_answers" jsonb DEFAULT '{}'::jsonb NOT NULL;

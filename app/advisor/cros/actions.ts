@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireRole } from "@/lib/auth/session";
-import { parseTags, PHILOSOPHY_FIELDS, STYLE_FIELDS } from "@/lib/cro";
-import { decideConflict, detectConflicts, removeCroPhoto, saveCroProfile, setCroPhoto, saveIntelligence, setCroProfileAdmin, setIntelligenceStatus, setStance, type ProfileInput, type RecordInput, type Result } from "@/lib/data/cro";
+import { parseTags, PHILOSOPHY_FIELDS, STYLE_FIELDS, VOICE_QUESTIONS } from "@/lib/cro";
+import { decideConflict, detectConflicts, generateCroBio, generateCroVoice, removeCroPhoto, saveCroProfile, setCroPhoto, saveIntelligence, setCroProfileAdmin, setIntelligenceStatus, setStance, type ProfileInput, type RecordInput, type Result } from "@/lib/data/cro";
 import { after } from "next/server";
 
 // The CRO network is run by Growth Goaled staff (advisors and admins); what each may change is checked in lib/data/cro.
@@ -27,16 +27,15 @@ function profileFrom(f: FormData): ProfileInput {
     headline: str(f, "headline"),
     bio: str(f, "bio"),
     linkedinUrl: str(f, "linkedinUrl"),
-    accomplishments: str(f, "accomplishments"),
     industries: list(f, "industries"),
     stages: list(f, "stages"),
     companyTypes: list(f, "companyTypes"),
     functions: list(f, "functions"),
     expertise: list(f, "expertise"),
-    websiteUrl: str(f, "websiteUrl"),
     availableForAdvisory: f.get("availableForAdvisory") === "on",
     philosophy: Object.fromEntries(Object.keys(PHILOSOPHY_FIELDS).map((k) => [k, str(f, `philosophy.${k}`)])),
     style: Object.fromEntries(Object.keys(STYLE_FIELDS).map((k) => [k, str(f, `style.${k}`)])),
+    voiceAnswers: Object.fromEntries(Object.keys(VOICE_QUESTIONS).map((k) => [k, str(f, `voice.${k}`)])),
   };
 }
 
@@ -186,5 +185,25 @@ export async function removeCroPhotoAction(croId: string): Promise<Result> {
   if (!uuid(croId)) return { ok: false, error: "That CRO wasn't found." };
   const r = await removeCroPhoto(user, croId);
   if (r.ok) refresh();
+  return r;
+}
+
+/** Write the biography from the CRO's LinkedIn profile PDF (saved straight away). */
+export async function generateBioAction(croId: string, f: FormData): Promise<Result<{ bio: string }>> {
+  const user = await staff();
+  if (!uuid(croId)) return { ok: false, error: "That CRO wasn't found." };
+  const file = f.get("linkedin");
+  if (!(file instanceof File)) return { ok: false, error: "Choose the LinkedIn PDF." };
+  const r = await generateCroBio(user, croId, new Uint8Array(await file.arrayBuffer()));
+  if (r.ok) refresh();
+  return r;
+}
+
+/** Save the two answers and fill in every philosophy and communication box from them. */
+export async function generateVoiceAction(croId: string, answers: { q1: string; q2: string }): Promise<Result> {
+  const user = await staff();
+  if (!uuid(croId)) return { ok: false, error: "That CRO wasn't found." };
+  const r = await generateCroVoice(user, croId, { q1: String(answers?.q1 ?? ""), q2: String(answers?.q2 ?? "") });
+  refresh();
   return r;
 }
