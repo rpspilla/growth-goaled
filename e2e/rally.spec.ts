@@ -19,9 +19,12 @@ test("Rally Beta: rate answers, share feedback, and read the Beta metrics", asyn
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   await ctx.addCookies([{ name: "gg_e2e_user", value: "rally-founder@e2e.test", domain: "localhost", path: "/" }]);
   const page = await ctx.newPage();
-  // Speech recognition stand-in: "hears" a question in two parts (interim, then final) and ends on stop.
+  // Speech recognition stand-in: each listen "hears" the next phrase (interim, then final, then
+  // silence); with nothing left to say it ends on its own, like the browser after a long silence.
   await page.addInitScript(() => {
     type Handler = ((e: unknown) => void) | null;
+    const w = window as unknown as { __phrases?: string[]; __listens?: number };
+    if (!sessionStorage.getItem("fake-phrases")) sessionStorage.setItem("fake-phrases", JSON.stringify(["Where should we focus next quarter?", "We have 3 reps."]));
     class FakeRecognition {
       lang = "";
       continuous = false;
@@ -29,15 +32,35 @@ test("Rally Beta: rate answers, share feedback, and read the Beta metrics", asyn
       onresult: Handler = null;
       onerror: Handler = null;
       onend: (() => void) | null = null;
+      ended = false;
       start() {
+        w.__listens = (w.__listens ?? 0) + 1;
+        const queue = () => JSON.parse(sessionStorage.getItem("fake-phrases") ?? "[]") as string[];
+        const phrase = queue()[0];
         const result = (text: string, isFinal: boolean) => Object.assign([{ transcript: text }], { isFinal });
-        setTimeout(() => this.onresult?.({ resultIndex: 0, results: [result("Where should we", false)] }), 50);
-        setTimeout(() => this.onresult?.({ resultIndex: 0, results: [result("Where should we focus next quarter?", true)] }), 150);
+        if (!phrase) {
+          setTimeout(() => this.end(), 400);
+          return;
+        }
+        setTimeout(() => !this.ended && this.onresult?.({ resultIndex: 0, results: [result(phrase.split(" ").slice(0, 2).join(" "), false)] }), 50);
+        setTimeout(() => {
+          if (this.ended) return;
+          // Heard: used up.
+          sessionStorage.setItem("fake-phrases", JSON.stringify(queue().slice(1)));
+          this.onresult?.({ resultIndex: 0, results: [result(phrase, true)] });
+        }, 150);
+      }
+      end() {
+        if (this.ended) return;
+        this.ended = true;
+        this.onend?.();
       }
       stop() {
-        setTimeout(() => this.onend?.(), 10);
+        setTimeout(() => this.end(), 10);
       }
-      abort() {}
+      abort() {
+        setTimeout(() => this.end(), 10);
+      }
     }
     for (const name of ["SpeechRecognition", "webkitSpeechRecognition"]) Object.defineProperty(window, name, { value: FakeRecognition, configurable: true, writable: true });
   });
@@ -45,19 +68,26 @@ test("Rally Beta: rate answers, share feedback, and read the Beta metrics", asyn
   await expect(page.getByRole("heading", { name: "What's the growth decision in front of you, Sam?" })).toBeVisible({ timeout: 120_000 });
   // Series A suggestions
   await expect(page.getByRole("group", { name: "Suggested questions" })).toContainText("Should we hire more salespeople?");
-  // Speak instead of typing: the words land in the box, editable, then send as usual.
-  await page.getByRole("button", { name: "Speak your question" }).click();
+  // Talk to Rally: the words appear as they're said, and a pause sends the question.
+  await page.getByRole("button", { name: "Talk to Rally" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Listening…" })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Ask Rally" })).toHaveValue("Where should we focus next quarter?");
-  await page.getByRole("button", { name: "Stop speaking" }).click();
-  await expect(page.getByRole("button", { name: "Speak your question" })).toBeVisible();
-  await expect(page.getByRole("textbox", { name: "Ask Rally" })).toHaveValue("Where should we focus next quarter?");
-  await page.getByRole("button", { name: "Ask", exact: true }).click();
-  await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/);
-  // The reply box has the microphone too.
-  await expect(page.getByRole("button", { name: "Speak your question" })).toBeVisible();
-  await page.getByLabel("Your reply").fill("We have 3 reps.");
-  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/, { timeout: 60_000 });
+  await expect(page.getByRole("heading", { name: "Where should we focus next quarter?" })).toBeVisible();
+  // Rally answered, so it listens for the reply; that sends on the pause too, and the box is left empty.
+  const thread = page.getByRole("list", { name: "Conversation", exact: true });
+  await expect(thread.getByText("We have 3 reps.", { exact: true })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText("See the full reasoning").last()).toBeVisible();
+  await expect(page.getByLabel("Your reply")).toHaveValue("");
+  // Rally listens again; saying nothing switches the microphone off, and the box stays empty.
+  await expect(page.getByRole("button", { name: "Talk to Rally" })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("status").filter({ hasText: "Listening…" })).toHaveCount(0);
+  await expect(page.getByLabel("Your reply")).toHaveValue("");
+  // Reloading doesn't switch it back on (voice mode ended).
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Talk to Rally" })).toBeVisible();
+  await page.waitForTimeout(1500);
+  await expect(page.getByRole("status").filter({ hasText: "Listening…" })).toHaveCount(0);
   await expect(page.getByText("See the full reasoning").last()).toBeVisible();
   const ratings = page.getByRole("group", { name: "Was this helpful?" });
   await ratings.nth(0).getByRole("button", { name: "Helpful", exact: true }).click();

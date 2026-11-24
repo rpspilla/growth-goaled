@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useFormStatus } from "react-dom";
 import type { StartState } from "@/app/(founder)/chat/actions";
 import type { Suggestion } from "@/lib/chat/suggestions";
 import { CroIdentity, type CroCard } from "./CroIdentity";
-import { DictateButton, DictationStatus, useDictation } from "./Dictation";
+import { DictateButton, DictationStatus, useDictation, voiceMode } from "./Dictation";
 
 function Send() {
   const { pending, data } = useFormStatus();
@@ -78,7 +79,20 @@ export function RallyEntry({
   const [state, action] = useActionState(start, {});
   const [croId, setCroId] = useState(cros.some((c) => c.id === defaultCroId) ? defaultCroId! : "");
   const [text, setText] = useState("");
-  const dictation = useDictation(text, setText);
+  const form = useRef<HTMLFormElement>(null);
+  const spokenSubmit = useRef(false);
+  // Spoken: asked as soon as they pause; the conversation then listens for the reply.
+  const dictation = useDictation(text, setText, {
+    onSpoken: (said) => {
+      const f = form.current;
+      if (!f) return;
+      voiceMode.on();
+      spokenSubmit.current = true;
+      flushSync(() => setText(said));
+      (f.elements.namedItem("question") as HTMLInputElement).value = "";
+      f.requestSubmit(f.querySelector<HTMLButtonElement>("button.btn-primary"));
+    },
+  });
   const cro = cros.find((c) => c.id === croId) ?? null;
   const who = cro ? cro.name.split(" ")[0] : "Rally";
   return (
@@ -111,7 +125,17 @@ export function RallyEntry({
       <h1 className="font-display text-3xl sm:text-4xl leading-tight" style={{ color: "var(--foreground)" }}>
         What&apos;s the growth decision in front of you{firstName ? `, ${firstName}` : ""}?
       </h1>
-      <form action={action} className="space-y-4">
+      <form
+        ref={form}
+        action={action}
+        className="space-y-4"
+        onSubmit={() => {
+          // Sending always switches the microphone off; typed or picked questions end voice mode.
+          dictation.cancel();
+          if (!spokenSubmit.current) voiceMode.off();
+          spokenSubmit.current = false;
+        }}
+      >
         <input type="hidden" name="cro" value={croId} />
         <input type="hidden" name="question" defaultValue="" />
         <div role="group" aria-label="Suggested questions" className="grid sm:grid-cols-2 gap-2">
@@ -127,7 +151,13 @@ export function RallyEntry({
             rows={3}
             maxLength={4000}
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              if (dictation.listening) {
+                dictation.cancel();
+                voiceMode.off();
+              }
+              setText(e.target.value);
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && text.trim()) {
                 e.preventDefault();

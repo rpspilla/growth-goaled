@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { FileProgress } from "./FileProgress";
 import { upload } from "@vercel/blob/client";
 import { Paperclip, Upload } from "lucide-react";
-import { DictateButton, DictationStatus, useDictation } from "./Dictation";
+import { DictateButton, DictationStatus, useDictation, voiceMode } from "./Dictation";
 import { contentTypeFor, INBOX_FOLDER, MAX_UPLOAD_BYTES } from "@/lib/documents";
 import { sha256 } from "@/components/readiness/hash";
 
@@ -33,11 +33,23 @@ export function Composer({
   const fileInput = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState<string | null>(null);
   const [text, setText] = useState("");
-  const dictation = useDictation(text, setText);
   const [sent, setSent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
+  // Spoken: sent as soon as they pause, and Rally listens again after answering.
+  const dictation = useDictation(text, setText, {
+    onSpoken: (said) => {
+      voiceMode.on();
+      if (!pending) run(() => send(conversationId, said), said);
+    },
+  });
+  // Voice mode: once the answer is in, the microphone opens for the reply.
+  useEffect(() => {
+    if (!dictation.supported || pending || sent !== null || awaitingAnswer || text.trim()) return;
+    if (voiceMode.get()) dictation.start({ quiet: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dictation.supported, pending, sent, awaitingAnswer]);
 
   // The message shows and the box clears straight away: updates inside the async transition are held
   // by React until the answer arrives, which made the page look frozen.
@@ -130,7 +142,11 @@ export function Composer({
 
   const submit = () => {
     const t = text.trim();
-    if (t && !pending) run(() => send(conversationId, t), t);
+    if (!t || pending) return;
+    // Typed and sent: the microphone goes off and stays off.
+    dictation.cancel();
+    voiceMode.off();
+    run(() => send(conversationId, t), t);
   };
 
   return (
@@ -193,7 +209,14 @@ export function Composer({
           rows={2}
           maxLength={4000}
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            // Typing takes over from talking.
+            if (dictation.listening) {
+              dictation.cancel();
+              voiceMode.off();
+            }
+            setText(e.target.value);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -205,7 +228,7 @@ export function Composer({
           disabled={pending}
         />
         <DictateButton d={dictation} disabled={pending} />
-        <button type="submit" className="btn btn-primary" disabled={pending || !text.trim()} onClick={() => dictation.stop()}>
+        <button type="submit" className="btn btn-primary" disabled={pending || !text.trim()}>
           Send
         </button>
       </form>
