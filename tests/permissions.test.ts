@@ -99,7 +99,9 @@ describe("route handlers", () => {
     // and the email unsubscribe link (an HMAC of the user id). A custom-project payment link is a
     // capability URL: its unguessable token is the permission, and paying is all it allows. The Rally
     // Beta switch for end-to-end tests (api/e2e/beta) does nothing unless e2eEnabled() (see below).
-    for (const r of routes) expect(read(r), rel(r)).toMatch(/requireRole\(|getCurrentUser\(|webhooks\.constructEvent\(|Bearer \$\{secret\}|validUnsubscribe\(|startLinkCheckout\(token|setBetaOffForE2e\(/);
+    // Website-chat speech (api/speak/guest) only reads the visitor's own chat, found by their guest
+    // cookie; the greeting (api/speak/greeting) is the same public sentence for everyone.
+    for (const r of routes) expect(read(r), rel(r)).toMatch(/requireRole\(|getCurrentUser\(|webhooks\.constructEvent\(|Bearer \$\{secret\}|validUnsubscribe\(|startLinkCheckout\(token|setBetaOffForE2e\(|speakableGuestMessage\(|greetingText\(|rallyVoice\(\)/);
   });
 });
 

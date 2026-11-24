@@ -9,3 +9,7 @@ export function speakableText(markdown: string): string {
     .trim()
     .slice(0, 2500);
 }
+
+/** What Rally says when someone first taps the microphone. */
+export const greetingText = (firstName: string | null) =>
+  `Hi${firstName ? ` ${firstName}` : ""}, I'm Rally. Tell me about the growth decision in front of you, in your own words, and we'll work through it together. Go ahead whenever you're ready.`;

@@ -20,6 +20,7 @@ export function Composer({
   retry,
   awaitingAnswer,
   latestAnswer = null,
+  transcribe = false,
   attach,
   blobPrefix,
 }: {
@@ -30,6 +31,8 @@ export function Composer({
   awaitingAnswer: boolean;
   /** The last answer: in voice mode Rally reads it aloud, then listens for the reply. */
   latestAnswer?: Spoken | null;
+  /** Speech for browsers without their own recognition (recorded, then transcribed). */
+  transcribe?: boolean;
   /** Files in the conversation: uploaded to the company's private store, then read like any upload. */
   attach?: Attach;
   blobPrefix?: string;
@@ -47,6 +50,7 @@ export function Composer({
       voiceMode.on();
       if (!pending) run(() => send(conversationId, said), said);
     },
+    transcribe,
   });
   // Voice mode: once the answer is in, Rally reads it aloud, then the microphone opens for the reply.
   useEffect(() => {

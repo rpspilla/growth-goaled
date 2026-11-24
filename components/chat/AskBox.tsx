@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
-import { useFormStatus } from "react-dom";
+import { useActionState, useRef, useState } from "react";
+import { flushSync, useFormStatus } from "react-dom";
+import { DictateButton, DictationStatus, useDictation, voiceMode } from "./Dictation";
 import type { StartState } from "@/app/(founder)/chat/actions";
 
 type Starter = { id: string; starter: string };
@@ -48,6 +49,7 @@ export function AskBox({
   initialText = "",
   title = "What are you working through?",
   defaultCroId = null,
+  voice = { transcribe: false, voiced: false, name: null },
 }: {
   starters: Starter[];
   start: (prev: StartState, formData: FormData) => Promise<StartState>;
@@ -61,9 +63,26 @@ export function AskBox({
   title?: string;
   /** The company's default (who the ask box starts on). */
   defaultCroId?: string | null;
+  /** Talking to Rally: transcription for browsers without speech recognition; the greeting's voice and name. */
+  voice?: { transcribe: boolean; voiced: boolean; name: string | null };
 }) {
   const [state, action] = useActionState(start, {});
   const [text, setText] = useState(initialText);
+  const form = useRef<HTMLFormElement>(null);
+  const spokenSubmit = useRef(false);
+  // Spoken: asked as soon as they pause; the conversation then reads the answer and listens.
+  const dictation = useDictation(text, setText, {
+    onSpoken: (said) => {
+      const f = form.current;
+      if (!f) return;
+      voiceMode.on();
+      spokenSubmit.current = true;
+      flushSync(() => setText(said));
+      f.requestSubmit(f.querySelector<HTMLButtonElement>("button[value=other]"));
+    },
+    transcribe: voice.transcribe,
+    greeting: { name: voice.name, voiced: voice.voiced },
+  });
   const common = starters.filter((s) => s.id !== "other");
   return (
     <section aria-labelledby="ask-cro" className="surface p-5 sm:p-6 space-y-4">
@@ -75,7 +94,16 @@ export function AskBox({
           {lead ?? "Ask your CRO about any growth decision. It knows your company, your numbers and the work under way, so you won't be asked twice."}
         </p>
       </div>
-      <form action={action} className="space-y-3">
+      <form
+        ref={form}
+        action={action}
+        className="space-y-3"
+        onSubmit={() => {
+          dictation.cancel();
+          if (!spokenSubmit.current) voiceMode.off();
+          spokenSubmit.current = false;
+        }}
+      >
         {fixedCro ? (
           <input type="hidden" name="cro" value={fixedCro.id} />
         ) : (
@@ -101,7 +129,13 @@ export function AskBox({
           rows={3}
           maxLength={4000}
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            if (dictation.listening) {
+              dictation.cancel();
+              voiceMode.off();
+            }
+            setText(e.target.value);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && text.trim()) e.currentTarget.form?.requestSubmit(e.currentTarget.form.querySelector<HTMLButtonElement>("button[value=other]"));
           }}
@@ -110,8 +144,10 @@ export function AskBox({
         />
         <div className="flex items-center gap-3 flex-wrap">
           <AskButton />
+          <DictateButton d={dictation} />
           <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>or start from a common question:</span>
         </div>
+        <DictationStatus d={dictation} />
         <div role="group" aria-label="Common questions" className="flex flex-wrap gap-2">
           {common.map((s) => (
             <StarterChip key={s.id} s={s} />

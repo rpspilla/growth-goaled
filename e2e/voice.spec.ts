@@ -55,3 +55,79 @@ test("a CRO creates their voice; a founder listens to an answer in it", async ({
   expect(other.status()).toBe(404);
   await fctx.close();
 });
+
+/** The speech recognition stand-in: each listen "hears" the next phrase, then ends on silence. */
+const fakeSpeech = (phrases: string[]) => {
+  type Handler = ((e: unknown) => void) | null;
+  if (!sessionStorage.getItem("fake-phrases")) sessionStorage.setItem("fake-phrases", JSON.stringify(phrases));
+  class FakeRecognition {
+    lang = "";
+    continuous = false;
+    interimResults = false;
+    onresult: Handler = null;
+    onerror: Handler = null;
+    onend: (() => void) | null = null;
+    ended = false;
+    start() {
+      const queue = () => JSON.parse(sessionStorage.getItem("fake-phrases") ?? "[]") as string[];
+      const phrase = queue()[0];
+      const result = (text: string, isFinal: boolean) => Object.assign([{ transcript: text }], { isFinal });
+      if (!phrase) return void setTimeout(() => this.end(), 400);
+      setTimeout(() => {
+        if (this.ended) return;
+        sessionStorage.setItem("fake-phrases", JSON.stringify(queue().slice(1)));
+        this.onresult?.({ resultIndex: 0, results: [result(phrase, true)] });
+      }, 150);
+    }
+    end() {
+      if (this.ended) return;
+      this.ended = true;
+      this.onend?.();
+    }
+    stop() {
+      setTimeout(() => this.end(), 10);
+    }
+    abort() {
+      setTimeout(() => this.end(), 10);
+    }
+  }
+  for (const name of ["SpeechRecognition", "webkitSpeechRecognition"]) Object.defineProperty(window, name, { value: FakeRecognition, configurable: true, writable: true });
+};
+
+test("a visitor talks to Rally from the landing page, hands-free; founders have the microphone on the Overview", async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const page = await ctx.newPage();
+  await page.addInitScript(fakeSpeech, ["Our pipeline isn't converting.", "Robin Guest"]);
+  await page.goto("/sign-in");
+  await page.getByText("Or ask Rally a question first").click();
+  // First tap: Rally says hello, then listens; a pause sends; Rally answers aloud and listens again.
+  await page.getByRole("button", { name: "Talk to Rally" }).click();
+  const chat = page.getByRole("list", { name: "Conversation", exact: true });
+  await expect(chat).toContainText("Our pipeline isn't converting.", { timeout: 60_000 });
+  await expect(chat).toContainText("What's your name?");
+  await expect(chat).toContainText("Robin Guest", { timeout: 60_000 });
+  await expect(page.getByText("Thanks, Robin. What's your company called?")).toBeVisible({ timeout: 30_000 });
+  // Nothing more said: the microphone goes off, and the box is empty.
+  await expect(page.getByRole("button", { name: "Talk to Rally" })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByLabel("Your answer")).toHaveValue("");
+  await expect(chat.getByRole("button", { name: "Listen" }).first()).toBeVisible();
+  // Website chat speech only for the visitor's own chat (no voice set up here: nothing to stream).
+  expect((await page.request.get("/api/speak/guest/2")).status()).toBe(404);
+  // Transcription is for visitors with a chat under way, or people signed in.
+  const t = await page.request.post("/api/transcribe", { multipart: { audio: { name: "s.webm", mimeType: "audio/webm", buffer: Buffer.alloc(500, 1) } } });
+  expect(await t.json()).toMatchObject({ ok: true, text: expect.stringContaining("what should we focus on") });
+  const anon = await browser.newContext();
+  const noChat = await anon.request.post("http://localhost:3210/api/transcribe", { multipart: { audio: { name: "s.webm", mimeType: "audio/webm", buffer: Buffer.alloc(500, 1) } } });
+  expect(noChat.status()).toBe(401);
+  await anon.close();
+  await ctx.close();
+
+  // The founder's Overview has the microphone too.
+  const f = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  await f.addCookies([{ name: "gg_e2e_user", value: "voice-founder@e2e.test", domain: "localhost", path: "/" }]);
+  const fp = await f.newPage();
+  await fp.goto("/overview");
+  await expect(fp.getByRole("heading", { name: "What are you working through?" })).toBeVisible({ timeout: 60_000 });
+  await expect(fp.getByRole("button", { name: "Talk to Rally" })).toBeVisible();
+  await f.close();
+});

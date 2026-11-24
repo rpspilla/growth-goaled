@@ -17,6 +17,8 @@ export function CroVoice({
   croId,
   name,
   voiceReady,
+  isRallyVoice = false,
+  setRally,
   configured,
   link,
   remove,
@@ -24,6 +26,9 @@ export function CroVoice({
   croId: string;
   name: string;
   voiceReady: boolean;
+  /** Their voice also speaks for Rally (the Collective, the website chat, the greeting). */
+  isRallyVoice?: boolean;
+  setRally?: (croId: string, on: boolean) => Promise<Result>;
   configured: boolean;
   link: (croId: string, voiceId: string, consent: boolean) => Promise<Result>;
   remove: (croId: string) => Promise<Result>;
@@ -146,6 +151,26 @@ export function CroVoice({
             <Trash2 size={14} aria-hidden /> Remove my voice
           </button>
         </div>
+      )}
+      {voiceReady && setRally && (
+        <label className="flex items-start gap-2 text-sm max-w-3xl rounded-lg px-3 py-2" style={{ background: "var(--green-muted)", color: "var(--foreground)" }}>
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={isRallyVoice}
+            disabled={pending}
+            onChange={(e) =>
+              start(async () => {
+                const r = await setRally(croId, e.target.checked);
+                setMsg(r.ok ? { kind: "ok", text: e.target.checked ? "Rally now speaks in your voice." : "Rally's own voice is back to the standard one." } : { kind: "error", text: r.error });
+                router.refresh();
+              })
+            }
+          />
+          <span>
+            <span className="font-semibold">Use my voice as Rally&apos;s voice.</span> The Collective&apos;s answers, the website chat on the landing page and Rally&apos;s greeting speak in your voice too (labelled as an AI voice). One CRO&apos;s voice at a time.
+          </span>
+        </label>
       )}
 
       <div className="space-y-3">

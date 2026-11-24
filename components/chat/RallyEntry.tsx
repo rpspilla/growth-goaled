@@ -66,6 +66,7 @@ export function RallyEntry({
   firstName,
   companyName,
   continueWith,
+  voice = { transcribe: false, voiced: false },
 }: {
   start: (prev: StartState, formData: FormData) => Promise<StartState>;
   cros: CroCard[];
@@ -75,6 +76,8 @@ export function RallyEntry({
   firstName: string | null;
   companyName: string;
   continueWith: { id: string; title: string } | null;
+  /** transcribe: speech for browsers without their own recognition; voiced: Rally has a real voice (the greeting). */
+  voice?: { transcribe: boolean; voiced: boolean };
 }) {
   const [state, action] = useActionState(start, {});
   const [croId, setCroId] = useState(cros.some((c) => c.id === defaultCroId) ? defaultCroId! : "");
@@ -92,6 +95,8 @@ export function RallyEntry({
       (f.elements.namedItem("question") as HTMLInputElement).value = "";
       f.requestSubmit(f.querySelector<HTMLButtonElement>("button.btn-primary"));
     },
+    transcribe: voice.transcribe,
+    greeting: { name: firstName, voiced: voice.voiced },
   });
   const cro = cros.find((c) => c.id === croId) ?? null;
   const who = cro ? cro.name.split(" ")[0] : "Rally";

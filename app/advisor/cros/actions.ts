@@ -227,3 +227,13 @@ export async function removeVoiceAction(croId: string) {
   if (r.ok) refresh();
   return r;
 }
+
+/** The CRO's choice to be Rally's voice too (the Collective, the website chat, the greeting). */
+export async function rallyVoiceAction(croId: string, on: boolean) {
+  const user = await staff();
+  if (!uuid(croId)) return { ok: false as const, error: "That CRO wasn't found." };
+  const { setRallyVoice } = await import("@/lib/data/voice");
+  const r = await setRallyVoice(user, croId, on === true);
+  if (r.ok) refresh();
+  return r;
+}

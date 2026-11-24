@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { askVoice } from "@/lib/data/voice";
 import { isBeta } from "@/lib/beta";
 import { notFound, redirect } from "next/navigation";
 import { AskBox } from "@/components/chat/AskBox";
@@ -16,7 +17,8 @@ const fg = { color: "var(--foreground)" };
 
 /** One CRO, as founders see them: who they are, what they know, how they think, and their AI to ask. */
 export default async function CroPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { company } = await founderContext();
+  const { user, company } = await founderContext();
+  const voice = await askVoice(user);
   if (!company) redirect("/welcome");
   const { slug } = await params;
   const cro = await publishedCro(slug);
@@ -46,7 +48,7 @@ export default async function CroPage({ params }: { params: Promise<{ slug: stri
         </div>
       </div>
 
-      <AskBox
+      <AskBox voice={voice}
         starters={CHAT_TOPICS.map((t) => ({ id: t.id, starter: t.starter }))}
         start={startChatAction}
         fixedCro={{ id: cro.id, name: cro.name }}

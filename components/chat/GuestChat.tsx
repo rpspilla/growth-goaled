@@ -9,6 +9,8 @@ import { authClient } from "@/lib/auth/client";
 import type { RecommendationCard } from "@/lib/db/schema";
 import { trackSignupEvent } from "@/app/(auth)/actions";
 import { RecommendationCardView } from "./RecommendationCardView";
+import { DictateButton, DictationStatus, useDictation, voiceMode } from "./Dictation";
+import { ListenButton, speak, speakingNow, stopSpeaking, type Spoken } from "./Speaker";
 import { HumanPresence } from "@/components/brand/HumanPresence";
 import { FREE_QUESTIONS, type CapScope } from "@/lib/guest/limits";
 import { ADVISOR_CALENDLY } from "./AdvisorNudge";
@@ -47,6 +49,7 @@ export function GuestChat({
   chooseCro,
   preferredCroId = null,
   beta = false,
+  voice = { transcribe: false, voiced: false, who: null },
 }: {
   view: GuestViewData;
   reply: (text: string) => Promise<Result>;
@@ -57,6 +60,8 @@ export function GuestChat({
   preferredCroId?: string | null;
   /** The Rally Beta (lib/beta): no paid-plan prompts or "a real CRO reviews every action plan"; the way on is free Beta access. */
   beta?: boolean;
+  /** Talking to Rally: transcription for browsers without speech recognition; whether Rally has a real voice, and whose. */
+  voice?: { transcribe: boolean; voiced: boolean; who: string | null };
 }) {
   const [text, setText] = useState("");
   // The message on its way, shown straight away (outside the transition, whose updates React holds
@@ -100,6 +105,19 @@ export function GuestChat({
     void chooseCro(preferredCroId).then(() => router.refresh());
   }, [preferredCroId, chooseCro, view.croLocked, view.croId, router]);
 
+  // Talk to Rally: a pause sends it; Rally reads each reply aloud and listens again (voice mode).
+  const dictation = useDictation(text, setText, {
+    onSpoken: (said) => {
+      voiceMode.on();
+      send(said);
+    },
+    transcribe: voice.transcribe,
+    greeting: { name: null, voiced: voice.voiced },
+  });
+  const spokenOf = (i: number): Spoken => ({ id: `guest-${i}`, text: view.messages[i]?.content ?? "", voiced: voice.voiced, who: voice.who, src: `/api/speak/guest/${i}` });
+  const lastIndex = view.messages.length - 1;
+  const lastIsRally = lastIndex > 0 && view.messages[lastIndex]?.role === "assistant";
+
   const send = (value: string) => {
     setError(null);
     setOutgoing({ text: value, base: view.messages.length });
@@ -122,12 +140,31 @@ export function GuestChat({
     e.preventDefault();
     if (pending || sent !== null) return;
     if (!text.trim()) return;
+    // Typed: the microphone goes off and stays off, and Rally stops reading.
+    dictation.cancel();
+    stopSpeaking();
+    voiceMode.off();
     send(text);
   };
 
   const step = view.step;
   // With a recommendation waiting behind the email, only the recommendation and the email box show.
   const locked = Boolean(view.card) && !view.emailed;
+  // Voice mode: Rally reads its latest message aloud, then listens for the answer.
+  useEffect(() => {
+    if (!dictation.supported || pending || sent !== null || locked || view.capped || !lastIsRally || text.trim() || speakingNow()) return;
+    if (!voiceMode.get()) return;
+    const key = `rally-guest-spoken:${lastIndex}:${view.messages[lastIndex]?.content.length ?? 0}`;
+    let read = true;
+    try {
+      read = sessionStorage.getItem(key) === "1";
+      sessionStorage.setItem(key, "1");
+    } catch {}
+    const listen = () => voiceMode.get() && dictation.start({ quiet: true });
+    if (!read) speak(spokenOf(lastIndex), listen);
+    else listen();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dictation.supported, pending, sent, locked, view.capped, lastIndex]);
   const capped = view.capped;
   // The last sign-up answer (if it reads as one) hands over to the AI: say so, and show it working.
   const spinningUp = Boolean(step && sent !== null && step.key === LAST_STEP && understand({ ...step, options: step.options ?? undefined } as GuestStep, sent) !== null);
@@ -157,8 +194,9 @@ export function GuestChat({
               <p className="rounded-2xl px-4 py-2.5 text-base max-w-[85%] whitespace-pre-wrap" style={{ background: "var(--navy)", color: "#fff" }}>{m.content}</p>
             </li>
           ) : (
-            <li key={i}>
+            <li key={i} className="space-y-1.5">
               <p className="text-base whitespace-pre-wrap leading-relaxed" style={{ color: "var(--foreground)" }}>{m.content}</p>
+              <ListenButton answer={spokenOf(i)} />
             </li>
           ),
         )}
@@ -204,6 +242,10 @@ export function GuestChat({
           autoFocus
           placeholder={spinningUp ? "Building your recommendation…" : (step?.placeholder ?? "Reply…")}
           onChange={(e) => {
+            if (dictation.listening) {
+              dictation.cancel();
+              voiceMode.off();
+            }
             setText(e.target.value);
             e.target.style.height = "auto";
             e.target.style.height = `${e.target.scrollHeight}px`;
@@ -212,11 +254,13 @@ export function GuestChat({
             if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) submit(e);
           }}
         />
+        <DictateButton d={dictation} disabled={pending || sent !== null} className="rounded-full w-9 h-9 p-0" />
         <button type="submit" aria-label="Send" title="Send" className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center disabled:opacity-40" style={{ background: "var(--navy)", color: "#fff" }} disabled={pending || sent !== null || !text.trim()}>
           <ArrowUp size={18} aria-hidden />
         </button>
       </form>
       )}
+      {!capped && <DictationStatus d={dictation} />}
       {!capped && aiPhase && view.questionsLeft <= 3 && (
         <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
           {view.questionsLeft} free {view.questionsLeft === 1 ? "question" : "questions"} left.

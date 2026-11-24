@@ -25,7 +25,7 @@ import { schema } from "@/lib/db";
 import type { Company, User } from "@/lib/db/schema";
 import { speakableText } from "@/lib/chat/speakable";
 import { getCroProfile, saveCroProfile, setCroProfileAdmin } from "@/lib/data/cro";
-import { linkCroVoice, removeCroVoice, setCroVoice, speakableAnswer } from "@/lib/data/voice";
+import { linkCroVoice, rallyVoice, removeCroVoice, setCroVoice, setRallyVoice, speakableAnswer, speakableGuestMessage } from "@/lib/data/voice";
 
 type DB = typeof import("@/lib/db").db;
 const db = () => h.db as unknown as DB;
@@ -47,7 +47,7 @@ beforeAll(async () => {
 }, 60_000);
 
 beforeEach(async () => {
-  for (const t of [schema.conversationMessages, schema.conversations, schema.companyMembers, schema.croProfiles, schema.events, schema.companies, schema.users]) await db().delete(t);
+  for (const t of [schema.guestSessions, schema.conversationMessages, schema.conversations, schema.companyMembers, schema.croProfiles, schema.events, schema.companies, schema.users]) await db().delete(t);
   [admin, ryan, founder, stranger] = (await db()
     .insert(schema.users)
     .values([
@@ -109,5 +109,26 @@ describe("CRO voices", () => {
     // Unpublished: no voice
     await setCroProfileAdmin(admin, cro, { status: "draft", inCollective: true, userId: ryan.id });
     expect(await speakableAnswer(founder, mine)).toMatchObject({ voiceId: null });
+  });
+
+  it("can be Rally's voice too, by the CRO's choice: the Collective and the website chat speak in it", async () => {
+    const collective = await answer(null);
+    expect(await setRallyVoice(ryan, cro, true)).toEqual({ ok: false, error: "Create your voice first." });
+    await setCroVoice(ryan, cro, { consent: true, files: [audio()] });
+    expect(await setRallyVoice(admin, cro, true)).toMatchObject({ ok: false });
+    expect(await setRallyVoice(ryan, cro, true)).toEqual({ ok: true });
+    expect(await rallyVoice()).toEqual({ voiceId: "voice1abcdefghij", name: "Ryan Spillane" });
+    expect(await speakableAnswer(founder, collective)).toMatchObject({ voiceId: "voice1abcdefghij", cro: "Ryan Spillane" });
+    // The website chat: only the visitor's own chat, only Rally's messages.
+    const { createHash } = await import("node:crypto");
+    const token = "a".repeat(40);
+    await db().insert(schema.guestSessions).values({ tokenHash: createHash("sha256").update(token).digest("hex"), ipHash: "x", messages: [{ role: "assistant", content: "How can we help you grow?", at: "" }, { role: "user", content: "Hi", at: "" }, { role: "assistant", content: "**What's your name?**", at: "" }] } as never);
+    expect(await speakableGuestMessage(token, 2)).toEqual({ text: "What's your name?", voiceId: "voice1abcdefghij" });
+    expect(await speakableGuestMessage(token, 1)).toBeNull();
+    expect(await speakableGuestMessage("b".repeat(40), 2)).toBeNull();
+    // Removing the voice ends it being Rally's.
+    await removeCroVoice(ryan, cro);
+    expect(await rallyVoice()).toBeNull();
+    expect(await speakableAnswer(founder, collective)).toMatchObject({ voiceId: null });
   });
 });

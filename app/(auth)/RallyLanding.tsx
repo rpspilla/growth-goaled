@@ -82,7 +82,7 @@ export async function RallyLanding({ cro }: { cro?: string }) {
         </section>
         <details open={chatting} className="group/ask rounded-xl border px-4 py-3" style={{ borderColor: "var(--border)" }}>
           <summary className="cursor-pointer list-none flex items-center justify-between text-base font-semibold" style={{ color: "var(--foreground)" }}>
-            Or ask Rally a question first
+            <span>Or ask Rally a question first <span className="font-normal text-sm" style={{ color: "var(--muted-foreground)" }}>· type or talk</span></span>
             <span aria-hidden className="transition-transform group-open/ask:rotate-90" style={{ color: "var(--muted-foreground)" }}>›</span>
           </summary>
           <div className="pt-4">

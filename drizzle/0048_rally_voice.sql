@@ -1,0 +1,1 @@
+ALTER TABLE "cro_profiles" ADD COLUMN "rally_voice" boolean DEFAULT false NOT NULL;

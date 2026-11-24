@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { askVoice } from "@/lib/data/voice";
 import { redirect } from "next/navigation";
 import { CalendarCheck } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
@@ -64,6 +65,7 @@ function benchmarkLead(peers: PeerComparison[]): string {
 export default async function OverviewPage({ searchParams }: { searchParams: Promise<{ welcome?: string }> }) {
   const { welcome } = await searchParams;
   const { user, company } = await founderContext();
+  const voice = await askVoice(user);
   if (!company) redirect("/welcome");
   const [perf, peers, site, projects, priorities, conversations, commitments, cros] = await Promise.all([
     companyPerformance(company),
@@ -113,7 +115,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
       )}
 
 
-      <AskBox starters={CHAT_TOPICS.map((t) => ({ id: t.id, starter: t.starter }))} start={startChatAction} cros={cros.map((c) => ({ id: c.id, name: c.name }))} defaultCroId={company.defaultCroId} />
+      <AskBox voice={voice} starters={CHAT_TOPICS.map((t) => ({ id: t.id, starter: t.starter }))} start={startChatAction} cros={cros.map((c) => ({ id: c.id, name: c.name }))} defaultCroId={company.defaultCroId} />
 
       {conversations.length > 0 && (
         <Section id="conversations" title="Pick up where you left off" aside={<Link href="/whats-next" className="link text-sm">All conversations →</Link>}>

@@ -2,7 +2,7 @@
 
 import { Square, Volume2 } from "lucide-react";
 import { useSyncExternalStore } from "react";
-import { speakableText } from "@/lib/chat/speakable";
+import { greetingText, speakableText } from "@/lib/chat/speakable";
 
 /**
  * Rally reads its answers aloud (Nov 24, 2026): in the voice of the CRO who gave it when they've set
@@ -10,7 +10,8 @@ import { speakableText } from "@/lib/chat/speakable";
  * time; talking or typing stops it.
  */
 
-export type Spoken = { id: string; text: string; voiced: boolean; who: string | null };
+/** src: where its audio comes from (default /api/speak/<id>, a signed-in conversation's answer). */
+export type Spoken = { id: string; text: string; voiced: boolean; who: string | null; src?: string };
 
 let current: { id: string; audio: HTMLAudioElement | null; done: () => void } | null = null;
 const listeners = new Set<() => void>();
@@ -68,7 +69,7 @@ export function speak(a: Spoken, onEnd?: () => void) {
   current = me;
   emit();
   if (a.voiced) {
-    const audio = new Audio(`/api/speak/${a.id}`);
+    const audio = new Audio(a.src ?? `/api/speak/${a.id}`);
     me.audio = audio;
     audio.onended = finish;
     // The CRO's voice didn't come through: the browser's voice reads it instead.
@@ -76,6 +77,11 @@ export function speak(a: Spoken, onEnd?: () => void) {
     audio.onerror = fallback;
     audio.play().catch(fallback);
   } else browserVoice(a.text, finish);
+}
+
+/** Rally's greeting, in Rally's voice when there is one (the browser's otherwise); then onEnd. */
+export function greet(firstName: string | null, voiced: boolean, onEnd: () => void) {
+  speak({ id: "greeting", text: greetingText(firstName), voiced, who: null, src: `/api/speak/greeting${firstName ? `?name=${encodeURIComponent(firstName)}` : ""}` }, onEnd);
 }
 
 export const useSpeaking = () => useSyncExternalStore(subscribe, () => current?.id ?? null, () => null);

@@ -83,3 +83,16 @@ export async function speech(voiceId: string, text: string): Promise<{ body: Rea
   if (!res.ok || !res.body) throw await failure(res, "read the answer aloud");
   return { body: res.body, type: "audio/mpeg" };
 }
+
+/** Speech to text, for browsers without their own speech recognition (ElevenLabs Scribe). */
+export async function transcribe(file: { filename: string; type: string; bytes: Uint8Array }): Promise<string> {
+  if (e2eEnabled()) return "Test mode: what should we focus on next quarter?";
+  if (!key()) throw new VoiceError("Speech isn't switched on yet.");
+  const form = new FormData();
+  form.set("model_id", process.env.ELEVENLABS_STT_MODEL || "scribe_v1");
+  form.set("file", new Blob([file.bytes as BlobPart], { type: file.type || "audio/webm" }), file.filename);
+  const res = await fetch(`${API}/speech-to-text`, { method: "POST", headers: { "xi-api-key": key() }, body: form });
+  if (!res.ok) throw await failure(res, "hear that");
+  const json = (await res.json()) as { text?: string };
+  return (json.text ?? "").trim();
+}

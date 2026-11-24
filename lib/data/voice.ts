@@ -66,13 +66,43 @@ export async function removeCroVoice(actor: Actor, croId: string): Promise<Voice
   const own = await ownProfile(actor, croId);
   if (!own.ok) return own;
   if (own.cro.voiceId) await deleteVoice(own.cro.voiceId).catch((err) => console.error("[voice] Voice not deleted", err));
-  await db.update(schema.croProfiles).set({ voiceId: null, voiceConsentAt: null, updatedAt: new Date() }).where(eq(schema.croProfiles.id, croId));
+  await db.update(schema.croProfiles).set({ voiceId: null, voiceConsentAt: null, rallyVoice: false, updatedAt: new Date() }).where(eq(schema.croProfiles.id, croId));
   return { ok: true };
 }
 
 /**
+ * The CRO's own choice to be Rally's voice too: the Collective's answers, the website chat and the
+ * greeting speak in it. One Rally voice at a time (turning it on turns any other off).
+ */
+export async function setRallyVoice(actor: Actor, croId: string, on: boolean): Promise<VoiceResult> {
+  const own = await ownProfile(actor, croId);
+  if (!own.ok) return own;
+  if (on && !(own.cro.voiceId && own.cro.voiceConsentAt)) return { ok: false, error: "Create your voice first." };
+  if (on) await db.update(schema.croProfiles).set({ rallyVoice: false }).where(eq(schema.croProfiles.rallyVoice, true));
+  await db.update(schema.croProfiles).set({ rallyVoice: on, updatedAt: new Date() }).where(eq(schema.croProfiles.id, croId));
+  return { ok: true };
+}
+
+/** Rally's own voice (a published CRO's, by their choice), if one is set up. */
+export async function rallyVoice(): Promise<{ voiceId: string; name: string } | null> {
+  const [v] = await db
+    .select({ voiceId: schema.croProfiles.voiceId, name: schema.croProfiles.name, consent: schema.croProfiles.voiceConsentAt })
+    .from(schema.croProfiles)
+    .where(and(eq(schema.croProfiles.rallyVoice, true), eq(schema.croProfiles.status, "published")))
+    .limit(1);
+  return v?.voiceId && v.consent ? { voiceId: v.voiceId, name: v.name } : null;
+}
+
+/** The voice an answer is read in: its CRO's own, else Rally's, else none (the browser's voice). */
+export async function voiceFor(croId: string | null): Promise<{ voiceId: string; name: string } | null> {
+  const cro = croId ? await getCroProfile(croId) : null;
+  if (cro && cro.status === "published" && cro.voiceId && cro.voiceConsentAt) return { voiceId: cro.voiceId, name: cro.name };
+  return rallyVoice();
+}
+
+/**
  * An answer to read aloud, for someone who may see its conversation: the text, and the voice of the
- * CRO who gave it (null for the Collective or a CRO without a voice: the browser's own voice reads it).
+ * CRO who gave it, or Rally's (null when neither is set up: the browser's own voice reads it).
  */
 export async function speakableAnswer(user: Actor, messageId: string): Promise<{ text: string; voiceId: string | null; cro: string | null } | null> {
   if (!/^[0-9a-f-]{36}$/.test(messageId)) return null;
@@ -89,7 +119,24 @@ export async function speakableAnswer(user: Actor, messageId: string): Promise<{
       ? await db.select({ id: schema.companyMembers.companyId }).from(schema.companyMembers).where(and(eq(schema.companyMembers.companyId, row.companyId), eq(schema.companyMembers.userId, user.id))).limit(1)
       : [];
   if (!canViewCompany(user, { id: row.companyId, advisorId: row.advisorId }, member.map((m) => m.id))) return null;
-  const cro = row.croId ? await getCroProfile(row.croId) : null;
-  const voiced = cro && cro.status === "published" && cro.voiceId && cro.voiceConsentAt ? cro : null;
-  return { text: speakableText(row.content), voiceId: voiced?.voiceId ?? null, cro: voiced?.name ?? null };
+  const voice = await voiceFor(row.croId);
+  return { text: speakableText(row.content), voiceId: voice?.voiceId ?? null, cro: voice?.name ?? null };
+}
+
+/** A website-chat message (by its place in the chat) to read aloud, for the visitor whose chat it is. */
+export async function speakableGuestMessage(token: string | undefined, index: number): Promise<{ text: string; voiceId: string | null } | null> {
+  const { guestByToken } = await import("./guest");
+  const g = await guestByToken(token);
+  const m = g && Number.isInteger(index) && index >= 0 ? g.messages[index] : undefined;
+  if (!g || !m || m.role !== "assistant") return null;
+  const voice = await voiceFor(g.croId ?? null);
+  return { text: speakableText(m.content), voiceId: voice?.voiceId ?? null };
+}
+
+export { greetingText } from "@/lib/chat/speakable";
+
+/** What a founder's ask box needs to talk to Rally: transcription available, a real Rally voice, their first name. */
+export async function askVoice(user: Pick<User, "name">): Promise<{ transcribe: boolean; voiced: boolean; name: string | null }> {
+  const { voiceConfigured } = await import("@/lib/ai/voice");
+  return { transcribe: voiceConfigured(), voiced: Boolean(await rallyVoice()), name: user.name?.trim().split(/\s+/)[0] || null };
 }

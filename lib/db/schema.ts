@@ -1712,6 +1712,8 @@ export const croProfiles = pgTable(
     // Their cloned voice (ElevenLabs voice id) for reading their AI's answers aloud, and when they consented
     voiceId: text("voice_id"),
     voiceConsentAt: timestamp("voice_consent_at", { withTimezone: true }),
+    // This CRO's voice also speaks for Rally itself (the Collective, the website chat, the greeting); set by the CRO
+    rallyVoice: boolean("rally_voice").notNull().default(false),
     voiceAnswers: jsonb("voice_answers").$type<Partial<Record<"q1" | "q2", string>>>().notNull().default({}),
     // Founders see and can talk to published CROs only; a CRO can also stay out of the Collective
     status: croProfileStatus("status").notNull().default("draft"),

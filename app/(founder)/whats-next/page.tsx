@@ -8,6 +8,8 @@ import { companyCommitments } from "@/lib/data/commitments";
 import { listCroProfiles } from "@/lib/data/cro";
 import { founderContext } from "@/lib/data/founder-context";
 import { suggestionsFor } from "@/lib/chat/suggestions";
+import { voiceConfigured } from "@/lib/ai/voice";
+import { rallyVoice } from "@/lib/data/voice";
 import { removeFactAction, startChatAction, updateFactAction } from "../chat/actions";
 
 export const maxDuration = 300;
@@ -25,7 +27,7 @@ const isRecent = (d: Date) => Date.now() - d.getTime() < RECENT_DAYS * 86_400_00
 export default async function RallyPage() {
   const { user, company } = await founderContext();
   if (!company) redirect("/welcome");
-  const [conversations, facts, cros, open] = await Promise.all([listConversations(company, 50), listFacts(company), listCroProfiles({ published: true }), companyCommitments(company, { status: ["open"] })]);
+  const [conversations, facts, cros, open, rally] = await Promise.all([listConversations(company, 50), listFacts(company), listCroProfiles({ published: true }), companyCommitments(company, { status: ["open"] }), rallyVoice()]);
   const latest = conversations[0];
   const continueWith = latest && isRecent(latest.updatedAt) ? { id: latest.id, title: latest.title } : null;
   return (
@@ -39,6 +41,7 @@ export default async function RallyPage() {
         firstName={user.name?.trim().split(/\s+/)[0] || null}
         companyName={company.name}
         continueWith={continueWith}
+        voice={{ transcribe: voiceConfigured(), voiced: Boolean(rally) }}
       />
 
       <section id="facts" aria-labelledby="history-title" className="scroll-mt-24 space-y-4">

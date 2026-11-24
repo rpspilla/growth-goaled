@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { askVoice } from "@/lib/data/voice";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { AskBox } from "@/components/chat/AskBox";
@@ -22,7 +23,8 @@ export const maxDuration = 300;
  * talk the week through with the CRO, starting from a summary of where things stand.
  */
 export default async function CheckinPage() {
-  const { company } = await founderContext();
+  const { user, company } = await founderContext();
+  const voice = await askVoice(user);
   if (!company) redirect("/welcome");
   const on = today();
   const [items, projects, all] = await Promise.all([checkinItems(company, on), companyProjects(company), companyCommitments(company)]);
@@ -53,7 +55,7 @@ export default async function CheckinPage() {
         </Section>
       ))}
 
-      <AskBox
+      <AskBox voice={voice}
         title="Talk the week through with your CRO"
         lead="We've written where things stand. Add anything else, then ask."
         starters={CHAT_TOPICS.map((t) => ({ id: t.id, starter: t.starter }))}

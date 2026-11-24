@@ -337,6 +337,13 @@
       "when": 1795549328767,
       "tag": "0047_cro_voice_clone",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1795553505004,
+      "tag": "0048_rally_voice",
+      "breakpoints": true
     }
   ]
 }
