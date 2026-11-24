@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { FileProgress } from "./FileProgress";
 import { upload } from "@vercel/blob/client";
 import { Paperclip, Upload } from "lucide-react";
+import { DictateButton, DictationStatus, useDictation } from "./Dictation";
 import { contentTypeFor, INBOX_FOLDER, MAX_UPLOAD_BYTES } from "@/lib/documents";
 import { sha256 } from "@/components/readiness/hash";
 
@@ -32,6 +33,7 @@ export function Composer({
   const fileInput = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState<string | null>(null);
   const [text, setText] = useState("");
+  const dictation = useDictation(text, setText);
   const [sent, setSent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -202,10 +204,12 @@ export function Composer({
           className="field flex-1 resize-y"
           disabled={pending}
         />
-        <button type="submit" className="btn btn-primary" disabled={pending || !text.trim()}>
+        <DictateButton d={dictation} disabled={pending} />
+        <button type="submit" className="btn btn-primary" disabled={pending || !text.trim()} onClick={() => dictation.stop()}>
           Send
         </button>
       </form>
+      <DictationStatus d={dictation} />
     </div>
   );
 }

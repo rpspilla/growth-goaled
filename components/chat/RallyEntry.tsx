@@ -6,6 +6,7 @@ import { useFormStatus } from "react-dom";
 import type { StartState } from "@/app/(founder)/chat/actions";
 import type { Suggestion } from "@/lib/chat/suggestions";
 import { CroIdentity, type CroCard } from "./CroIdentity";
+import { DictateButton, DictationStatus, useDictation } from "./Dictation";
 
 function Send() {
   const { pending, data } = useFormStatus();
@@ -77,6 +78,7 @@ export function RallyEntry({
   const [state, action] = useActionState(start, {});
   const [croId, setCroId] = useState(cros.some((c) => c.id === defaultCroId) ? defaultCroId! : "");
   const [text, setText] = useState("");
+  const dictation = useDictation(text, setText);
   const cro = cros.find((c) => c.id === croId) ?? null;
   const who = cro ? cro.name.split(" ")[0] : "Rally";
   return (
@@ -139,10 +141,14 @@ export function RallyEntry({
           />
           <div className="flex items-center justify-between gap-3">
             <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>Rally knows {companyName}&apos;s context, so you won&apos;t be asked twice.</span>
-            <Send />
+            <span className="flex items-center gap-2">
+              <DictateButton d={dictation} />
+              <Send />
+            </span>
           </div>
         </div>
       </form>
+      <DictationStatus d={dictation} />
       {state.error && (
         <p role="alert" className="text-base" style={{ color: "var(--red)" }}>
           {state.error}

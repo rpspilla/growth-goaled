@@ -19,13 +19,43 @@ test("Rally Beta: rate answers, share feedback, and read the Beta metrics", asyn
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   await ctx.addCookies([{ name: "gg_e2e_user", value: "rally-founder@e2e.test", domain: "localhost", path: "/" }]);
   const page = await ctx.newPage();
+  // Speech recognition stand-in: "hears" a question in two parts (interim, then final) and ends on stop.
+  await page.addInitScript(() => {
+    type Handler = ((e: unknown) => void) | null;
+    class FakeRecognition {
+      lang = "";
+      continuous = false;
+      interimResults = false;
+      onresult: Handler = null;
+      onerror: Handler = null;
+      onend: (() => void) | null = null;
+      start() {
+        const result = (text: string, isFinal: boolean) => Object.assign([{ transcript: text }], { isFinal });
+        setTimeout(() => this.onresult?.({ resultIndex: 0, results: [result("Where should we", false)] }), 50);
+        setTimeout(() => this.onresult?.({ resultIndex: 0, results: [result("Where should we focus next quarter?", true)] }), 150);
+      }
+      stop() {
+        setTimeout(() => this.onend?.(), 10);
+      }
+      abort() {}
+    }
+    for (const name of ["SpeechRecognition", "webkitSpeechRecognition"]) Object.defineProperty(window, name, { value: FakeRecognition, configurable: true, writable: true });
+  });
   await page.goto("/start");
   await expect(page.getByRole("heading", { name: "What's the growth decision in front of you, Sam?" })).toBeVisible({ timeout: 120_000 });
   // Series A suggestions
   await expect(page.getByRole("group", { name: "Suggested questions" })).toContainText("Should we hire more salespeople?");
-  await page.getByRole("textbox", { name: "Ask Rally" }).fill("Where should we focus next quarter?");
+  // Speak instead of typing: the words land in the box, editable, then send as usual.
+  await page.getByRole("button", { name: "Speak your question" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Listening…" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Ask Rally" })).toHaveValue("Where should we focus next quarter?");
+  await page.getByRole("button", { name: "Stop speaking" }).click();
+  await expect(page.getByRole("button", { name: "Speak your question" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Ask Rally" })).toHaveValue("Where should we focus next quarter?");
   await page.getByRole("button", { name: "Ask", exact: true }).click();
   await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/);
+  // The reply box has the microphone too.
+  await expect(page.getByRole("button", { name: "Speak your question" })).toBeVisible();
   await page.getByLabel("Your reply").fill("We have 3 reps.");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByText("See the full reasoning").last()).toBeVisible();
