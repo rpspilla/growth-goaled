@@ -40,7 +40,7 @@ export async function RallyLanding({ cro }: { cro?: string }) {
                 Your CRO.<br />
                 <em style={{ color: "#3DDC97" }}>Ready when you are.</em>
               </h1>
-              <p className="text-lg mt-5 max-w-lg" style={{ color: "#C8D3E0" }}>{RALLY.description}</p>
+              <p className="text-lg mt-5 max-w-lg" style={{ color: "#C8D3E0" }}>{RALLY.landing}</p>
             </div>
             {/* Phones and tablets: a "Watch" row that opens the video in place. */}
             <div className="lg:hidden">

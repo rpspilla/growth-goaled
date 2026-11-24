@@ -2,7 +2,7 @@ import Link from "next/link";
 import { LegalLinks } from "@/components/legal/LegalLinks";
 import type { ReactNode } from "react";
 import { StagingBadge } from "@/components/shell/Shell";
-import { RallyLogo } from "@/components/brand/Rally";
+import { RallyHeroLogo, RallyLogo } from "@/components/brand/Rally";
 
 const Check = () => (
   <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden className="shrink-0 mt-0.5">
@@ -41,7 +41,7 @@ export function AuthShell({ brand, children, wide = false }: { brand: ReactNode;
         />
         <div className="relative flex items-center gap-2.5">
           <Link href="/sign-in" aria-label="Rally by Growth Goaled">
-            <RallyLogo />
+            {wide ? <RallyHeroLogo /> : <RallyLogo />}
           </Link>
           <StagingBadge />
         </div>
