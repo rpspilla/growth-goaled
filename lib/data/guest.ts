@@ -296,14 +296,14 @@ export async function notifyNewLead(guestId: string, appUrl: string, opts: { for
  * their profile, and a saved conversation with its recommendation. Only for the email they gave.
  */
 /**
- * The website chat that belongs to this person: the one in this browser (its cookie), unless it was
- * given someone else's email; or, in another browser (an email app's), their latest unclaimed chat
- * under the email they signed in with.
+ * The website chat that belongs to this person: the one in this browser (its cookie: whoever signs in
+ * here just had that conversation, even if they gave a different email in it); or, in another browser
+ * (an email app's), their latest unclaimed chat under the email they signed in with.
  */
 export async function guestFor(user: Pick<User, "email">, token: string | undefined | null): Promise<GuestSession | null> {
   const email = user.email.trim().toLowerCase();
   const here = await guestByToken(token);
-  if (here && !here.claimedAt && (!here.email || here.email === email)) return here;
+  if (here && !here.claimedAt) return here;
   const [byEmail] = await db
     .select()
     .from(schema.guestSessions)

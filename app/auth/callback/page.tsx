@@ -4,10 +4,13 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { authClient } from "@/lib/auth/client";
 
-/** Same-site path to continue to after sign-in (e.g. an invite); anything else falls back to "/". */
+/**
+ * Same-site path to continue to after sign-in (e.g. an invite); anything else goes to /claim, which
+ * brings over a website chat from this browser and otherwise routes by role, like "/".
+ */
 function nextPath(): string {
   const next = new URLSearchParams(window.location.search).get("next");
-  return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/";
+  return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/claim";
 }
 
 /**

@@ -23,5 +23,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL(`/chat/${claimed.conversationId}${anchor}`, request.url));
   }
   if (request.nextUrl.searchParams.get("to") === "library" && !needsOnboarding(user) && user.role === "founder") return NextResponse.redirect(new URL("/overview", request.url));
-  return NextResponse.redirect(new URL(needsOnboarding(user) ? "/welcome" : homePathFor(user.role), request.url));
+  // ?claimed=0 stops /welcome sending them straight back here.
+  return NextResponse.redirect(new URL(needsOnboarding(user) ? "/welcome?claimed=0" : homePathFor(user.role), request.url));
 }

@@ -123,7 +123,8 @@ describe("guest chat", () => {
         { email: "Sam@Acme.test", authUserId: "s", role: "founder" },
       ])
       .returning()) as [User, User];
-    expect(await claimGuest(stranger, token)).toBeNull();
+    // Without this browser's chat, only the email given in it finds it.
+    expect(await claimGuest(stranger, null)).toBeNull();
     const claimed = await claimGuest(sam, token);
     expect(claimed).not.toBeNull();
     expect(await claimGuest(sam, token)).toBeNull();
@@ -159,6 +160,14 @@ describe("guest chat", () => {
     await guestEmail(await current(), "lee@beta.test");
     const [lee] = (await db().insert(schema.users).values({ email: "lee@beta.test", authUserId: "l", role: "founder" }).returning()) as [User];
     expect(await claimGuest(lee, null)).not.toBeNull();
+  });
+
+  it("in the browser that had the chat, it comes over even when they sign in with a different email than they gave", async () => {
+    await startGuest(token, null);
+    await answerAll();
+    await guestEmail(await current(), "personal@gmail.test");
+    const [work] = (await db().insert(schema.users).values({ email: "sam@acme.test", authUserId: "s", role: "founder" }).returning()) as [User];
+    expect(await claimGuest(work, token)).not.toBeNull();
   });
 
   it("a chat that stopped before the basics stays unclaimed, so /welcome asks only the rest and the chat comes over after", async () => {

@@ -6,6 +6,7 @@ import { needsOnboarding } from "@/lib/onboarding";
 import { getFounderCompany } from "@/lib/data/companies";
 import { cookies } from "next/headers";
 import { guestFor, GUEST_COOKIE } from "@/lib/data/guest";
+import { basicsFrom } from "@/lib/guest/steps";
 import { track } from "@/lib/events";
 import { AuthShell, Points } from "../(auth)/AuthShell";
 import { WelcomeForm } from "./WelcomeForm";
@@ -13,7 +14,7 @@ import { WelcomeForm } from "./WelcomeForm";
 export const metadata: Metadata = { title: "Set up your company · Rally" };
 
 /** First sign-in: founders set up their company (step 2 of 3); advisors and invited founders confirm their profile. */
-export default async function WelcomePage() {
+export default async function WelcomePage({ searchParams }: { searchParams: Promise<{ claimed?: string }> }) {
   const user = await requireUser({ allowIncomplete: true });
   if (!needsOnboarding(user)) redirect(homePathFor(user.role));
   const isFounder = user.role === "founder";
@@ -22,6 +23,8 @@ export default async function WelcomePage() {
   const askCompany = isFounder && !company;
   // What they already told Rally in the website chat, so nothing is asked twice.
   const guest = askCompany ? await guestFor(user, (await cookies()).get(GUEST_COOKIE)?.value).catch(() => null) : null;
+  // Rally already has the basics from the website chat (however they signed in): straight into it.
+  if (guest && basicsFrom(guest.profile) && (await searchParams).claimed !== "0") redirect("/claim");
   const known = guest?.profile ?? {};
   const values = Object.fromEntries(["companyName", "revenueBand", "foundedYear", "vertical", "verticalOther", "stage", "aes", "bdrs", "cs"].filter((k) => known[k]).map((k) => [k, String(known[k])]));
   await track("welcome_viewed", { userId: user.id, props: { role: user.role, new_company: askCompany } });

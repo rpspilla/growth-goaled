@@ -175,3 +175,28 @@ test("signing up from the landing page after a partial chat only asks what Rally
   await expect(page.getByLabel("Your name")).toHaveValue("Pat Partial");
   await expect(page.getByLabel(/Company name/)).toHaveValue("Halfway Co");
 });
+
+/** However the sign-in link lands (here, the home page), a finished website chat skips Step 2 and opens as the conversation. */
+test("after a full landing-page chat, signing in by any route opens the conversation, not Step 2", async ({ browser }) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await page.goto("/sign-in");
+  await page.getByText("Or ask Rally a question first").click();
+  const answer = async (text: string) => {
+    await page.getByLabel("Your answer").fill(text);
+    await page.getByRole("button", { name: "Send", exact: true }).click();
+  };
+  await answer("Do we need a VP of Sales yet?");
+  await expect(page.getByText("What's your name?")).toBeVisible();
+  for (const [a, next] of [["Fran Full", /company called/], ["Fullstop", /revenue|ARR/i], ["about $2M", /founded/], ["2022", /stage|raised/i], ["seed", /vertical|industry|space/i], ["fintech", /AEs|account executives/i], ["2", /BDR|SDR/i], ["0", /customer success/i]] as const) {
+    await answer(a);
+    await expect(page.getByText(next).last()).toBeVisible();
+  }
+  await answer("1");
+  await expect(page.getByText(/Test mode: let's work through/)).toBeVisible({ timeout: 60_000 });
+  await ctx.addCookies([{ name: "gg_e2e_user", value: "fran@work.test", domain: "localhost", path: "/" }]);
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}/);
+  await expect(page.getByRole("heading", { name: "Do we need a VP of Sales yet?" })).toBeVisible();
+  await ctx.close();
+});
