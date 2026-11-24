@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { RALLY } from "@/components/brand/Rally";
+import { IntroVideo } from "@/components/brand/IntroVideo";
 import { listCroProfiles } from "@/lib/data/cro";
 import { GUEST_COOKIE, guestByToken } from "@/lib/data/guest";
 import { AuthShell } from "./AuthShell";
@@ -30,32 +31,42 @@ export async function RallyLanding({ cro }: { cro?: string }) {
   const chatting = Boolean(cro) || Boolean(guest && !guest.claimedAt && guest.messages.some((m) => m.role === "user"));
   return (
     <AuthShell
+      wide
       brand={
-        <div className="space-y-7">
-          <div>
-            <h1 className="font-display text-4xl sm:text-6xl font-normal leading-[1.02] text-white" style={{ letterSpacing: "-0.015em" }}>
-              Your CRO.<br />
-              <em style={{ color: "#3DDC97" }}>Ready when you are.</em>
-            </h1>
-            <p className="text-lg mt-5 max-w-lg" style={{ color: "#C8D3E0" }}>{RALLY.description}</p>
-          </div>
-          {cros.length > 0 && (
-            <div className="hidden sm:block space-y-3" aria-label="The CROs behind Rally">
-              <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: "#8FA3B8" }}>The CROs behind Rally</div>
-              <ul className="space-y-2.5">
-                {cros.slice(0, 4).map((c) => (
-                  <li key={c.id} className="flex items-center gap-3">
-                    <CroFace name={c.name} photoUrl={c.photoUrl} size={44} />
-                    <span className="min-w-0">
-                      <span className="block font-semibold text-white">{c.name}</span>
-                      {(c.title || c.headline) && <span className="block text-sm truncate" style={{ color: "#8FA3B8" }}>{c.title || c.headline}</span>}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <p className="text-sm max-w-lg" style={{ color: "#8FA3B8" }}>{RALLY.transparency}</p>
+        <div className="flex items-center gap-10">
+          <div className="space-y-7 min-w-0 flex-1">
+            <div>
+              <h1 className="font-display text-4xl sm:text-5xl lg:text-[clamp(2.25rem,3vw,3.75rem)] font-normal leading-[1.02] text-white" style={{ letterSpacing: "-0.015em" }}>
+                Your CRO.<br />
+                <em style={{ color: "#3DDC97" }}>Ready when you are.</em>
+              </h1>
+              <p className="text-lg mt-5 max-w-lg" style={{ color: "#C8D3E0" }}>{RALLY.description}</p>
             </div>
-          )}
+            {/* Phones and tablets: a "Watch" row that opens the video in place. */}
+            <div className="lg:hidden">
+              <IntroVideo compact />
+            </div>
+            {cros.length > 0 && (
+              <div className="hidden sm:block space-y-3" aria-label="The CROs behind Rally">
+                <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: "#8FA3B8" }}>The CROs behind Rally</div>
+                <ul className="space-y-2.5">
+                  {cros.slice(0, 4).map((c) => (
+                    <li key={c.id} className="flex items-center gap-3">
+                      <CroFace name={c.name} photoUrl={c.photoUrl} size={44} />
+                      <span className="min-w-0">
+                        <span className="block font-semibold text-white">{c.name}</span>
+                        {(c.title || c.headline) && <span className="block text-sm truncate" style={{ color: "#8FA3B8" }}>{c.title || c.headline}</span>}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-sm max-w-lg" style={{ color: "#8FA3B8" }}>{RALLY.transparency}</p>
+              </div>
+            )}
+          </div>
+          <div className="hidden lg:block">
+            <IntroVideo />
+          </div>
         </div>
       }
     >

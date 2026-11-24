@@ -30,7 +30,7 @@ export function Points({ items }: { items: string[] }) {
  * navy side, the one thing to do on the white side. On small screens the navy side shrinks to the
  * headline so the form is on the first screen; the supporting points show from `lg` up.
  */
-export function AuthShell({ brand, children }: { brand: ReactNode; children: ReactNode }) {
+export function AuthShell({ brand, children, wide = false }: { brand: ReactNode; children: ReactNode; /** A wider brand side (the Rally landing, with its video). */ wide?: boolean }) {
   return (
     <div className="min-h-screen grid grid-rows-[auto_1fr] lg:grid-rows-1 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]" style={{ background: "var(--card)" }}>
       <div className="relative overflow-hidden px-6 sm:px-12 py-6 lg:py-14 flex flex-col" style={{ background: "var(--navy)" }}>
@@ -45,7 +45,7 @@ export function AuthShell({ brand, children }: { brand: ReactNode; children: Rea
           </Link>
           <StagingBadge />
         </div>
-        <div className="relative flex-1 flex flex-col justify-center max-w-xl pt-6 lg:py-0">{brand}</div>
+        <div className={`relative flex-1 flex flex-col justify-center ${wide ? "max-w-3xl" : "max-w-xl"} pt-6 lg:py-0`}>{brand}</div>
       </div>
       <div className="flex items-start lg:items-center justify-center px-6 sm:px-12 py-8 lg:py-14">
         <div className="w-full max-w-md" style={{ animation: "fadeInUp 0.35s ease-out" }}>

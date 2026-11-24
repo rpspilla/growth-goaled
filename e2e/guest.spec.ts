@@ -14,6 +14,9 @@ test("a visitor talks it through, unlocks the recommendation with an email, and 
   // The Rally landing: one action (free Beta access); the website chat is a click away.
   await expect(page.getByRole("heading", { name: /Your CRO\.\s*Ready when you are\./ })).toBeVisible();
   await expect(page.getByRole("button", { name: "Get Free Beta Access" })).toBeVisible();
+  // Ryan's intro video: plays only when tapped, and the file is public (no sign-in).
+  await expect(page.getByRole("button", { name: /Watch Ryan's intro to Rally/ })).toBeVisible();
+  expect((await page.request.get("/rally/intro.mp4", { headers: { range: "bytes=0-99" } })).status()).toBeLessThan(300);
   await expect(page.getByText(/\$\d/)).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
   await page.getByText("Or ask Rally a question first").click();
