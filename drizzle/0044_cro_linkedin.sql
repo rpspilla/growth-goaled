@@ -1,0 +1,1 @@
+ALTER TABLE "cro_profiles" ADD COLUMN "linkedin_url" text;

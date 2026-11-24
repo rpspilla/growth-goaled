@@ -309,6 +309,13 @@
       "when": 1795473676681,
       "tag": "0043_cro_photos",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1795534101546,
+      "tag": "0044_cro_linkedin",
+      "breakpoints": true
     }
   ]
 }

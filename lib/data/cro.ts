@@ -61,7 +61,7 @@ export type ProfileInput = {
   headline?: string;
   photoUrl?: string;
   bio?: string;
-  careerHistory?: string;
+  linkedinUrl?: string;
   accomplishments?: string;
   industries?: string[];
   stages?: string[];
@@ -106,12 +106,14 @@ export async function saveCroProfile(actor: Actor, id: string | null, input: Pro
   const site = httpsOrNull(input.websiteUrl);
   if (!photo.ok) return { ok: false, error: "Use an https:// link for the photo." };
   if (!site.ok) return { ok: false, error: "Use an https:// link for the website profile." };
+  const linkedin = httpsOrNull(input.linkedinUrl);
+  if (!linkedin.ok || (linkedin.value && !/^https:\/\/([a-z]+\.)?linkedin\.com\//i.test(linkedin.value))) return { ok: false, error: "Use the CRO's LinkedIn profile link (https://www.linkedin.com/in/…)." };
   const values = {
     name,
     headline: clean(input.headline, 200),
     ...(photo.value !== undefined ? { photoUrl: photo.value } : {}),
     bio: clean(input.bio),
-    careerHistory: clean(input.careerHistory),
+    linkedinUrl: linkedin.value,
     accomplishments: clean(input.accomplishments),
     industries: tags(input.industries),
     stages: tags(input.stages),

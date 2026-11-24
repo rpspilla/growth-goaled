@@ -94,10 +94,10 @@ export default async function CroProfilePage({ params }: { params: Promise<{ id:
               <CroPhotoUpload name={cro.name} photoUrl={cro.photoUrl} upload={uploadCroPhotoAction.bind(null, cro.id)} remove={removeCroPhotoAction.bind(null, cro.id)} />
               <Field name="name" label="Name" value={cro.name} />
               <Field name="headline" label="Headline" value={cro.headline} />
+              <Field name="linkedinUrl" label="Career history: LinkedIn profile link" value={cro.linkedinUrl} hint="e.g. https://www.linkedin.com/in/their-name" />
               <Field name="websiteUrl" label="Website profile (https link)" value={cro.websiteUrl} />
             </div>
             <Field name="bio" label="Professional biography" value={cro.bio} rows={4} />
-            <Field name="careerHistory" label="Career history" value={cro.careerHistory} rows={4} />
             <Field name="accomplishments" label="Relevant accomplishments" value={cro.accomplishments} rows={3} />
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" name="availableForAdvisory" defaultChecked={cro.availableForAdvisory} /> Available for human advisory engagements

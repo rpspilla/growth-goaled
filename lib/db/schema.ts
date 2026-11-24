@@ -1693,7 +1693,9 @@ export const croProfiles = pgTable(
     headline: text("headline"),
     photoUrl: text("photo_url"),
     bio: text("bio"),
+    // Replaced on the form by linkedinUrl (Nov 24, 2026); kept for any text already entered
     careerHistory: text("career_history"),
+    linkedinUrl: text("linkedin_url"),
     accomplishments: text("accomplishments"),
     industries: text("industries").array().notNull().default(sql`'{}'::text[]`),
     stages: text("stages").array().notNull().default(sql`'{}'::text[]`),

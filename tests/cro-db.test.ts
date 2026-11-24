@@ -26,7 +26,7 @@ import { schema } from "@/lib/db";
 import type { ChatInput } from "@/lib/ai/chat";
 import type { Company, User } from "@/lib/db/schema";
 import { disagreements, intelligenceBlock, matchCros, relevance, selectIntelligence, slugify, type RecordForRetrieval } from "@/lib/cro";
-import { croForUser, getIntelligence, intelligenceFor, listIntelligence, saveCroProfile, saveIntelligence, setCroProfileAdmin, setIntelligenceStatus, setStance, strongestCros } from "@/lib/data/cro";
+import { croForUser, getCroProfile, getIntelligence, intelligenceFor, listIntelligence, saveCroProfile, saveIntelligence, setCroProfileAdmin, setIntelligenceStatus, setStance, strongestCros } from "@/lib/data/cro";
 import { getConversation, secondOpinion, sendMessage, setDefaultCro, startConversation, switchPerspective } from "@/lib/data/chat";
 import { chatContext } from "@/lib/chat/context";
 
@@ -103,6 +103,9 @@ describe("CRO profiles", () => {
     expect(await saveCroProfile(ana, null, { name: "Someone" })).toEqual({ ok: false, error: "Only an admin or the CRO can change this profile." });
     expect(await saveCroProfile(ben, anaCro, { name: "Ana" })).toEqual({ ok: false, error: "Only an admin or the CRO can change this profile." });
     expect(await saveCroProfile(ana, anaCro, { name: "Ana Alvarez", bio: "Seed CRO.", expertise: ["Sales Hiring", "sales hiring"], philosophy: { hiring: "Hire for the stage you're in.", unknown: "x" } as never, photoUrl: "http://insecure.test/a.png" })).toEqual({ ok: false, error: "Use an https:// link for the photo." });
+    expect(await saveCroProfile(ana, anaCro, { name: "Ana Alvarez", bio: "Seed CRO.", linkedinUrl: "https://example.com/ana" })).toEqual({ ok: false, error: "Use the CRO's LinkedIn profile link (https://www.linkedin.com/in/…)." });
+    expect(await saveCroProfile(ana, anaCro, { name: "Ana Alvarez", bio: "Seed CRO.", linkedinUrl: "https://www.linkedin.com/in/ana-alvarez" })).toMatchObject({ ok: true });
+    expect((await getCroProfile(anaCro))!.linkedinUrl).toBe("https://www.linkedin.com/in/ana-alvarez");
     expect(await saveCroProfile(ana, anaCro, { name: "Ana Alvarez", bio: "Seed CRO.", expertise: ["Sales Hiring", "sales hiring"], philosophy: { hiring: "Hire for the stage you're in.", unknown: "x" } as never })).toEqual({ ok: true, id: anaCro });
     const [p] = await db().select().from(schema.croProfiles).where(eq(schema.croProfiles.id, anaCro));
     expect(p).toMatchObject({ slug: "ana-alvarez", expertise: ["sales hiring"], philosophy: { hiring: "Hire for the stage you're in." }, status: "published" });
@@ -216,7 +219,7 @@ describe("retrieval", () => {
     expect(collective).toContain("Synthesize, don't concatenate");
     expect(collective).toContain('"cro":"A"');
     expect(collective).toContain('"disputedBy":"Ben"');
-    const individual = intelligenceBlock({ mode: "individual", cro: { id: "a", name: "Ana Alvarez", headline: null, bio: "Seed CRO", careerHistory: null, accomplishments: null, industries: [], stages: [], companyTypes: [], functions: [], expertise: [], philosophy: { hiring: "Hire late" }, style: { directness: "Very direct" } }, records: [] });
+    const individual = intelligenceBlock({ mode: "individual", cro: { id: "a", name: "Ana Alvarez", headline: null, bio: "Seed CRO", accomplishments: null, industries: [], stages: [], companyTypes: [], functions: [], expertise: [], philosophy: { hiring: "Hire late" }, style: { directness: "Very direct" } }, records: [] });
     expect(individual).toContain("not Ana Alvarez personally");
     expect(individual).toContain("Never invent experiences");
     expect(individual).toContain('"Views on hiring":"Hire late"');

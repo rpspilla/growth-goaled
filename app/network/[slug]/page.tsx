@@ -37,7 +37,10 @@ export default async function PublicCroPage({ params }: { params: Promise<{ slug
         <div className="flex-1 min-w-[16rem]">
           <h1 className="font-display text-4xl sm:text-5xl" style={fg}>{cro.name}</h1>
           {cro.headline && <p className="text-lg mt-1" style={muted}>{cro.headline}</p>}
-          {cro.websiteUrl && <a href={cro.websiteUrl} target="_blank" rel="noopener" className="link text-sm">Website profile</a>}
+          <div className="flex gap-4 flex-wrap">
+            {cro.linkedinUrl && <a href={cro.linkedinUrl} target="_blank" rel="noopener" className="link text-sm">Career history on LinkedIn</a>}
+            {cro.websiteUrl && <a href={cro.websiteUrl} target="_blank" rel="noopener" className="link text-sm">Website profile</a>}
+          </div>
         </div>
       </header>
 
@@ -51,11 +54,10 @@ export default async function PublicCroPage({ params }: { params: Promise<{ slug
       </section>
 
       <div className="grid lg:grid-cols-2 gap-6">
-        {(cro.bio || cro.careerHistory) && (
+        {cro.bio && (
           <section className="surface p-6 space-y-3">
             <h2 className="text-xl font-semibold" style={fg}>Who {first} is</h2>
             {cro.bio && <p className="text-base whitespace-pre-wrap" style={fg}>{cro.bio}</p>}
-            {cro.careerHistory && <p className="text-base whitespace-pre-wrap" style={muted}>{cro.careerHistory}</p>}
           </section>
         )}
         <section className="surface p-6 space-y-3" aria-label="Expertise">

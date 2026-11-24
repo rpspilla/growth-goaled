@@ -26,7 +26,7 @@ function profileFrom(f: FormData): ProfileInput {
     name: str(f, "name"),
     headline: str(f, "headline"),
     bio: str(f, "bio"),
-    careerHistory: str(f, "careerHistory"),
+    linkedinUrl: str(f, "linkedinUrl"),
     accomplishments: str(f, "accomplishments"),
     industries: list(f, "industries"),
     stages: list(f, "stages"),

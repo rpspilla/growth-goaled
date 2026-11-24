@@ -38,6 +38,7 @@ export default async function CroPage({ params }: { params: Promise<{ slug: stri
             <h1 className="font-display text-3xl sm:text-4xl" style={fg}>{cro.name}</h1>
             {cro.headline && <p className="text-lg" style={muted}>{cro.headline}</p>}
             <div className="flex items-center gap-4 flex-wrap">
+              {cro.linkedinUrl && <a href={cro.linkedinUrl} target="_blank" rel="noopener" className="link text-sm">Career history on LinkedIn</a>}
               {cro.websiteUrl && <a href={cro.websiteUrl} target="_blank" rel="noopener" className="link text-sm">Website profile</a>}
               <DefaultCroButton croId={cro.id} isDefault={company.defaultCroId === cro.id} label={`${cro.name}'s AI CRO`} set={setDefaultCroAction} />
             </div>

@@ -194,7 +194,7 @@ export function disagreements(chosen: RecordForRetrieval[]): { recordId: string;
 
 export type IntelligenceBundle =
   | { mode: "collective"; records: RecordForRetrieval[]; croCount: number }
-  | { mode: "individual"; cro: Pick<CroProfile, "id" | "name" | "headline" | "bio" | "careerHistory" | "accomplishments" | "industries" | "stages" | "companyTypes" | "functions" | "expertise" | "philosophy" | "style">; records: RecordForRetrieval[] };
+  | { mode: "individual"; cro: Pick<CroProfile, "id" | "name" | "headline" | "bio" | "accomplishments" | "industries" | "stages" | "companyTypes" | "functions" | "expertise" | "philosophy" | "style">; records: RecordForRetrieval[] };
 
 const recordJson = (r: RecordForRetrieval) => ({
   id: r.id,
@@ -233,7 +233,6 @@ export function intelligenceBlock(b: IntelligenceBundle): string {
       name: cro.name,
       headline: cro.headline,
       bio: cro.bio,
-      career_history: cro.careerHistory,
       accomplishments: cro.accomplishments,
       industries: cro.industries,
       stages: cro.stages,
