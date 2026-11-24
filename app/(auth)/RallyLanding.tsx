@@ -21,6 +21,45 @@ export function CroFace({ name, photoUrl, size = 48, ring = "#152638" }: { name:
   );
 }
 
+const CAN_DO = [
+  ["Ask any go-to-market question", "Hiring your first AE, pipeline that won't convert, pricing, comp plans, when to raise prices, which channel to bet on."],
+  ["Get a clear recommendation", "What to do next, why, and how confident Rally is, drawn from the playbooks of real CROs."],
+  ["Keep talking it through", "Follow up, push back or add detail. Rally remembers your company, so every answer fits your stage and team."],
+] as const;
+
+const HOW = [
+  ["Get free Beta access", "Enter your email and open the sign-in link we send."],
+  ["Tell Rally about your company", "Stage, revenue and team size. About a minute, and only once."],
+  ["Ask your question", "Type it, or tap the mic and say it. Rally answers in seconds, out loud if you like."],
+] as const;
+
+/** What Rally does and how to use it, in plain words, before anyone signs up. */
+function RallyHowTo() {
+  const item = (t: string, d: string, mark: React.ReactNode) => (
+    <li key={t} className="flex gap-2.5">
+      {mark}
+      <span>
+        <span className="block font-semibold text-white">{t}</span>
+        <span className="block text-sm" style={{ color: "#B7C5D4" }}>{d}</span>
+      </span>
+    </li>
+  );
+  return (
+    <div className="grid gap-x-10 gap-y-6 sm:grid-cols-2" aria-label="About Rally">
+      <section>
+        <h2 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "#8FA3B8" }}>What you can do with Rally</h2>
+        <ul className="space-y-3">{CAN_DO.map(([t, d]) => item(t, d, <span aria-hidden className="mt-1.5 h-2 w-2 min-w-2 rounded-full" style={{ background: "#3DDC97" }} />))}</ul>
+      </section>
+      <section>
+        <h2 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "#8FA3B8" }}>How to use it</h2>
+        <ol className="space-y-3">
+          {HOW.map(([t, d], i) => item(t, d, <span aria-hidden className="flex h-6 w-6 min-w-6 items-center justify-center rounded-full text-xs font-bold" style={{ background: "rgba(61,220,151,0.15)", color: "#3DDC97" }}>{i + 1}</span>))}
+        </ol>
+      </section>
+    </div>
+  );
+}
+
 /**
  * The Rally landing page (Rally Beta, Nov 24, 2026), on /sign-in and /sign-up: what Rally is, the
  * real CROs behind it, and one action, Get Free Beta Access (a magic link, then the short company
@@ -36,6 +75,7 @@ export async function RallyLanding({ cro }: { cro?: string }) {
     <AuthShell
       wide
       brand={
+        <div className="space-y-9">
         <div className="flex items-center gap-10">
           <div className="space-y-7 min-w-0 flex-1">
             <div>
@@ -70,6 +110,8 @@ export async function RallyLanding({ cro }: { cro?: string }) {
           <div className="hidden lg:block">
             <IntroVideo photoUrl={introPhoto} />
           </div>
+        </div>
+        <RallyHowTo />
         </div>
       }
     >
