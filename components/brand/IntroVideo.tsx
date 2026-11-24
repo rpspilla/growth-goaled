@@ -3,7 +3,7 @@
 import { Play } from "lucide-react";
 import { useRef, useState } from "react";
 
-export const INTRO_VIDEO = { src: "/rally/intro.mp4", poster: "/rally/intro-poster.jpg?v=3", length: "0:58", who: "Ryan Spillane", role: "Cofounding CRO, Growth Goaled" };
+export const INTRO_VIDEO = { src: "/rally/intro.mp4", poster: "/rally/intro-poster.jpg?v=3", length: "0:58", who: "Ryan Spillane", role: "Founder & CRO, Growth Goaled" };
 
 /**
  * The Rally intro video on the landing page (Nov 24, 2026): a phone-shaped card with its poster and
