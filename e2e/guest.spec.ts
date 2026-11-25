@@ -12,14 +12,14 @@ test("a visitor talks it through, unlocks the recommendation with an email, and 
   const page = await ctx.newPage();
   await page.goto("/sign-in");
   // The Rally landing: one action (free Beta access); the website chat is a click away.
-  await expect(page.getByRole("heading", { name: /Your CRO\.\s*Ready when you are\./ })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Get Free Beta Access" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Meet your CRO collective." })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Get Access to Rally" })).toBeVisible();
   // Ryan's intro video: plays only when tapped, and the file is public (no sign-in).
   await expect(page.getByRole("button", { name: /Watch Ryan's intro to Rally/ })).toBeVisible();
   expect((await page.request.get("/rally/intro.mp4", { headers: { range: "bytes=0-99" } })).status()).toBeLessThan(300);
   await expect(page.getByText(/\$\d/)).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
-  await page.getByText("Or ask Rally a question first").click();
+  await page.getByText("Or ask a question first").click();
   await expect(page.getByRole("heading", { name: "How can we help you grow?" })).toBeVisible();
   await expect(page.getByTestId("human-presence")).toHaveCount(0);
   await expect(page.getByRole("form", { name: "See your recommendation" })).toHaveCount(0);
@@ -33,19 +33,12 @@ test("a visitor talks it through, unlocks the recommendation with an email, and 
   await answer("Robin Guest");
   await expect(page.getByText("Thanks, Robin. What's your company called?")).toBeVisible();
   await answer("Guestly");
+  // Only name, company, role and vertical: no revenue, stage or headcounts before the first answer.
+  await expect(page.getByText("And your role there?")).toBeVisible();
   // Every answer is typed, like any chat: no buttons or dropdowns.
-  await expect(page.getByRole("button", { name: "$1M–$3M" })).toHaveCount(0);
   await expect(page.locator("select")).toHaveCount(0);
-  await answer("lots");
-  await expect(page.getByText(/didn't catch a revenue figure/)).toBeVisible();
-  await answer("about $2M");
-  await expect(page.getByText("What year was it founded?")).toBeVisible();
-  await answer("2022");
-  await answer("we raised a seed round");
-  await answer("fintech");
-  await answer("2");
-  await answer("skip");
-  await expect(page.getByText("Last one: how many in customer success?")).toBeVisible();
+  await answer("Founder & CEO");
+  await expect(page.getByText(/Last one: what vertical are you in\?/)).toBeVisible();
   // The recommendation takes up to a minute in production: hold the answer back to check the wait
   // shows straight away (the message, a moving progress bar and steps) instead of a frozen page.
   let release: () => void = () => {};
@@ -58,8 +51,8 @@ test("a visitor talks it through, unlocks the recommendation with an email, and 
     }
     await route.fallback();
   });
-  await answer("1");
-  await expect(page.getByText("1", { exact: true }).last()).toBeVisible();
+  await answer("fintech");
+  await expect(page.getByText("fintech", { exact: true }).last()).toBeVisible();
   await expect(page.getByText("Super. Give me 60 seconds while we spin up a CRO-level recommendation")).toBeVisible({ timeout: 3000 });
   await expect(page.getByRole("progressbar", { name: "Building your recommendation" })).toBeVisible();
   await expect(page.getByText("Reading your answers")).toBeVisible();
@@ -133,7 +126,7 @@ test("a visitor talks it through, unlocks the recommendation with an email, and 
   const cap = page.getByRole("region", { name: "Your free questions are used up" });
   await expect(cap).toContainText("You've used your free questions");
   await expect(cap.getByRole("link", { name: "Talk to an advisor" })).toHaveCount(0);
-  await expect(cap.getByRole("button", { name: "Get Free Beta Access" })).toBeVisible();
+  await expect(cap.getByRole("button", { name: "Get Access to Rally" })).toBeVisible();
   await expect(page.getByLabel("Your answer")).toHaveCount(0);
 
   // Signing in (the link's landing, /claim) saves it as their account, company and conversation.
@@ -150,14 +143,14 @@ test("a visitor talks it through, unlocks the recommendation with an email, and 
 });
 
 /**
- * Chatting on the landing page and then signing up with "Get Free Beta Access" (no email in the chat):
+ * Chatting on the landing page and then signing up with "Get Access to Rally" (no email in the chat):
  * whatever Rally already heard isn't asked again, and the conversation comes along.
  */
 test("signing up from the landing page after a partial chat only asks what Rally hasn't heard", async ({ browser }) => {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   await page.goto("/sign-in");
-  await page.getByText("Or ask Rally a question first").click();
+  await page.getByText("Or ask a question first").click();
   const answer = async (text: string) => {
     await page.getByLabel("Your answer").fill(text);
     await page.getByRole("button", { name: "Send", exact: true }).click();
@@ -167,7 +160,7 @@ test("signing up from the landing page after a partial chat only asks what Rally
   await answer("Pat Partial");
   await expect(page.getByText(/What's your company called\?/)).toBeVisible();
   await answer("Halfway Co");
-  await expect(page.getByText(/annual revenue|ARR/i).last()).toBeVisible();
+  await expect(page.getByText("And your role there?")).toBeVisible();
   // The magic link from the landing form lands on /claim.
   await ctx.addCookies([{ name: "gg_e2e_user", value: "pat@halfway.test", domain: "localhost", path: "/" }]);
   await page.goto("/claim");
@@ -181,18 +174,18 @@ test("after a full landing-page chat, signing in by any route opens the conversa
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   await page.goto("/sign-in");
-  await page.getByText("Or ask Rally a question first").click();
+  await page.getByText("Or ask a question first").click();
   const answer = async (text: string) => {
     await page.getByLabel("Your answer").fill(text);
     await page.getByRole("button", { name: "Send", exact: true }).click();
   };
   await answer("Do we need a VP of Sales yet?");
   await expect(page.getByText("What's your name?")).toBeVisible();
-  for (const [a, next] of [["Fran Full", /company called/], ["Fullstop", /revenue|ARR/i], ["about $2M", /founded/], ["2022", /stage|raised/i], ["seed", /vertical|industry|space/i], ["fintech", /AEs|account executives/i], ["2", /BDR|SDR/i], ["0", /customer success/i]] as const) {
+  for (const [a, next] of [["Fran Full", /company called/], ["Fullstop", /your role/], ["Founder", /what vertical/]] as const) {
     await answer(a);
     await expect(page.getByText(next).last()).toBeVisible();
   }
-  await answer("1");
+  await answer("fintech");
   await expect(page.getByText(/Test mode: let's work through/)).toBeVisible({ timeout: 60_000 });
   await ctx.addCookies([{ name: "gg_e2e_user", value: "fran@work.test", domain: "localhost", path: "/" }]);
   await page.goto("/");

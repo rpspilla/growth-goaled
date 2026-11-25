@@ -24,7 +24,7 @@ export type IntelligenceType = keyof typeof INTELLIGENCE_TYPES;
 
 export const EVIDENCE_LEVELS = { opinion: "Opinion", experience: "Experience", case_evidence: "Case evidence", data: "Data" } as const satisfies Record<CroIntelligence["evidence"], string>;
 export const INTELLIGENCE_STATUSES = { draft: "Draft", submitted: "Submitted for review", validated: "Validated", rejected: "Rejected", retired: "Retired" } as const satisfies Record<CroIntelligence["status"], string>;
-export const CLASSIFICATIONS = { individual: "One CRO's view", collective: "Growth Goaled network position", multi: "Several CROs' joint work" } as const satisfies Record<CroIntelligence["classification"], string>;
+export const CLASSIFICATIONS = { individual: "One CRO's view", collective: "Rally Collective position", multi: "Several CROs' joint work" } as const satisfies Record<CroIntelligence["classification"], string>;
 
 /** Expertise tags (searchable); CROs and records can add others. */
 export const EXPERTISE = [
@@ -84,6 +84,17 @@ export const STYLE_FIELDS = {
 } as const;
 
 /** Which expertise each conversation starter draws on (lib/chat/topics.ts ids). */
+/** The topics a CRO is strongest on: their expertise tags against each topic's, best first (ties keep topic order). */
+export function topicsFor(expertise: string[], topicIds: string[], limit = 4): string[] {
+  const mine = new Set(expertise.map((e) => e.trim().toLowerCase()));
+  return topicIds
+    .filter((t) => t !== "other")
+    .map((t, i) => ({ t, i, score: (TOPIC_EXPERTISE[t] ?? []).filter((e) => mine.has(e)).length }))
+    .sort((a, b) => b.score - a.score || a.i - b.i)
+    .slice(0, limit)
+    .map((x) => x.t);
+}
+
 export const TOPIC_EXPERTISE: Record<string, readonly string[]> = {
   revenue_engine: ["gtm strategy", "icp", "positioning", "pipeline", "sales", "revenue operations", "growth strategy"],
   first_gtm_hire: ["sales hiring", "founder-led sales", "organizational design", "sales"],
@@ -186,13 +197,13 @@ export function disagreements(chosen: RecordForRetrieval[]): { recordId: string;
   const disputes = chosen.flatMap((r) =>
     r.stances
       .filter((s) => s.stance === "disputes")
-      .map((s) => ({ recordId: r.id, title: r.title, heldBy: r.primaryCroName ?? "Growth Goaled network", disputedBy: s.croName, why: s.note })),
+      .map((s) => ({ recordId: r.id, title: r.title, heldBy: r.primaryCroName ?? "Rally Collective", disputedBy: s.croName, why: s.note })),
   );
   // Confirmed conflicts between two chosen records, once per pair.
   const conflicts = chosen.flatMap((r) =>
     (r.conflicts ?? [])
       .filter((c) => byId.has(c.otherId) && r.id < c.otherId)
-      .map((c) => ({ recordId: r.id, title: r.title, heldBy: r.primaryCroName ?? "Growth Goaled network", disputedBy: byId.get(c.otherId)!.primaryCroName ?? "Growth Goaled network", why: c.why })),
+      .map((c) => ({ recordId: r.id, title: r.title, heldBy: r.primaryCroName ?? "Rally Collective", disputedBy: byId.get(c.otherId)!.primaryCroName ?? "Rally Collective", why: c.why })),
   );
   return [...disputes, ...conflicts];
 }
@@ -210,7 +221,7 @@ const recordJson = (r: RecordForRetrieval) => ({
   type: INTELLIGENCE_TYPES[r.type],
   title: r.title,
   content: r.content.slice(0, 1500),
-  cro: r.primaryCroName ?? "Growth Goaled network position",
+  cro: r.primaryCroName ?? "Rally Collective position",
   classification: CLASSIFICATIONS[r.classification],
   evidence: EVIDENCE_LEVELS[r.evidence],
   stages: r.stages,
@@ -226,7 +237,7 @@ export const INDIVIDUAL_RULES = (name: string) => `CRO MODE: the founder chose t
 - When their documented intelligence doesn't cover the question, say so plainly, then give your best general CRO judgment, clearly labelled as general, not as ${name}'s view. Don't pull in other CROs' views unless the founder asks for the Collective.
 - List in intelligence_used every record you relied on (its id) and how.`;
 
-export const COLLECTIVE_RULES = `CRO MODE: the Growth Goaled Collective. You draw on the documented intelligence of several CROs in the Growth Goaled network (records below, each attributed).
+export const COLLECTIVE_RULES = `CRO MODE: the Rally Collective. You draw on the documented intelligence of several CROs in the Rally Collective (records below, each attributed).
 - Synthesize, don't concatenate. Find where the relevant CROs agree, and use that.
 - A Correction record is a CRO's fix to an earlier AI answer: follow its "right guidance" over other advice on the same point.
 - When perspectives differ materially for this founder's question, don't force consensus and don't stage a debate: name the difference in a sentence or two, the assumption behind each view, which fits this company's context and why, and what evidence would change your recommendation. Put them in the card's perspectives (fits: true for the one you recommend).

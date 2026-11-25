@@ -46,7 +46,7 @@ const current = async () => (await guestByToken(token)) as GuestSession;
 const say = async (text: string) => guestReply(await current(), text);
 
 async function answerAll() {
-  for (const a of ["Our pipeline isn't converting.", "Sam Founder", "Acme", "1m_3m", "2021", "Seed", "Fintech", "3", "", "1"]) {
+  for (const a of ["Our pipeline isn't converting.", "Sam Founder", "Acme", "CEO", "Fintech"]) {
     const r = await say(a);
     if (!r.ok) throw new Error(`${a}: ${r.error}`);
   }
@@ -60,28 +60,20 @@ describe("guest chat", () => {
     expect(await say("Our pipeline isn't converting.")).toEqual({ ok: true });
     expect(await say("Sam Founder")).toEqual({ ok: true });
     expect(await say("Acme")).toEqual({ ok: true });
-    expect((await guestView(await current())).step).toMatchObject({ key: "revenueBand" });
+    // Only name, company, role and vertical (Nov 25, 2026): no revenue, stage or headcounts up front.
+    expect((await guestView(await current())).step).toMatchObject({ key: "role" });
     expect(await say("   ")).toEqual({ ok: false, error: "Type a message first." });
-    // Unclear answers get a follow-up in the chat, not a form error, and the question stays open.
-    expect(await say("a lot")).toEqual({ ok: true });
-    let g = await current();
-    expect(g.messages.at(-2)).toMatchObject({ role: "user", content: "a lot" });
-    expect(g.messages.at(-2)?.at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-    expect(g.messages.at(-1)?.content).toMatch(/didn't catch a revenue figure/);
-    expect((await guestView(g)).step?.key).toBe("revenueBand");
-    await say("about $2M ARR");
-    await say("we started in 2021");
-    await say("we just closed our seed round");
+    expect(await say("CEO & co-founder")).toEqual({ ok: true });
+    expect((await guestView(await current())).step).toMatchObject({ key: "vertical" });
+    // Unclear answers get a follow-up in the chat, not a form error; a description is read as "Other".
     await say("we help support teams with customer experience");
-    await say("three");
-    expect((await guestView(await current())).step).toMatchObject({ key: "bdrs", optional: true });
-    await say("skip");
-    g = await current();
-    expect(g.profile).toMatchObject({ challenge: "Our pipeline isn't converting.", name: "Sam Founder", companyName: "Acme", revenueBand: "1m_3m", foundedYear: "2021", stage: "Seed", vertical: "Other", verticalOther: "we help support teams with customer experience", aes: "3", bdrs: "" });
+    const g = await current();
+    expect(g.messages.at(-2)?.at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(g.profile).toMatchObject({ challenge: "Our pipeline isn't converting.", name: "Sam Founder", companyName: "Acme", role: "CEO & co-founder", vertical: "Other", verticalOther: "we help support teams with customer experience" });
+    expect(g.profile).not.toHaveProperty("revenueBand");
+    expect((await guestView(g)).step).toBeNull();
     // The founder's words appear as typed; the next question is asked by name.
-    expect(g.messages.map((m) => m.content)).toContain("about $2M ARR");
     expect(g.messages.map((m) => m.content)).toContain("Thanks, Sam. What's your company called?");
-    expect(g.messages.at(-1)?.content).toBe("Last one: how many in customer success?");
   });
 
   it("hands the challenge and profile to the AI, which recommends; the recommendation stays locked until an email is given", async () => {
@@ -91,12 +83,12 @@ describe("guest chat", () => {
     const input = h.inputs[0] as ChatInput;
     expect(input.guest).toBe(true);
     expect(input.history).toEqual([{ role: "user", content: "Our pipeline isn't converting." }]);
-    expect(input.context.company).toMatchObject({ name: "Acme", stage: "Seed", industry: "Fintech", revenue_band: "$1M–$3M", gtm_team: "3 AEs, 1 in customer success" });
+    expect(input.context.company).toMatchObject({ name: "Acme", industry: "Fintech" });
     expect((await guestView(g)).step).toBeNull();
     expect(g.card).toBeNull();
     // After the last answer the chat says it's on it, then the AI's first reply follows.
     const contents = g.messages.map((m) => m.content);
-    expect(contents.indexOf(SPIN_UP)).toBe(contents.indexOf("1") + 1);
+    expect(contents.indexOf(SPIN_UP)).toBe(contents.indexOf("Fintech") + 1);
     expect(g.messages.at(-1)?.content).toMatch(/Test mode: let's work through/);
     expect(await guestReply(g, "We close $20k deals.")).toEqual({ ok: true });
     g = await current();
@@ -134,7 +126,8 @@ describe("guest chat", () => {
     expect(user!.onboardedAt).not.toBeNull();
     const [member] = await db().select().from(schema.companyMembers).where(eq(schema.companyMembers.userId, sam.id));
     const [company] = await db().select().from(schema.companies).where(eq(schema.companies.id, member!.companyId));
-    expect(company).toMatchObject({ name: "Acme", revenueBand: "1m_3m", advisorId: null });
+    expect(company).toMatchObject({ name: "Acme", revenueBand: null, advisorId: null });
+    expect(user!.title).toBe("CEO");
     const messages = await db().select().from(schema.conversationMessages).where(eq(schema.conversationMessages.conversationId, claimed!.conversationId)).orderBy(schema.conversationMessages.createdAt);
     expect(messages.map((m) => m.role)).toEqual(["user", "assistant", "user", "assistant"]);
     expect(messages[0]!.content).toBe("Our pipeline isn't converting.");
@@ -237,7 +230,7 @@ describe("free-question cap and the CRM record", () => {
       expect(texts).toContain("Before the email?");
       expect(texts).toContain("After the email?");
       expect(texts.indexOf("Before the email?")).toBeLessThan(texts.indexOf("After the email?"));
-      expect(view.chats[0]!.profile).toMatchObject({ companyName: "Acme", revenueBand: "1m_3m" });
+      expect(view.chats[0]!.profile).toMatchObject({ companyName: "Acme", role: "CEO" });
     }
     // Giving the same email again doesn't add a second contact.
     await guestEmail(await current(), "sam@acme.test");
@@ -281,7 +274,7 @@ describe("new lead alert", () => {
     expect(mails).toHaveLength(1);
     expect(mails[0]).toMatchObject({ to: "boss@gg.test", subject: "New lead from the website chat: Sam Founder, Acme" });
     expect(mails[0]!.text).toContain("Wants help with: Our pipeline isn't converting.");
-    expect(mails[0]!.text).toContain("Revenue: $1M–$3M");
+    expect(mails[0]!.text).toContain("Role: CEO");
     expect(mails[0]!.text).toContain(`https://app.test/advisor/crm/contacts/${g.crmContactId}?tab=chat`);
     // Once per chat and email; the event keeps no email address.
     expect(await notifyNewLead(g.id, "https://app.test")).toBe(0);

@@ -8,7 +8,7 @@ import { cookies } from "next/headers";
 import { guestFor, GUEST_COOKIE } from "@/lib/data/guest";
 import { basicsFrom } from "@/lib/guest/steps";
 import { track } from "@/lib/events";
-import { AuthShell, Points } from "../(auth)/AuthShell";
+import { AuthShell } from "../(auth)/AuthShell";
 import { WelcomeForm } from "./WelcomeForm";
 
 export const metadata: Metadata = { title: "Set up your company · Rally" };
@@ -28,7 +28,7 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
   // Rally already has the basics from the website chat (however they signed in): straight into it.
   if (guest && basicsFrom(guest.profile) && (await searchParams).claimed !== "0") redirect("/claim");
   const known = guest?.profile ?? {};
-  const values = Object.fromEntries(["companyName", "revenueBand", "foundedYear", "vertical", "verticalOther", "stage", "aes", "bdrs", "cs"].filter((k) => known[k]).map((k) => [k, String(known[k])]));
+  const values = Object.fromEntries(["companyName", "revenueBand", "foundedYear", "vertical", "verticalOther", "stage", "aes", "bdrs", "cs", "role", "challenge"].filter((k) => known[k]).map((k) => [k, String(known[k])]));
   await track("welcome_viewed", { userId: user.id, props: { role: user.role, new_company: askCompany } });
 
   return (
@@ -37,9 +37,8 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
         askCompany ? (
           <>
             <div className="text-sm font-semibold mb-4" style={{ color: "#3DDC97" }}>Step 2 of 3 · Your company</div>
-            <h1 className="font-display text-4xl sm:text-5xl font-normal leading-[1.08] text-white">A few basics, then your first conversation.</h1>
-            <p className="text-lg mt-5 mb-8" style={{ color: "#B7C5D4" }}>Your stage, vertical and team size shape every recommendation. Everything else can come up in the conversation.</p>
-            <Points items={["Next: ask the growth question on your mind", "Then: a free recommendation in about a minute", "Nothing is charged unless you choose a plan"]} />
+            <h1 className="font-display text-4xl sm:text-5xl font-normal leading-[1.08] text-white">A few basics, then meet your CROs.</h1>
+            <p className="text-lg mt-5" style={{ color: "#B7C5D4" }}>Rally asks for anything else only when an answer depends on it.</p>
           </>
         ) : (
           <>
@@ -51,7 +50,7 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
       }
     >
       <h2 className="text-2xl sm:text-3xl font-semibold" style={{ color: "var(--foreground)", letterSpacing: "-0.01em" }}>{askCompany ? "Set up your company" : "Your profile"}</h2>
-      <p className="text-base mt-2 mb-6" style={{ color: "var(--muted-foreground)" }}>{askCompany ? "Takes about a minute." : "One step and you're in."}</p>
+      <p className="text-base mt-2 mb-6" style={{ color: "var(--muted-foreground)" }}>{askCompany ? "Under a minute." : "One step and you're in."}</p>
       <WelcomeForm isFounder={isFounder} askCompany={askCompany} defaultName={user.name ?? known.name ?? ""} known={values} />
     </AuthShell>
   );

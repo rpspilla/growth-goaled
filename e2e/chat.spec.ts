@@ -23,7 +23,11 @@ test("Rally: a founder starts from a suggestion, gets a short CRO answer with th
   await page.goto("/start");
   await expect(page).toHaveURL(/\/whats-next$/);
   await expect(page.getByRole("heading", { name: "What's the growth decision in front of you, Chris?", level: 1 })).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByRole("group", { name: "Talking with the Growth Goaled Collective" })).toBeVisible();
+  // Who to ask: the Rally Collective (chosen) or a CRO, as cards; suggestions sit under the question box.
+  await expect(page.getByRole("radiogroup", { name: "Who to ask" }).getByRole("radio", { name: /Rally Collective/ })).toHaveAttribute("aria-checked", "true");
+  const box = await page.getByLabel(/^Ask /).boundingBox();
+  const firstSuggestion = await page.getByRole("group", { name: "Suggested questions" }).boundingBox();
+  expect(firstSuggestion!.y).toBeGreaterThan(box!.y);
   await expect(page.getByRole("group", { name: "Suggested questions" }).getByRole("button")).toHaveText(["Where is our biggest growth constraint?", "Are we ready to hire our first salesperson?", "Why isn't our pipeline converting?", "How do we build a repeatable revenue engine?"]);
   // The old Strategic Growth Questions address lands on Rally too.
   await page.goto("/chat");
@@ -43,8 +47,8 @@ test("Rally: a founder starts from a suggestion, gets a short CRO answer with th
   await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/);
   await expect(page.getByRole("heading", { name: "Are we ready to hire our first salesperson?" })).toBeVisible();
   await expect(page.getByText(/Test mode: let's work through/)).toBeVisible();
-  await expect(page.getByRole("group", { name: "Talking with the Growth Goaled Collective" })).toBeVisible();
-  await expect(page.getByText(/no one is reviewing this conversation live/)).toBeVisible();
+  await expect(page.getByRole("group", { name: "Talking with the Rally Collective" })).toBeVisible();
+  await expect(page.getByText(/AI built on the documented expertise of the Rally Collective's CROs/)).toBeVisible();
   await expect(page.getByTestId("human-presence")).toHaveCount(0);
   await expect(page.getByRole("article", { name: "Recommendation" })).toHaveCount(0);
   const url = page.url();
@@ -67,7 +71,7 @@ test("Rally: a founder starts from a suggestion, gets a short CRO answer with th
   await expect(card.getByText("Days 1–30")).toBeVisible();
   await expect(card).toContainText("Assumption");
   await expect(page.getByRole("region", { name: "Build my action plan" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Save this recommendation" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save recommendation" })).toBeVisible();
 
   // Files can be dragged anywhere onto the page and dropped into the conversation.
   await page.evaluate(() => {
@@ -126,7 +130,7 @@ test("Rally: a founder starts from a suggestion, gets a short CRO answer with th
   await expect(page.getByRole("article", { name: "Recommendation" }).getByRole("button", { name: "Helpful" })).toHaveAttribute("aria-pressed", "true");
 
   // What they said is remembered and can be corrected.
-  await page.getByRole("link", { name: "See or correct them" }).click();
+  await page.getByRole("link", { name: "see or correct" }).click();
   const facts = page.locator("#facts");
   await facts.getByText(/What Rally remembers/).click();
   await expect(facts).toContainText("Sales team size");

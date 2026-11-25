@@ -11,6 +11,7 @@ import { answerStep, createPlanCheckout, PlanCheckoutError, requestPlanUpdate, s
 import { processInboxDocument, registerDocument } from "@/lib/data/documents";
 import { stripeConfigured } from "@/lib/stripe";
 import { commitRecommendation, rescheduleCommitment, setCommitmentOutcome, setCommitmentStatus } from "@/lib/data/commitments";
+import { setRecommendationSaved } from "@/lib/data/decisions";
 
 /** The signed-in founder and their company: conversations are only ever read or changed within it. */
 async function founderCompany() {
@@ -275,6 +276,16 @@ export async function commitRecommendationAction(recommendationId: string, _prev
   if (!result.ok) return { error: result.error };
   revalidatePath("/", "layout");
   return { projectId: result.projectId };
+}
+
+/** "Save recommendation": keep it under Decisions for later (or un-save it). Committing is separate. */
+export async function saveRecommendationAction(recommendationId: string, saved: boolean): Promise<{ ok: boolean; error?: string }> {
+  const { user, company } = await founderCompany();
+  if (!id.safeParse(recommendationId).success) return { ok: false, error: "That recommendation wasn't found." };
+  const r = await setRecommendationSaved(user, company, recommendationId, saved);
+  if (!r.ok) return { ok: false, error: r.error };
+  revalidatePath("/", "layout");
+  return { ok: true };
 }
 
 /** Tick a commitment done, drop it, or reopen it (Overview and project pages). */

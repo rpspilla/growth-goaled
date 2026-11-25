@@ -1,6 +1,6 @@
 import "server-only";
 import { nudgeDue } from "@/lib/chat/nudge";
-import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { Company, RecommendationCard, User } from "@/lib/db/schema";
 import { ChatError, chatTurn, type ChatOutput } from "@/lib/ai/chat";
@@ -21,11 +21,13 @@ export const MAX_MESSAGE_LENGTH = 4000;
 
 export type ChatResult<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
-export async function listConversations(company: Pick<Company, "id">, limit = 20) {
+/** The company's conversations, newest first; `cro` narrows to one CRO's (an id) or the Collective's (null). */
+export async function listConversations(company: Pick<Company, "id">, limit = 20, opts: { cro?: string | null } = {}) {
+  const who = opts.cro === undefined ? undefined : opts.cro === null ? isNull(schema.conversations.croId) : eq(schema.conversations.croId, opts.cro);
   return db
-    .select({ id: schema.conversations.id, title: schema.conversations.title, topic: schema.conversations.topic, updatedAt: schema.conversations.updatedAt })
+    .select({ id: schema.conversations.id, title: schema.conversations.title, topic: schema.conversations.topic, croId: schema.conversations.croId, updatedAt: schema.conversations.updatedAt })
     .from(schema.conversations)
-    .where(eq(schema.conversations.companyId, company.id))
+    .where(and(eq(schema.conversations.companyId, company.id), who))
     .orderBy(desc(schema.conversations.updatedAt))
     .limit(limit);
 }
@@ -173,7 +175,7 @@ export async function startConversation(
   company: Company,
   topicId: string,
   text: string | null,
-  /** A published CRO's AI representation; null for the Growth Goaled Collective; undefined: the company's default. */
+  /** A published CRO's AI representation; null for the Rally Collective; undefined: the company's default. */
   croId?: string | null,
   /** A suggested question's own words (Rally's suggestions), asked on its topic. */
   question?: string | null,
@@ -210,7 +212,7 @@ export async function sendMessage(user: User, company: Company, conversationId: 
   // Whose perspective answers this turn: the conversation's (a CRO's AI or the Collective), or the
   // Collective once, for a second opinion. Earlier answers from another perspective are labelled.
   const perspective = opts.secondOpinion ? null : view.conversation.croId;
-  const label = (id: string | null) => (id ? `${view.cros.get(id) ?? "Another CRO"}'s AI CRO` : "the Growth Goaled Collective");
+  const label = (id: string | null) => (id ? `${view.cros.get(id) ?? "Another CRO"}'s AI CRO` : "the Rally Collective");
   const history = [
     ...view.messages.map((m) => ({
       role: m.role,
@@ -447,7 +449,7 @@ export async function secondOpinion(user: User, company: Company, conversationId
   if (!view.conversation.croId) return { ok: false, error: "This conversation is already with the Collective." };
   if (!view.messages.some((m) => m.recommendationId)) return { ok: false, error: "Ask for a second opinion once there's a recommendation." };
   await track("second_opinion", { userId: user.id, companyId: company.id, props: {} });
-  return sendMessage(user, company, conversationId, "Second opinion, please: what does the Growth Goaled network think?", { secondOpinion: true });
+  return sendMessage(user, company, conversationId, "Second opinion, please: what does the Rally Collective think?", { secondOpinion: true });
 }
 
 /** The company's default: who its founders talk to unless they choose otherwise. */

@@ -24,10 +24,18 @@ const isRecent = (d: Date) => Date.now() - d.getTime() < RECENT_DAYS * 86_400_00
  * to, four suggested questions for their stage, their own question, and "Continue" for a conversation
  * from the last week. All conversations and what Rally remembers sit below.
  */
-export default async function RallyPage() {
+export default async function RallyPage({ searchParams }: { searchParams: Promise<{ ask?: string; with?: string; show?: string }> }) {
   const { user, company } = await founderContext();
   if (!company) redirect("/welcome");
   const [conversations, facts, cros, open, rally] = await Promise.all([listConversations(company, 50), listFacts(company), listCroProfiles({ published: true }), companyCommitments(company, { status: ["open"] }), rallyVoice()]);
+  const { ask, with: withCro, show } = await searchParams;
+  // The conversation list, narrowed to the Collective's or one CRO's (?show=collective | a CRO's slug).
+  const showCro = show === "collective" ? null : cros.find((c) => c.slug === show)?.id;
+  const shown = showCro === undefined ? conversations : await listConversations(company, 50, { cro: showCro });
+  const croName = new Map(cros.map((c) => [c.id, c.name]));
+  const askedOf = new Set(conversations.map((c) => c.croId));
+  const filters = [{ key: "", label: "All" }, ...(askedOf.has(null) ? [{ key: "collective", label: "Rally Collective" }] : []), ...cros.filter((c) => askedOf.has(c.id)).map((c) => ({ key: c.slug, label: c.name }))];
+  const current = showCro === undefined ? "" : (show ?? "");
   const latest = conversations[0];
   const continueWith = latest && isRecent(latest.updatedAt) ? { id: latest.id, title: latest.title } : null;
   return (
@@ -36,7 +44,8 @@ export default async function RallyPage() {
         start={startChatAction}
         cros={cros.map(toCroCard)}
         collective={cros.filter((c) => c.inCollective).map(toCroCard)}
-        defaultCroId={company.defaultCroId}
+        defaultCroId={withCro === "collective" ? null : cros.find((c) => c.slug === withCro)?.id ?? company.defaultCroId}
+        initialQuestion={ask?.slice(0, 2000) ?? ""}
         suggestions={suggestionsFor({ stage: company.stage, openCommitments: open.length })}
         firstName={user.name?.trim().split(/\s+/)[0] || null}
         companyName={company.name}
@@ -46,12 +55,30 @@ export default async function RallyPage() {
 
       <section id="facts" aria-labelledby="history-title" className="scroll-mt-24 space-y-4">
         <h2 id="history-title" className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>Your conversations</h2>
-        {conversations.length > 0 ? (
+        {filters.length > 2 && (
+          <nav aria-label="Show conversations with" className="flex flex-wrap gap-2">
+            {filters.map((f) => (
+              <Link
+                key={f.key}
+                href={f.key ? `/whats-next?show=${f.key}#facts` : "/whats-next#facts"}
+                aria-current={f.key === current ? "true" : undefined}
+                className="text-sm rounded-full px-3 py-1 border"
+                style={f.key === current ? { background: "var(--green)", color: "#fff", borderColor: "var(--green)" } : { borderColor: "var(--border)", color: "var(--foreground)" }}
+              >
+                {f.label}
+              </Link>
+            ))}
+          </nav>
+        )}
+        {shown.length > 0 ? (
           <ul aria-label="Questions asked" className="surface divide-y" style={{ borderColor: "var(--border)" }}>
-            {conversations.map((c) => (
+            {shown.map((c) => (
               <li key={c.id} style={{ borderColor: "var(--border)" }}>
                 <Link href={`/chat/${c.id}`} className="flex items-center gap-4 px-4 py-3 hover:bg-[var(--muted)] rounded-xl">
-                  <span className="flex-1 min-w-0 text-base" style={{ color: "var(--foreground)" }}>{c.title}</span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-base truncate" style={{ color: "var(--foreground)" }}>{c.title}</span>
+                    <span className="block text-xs" style={{ color: "var(--muted-foreground)" }}>{c.croId ? (croName.get(c.croId) ?? "A CRO") : "Rally Collective"}</span>
+                  </span>
                   <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>{c.updatedAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
                 </Link>
               </li>

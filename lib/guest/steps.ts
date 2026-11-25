@@ -28,14 +28,22 @@ export const GUEST_STEPS: readonly GuestStep[] = [
   { key: "challenge", ask: () => OPENING, kind: "text", placeholder: "e.g. Our pipeline isn't converting and I'm not sure whether to hire another AE." },
   { key: "name", ask: () => "Got it. A few quick questions first, so the answer fits your company. What's your name?", kind: "text", placeholder: "Your name" },
   { key: "companyName", ask: (p) => `Thanks${first(p) ? `, ${first(p)}` : ""}. What's your company called?`, kind: "text", placeholder: "Company name" },
+  { key: "role", ask: () => "And your role there?", kind: "text", placeholder: "e.g. CEO & co-founder" },
+  { key: "vertical", ask: () => "Last one: what vertical are you in? For example fintech, healthtech, security or HR tech.", kind: "choice", options: opts(VERTICALS), placeholder: "e.g. Fintech" },
+  { key: "verticalOther", ask: () => "Which vertical, in a few words?", kind: "text", when: (p) => p.vertical === "Other", placeholder: "e.g. Customer experience" },
+];
+
+/**
+ * Asked before Nov 25, 2026 and now left to the conversation (Rally asks when an answer depends on
+ * one). Kept so a chat started earlier, or a reply that mentions them, still reads them.
+ */
+export const LATER_STEPS: readonly GuestStep[] = [
   { key: "revenueBand", ask: () => "Roughly what's your annual revenue? A ballpark is fine, like $800k, $2M or $15M.", kind: "choice", options: REVENUE_BANDS, placeholder: "e.g. about $2M" },
   { key: "foundedYear", ask: () => "What year was it founded?", kind: "select", options: opts(FOUNDING_YEARS), placeholder: "e.g. 2021" },
   { key: "stage", ask: () => "What's your funding stage: bootstrapped, pre-seed, seed, Series A, or Series B and later?", kind: "choice", options: opts(FUNDING_STAGES), placeholder: "e.g. Seed" },
-  { key: "vertical", ask: () => "What vertical are you in? For example fintech, healthtech, security or HR tech.", kind: "choice", options: opts(VERTICALS), placeholder: "e.g. Fintech" },
-  { key: "verticalOther", ask: () => "Which vertical, in a few words?", kind: "text", when: (p) => p.vertical === "Other", placeholder: "e.g. Customer experience" },
-  { key: "aes", ask: () => "How many account executives (people who close deals) do you have? 0 if it's just you.", kind: "number", placeholder: "e.g. 3" },
+  { key: "aes", ask: () => "How many account executives (people who close deals) do you have? 0 if it's just you.", kind: "number", optional: true, placeholder: "e.g. 3" },
   { key: "bdrs", ask: () => "And BDRs or SDRs (people who book meetings)? Say skip if you'd rather not.", kind: "number", optional: true, placeholder: "e.g. 2, or skip" },
-  { key: "cs", ask: () => "Last one: how many in customer success?", kind: "number", optional: true, placeholder: "e.g. 1, or skip" },
+  { key: "cs", ask: () => "How many in customer success?", kind: "number", optional: true, placeholder: "e.g. 1, or skip" },
 ];
 
 /** The next question to ask, or null once every applicable one is answered. */
@@ -47,6 +55,7 @@ const fieldSchema: Record<string, (v: string) => string | null> = {
   challenge: (v) => (v.length < 3 ? "Tell us a little more." : v.length > 2000 ? "Please keep it under 2,000 characters." : null),
   name: (v) => (!v ? "Enter your name." : v.length > 120 ? "That's too long." : null),
   companyName: (v) => (!v ? "Enter your company name." : v.length > 160 ? "That's too long." : null),
+  role: (v) => (!v ? "What's your role?" : v.length > 120 ? "That's too long." : null),
   verticalOther: (v) => (!v ? "Tell us your vertical." : v.length > 120 ? "That's too long." : null),
 };
 
@@ -72,7 +81,8 @@ export function interpretAnswer(step: GuestStep, raw: string): { ok: true; value
   if (read === null) return { ok: false, reply: CLARIFY[step.key] ?? "Sorry, I didn't catch that. Could you say it another way?" };
   const values: Record<string, string> = {};
   for (const [key, value] of Object.entries(read)) {
-    const target = GUEST_STEPS.find((s) => s.key === key)!;
+    const target = [...GUEST_STEPS, ...LATER_STEPS].find((s) => s.key === key);
+    if (!target) continue;
     const checked = checkAnswer(target, value);
     if (!checked.ok) return { ok: false, reply: checked.error };
     values[key] = checked.value;

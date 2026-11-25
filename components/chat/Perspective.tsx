@@ -8,7 +8,7 @@ type Cro = { id: string; name: string; slug: string };
 
 /**
  * Who's answering in this conversation, and switching it (multi-CRO, Nov 24, 2026): a CRO's AI or the
- * Growth Goaled Collective. Switching changes the perspective and the knowledge it draws on, never
+ * Rally Collective. Switching changes the perspective and the knowledge it draws on, never
  * the company record or what's been said: earlier answers keep their own CRO.
  */
 export function PerspectiveSwitch({ conversationId, current, cros, switchTo, strongest }: { conversationId: string; current: Cro | null; cros: Cro[]; switchTo: (conversationId: string, croId: string | null) => Promise<Result>; strongest: Cro[] }) {
@@ -29,7 +29,7 @@ export function PerspectiveSwitch({ conversationId, current, cros, switchTo, str
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <label htmlFor="perspective" className="sr-only">Continue with</label>
           <select id="perspective" aria-label="Continue with" value={current?.id ?? ""} disabled={pending} onChange={(e) => go(e.target.value || null)} className="field py-1 text-sm">
-            <option value="">Growth Goaled Collective</option>
+            <option value="">Rally Collective</option>
             {cros.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}

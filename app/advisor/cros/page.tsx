@@ -11,7 +11,7 @@ const fg = { color: "var(--foreground)" };
 
 /**
  * The CRO network (Nov 23, 2026): every CRO's profile, whether founders can talk to their AI
- * representation (published) and whether they're part of the Growth Goaled Collective.
+ * representation (published) and whether they're part of the Rally Collective.
  */
 export default async function CrosPage() {
   const user = await requireRole(["advisor", "admin"]);
@@ -23,7 +23,7 @@ export default async function CrosPage() {
         <div>
           <h1 className="font-display text-3xl" style={fg}>CRO network</h1>
           <p className="text-sm mt-1 max-w-3xl" style={muted}>
-            Each CRO has their own profile and intelligence. Founders can talk to a published CRO&apos;s AI representation, or to the Growth Goaled Collective, which draws on every CRO in it.
+            Each CRO has their own profile and intelligence. Founders can talk to a published CRO&apos;s AI representation, or to the Rally Collective, which draws on every CRO in it.
           </p>
         </div>
         <Link href="/advisor/intelligence" className="link text-sm">Intelligence library →</Link>

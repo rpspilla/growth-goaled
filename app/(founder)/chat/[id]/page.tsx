@@ -32,7 +32,7 @@ import { companyBlobPrefix } from "@/lib/data/documents";
 import { founderContext } from "@/lib/data/founder-context";
 import { formatPrice, pricing } from "@/lib/pricing";
 import { stripeConfigured } from "@/lib/stripe";
-import { commitRecommendationAction, rateAnswerAction, secondOpinionAction, switchPerspectiveAction, attachFilesAction, buyPlanAction, feedbackAction, planTargetsAction, retryMessageAction, sendMessageAction, answerStepAction, answerStepFileAction, stepDetailsAction, stepStatusAction, startPlanAction, submitPlanAction, updatePlanAction } from "../actions";
+import { saveRecommendationAction, commitRecommendationAction, rateAnswerAction, secondOpinionAction, switchPerspectiveAction, attachFilesAction, buyPlanAction, feedbackAction, planTargetsAction, retryMessageAction, sendMessageAction, answerStepAction, answerStepFileAction, stepDetailsAction, stepStatusAction, startPlanAction, submitPlanAction, updatePlanAction } from "../actions";
 
 // Each answer is prepared while the founder waits.
 export const maxDuration = 300;
@@ -80,7 +80,7 @@ export default async function ConversationPage({ params, searchParams }: { param
   const informedBy = (card: { sources?: { id: string; how: string }[] }) =>
     (card.sources ?? []).flatMap((x) => {
       const a = sources.get(x.id);
-      return a ? [{ title: a.title, cro: a.cro ?? "Growth Goaled network", how: x.how }] : [];
+      return a ? [{ title: a.title, cro: a.cro ?? "Rally Collective", how: x.how }] : [];
     });
   const asCro = (c: { id: string; name: string; slug: string }) => ({ id: c.id, name: c.name, slug: c.slug });
   const current = cro && cro.status === "published" ? cro : null;
@@ -88,7 +88,7 @@ export default async function ConversationPage({ params, searchParams }: { param
   const perspectives = new Set(view.messages.filter((m) => m.role === "assistant").map((m) => m.croId ?? "collective"));
   const labelAnswers = perspectives.size > 1;
   const perspectiveOf = (m: { croId: string | null; secondOpinion: boolean }) =>
-    m.secondOpinion ? "Second opinion from the Growth Goaled Collective" : m.croId ? `${view.cros.get(m.croId) ?? "A CRO"}'s AI CRO` : "Growth Goaled Collective";
+    m.secondOpinion ? "Second opinion from the Rally Collective" : m.croId ? `${view.cros.get(m.croId) ?? "A CRO"}'s AI CRO` : "Rally Collective";
   const trailingMessage = lastCardId ? view.messages.find((m) => m.recommendationId === lastCardId) : undefined;
   // Spoken answers: in the voice of the CRO who gave it, when they've set one up (lib/data/voice).
   // Answers without their own CRO's voice speak in Rally's (a CRO's, by their choice), if there is one.
@@ -250,7 +250,7 @@ export default async function ConversationPage({ params, searchParams }: { param
           <FullReasoning>
             <RecommendationCardView id={trailing.id} card={trailing.card} given={(view.feedback.get(trailing.id) ?? []).map((f) => f.kind)} deeper={null} feedback={feedbackAction} compact informedBy={informedBy(trailing.card)} />
           </FullReasoning>
-          {commit && <CommitToThis {...commit} commit={commitRecommendationAction.bind(null, trailing.id)} />}
+          {commit && <CommitToThis {...commit} commit={commitRecommendationAction.bind(null, trailing.id)} saved={Boolean(trailing.savedAt)} save={saveRecommendationAction.bind(null, trailing.id)} />}
           {cro && cro.status === "published" && trailingMessage && !trailingMessage.secondOpinion && <SecondOpinion conversationId={view.conversation.id} cro={cro.name} ask={secondOpinionAction} />}
           {offer && trailing.id === lastCardId && (
             <PlanOffer conversationId={view.conversation.id} planPrice={formatPrice(actionPlanCents)} supportedPrice={formatPrice(supportedMonthlyCents)} buy={buyPlanAction} bookHref="/advisory/book?kind=review" />
@@ -258,11 +258,7 @@ export default async function ConversationPage({ params, searchParams }: { param
         </div>
       )}
       <p className="text-sm max-w-4xl" style={muted}>
-        {current
-          ? `Rally is an AI built on ${current.name}'s documented CRO expertise and judgment; ${current.name.split(" ")[0]} isn't reviewing this conversation live. `
-          : "Rally's Collective answers draw on the documented expertise and judgment of the CROs in the Growth Goaled network; no one is reviewing this conversation live. "}
-        Facts you mention are remembered for your company, so you won&apos;t be asked twice. <Link href="/whats-next#facts" className="link">See or correct them</Link>. Never shown to other
-        companies; <Link href="/data-use" className="link">how we use your data</Link>.
+        {current ? `An AI built on ${current.name}'s documented expertise, not ${current.name.split(" ")[0]} live.` : "AI built on the documented expertise of the Rally Collective's CROs."} Rally remembers what you tell it about {company.name} (<Link href="/whats-next#facts" className="link">see or correct</Link>); it&apos;s never shown to other companies.
       </p>
     </div>
     </div>

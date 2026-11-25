@@ -6,7 +6,8 @@ import { flushSync } from "react-dom";
 import { useFormStatus } from "react-dom";
 import type { StartState } from "@/app/(founder)/chat/actions";
 import type { Suggestion } from "@/lib/chat/suggestions";
-import { CroIdentity, type CroCard } from "./CroIdentity";
+import { WhoToAsk } from "./WhoToAsk";
+import type { CroCard } from "./CroIdentity";
 import { DictateButton, DictationStatus, useDictation, voiceMode } from "./Dictation";
 
 function Send() {
@@ -53,9 +54,9 @@ function SuggestionButton({ s }: { s: Suggestion }) {
 }
 
 /**
- * Rally's front door (Rally Beta, Nov 24, 2026): who you're talking to (with their face and
- * credentials), "What's the growth decision in front of you?", four suggestions for the company's
- * stage, and the box to type your own. With a conversation under way, "Continue" comes first.
+ * Rally's front door (Nov 25, 2026): "What's the growth decision in front of you?", who to ask (the
+ * Rally Collective or one CRO, as cards), the box to type or say it, then suggestions under it. With a
+ * conversation under way, "Continue" comes first.
  */
 export function RallyEntry({
   start,
@@ -66,6 +67,7 @@ export function RallyEntry({
   firstName,
   companyName,
   continueWith,
+  initialQuestion = "",
   voice = { transcribe: false, voiced: false },
 }: {
   start: (prev: StartState, formData: FormData) => Promise<StartState>;
@@ -76,12 +78,14 @@ export function RallyEntry({
   firstName: string | null;
   companyName: string;
   continueWith: { id: string; title: string } | null;
+  /** The challenge they gave when setting up their company, waiting in the box. */
+  initialQuestion?: string;
   /** transcribe: speech for browsers without their own recognition; voiced: Rally has a real voice (the greeting). */
   voice?: { transcribe: boolean; voiced: boolean };
 }) {
   const [state, action] = useActionState(start, {});
   const [croId, setCroId] = useState(cros.some((c) => c.id === defaultCroId) ? defaultCroId! : "");
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialQuestion);
   const form = useRef<HTMLFormElement>(null);
   const spokenSubmit = useRef(false);
   // Spoken: asked as soon as they pause; the conversation then listens for the reply.
@@ -109,27 +113,10 @@ export function RallyEntry({
           <span aria-hidden style={{ color: "var(--muted-foreground)" }}>→</span>
         </Link>
       )}
-      <CroIdentity
-        cro={cro}
-        collective={collective}
-        size="lg"
-        action={
-          cros.length > 0 && (
-            <label className="block">
-              <span className="sr-only">Who to ask</span>
-              <select value={croId} onChange={(e) => setCroId(e.target.value)} className="field py-1.5 text-sm" aria-label="Who to ask">
-                <option value="">Growth Goaled Collective</option>
-                {cros.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </label>
-          )
-        }
-      />
       <h1 className="font-display text-3xl sm:text-4xl leading-tight" style={{ color: "var(--foreground)" }}>
         What&apos;s the growth decision in front of you{firstName ? `, ${firstName}` : ""}?
       </h1>
+      <WhoToAsk cros={cros} collective={collective} value={croId} onChange={setCroId} />
       <form
         ref={form}
         action={action}
@@ -143,11 +130,6 @@ export function RallyEntry({
       >
         <input type="hidden" name="cro" value={croId} />
         <input type="hidden" name="question" defaultValue="" />
-        <div role="group" aria-label="Suggested questions" className="grid sm:grid-cols-2 gap-2">
-          {suggestions.map((s) => (
-            <SuggestionButton key={s.text} s={s} />
-          ))}
-        </div>
         <div className="rounded-2xl border p-3 flex flex-col gap-2" style={{ borderColor: "var(--border)", background: "var(--card)" }}>
           <label htmlFor="ask-text" className="sr-only">Ask {who}</label>
           <textarea
@@ -175,13 +157,23 @@ export function RallyEntry({
             placeholder={`Ask ${who} anything about growing ${companyName}…`}
           />
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>Rally knows {companyName}&apos;s context, so you won&apos;t be asked twice.</span>
+            <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>Type or talk</span>
             <span className="flex items-center gap-2">
               <DictateButton d={dictation} />
               <Send />
             </span>
           </div>
         </div>
+        {suggestions.length > 0 && (
+          <div className="space-y-2">
+            <div className="text-sm font-semibold" style={{ color: "var(--muted-foreground)" }}>Or start with one of these</div>
+            <div role="group" aria-label="Suggested questions" className="grid sm:grid-cols-2 gap-2">
+              {suggestions.map((s) => (
+                <SuggestionButton key={s.text} s={s} />
+              ))}
+            </div>
+          </div>
+        )}
       </form>
       <DictationStatus d={dictation} />
       {state.error && (

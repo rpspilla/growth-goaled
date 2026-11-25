@@ -99,7 +99,7 @@ test("a visitor talks to Rally from the landing page, hands-free; founders have 
   const page = await ctx.newPage();
   await page.addInitScript(fakeSpeech, ["Our pipeline isn't converting.", "Robin Guest"]);
   await page.goto("/sign-in");
-  await page.getByText("Or ask Rally a question first").click();
+  await page.getByText("Or ask a question first").click();
   // First tap: Rally says hello, then listens; a pause sends; Rally answers aloud and listens again.
   await page.getByRole("button", { name: "Talk to Rally" }).click();
   const chat = page.getByRole("list", { name: "Conversation", exact: true });

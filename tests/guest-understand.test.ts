@@ -1,10 +1,10 @@
 /** Typed answers to the sign-in chat's sign-up questions, read without buttons or dropdowns. */
 import { describe, expect, it } from "vitest";
 import { count, foundedYear, revenueBand, stage, understand, vertical } from "@/lib/guest/understand";
-import { GUEST_STEPS, interpretAnswer } from "@/lib/guest/steps";
+import { GUEST_STEPS, LATER_STEPS, interpretAnswer } from "@/lib/guest/steps";
 import { FOUNDING_YEARS } from "@/lib/intake";
 
-const step = (key: string) => GUEST_STEPS.find((s) => s.key === key)!;
+const step = (key: string) => [...GUEST_STEPS, ...LATER_STEPS].find((s) => s.key === key)!;
 const now = Number(FOUNDING_YEARS[0]);
 
 describe("typed sign-up answers", () => {
@@ -54,7 +54,7 @@ describe("typed sign-up answers", () => {
   });
   it("optional questions can be skipped in words; exact option labels still work", () => {
     expect(understand(step("bdrs"), "skip")).toEqual({ bdrs: "" });
-    expect(understand(step("aes"), "skip")).toBeNull();
+    expect(understand(step("aes"), "skip")).toEqual({ aes: "" });
     expect(understand(step("revenueBand"), "$1M–$3M")).toEqual({ revenueBand: "1m_3m" });
   });
   it("answers are still checked by the sign-up rules, and unclear ones get a question back", () => {

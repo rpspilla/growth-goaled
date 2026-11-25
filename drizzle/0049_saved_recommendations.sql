@@ -1,0 +1,1 @@
+ALTER TABLE "recommendations" ADD COLUMN "saved_at" timestamp with time zone;

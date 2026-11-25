@@ -12,7 +12,7 @@ const muted = { color: "var(--muted-foreground)" };
 const fg = { color: "var(--foreground)" };
 
 /**
- * The CRO directory (Nov 23, 2026): the CROs in the Growth Goaled network whose AI representation a
+ * The CRO directory (Nov 23, 2026): the CROs in the Rally Collective whose AI representation a
  * founder can talk to, and the Collective, which draws on all of them.
  */
 export default async function CroDirectoryPage() {
@@ -21,15 +21,15 @@ export default async function CroDirectoryPage() {
   const cros = await listCroProfiles({ published: true });
   return (
     <div className="page space-y-8">
-      <PageHeader title="Our CROs" subtitle="Talk to one CRO's AI, built from their own documented expertise and judgment, or to the Growth Goaled Collective, which draws on all of them. Your default is who new conversations start with; you can switch in any conversation without losing anything." />
+      <PageHeader title="Meet your CRO collective" subtitle="Experienced operators. Different perspectives. Ask them all at once, or one at a time. Each is an AI built on that CRO's documented expertise." />
 
-      <section aria-label="The Growth Goaled Collective" className="surface p-5 space-y-2">
-        <h2 className="text-xl font-semibold" style={fg}>The Growth Goaled Collective</h2>
+      <section aria-label="The Rally Collective" className="surface p-5 space-y-2">
+        <h2 className="text-xl font-semibold" style={fg}>The Rally Collective</h2>
         <p className="text-base" style={muted}>
           One recommendation that draws on the most relevant experience across our CROs. Where they see it differently, you&apos;ll hear why, and which view fits your company.
         </p>
         <div className="flex items-center gap-4 flex-wrap">
-          <Link href="/whats-next" className="btn btn-primary inline-block">Ask the Collective</Link>
+          <Link href="/whats-next?with=collective" className="btn btn-primary inline-block">Ask the Collective</Link>
           <DefaultCroButton croId={null} isDefault={!company.defaultCroId || !cros.some((c) => c.id === company.defaultCroId)} label="the Collective" set={setDefaultCroAction} />
         </div>
       </section>
@@ -55,7 +55,8 @@ export default async function CroDirectoryPage() {
               {c.expertise.length > 0 && <p className="text-sm" style={muted}>{c.expertise.slice(0, 6).join(" · ")}</p>}
               <div className="flex-1" />
               <div className="flex items-center gap-4 flex-wrap">
-                <Link href={`/cros/${c.slug}`} className="link">Profile and ask {c.name.split(" ")[0]}&apos;s AI →</Link>
+                <Link href={`/whats-next?with=${c.slug}`} className="btn btn-primary text-sm py-1.5">Ask {c.name.split(" ")[0]}</Link>
+                <Link href={`/cros/${c.slug}`} className="link text-sm">View profile</Link>
                 <DefaultCroButton croId={c.id} isDefault={company.defaultCroId === c.id} label={`${c.name}'s AI CRO`} set={setDefaultCroAction} />
               </div>
             </li>

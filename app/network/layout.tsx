@@ -12,7 +12,7 @@ export default function NetworkLayout({ children }: { children: ReactNode }) {
             <RallyLogo tone="light" />
           </Link>
           <span className="flex-1" />
-          <Link href="/sign-in" className="btn btn-primary text-sm">Get Free Beta Access</Link>
+          <Link href="/sign-in" className="btn btn-primary text-sm">Get Access to Rally</Link>
         </div>
       </header>
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10">{children}</main>

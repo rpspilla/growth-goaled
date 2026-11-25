@@ -41,21 +41,23 @@ const headcount = (label: string, optional: boolean) =>
     });
 
 const pick = <T extends readonly [string, ...string[]]>(values: T, message: string) => z.enum(values as unknown as [T[number], ...T[number][]], { error: message });
+/** Optional: empty (or absent) is null; anything else must be one of the values. */
+const maybe = <S extends z.ZodTypeAny>(schema: S) => z.preprocess((v) => (v === "" || v === undefined ? null : v), schema.nullable());
 
 /**
- * The six company basics asked before the free Snapshot (owner decision, Nov 2 2026): name, ARR,
- * founding year, vertical, funding stage and go-to-market team size. Everything else in the profile
- * is optional and comes after the Snapshot.
+ * The company basics. Only the name and vertical are required (Nov 25, 2026, after Ben Carcio's
+ * walkthrough: value before sensitive details); revenue, founding year, stage and team are optional
+ * here and Rally asks for them in conversation when an answer depends on them.
  */
 export const companyBasicsSchema = z
   .object({
     companyName: z.string().trim().min(1, "Enter your company name.").max(160),
-    revenueBand: z.enum(bandValues, { error: "Choose your annual revenue." }),
-    foundedYear: pick(FOUNDING_YEARS as unknown as [string, ...string[]], "Choose your founding year."),
+    revenueBand: maybe(z.enum(bandValues, { error: "Choose your annual revenue." })),
+    foundedYear: maybe(pick(FOUNDING_YEARS as unknown as [string, ...string[]], "Choose your founding year.")),
     vertical: pick(VERTICALS, "Choose your vertical."),
     verticalOther: z.string().trim().max(120).optional().transform((v) => v || null),
-    stage: pick(FUNDING_STAGES, "Choose your funding stage."),
-    aes: headcount("account executives", false),
+    stage: maybe(pick(FUNDING_STAGES, "Choose your funding stage.")),
+    aes: headcount("account executives", true),
     bdrs: headcount("BDRs", true),
     cs: headcount("customer success staff", true),
   })
@@ -65,11 +67,12 @@ export const companyBasicsSchema = z
 
 export type CompanyBasics = z.infer<typeof companyBasicsSchema>;
 
-/** Founders: their name, an optional title, and the company basics. */
+/** Founders setting up a company: their name and role, the company basics, and (optional) the challenge on their mind. */
 export const founderOnboardingSchema = z
   .object({
     name,
-    title: z.string().trim().max(120).optional().transform((v) => v || null),
+    title: z.string().trim().min(1, "Enter your role.").max(120),
+    challenge: z.string().trim().max(2000).optional().transform((v) => v || null),
   })
   .and(companyBasicsSchema);
 

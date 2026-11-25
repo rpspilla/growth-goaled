@@ -61,7 +61,7 @@ export async function guestRestartAction(): Promise<void> {
   revalidatePath("/sign-in");
 }
 
-/** Who the visitor talks to: a published CRO's AI, or (empty) the Growth Goaled Collective. */
+/** Who the visitor talks to: a published CRO's AI, or (empty) the Rally Collective. */
 export async function guestCroAction(croId: string | null): Promise<GuestResult> {
   const g = await guestSession(true);
   if (!g) return { ok: false, error: "Something went wrong. Please refresh and try again." };

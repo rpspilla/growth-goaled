@@ -28,10 +28,15 @@ export function WelcomeForm({ isFounder, askCompany, defaultName, known = {} }: 
       <Field id="name" label="Your name" error={e.name}>
         <input id="name" name="name" defaultValue={state.values?.name ?? defaultName} autoComplete="name" required className="field" {...invalid("name")} />
       </Field>
-      {askCompany && <CompanyBasicsFields key={JSON.stringify(state.values ?? {})} errors={e} values={state.values ?? known} />}
-      <Field id="title" label="Your title" hint={isFounder ? "optional" : undefined} error={e.title}>
-        <input id="title" name="title" defaultValue={state.values?.title} placeholder={isFounder ? "CEO & Co-founder" : "Lead Advisor"} autoComplete="organization-title" required={!isFounder} className="field" {...invalid("title")} />
+      <Field id="title" label={isFounder ? "Your role" : "Your title"} hint={isFounder && !askCompany ? "optional" : undefined} error={e.title}>
+        <input id="title" name="title" defaultValue={state.values?.title ?? known.role} placeholder={isFounder ? "CEO & Co-founder" : "Lead Advisor"} autoComplete="organization-title" required={!isFounder || askCompany} className="field" {...invalid("title")} />
       </Field>
+      {askCompany && <CompanyBasicsFields key={JSON.stringify(state.values ?? {})} errors={e} values={state.values ?? known} />}
+      {askCompany && (
+        <Field id="challenge" label="What's the main growth challenge on your mind?" hint="optional" error={e.challenge}>
+          <textarea id="challenge" name="challenge" rows={3} defaultValue={state.values?.challenge ?? known.challenge} placeholder="e.g. Should I hire my first VP of Sales?" className="field" {...invalid("challenge")} />
+        </Field>
+      )}
       <button type="submit" disabled={pending} className="btn btn-primary btn-lg w-full">
         {pending ? "Saving…" : isFounder ? "Continue" : "Continue to Portfolio"}
       </button>

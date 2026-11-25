@@ -37,7 +37,7 @@ export default async function IntelligenceRecordPage({ params }: { params: Promi
         <Link href="/advisor/intelligence" className="link text-sm">← Intelligence library</Link>
         <h1 className="font-display text-3xl mt-2" style={fg}>{r.title}</h1>
         <p className="text-sm mt-1" style={muted}>
-          {INTELLIGENCE_TYPES[r.type]} · {r.primaryCroName ?? "Growth Goaled network position"} · {CLASSIFICATIONS[r.classification]} · {EVIDENCE_LEVELS[r.evidence]} · version {r.version} · {INTELLIGENCE_STATUSES[r.status]}
+          {INTELLIGENCE_TYPES[r.type]} · {r.primaryCroName ?? "Rally Collective position"} · {CLASSIFICATIONS[r.classification]} · {EVIDENCE_LEVELS[r.evidence]} · version {r.version} · {INTELLIGENCE_STATUSES[r.status]}
           {r.validatedByName && r.validatedAt ? ` by ${r.validatedByName} on ${r.validatedAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : ""}
         </p>
       </header>

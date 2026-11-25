@@ -15,7 +15,7 @@ export const PROJECTS = "/projects";
 
 /** The company pages under "Your company" in the Rally rail (everything but the conversation). */
 export function founderCompanyNav(): NavItem[] {
-  return [...founderNav().slice(1), { href: "/cros", label: "Our CROs" }];
+  return founderNav().slice(1);
 }
 
 export function founderNav(): NavItem[] {

@@ -15,12 +15,12 @@ export default async function NetworkPage() {
       <header className="max-w-3xl">
         <h1 className="font-display text-4xl sm:text-5xl leading-tight" style={fg}>The CROs behind Growth Goaled</h1>
         <p className="text-lg mt-3" style={muted}>
-          Talk to one CRO&apos;s AI, built from their own documented expertise and judgment, or to the Growth Goaled Collective, which brings the network&apos;s expertise to your question. It&apos;s free to start.
+          Talk to one CRO&apos;s AI, built from their own documented expertise and judgment, or to the Rally Collective, which brings the network&apos;s expertise to your question. It&apos;s free to start.
         </p>
       </header>
 
-      <section aria-label="The Growth Goaled Collective" className="surface p-6 space-y-2" style={{ borderColor: "var(--green)" }}>
-        <h2 className="text-2xl font-semibold" style={fg}>The Growth Goaled Collective</h2>
+      <section aria-label="The Rally Collective" className="surface p-6 space-y-2" style={{ borderColor: "var(--green)" }}>
+        <h2 className="text-2xl font-semibold" style={fg}>The Rally Collective</h2>
         <p className="text-base max-w-3xl" style={muted}>One recommendation that draws on the most relevant experience across our CROs. Where they see it differently, you&apos;ll hear why, and which view fits your company.</p>
         <Link href="/sign-in" className="btn btn-primary inline-block">Talk to the Collective</Link>
       </section>

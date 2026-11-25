@@ -21,10 +21,15 @@ describe("founderOnboardingSchema", () => {
   });
 
   it("rejects bad input with a field-specific message", () => {
-    const r = founderOnboardingSchema.safeParse({ ...valid, companyName: " ", revenueBand: "100m_plus", foundedYear: "", stage: "IPO", aes: "", cs: "2.5" });
+    const r = founderOnboardingSchema.safeParse({ ...valid, title: " ", companyName: " ", revenueBand: "100m_plus", stage: "IPO", cs: "2.5" });
     expect(r.success).toBe(false);
     const fields = r.error!.issues.map((i) => i.path[0]);
-    expect(fields).toEqual(expect.arrayContaining(["companyName", "revenueBand", "foundedYear", "stage", "aes", "cs"]));
+    expect(fields).toEqual(expect.arrayContaining(["title", "companyName", "revenueBand", "stage", "cs"]));
+  });
+
+  it("needs only name, role, company and vertical (Nov 25, 2026): stage, revenue, year and team are optional", () => {
+    const parsed = founderOnboardingSchema.parse({ name: "Sam", title: "CEO", companyName: "Acme", vertical: "Fintech", revenueBand: "", foundedYear: "", stage: "", aes: "", bdrs: "", cs: "" });
+    expect(parsed).toMatchObject({ revenueBand: null, foundedYear: null, stage: null, aes: null, challenge: null });
   });
 });
 

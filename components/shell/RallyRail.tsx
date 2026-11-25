@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, MessageSquarePlus } from "lucide-react";
+import { BookmarkCheck, ChevronDown, Home, MessageSquarePlus, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -8,8 +8,8 @@ import { NavLink } from "./NavLink";
 import type { NavItem } from "./UseCaseSidebar";
 
 /**
- * The founder's rail in Rally (Rally Beta, Nov 24, 2026): New conversation, recent conversations,
- * then the company pages under one "Your company" heading (open while one of them is showing) and
+ * The founder's rail in Rally (Nov 25, 2026): New conversation; Home, the Rally Collective & CROs and
+ * Decisions; recent conversations; then the company pages under one "Your company" heading (open while one of them is showing) and
  * Share feedback. The conversation is the product; everything else is one click away.
  */
 export function RallyRail({ recent, company }: { recent: { id: string; title: string }[]; company: NavItem[] }) {
@@ -21,6 +21,22 @@ export function RallyRail({ recent, company }: { recent: { id: string; title: st
       <Link href="/whats-next" className="btn btn-primary w-full inline-flex items-center justify-center gap-2 text-sm py-2">
         <MessageSquarePlus size={16} aria-hidden /> New conversation
       </Link>
+
+      <div className="space-y-0.5">
+        {[
+          { href: "/whats-next", label: "Home", icon: Home, exact: true },
+          { href: "/cros", label: "Rally Collective & CROs", icon: Users },
+          { href: "/decisions", label: "Decisions", icon: BookmarkCheck },
+        ].map(({ href, label, icon: Icon, exact }) => (
+          <NavLink key={href} href={href} exact={exact}>
+            {(active) => (
+              <span className="flex items-center gap-2 font-medium" style={{ color: active ? "#fff" : undefined }}>
+                <Icon size={16} aria-hidden /> {label}
+              </span>
+            )}
+          </NavLink>
+        ))}
+      </div>
 
       {recent.length > 0 && (
         <div>

@@ -42,6 +42,7 @@ function StarterChip({ s }: { s: Starter }) {
  */
 export function AskBox({
   starters,
+  startersLabel = "or start from a common question",
   start,
   lead,
   cros = [],
@@ -52,6 +53,8 @@ export function AskBox({
   voice = { transcribe: false, voiced: false, name: null },
 }: {
   starters: Starter[];
+  /** The line before the starter questions (a CRO's page: "Questions {name} can help with"). */
+  startersLabel?: string;
   start: (prev: StartState, formData: FormData) => Promise<StartState>;
   lead?: string;
   /** Published CROs the founder can talk to instead of the Collective. */
@@ -111,7 +114,7 @@ export function AskBox({
             <div className="flex items-center gap-2 flex-wrap text-sm">
               <span className="font-semibold" style={{ color: "var(--foreground)" }}>Ask</span>
               <select name="cro" defaultValue={cros.some((c) => c.id === defaultCroId) ? (defaultCroId ?? "") : ""} className="field py-1.5" aria-label="Who to ask">
-                <option value="">The Growth Goaled Collective (all our CROs){!defaultCroId ? " · your default" : ""}</option>
+                <option value="">The Rally Collective (all our CROs){!defaultCroId ? " · your default" : ""}</option>
                 {cros.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}&apos;s AI CRO{c.id === defaultCroId ? " · your default" : ""}
@@ -145,7 +148,7 @@ export function AskBox({
         <div className="flex items-center gap-3 flex-wrap">
           <AskButton />
           <DictateButton d={dictation} />
-          <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>or start from a common question:</span>
+          <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>{startersLabel}:</span>
         </div>
         <DictationStatus d={dictation} />
         <div role="group" aria-label="Common questions" className="flex flex-wrap gap-2">

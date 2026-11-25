@@ -161,7 +161,7 @@ export const companies = pgTable(
     siteCheckedAt: timestamp("site_checked_at", { withTimezone: true }),
     // The plan the company is working on with its advisor, as the advisor names it (e.g. "Sales Hiring")
     currentPlan: text("current_plan"),
-    // Who the company's founders talk to by default: a CRO's AI, or null for the Growth Goaled Collective
+    // Who the company's founders talk to by default: a CRO's AI, or null for the Rally Collective
     defaultCroId: uuid("default_cro_id").references((): AnyPgColumn => croProfiles.id, { onDelete: "set null" }),
     ...timestamps,
   },
@@ -990,7 +990,7 @@ export const conversations = pgTable(
     // Starter topic id (lib/chat/topics.ts); "other" for "Something else"
     topic: text("topic").notNull(),
     title: text("title").notNull(),
-    // Who the founder is talking to: one CRO's AI representation, or (null) the Growth Goaled Collective
+    // Who the founder is talking to: one CRO's AI representation, or (null) the Rally Collective
     croId: uuid("cro_id").references(() => croProfiles.id, { onDelete: "set null" }),
     ...timestamps,
   },
@@ -1088,6 +1088,8 @@ export const recommendations = pgTable(
     methodologyVersion: text("methodology_version").notNull(),
     model: text("model"),
     status: recommendationStatus("status").notNull().default("proposed"),
+    // Saved by the founder for later (a bookmark, Nov 25, 2026): listed under Decisions; committing is separate
+    savedAt: timestamp("saved_at", { withTimezone: true }),
     ...timestamps,
   },
   (t) => [index("recommendations_company_idx").on(t.companyId, t.createdAt), index("recommendations_topic_idx").on(t.topic)],
@@ -1250,7 +1252,7 @@ export const guestSessions = pgTable(
     ipHash: text("ip_hash"),
     claimedBy: uuid("claimed_by").references(() => users.id, { onDelete: "set null" }),
     claimedAt: timestamp("claimed_at", { withTimezone: true }),
-    // The CRO whose AI the visitor chose (null: the Growth Goaled Collective)
+    // The CRO whose AI the visitor chose (null: the Rally Collective)
     croId: uuid("cro_id").references((): AnyPgColumn => croProfiles.id, { onDelete: "set null" }),
     ...timestamps,
   },
@@ -1671,7 +1673,7 @@ export type WeeklyPriority = typeof weeklyPriorities.$inferSelect;
 // ---------------------------------------------------------------------------
 // Multi-CRO intelligence (Nov 23, 2026)
 // Every CRO in the network has a profile and their own intelligence records; founders talk to one
-// CRO's AI representation or to the Growth Goaled Collective, which draws on everyone's validated
+// CRO's AI representation or to the Rally Collective, which draws on everyone's validated
 // records. Attribution is kept on every record and every answer that uses one.
 // ---------------------------------------------------------------------------
 

@@ -191,3 +191,32 @@ consent line in the founder terms before any founder content is used.
   streaming or a progress state, and a per-company daily cap.
 - **No destructive changes** planned: migrations additive, no tables dropped, existing conversation,
   recommendation and commitment data untouched.
+
+---
+
+## 9. Release 1: what was built (Nov 25, 2026)
+
+| Backlog item | Done | Where |
+| --- | --- | --- |
+| B1 + A1 Landing | "Meet your CRO collective." + promise line + CRO faces; one **Get Access to Rally** button (also in the website chat and `/network`); "How Rally works" and "Or ask a question first" as disclosures | `app/(auth)/RallyLanding.tsx`, `components/brand/Rally.tsx` (`RALLY.promise`, `RALLY.cta`) |
+| B3 Onboarding | Website chat asks challenge → name → company → role → vertical. Company step asks name, role, company, vertical, optional challenge; stage, revenue, founding year and team behind an optional disclosure. Role saved to `users.title`; the challenge waits in the home question box | `lib/guest/steps.ts` (`LATER_STEPS` keeps the old questions readable), `lib/onboarding.ts`, `components/onboarding/CompanyBasicsFields.tsx`, `app/welcome/*` |
+| B4 Progressive collection | Prompt: ask for revenue / stage / team only when the answer depends on it, or answer conditionally; facts already persist | `lib/ai/chat.ts` |
+| R1 Brand | "Growth Goaled Collective" → "Rally Collective" in founder UI, staff UI and prompts | many (string change only) |
+| C1 + F1 Home | "Who do you want to ask?" cards (Rally Collective, each CRO with title and expertise), question box, suggestions under it | `components/chat/WhoToAsk.tsx`, `components/chat/RallyEntry.tsx` |
+| C2 CRO page | "Questions {name} can help with" ranked by their expertise (`topicsFor`), AI disclosure line, "Your conversations with {name}" | `app/(founder)/cros/[slug]/page.tsx`, `lib/cro.ts` |
+| C5 History by CRO | Filter chips (All · Rally Collective · each CRO) and who answered on each row; `?with=` preselects who to ask | `app/(founder)/whats-next/page.tsx`, `lib/data/chat.ts` (`listConversations` `cro` option) |
+| F3 + E2 Save vs Commit, Decisions | **Save recommendation** (bookmark, `recommendations.saved_at`, migration 0049) and **Commit to this** (unchanged commitments flow) side by side with one line explaining each; new **Decisions** page | `components/chat/CommitToThis.tsx`, `lib/data/decisions.ts`, `app/(founder)/decisions/page.tsx`, `saveRecommendationAction` |
+| F5 + F6 Navigation | Logo → home (sidebar; Rally mark on phones); rail: New conversation · Home · Rally Collective & CROs · Decisions · Recent · Your company · Share feedback | `app/(founder)/layout.tsx`, `components/shell/RallyRail.tsx`, `lib/nav.ts` |
+| F4 Company context | Company bar collapsible, remembered per browser | `components/brand/CompanyBrandBar.tsx` |
+| A2 + F2 Copy | Conversation footer one line; CRO directory "Meet your CRO collective" with **Ask {name}** / **View profile** | chat page, `app/(founder)/cros/page.tsx` |
+| CRO roster | James Winn added as a draft CRO, linked to his advisor login, in the Collective once published | production data |
+
+Preserved: authentication and the website-chat claim, conversation persistence and continuation,
+switching perspective, second opinion, commitments, projects, check-ins, intelligence retrieval and
+attribution, voice, Beta pricing switch, every staff tool. Migration 0049 is additive.
+
+QA: `e2e/rally-journey.spec.ts` runs the brief's 13-step journey on a 1440×900 desktop and a 390×844
+phone (including no sideways scroll); the existing suites were updated for the new controls.
+
+Outstanding for Release 1: branded sign-in email (Neon Auth custom SMTP via Resend: needs the key
+entered in the Neon console).

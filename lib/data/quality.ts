@@ -53,7 +53,7 @@ export async function qualityReport(): Promise<{ topics: QualityRow[]; cros: Qua
     const tKey = c.topic;
     if (!topics.has(tKey)) topics.set(tKey, empty(tKey, tKey === "other" ? "In their own words" : (getChatTopic(tKey)?.starter ?? tKey)));
     const cKey = c.croId ?? "collective";
-    if (!byCro.has(cKey)) byCro.set(cKey, empty(cKey, c.croId ? `${croName.get(c.croId) ?? "A CRO"}'s AI` : "Growth Goaled Collective"));
+    if (!byCro.has(cKey)) byCro.set(cKey, empty(cKey, c.croId ? `${croName.get(c.croId) ?? "A CRO"}'s AI` : "Rally Collective"));
     return [topics.get(tKey)!, byCro.get(cKey)!];
   };
   for (const id of real.keys()) for (const r of rowsFor(id)) r.conversations++;

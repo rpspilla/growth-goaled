@@ -26,5 +26,8 @@ export async function GET(request: NextRequest) {
   if (request.nextUrl.searchParams.get("to") === "library" && !needsOnboarding(user) && user.role === "founder") return NextResponse.redirect(new URL("/overview", request.url));
   // ?claimed=0 stops /welcome sending them straight back here.
   const setUp = needsOnboarding(user) || (user.role === "founder" && !(await getFounderCompany(user)));
-  return NextResponse.redirect(new URL(setUp ? "/welcome?claimed=0" : homePathFor(user.role), request.url));
+  // From the company step: the challenge they gave waits in Rally's question box.
+  const ask = request.nextUrl.searchParams.get("ask")?.slice(0, 2000);
+  const home = ask && user.role === "founder" ? `/whats-next?ask=${encodeURIComponent(ask)}` : homePathFor(user.role);
+  return NextResponse.redirect(new URL(setUp ? "/welcome?claimed=0" : home, request.url));
 }

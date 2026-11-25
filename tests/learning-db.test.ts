@@ -141,7 +141,7 @@ describe("the AI CRO quality report", () => {
     await committedCard(null, "Second");
     const report = await qualityReport();
     expect(report.topics).toEqual([expect.objectContaining({ label: "Who should my first GTM hire be?", conversations: 2, recommendations: 2, committed: 2, helpful: 1, worked: 1 })]);
-    expect(report.cros.map((c) => [c.label, c.conversations, c.worked])).toEqual(expect.arrayContaining([["Ana Alvarez's AI", 1, 1], ["Growth Goaled Collective", 1, 0]]));
+    expect(report.cros.map((c) => [c.label, c.conversations, c.worked])).toEqual(expect.arrayContaining([["Ana Alvarez's AI", 1, 1], ["Rally Collective", 1, 0]]));
     expect(report.records).toEqual([expect.objectContaining({ title: "Founders sell first", cro: "Ana Alvarez", worked: 1 })]);
     expect(report.records[0]!.uses).toBeGreaterThanOrEqual(1);
   });
@@ -159,7 +159,7 @@ describe("the website chat's CRO choice", () => {
     let s = (await guestByToken(TOKEN))!;
     expect(s.croId).toBe(croId);
     // Answer the sign-up questions; the last one hands over to the AI.
-    for (const a of ["Should we hire our first AE?", "Fran Founder", "Acmeloop", "1m_3m", "2024", "Seed", "Fintech", "2", "", "0"]) {
+    for (const a of ["Should we hire our first AE?", "Fran Founder", "Acmeloop", "Founder", "Fintech"]) {
       const r = await guestReply((await guestByToken(TOKEN))!, a);
       if (!r.ok) throw new Error(`${a}: ${r.error}`);
     }

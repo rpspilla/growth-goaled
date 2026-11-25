@@ -167,7 +167,9 @@ export function GuestChat({
   }, [dictation.supported, pending, sent, locked, view.capped, lastIndex]);
   const capped = view.capped;
   // The last sign-up answer (if it reads as one) hands over to the AI: say so, and show it working.
-  const spinningUp = Boolean(step && sent !== null && step.key === LAST_STEP && understand({ ...step, options: step.options ?? undefined } as GuestStep, sent) !== null);
+  // The last sign-up answer (the vertical, or what "Other" means) hands over to the AI.
+  const read = step && sent !== null ? understand({ ...step, options: step.options ?? undefined } as GuestStep, sent) : null;
+  const spinningUp = Boolean(step && read && (step.key === "verticalOther" || (step.key === "vertical" && read.vertical !== "Other")));
   const intent: LinkIntent = planIntent ? "plan" : null;
   return (
     <div className="flex flex-col gap-4 w-full">
@@ -205,7 +207,7 @@ export function GuestChat({
             <p className="rounded-2xl px-4 py-2.5 text-base max-w-[85%] whitespace-pre-wrap" style={{ background: "var(--navy)", color: "#fff" }}>{sent}</p>
           </li>
         )}
-        {/* The last sign-up answer (customer success) hands over to the AI, as does any reply after it. */}
+        {/* The last sign-up answer (the vertical) hands over to the AI, as does any reply after it. */}
         {sent !== null && (spinningUp ? (
           <li role="status" aria-live="polite" className="space-y-2">
             <p className="text-base flex items-start gap-2 leading-relaxed" style={{ color: "var(--foreground)" }}>
@@ -432,7 +434,6 @@ export function teaserInsights(card: RecommendationCard): string[] {
   return [card.diagnosis, firm?.text].filter((t): t is string => Boolean(t?.trim())).slice(0, 2);
 }
 
-const LAST_STEP = "cs";
 
 const SPIN_UP_STEPS = [
   "Reading your answers",
@@ -538,7 +539,7 @@ function ConvertOptions({ scope, email, giveEmail, beta }: { scope: CapScope; em
       {beta ? (
         <div className="flex gap-2 flex-wrap">
           <button type="button" className="btn btn-primary" disabled={status === "sending"} onClick={() => (email ? diagnose(email) : setAsking(true))}>
-            Get Free Beta Access
+            Get Access to Rally
           </button>
         </div>
       ) : (
@@ -565,7 +566,7 @@ function ConvertOptions({ scope, email, giveEmail, beta }: { scope: CapScope; em
   );
 }
 
-/** Who to talk to: the Growth Goaled Collective, or one CRO's AI (an AI, never the person). Fixed once the AI has answered. */
+/** Who to talk to: the Rally Collective, or one CRO's AI (an AI, never the person). Fixed once the AI has answered. */
 function CroPicker({ cros, croId, locked, choose, onError }: { cros: GuestViewData["cros"]; croId: string | null; locked: boolean; choose: (croId: string | null) => Promise<Result>; onError: (e: string | null) => void }) {
   const [pending, start] = useTransition();
   const router = useRouter();
@@ -573,7 +574,7 @@ function CroPicker({ cros, croId, locked, choose, onError }: { cros: GuestViewDa
   if (locked) {
     return (
       <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-        {chosen ? `Talking to ${chosen.name}'s AI CRO: an AI built from ${chosen.name}'s documented expertise, not ${chosen.name.split(" ")[0]} in person.` : "Talking to the Growth Goaled Collective: our CROs' combined expertise."}
+        {chosen ? `Talking to ${chosen.name}'s AI CRO: an AI built from ${chosen.name}'s documented expertise, not ${chosen.name.split(" ")[0]} in person.` : "Talking to the Rally Collective: our CROs' combined expertise."}
       </p>
     );
   }
@@ -584,7 +585,7 @@ function CroPicker({ cros, croId, locked, choose, onError }: { cros: GuestViewDa
       if (!r.ok) onError(r.error ?? "That didn't work. Try again.");
       router.refresh();
     });
-  const options = [{ id: null as string | null, label: "The Growth Goaled Collective", title: "All our CROs' combined expertise" }, ...cros.map((c) => ({ id: c.id as string | null, label: `${c.name}'s AI CRO`, title: c.headline ?? `An AI built from ${c.name}'s documented expertise` }))];
+  const options = [{ id: null as string | null, label: "The Rally Collective", title: "All our CROs' combined expertise" }, ...cros.map((c) => ({ id: c.id as string | null, label: `${c.name}'s AI CRO`, title: c.headline ?? `An AI built from ${c.name}'s documented expertise` }))];
   return (
     <div role="group" aria-label="Who to talk to" className="flex items-center gap-2 flex-wrap text-sm">
       <span className="font-semibold" style={{ color: "var(--foreground)" }}>Talk to</span>

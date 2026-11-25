@@ -27,7 +27,7 @@ export default async function EvalRunPage({ params }: { params: Promise<{ id: st
     <div className="page space-y-8">
       <header>
         <Link href="/advisor/evals" className="link text-sm">← Evaluations</Link>
-        <h1 className="font-display text-3xl mt-2" style={fg}>{cro ? `${cro}'s AI CRO` : "Growth Goaled Collective"}</h1>
+        <h1 className="font-display text-3xl mt-2" style={fg}>{cro ? `${cro}'s AI CRO` : "Rally Collective"}</h1>
         <p className="text-sm mt-1" style={muted}>
           {run.scenarioIds.length} scenarios · started {run.createdAt.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} · methodology {run.methodologyVersion}
         </p>

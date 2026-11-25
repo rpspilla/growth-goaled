@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useState, useTransition } from "react";
+import { Bookmark, BookmarkCheck, ListChecks } from "lucide-react";
 import { useFormStatus } from "react-dom";
 import type { CommitState } from "@/app/(founder)/chat/actions";
 import type { CommitmentDraft } from "@/lib/commitments";
@@ -26,6 +27,8 @@ export function CommitToThis({
   openProjects,
   committed,
   commit,
+  saved = false,
+  save,
 }: {
   proposals: CommitmentDraft[];
   projectName: string;
@@ -33,29 +36,57 @@ export function CommitToThis({
   /** The project it was committed to, when it already has been. */
   committed: { id: string; name: string } | null;
   commit: (prev: CommitState, formData: FormData) => Promise<CommitState>;
+  /** Saved for later under Decisions (a bookmark), and how to toggle it. */
+  saved?: boolean;
+  save?: (saved: boolean) => Promise<{ ok: boolean; error?: string }>;
 }) {
   const [state, action] = useActionState(commit, {});
   const [open, setOpen] = useState(false);
+  const [isSaved, setSaved] = useState(saved);
+  const [saving, startSave] = useTransition();
   const [project, setProject] = useState("new");
   const done = committed ?? (state.projectId ? { id: state.projectId, name: null } : null);
 
   if (done) {
     return (
       <div role="status" className="rounded-xl px-4 py-3 text-base flex items-center gap-3 flex-wrap" style={{ background: "var(--green-muted)", color: "var(--foreground)" }}>
-        <span className="font-semibold" style={{ color: "var(--green)" }}>Saved.</span>
-        <span>Your commitments are tracked on your Overview{done.name ? ` and in ${done.name}` : ""}.</span>
+        <span className="font-semibold" style={{ color: "var(--green)" }}>Committed.</span>
+        <span>Rally follows up on these steps{done.name ? ` in ${done.name}` : ""}.</span>
         <Link href={`/projects/${done.id}`} className="link">Open the growth project →</Link>
+        <Link href="/decisions" className="link">All decisions</Link>
       </div>
     );
   }
-  if (!proposals.length) return null;
   if (!open) {
     return (
-      <div className="flex items-center gap-3 flex-wrap">
-        <button type="button" className="btn btn-secondary text-sm py-1.5" onClick={() => setOpen(true)}>
-          Save this recommendation
-        </button>
-        <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>Turn its next steps into actions Rally follows up on.</span>
+      <div className="space-y-2">
+        <div className="flex items-center gap-3 flex-wrap">
+          {save && (
+            <button
+              type="button"
+              aria-pressed={isSaved}
+              disabled={saving}
+              className="btn btn-secondary text-sm py-1.5 inline-flex items-center gap-1.5"
+              onClick={() =>
+                startSave(async () => {
+                  const r = await save(!isSaved);
+                  if (r.ok) setSaved(!isSaved);
+                })
+              }
+            >
+              {isSaved ? <BookmarkCheck size={16} aria-hidden /> : <Bookmark size={16} aria-hidden />}
+              {isSaved ? "Saved to Decisions" : "Save recommendation"}
+            </button>
+          )}
+          {proposals.length > 0 && (
+            <button type="button" className="btn btn-primary text-sm py-1.5 inline-flex items-center gap-1.5" onClick={() => setOpen(true)}>
+              <ListChecks size={16} aria-hidden /> Commit to this
+            </button>
+          )}
+        </div>
+        <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+          <strong className="font-semibold">Save</strong> keeps it under <Link href="/decisions" className="link">Decisions</Link> to come back to. <strong className="font-semibold">Commit</strong> turns its next steps into tasks with owners and dates that Rally follows up on. This conversation is saved either way.
+        </p>
       </div>
     );
   }

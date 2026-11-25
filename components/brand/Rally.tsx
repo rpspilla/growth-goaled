@@ -34,6 +34,9 @@ export const RALLY = {
   transparency: "An AI-powered CRO experience built on real operator expertise, proprietary growth frameworks, and the judgment of experienced revenue leaders.",
   beta: "Free during Beta. Help shape the future of CRO support for founders.",
   landing: "1,000s of GTM experiences, brought to you in conversation, so you can get the next decision right.",
+  promise: "Experienced operators. Different perspectives. Better growth decisions.",
+  /** The one way in (Nov 25, 2026): every sign-up button says this. */
+  cta: "Get Access to Rally",
 } as const;
 
 /**

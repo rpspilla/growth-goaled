@@ -9,7 +9,7 @@ export type CroCard = { id: string; name: string; slug: string; title: string | 
 const initialsOf = (name: string) => name.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 // Expertise tags are stored lower-case; show them the way people write them.
 const ACRONYMS: Record<string, string> = { b2b: "B2B", b2c: "B2C", saas: "SaaS", gtm: "GTM", icp: "ICP", arr: "ARR", mrr: "MRR", nrr: "NRR", revops: "RevOps", ai: "AI", plg: "PLG", sdr: "SDR", ae: "AE", aes: "AEs", vp: "VP", cs: "CS", abm: "ABM" };
-const cap = (s: string) => {
+export const cap = (s: string) => {
   const words = s.split(" ").map((w) => ACRONYMS[w.toLowerCase()] ?? w);
   const first = words[0] ?? "";
   if (first && !ACRONYMS[first.toLowerCase()]) words[0] = first.charAt(0).toUpperCase() + first.slice(1);
@@ -28,7 +28,7 @@ export function Face({ name, photoUrl, size = 52 }: { name: string; photoUrl: st
   );
 }
 
-function Faces({ cros, size }: { cros: CroCard[]; size: number }) {
+export function Faces({ cros, size }: { cros: CroCard[]; size: number }) {
   const shown = cros.slice(0, 3);
   return (
     <span className="flex shrink-0" aria-hidden>
@@ -43,7 +43,7 @@ function Faces({ cros, size }: { cros: CroCard[]; size: number }) {
         </span>
       )}
       {!shown.length && (
-        <span className="rounded-full flex items-center justify-center text-sm font-semibold text-white" style={{ width: size, height: size, background: "var(--green)" }}>GG</span>
+        <span className="rounded-full flex items-center justify-center text-sm font-semibold text-white" style={{ width: size, height: size, background: "var(--green)" }}>R</span>
       )}
     </span>
   );
@@ -54,13 +54,13 @@ export function CroIdentity({ cro, collective, size = "sm", action }: { cro: Cro
   const lg = size === "lg";
   const first = cro?.name.split(" ")[0];
   return (
-    <div className={`flex flex-wrap items-center ${lg ? "gap-x-5 gap-y-3" : "gap-3"} min-w-0`} aria-label={cro ? `Talking with ${cro.name}'s AI CRO` : "Talking with the Growth Goaled Collective"} role="group">
+    <div className={`flex flex-wrap items-center ${lg ? "gap-x-5 gap-y-3" : "gap-3"} min-w-0`} aria-label={cro ? `Talking with ${cro.name}'s AI CRO` : "Talking with the Rally Collective"} role="group">
       {cro ? <Face name={cro.name} photoUrl={cro.photoUrl} size={lg ? 84 : 48} /> : <Faces cros={collective} size={lg ? 56 : 36} />}
       <div className="min-w-[12rem] flex-1 space-y-1">
         <div className="flex items-baseline gap-x-2 flex-wrap">
-          <span className={`font-semibold ${lg ? "text-lg" : "text-base"}`} style={{ color: "var(--foreground)" }}>{cro ? cro.name : "Growth Goaled Collective"}</span>
+          <span className={`font-semibold ${lg ? "text-lg" : "text-base"}`} style={{ color: "var(--foreground)" }}>{cro ? cro.name : "Rally Collective"}</span>
           {cro?.title && <span className="text-sm hidden sm:inline" style={{ color: "var(--muted-foreground)" }}>{cro.title}</span>}
-          {!cro && <span className="text-sm hidden sm:inline" style={{ color: "var(--muted-foreground)" }}>{collective.length > 1 ? `The combined judgment of ${collective.length} CROs` : "The combined judgment of the Growth Goaled network"}</span>}
+          {!cro && <span className="text-sm hidden sm:inline" style={{ color: "var(--muted-foreground)" }}>{collective.length > 1 ? `The combined judgment of ${collective.length} CROs` : "Experienced operators. Different perspectives."}</span>}
         </div>
         {lg && cro?.headline && <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>{cro.headline}</p>}
         {cro && cro.expertise.length > 0 && (
@@ -72,7 +72,7 @@ export function CroIdentity({ cro, collective, size = "sm", action }: { cro: Cro
         )}
         {lg && (
           <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-            {cro ? `Powered by ${first}'s CRO experience and judgment. An AI built on ${first}'s documented expertise, not ${first} in person.` : "Powered by the experience and judgment of the CROs in the Growth Goaled network, combined into one recommendation."}
+            {cro ? `Powered by ${first}'s CRO experience and judgment. An AI built on ${first}'s documented expertise, not ${first} in person.` : "Powered by the experience and judgment of the CROs in the Rally Collective, combined into one recommendation."}
           </p>
         )}
       </div>

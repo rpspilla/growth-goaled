@@ -46,6 +46,8 @@ export type EventName =
   | "plan_input_answered"
   | "growth_project_created"
   | "recommendation_committed"
+  | "recommendation_saved"
+  | "recommendation_unsaved"
   | "commitment_status"
   | "commitment_outcome"
   | "commitment_rescheduled"

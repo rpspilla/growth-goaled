@@ -131,7 +131,7 @@ export function IntelligenceFields({
             <input type="checkbox" name="modes" value="individual" defaultChecked={modes.includes("individual")} /> In this CRO&apos;s own conversations
           </label>
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="modes" value="collective" defaultChecked={modes.includes("collective")} /> In the Growth Goaled Collective
+            <input type="checkbox" name="modes" value="collective" defaultChecked={modes.includes("collective")} /> In the Rally Collective
           </label>
         </fieldset>
         {others.length > 0 && (

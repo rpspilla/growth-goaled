@@ -64,7 +64,7 @@ export default async function CroProfilePage({ params }: { params: Promise<{ id:
           {cro.status === "published" && <Link href={`/cros/${cro.slug}`} className="link text-sm">As founders see it →</Link>}
         </div>
         <p className="text-sm mt-1" style={muted}>
-          {linked ? `Linked to ${linked.name || linked.email}'s login.` : "No login linked yet."} {cro.inCollective ? "Part of the Growth Goaled Collective." : "Not part of the Collective."}
+          {linked ? `Linked to ${linked.name || linked.email}'s login.` : "No login linked yet."} {cro.inCollective ? "Part of the Rally Collective." : "Not part of the Collective."}
         </p>
       </header>
 

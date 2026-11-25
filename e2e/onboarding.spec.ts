@@ -14,7 +14,10 @@ test("sign-up basics carry through, and every growth question opens its own page
   await page.goto("/overview");
   await expect(page).toHaveURL(/\/welcome/);
   await page.locator("#name").fill("Dee Founder");
+  await page.locator("#title").fill("CEO");
   await page.locator("#companyName").fill("Deer in Headlights");
+  // Stage, revenue and team are optional (Nov 25, 2026), behind one click.
+  await page.getByText("Stage, revenue and team").click();
   await page.locator("#revenueBand").selectOption("10m_20m");
   await page.locator("#foundedYear").selectOption("2020");
   await page.locator("#stage").selectOption("Seed");
@@ -88,13 +91,13 @@ test("a founder whose company was removed lands on company set-up, not a redirec
     await expect(page).toHaveURL(/\/welcome/);
     await expect(page.getByRole("heading", { name: "Set up your company" })).toBeVisible();
   }
+  // Only name, role, company and vertical are needed; the challenge waits in Rally's question box.
+  await page.locator("#title").fill("Founder");
   await page.locator("#companyName").fill("Second Act");
-  await page.locator("#revenueBand").selectOption("1m_3m");
-  await page.locator("#foundedYear").selectOption("2020");
-  await page.locator("#stage").selectOption("Seed");
   await page.locator("#vertical").selectOption("Fintech");
-  await page.locator("#aes").fill("2");
+  await page.locator("#challenge").fill("Should I hire my first VP of Sales?");
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await expect(page).toHaveURL(/\/whats-next$/);
+  await expect(page).toHaveURL(/\/whats-next\?ask=/);
+  await expect(page.getByLabel(/^Ask /)).toHaveValue("Should I hire my first VP of Sales?");
   await ctx.close();
 });

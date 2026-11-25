@@ -29,11 +29,11 @@ test("advisor names the plan and asks for data; the founder sees progress and da
   // Rally's menu: the conversation first; the company pages under "Your company", open on them.
   const companyProfile = f.page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Your company" });
   await expect(companyProfile).toHaveAttribute("aria-expanded", "true");
-  await expect(menu).toHaveText(["New conversation", "Company Details", "Team", "Overview", "Growth Projects", "Data", "Performance", "Documents", "Our CROs", "Share feedback"]);
+  await expect(menu).toHaveText(["New conversation", "Home", "Rally Collective & CROs", "Decisions", "Company Details", "Team", "Overview", "Growth Projects", "Data", "Performance", "Documents", "Share feedback"]);
   await companyProfile.click();
-  await expect(menu).toHaveText(["New conversation", "Share feedback"]);
+  await expect(menu).toHaveText(["New conversation", "Home", "Rally Collective & CROs", "Decisions", "Share feedback"]);
   await companyProfile.click();
-  await expect(menu).toHaveCount(10);
+  await expect(menu).toHaveCount(12);
   await expect(f.page.getByRole("heading", { name: "Fasten Perf", level: 1 })).toBeVisible();
   await expect(f.page.getByText("Add your website to your company profile to show your logo and what you do.")).toBeVisible();
   await expect(f.page.getByText("Your advisor will share your plan here.")).toBeVisible();

@@ -4,7 +4,8 @@ import { isBeta } from "@/lib/beta";
 import { notFound, redirect } from "next/navigation";
 import { AskBox } from "@/components/chat/AskBox";
 import { CHAT_TOPICS } from "@/lib/chat/topics";
-import { PHILOSOPHY_FIELDS } from "@/lib/cro";
+import { PHILOSOPHY_FIELDS, topicsFor } from "@/lib/cro";
+import { listConversations } from "@/lib/data/chat";
 import { founderContext } from "@/lib/data/founder-context";
 import { publishedCro } from "@/lib/data/cro";
 import { setDefaultCroAction, startChatAction } from "../../chat/actions";
@@ -24,6 +25,10 @@ export default async function CroPage({ params }: { params: Promise<{ slug: stri
   const cro = await publishedCro(slug);
   if (!cro) notFound();
   const first = cro.name.split(" ")[0];
+  // Example questions: the topics this CRO is strongest on; and the founder's conversations with them.
+  const strong = topicsFor(cro.expertise, CHAT_TOPICS.map((t) => t.id));
+  const starters = strong.map((id) => CHAT_TOPICS.find((t) => t.id === id)!).map((t) => ({ id: t.id, starter: t.starter }));
+  const mine = await listConversations(company, 10, { cro: cro.id });
   const philosophy = Object.entries(PHILOSOPHY_FIELDS).flatMap(([k, label]) => {
     const v = cro.philosophy[k as keyof typeof cro.philosophy];
     return v ? [{ label, v }] : [];
@@ -49,11 +54,28 @@ export default async function CroPage({ params }: { params: Promise<{ slug: stri
       </div>
 
       <AskBox voice={voice}
-        starters={CHAT_TOPICS.map((t) => ({ id: t.id, starter: t.starter }))}
+        starters={[...starters, { id: "other", starter: "" }]}
+        startersLabel={`Questions ${first} can help with`}
         start={startChatAction}
         fixedCro={{ id: cro.id, name: cro.name }}
-        lead={`You'll talk to ${first}'s AI CRO: an AI built from ${cro.name}'s documented expertise and judgment, not ${first} in person. It knows your company and the work under way.`}
+        lead={`An AI built on ${first}'s documented expertise and judgment, not ${first} in person. It knows your company and picks up where you left off.`}
       />
+
+      {mine.length > 0 && (
+        <section aria-label={`Your conversations with ${first}`} className="space-y-2">
+          <h2 className="text-lg font-semibold" style={fg}>Your conversations with {first}</h2>
+          <ul className="surface divide-y" style={{ borderColor: "var(--border)" }}>
+            {mine.map((c) => (
+              <li key={c.id} style={{ borderColor: "var(--border)" }}>
+                <Link href={`/chat/${c.id}`} className="flex items-center gap-4 px-4 py-3 hover:bg-[var(--muted)] rounded-xl">
+                  <span className="flex-1 min-w-0 truncate text-base" style={fg}>{c.title}</span>
+                  <span className="text-sm" style={muted}>{c.updatedAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="grid lg:grid-cols-2 gap-6">
         {cro.bio && (

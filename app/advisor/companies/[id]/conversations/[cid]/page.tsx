@@ -36,7 +36,7 @@ export default async function AdvisorConversationPage({ params }: { params: Prom
   const informedBy = (card: { sources?: { id: string; how: string }[] }) =>
     (card.sources ?? []).flatMap((x) => {
       const a = sources.get(x.id);
-      return a ? [{ title: a.title, cro: a.cro ?? "Growth Goaled network", how: x.how }] : [];
+      return a ? [{ title: a.title, cro: a.cro ?? "Rally Collective", how: x.how }] : [];
     });
   const names = new Map(projects.map((p) => [p.id, p.name]));
 
@@ -46,7 +46,7 @@ export default async function AdvisorConversationPage({ params }: { params: Prom
         <Link href={`/advisor/companies/${company.id}#whats-next`} className="link text-sm">← {company.name}: conversations</Link>
         <h1 className="font-display text-3xl mt-2" style={fg}>{view.conversation.title}</h1>
         <p className="text-sm mt-1" style={muted}>
-          {cro ? `With ${cro.name}'s AI CRO` : "With the Growth Goaled Collective"} · started {view.conversation.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+          {cro ? `With ${cro.name}'s AI CRO` : "With the Rally Collective"} · started {view.conversation.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
         </p>
       </div>
 

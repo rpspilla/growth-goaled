@@ -4,7 +4,9 @@ import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { requireUser } from "@/lib/auth/session";
+import { getCurrentUser, requireUser } from "@/lib/auth/session";
+import { cookies } from "next/headers";
+import { claimGuest, GUEST_COOKIE } from "@/lib/data/guest";
 import { getFounderCompany } from "@/lib/data/companies";
 import { saveCompanyBasics } from "@/lib/data/intake";
 import { homePathFor } from "@/lib/access";
@@ -50,9 +52,15 @@ export async function completeOnboarding(_prev: OnboardingState, formData: FormD
     await saveCompanyBasics(user, companyId, parsed.data);
     await profileUpdate(name, title);
     await track("onboarding_completed", { userId: user.id, companyId, props: { revenue_band: revenueBand, stage: parsed.data.stage, vertical: parsed.data.vertical } });
-    // Straight into Rally: the website chat they started, if there is one (/claim brings it over and
-    // falls back home), else the first conversation (Rally Beta).
-    redirect("/claim");
+    // Straight into Rally: the website chat they started, if there is one, else home with the challenge
+    // they gave waiting in the question box.
+    const fresh = await getCurrentUser();
+    const claimed = fresh ? await claimGuest(fresh, (await cookies()).get(GUEST_COOKIE)?.value).catch((err) => (console.error("[guest] Claim failed", err), null)) : null;
+    if (claimed) {
+      (await cookies()).delete(GUEST_COOKIE);
+      redirect(`/chat/${claimed.conversationId}`);
+    }
+    redirect(parsed.data.challenge ? `/whats-next?ask=${encodeURIComponent(parsed.data.challenge)}` : "/whats-next");
   }
 
   const parsed = (user.role === "founder" ? founderProfileSchema : staffProfileSchema).safeParse(raw);

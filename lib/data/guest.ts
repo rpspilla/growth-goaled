@@ -265,6 +265,7 @@ export async function notifyNewLead(guestId: string, appUrl: string, opts: { for
       ["Email", g.email],
       ["Name", p.name],
       ["Company", p.companyName],
+      ["Role", p.role],
       ["Wants help with", p.challenge],
       ["Revenue", band],
       ["Founded", p.foundedYear],
@@ -339,7 +340,7 @@ export async function claimGuest(user: User, token: string | undefined | null): 
     await track("onboarding_completed", { userId: user.id, companyId, props: { revenue_band: basics.revenueBand, stage: basics.stage, vertical: basics.vertical, via: "guest_chat" } });
   }
   if (user.onboardedAt === null) {
-    await db.update(schema.users).set({ name: user.name ?? g.profile.name ?? null, onboardedAt: new Date() }).where(eq(schema.users.id, user.id));
+    await db.update(schema.users).set({ name: user.name ?? g.profile.name ?? null, title: user.title ?? g.profile.role ?? null, onboardedAt: new Date() }).where(eq(schema.users.id, user.id));
   }
 
   const challenge = g.profile.challenge ?? "Something else";
