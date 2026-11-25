@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { LegalLinks } from "@/components/legal/LegalLinks";
 import type { ReactNode } from "react";
 import { StagingBadge } from "@/components/shell/Shell";
 import { RallyHeroLogo, RallyLogo } from "@/components/brand/Rally";
@@ -50,7 +49,6 @@ export function AuthShell({ brand, children, wide = false }: { brand: ReactNode;
       <div className="flex items-start lg:items-center justify-center px-6 sm:px-12 py-8 lg:py-14">
         <div className="w-full max-w-md" style={{ animation: "fadeInUp 0.35s ease-out" }}>
           {children}
-          <LegalLinks className="mt-10 justify-center" />
         </div>
       </div>
     </div>
