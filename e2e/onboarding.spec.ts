@@ -71,3 +71,30 @@ test("sign-up basics carry through, and every growth question opens its own page
   for (const text of ["10 Account executives", "4 BDRs / SDRs", "1 Customer success", "5 Marketing"]) await expect(team).toContainText(text);
   await ctx.close();
 });
+
+/** A founder whose company was removed (say, a portfolio clean-up) sets up a new one, rather than an endless redirect. */
+test("a founder whose company was removed lands on company set-up, not a redirect loop", async ({ browser }) => {
+  const { Client } = await import("pg");
+  const { E2E_DATABASE_URL } = await import("../playwright.config");
+  const db = new Client({ connectionString: E2E_DATABASE_URL });
+  await db.connect();
+  await db.query("insert into users (email, auth_user_id, role, name, onboarded_at) values ('removed-co@e2e.test','e2e:removed-co@e2e.test','founder','Remy Removed', now()) on conflict (auth_user_id) do nothing");
+  await db.end();
+  const ctx = await browser.newContext();
+  await ctx.addCookies([{ name: "gg_e2e_user", value: "removed-co@e2e.test", domain: "localhost", path: "/" }]);
+  const page = await ctx.newPage();
+  for (const path of ["/claim", "/", "/whats-next"]) {
+    await page.goto(path);
+    await expect(page).toHaveURL(/\/welcome/);
+    await expect(page.getByRole("heading", { name: "Set up your company" })).toBeVisible();
+  }
+  await page.locator("#companyName").fill("Second Act");
+  await page.locator("#revenueBand").selectOption("1m_3m");
+  await page.locator("#foundedYear").selectOption("2020");
+  await page.locator("#stage").selectOption("Seed");
+  await page.locator("#vertical").selectOption("Fintech");
+  await page.locator("#aes").fill("2");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(page).toHaveURL(/\/whats-next$/);
+  await ctx.close();
+});

@@ -27,7 +27,9 @@ const textValues = (formData: FormData): Record<string, string> => Object.fromEn
 
 export async function completeOnboarding(_prev: OnboardingState, formData: FormData): Promise<OnboardingState> {
   const user = await requireUser({ allowIncomplete: true });
-  if (!needsOnboarding(user)) redirect(homePathFor(user.role));
+  // A founder whose company was removed sets up a new one here, even though they've onboarded before.
+  const companyless = user.role === "founder" && !(await getFounderCompany(user));
+  if (!needsOnboarding(user) && !companyless) redirect(homePathFor(user.role));
 
   const raw = Object.fromEntries(formData);
   const profileUpdate = (name: string, title: string | null) =>
@@ -35,7 +37,7 @@ export async function completeOnboarding(_prev: OnboardingState, formData: FormD
 
   // A founder attached to a company (via invite) only completes their profile;
   // otherwise the new company goes to the unassigned queue for an advisor to claim.
-  if (user.role === "founder" && !(await getFounderCompany(user))) {
+  if (companyless) {
     const parsed = founderOnboardingSchema.safeParse(raw);
     if (!parsed.success) return { errors: fieldErrors(parsed.error.issues), values: textValues(formData) };
     const { name, title, companyName, revenueBand } = parsed.data;

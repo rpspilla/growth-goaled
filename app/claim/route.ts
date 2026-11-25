@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { homePathFor } from "@/lib/access";
 import { getCurrentUser } from "@/lib/auth/session";
+import { getFounderCompany } from "@/lib/data/companies";
 import { claimGuest, GUEST_COOKIE } from "@/lib/data/guest";
 import { needsOnboarding } from "@/lib/onboarding";
 
@@ -24,5 +25,6 @@ export async function GET(request: NextRequest) {
   }
   if (request.nextUrl.searchParams.get("to") === "library" && !needsOnboarding(user) && user.role === "founder") return NextResponse.redirect(new URL("/overview", request.url));
   // ?claimed=0 stops /welcome sending them straight back here.
-  return NextResponse.redirect(new URL(needsOnboarding(user) ? "/welcome?claimed=0" : homePathFor(user.role), request.url));
+  const setUp = needsOnboarding(user) || (user.role === "founder" && !(await getFounderCompany(user)));
+  return NextResponse.redirect(new URL(setUp ? "/welcome?claimed=0" : homePathFor(user.role), request.url));
 }

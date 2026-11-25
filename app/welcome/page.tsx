@@ -16,11 +16,13 @@ export const metadata: Metadata = { title: "Set up your company · Rally" };
 /** First sign-in: founders set up their company (step 2 of 3); advisors and invited founders confirm their profile. */
 export default async function WelcomePage({ searchParams }: { searchParams: Promise<{ claimed?: string }> }) {
   const user = await requireUser({ allowIncomplete: true });
-  if (!needsOnboarding(user)) redirect(homePathFor(user.role));
   const isFounder = user.role === "founder";
   // Invited founders already have a company, so they only complete their profile.
   const company = isFounder ? await getFounderCompany(user) : null;
   const askCompany = isFounder && !company;
+  // Founders without a company (say, it was removed) always set one up here: sending them home would
+  // send them straight back (home needs a company), an endless redirect.
+  if (!needsOnboarding(user) && !askCompany) redirect(homePathFor(user.role));
   // What they already told Rally in the website chat, so nothing is asked twice.
   const guest = askCompany ? await guestFor(user, (await cookies()).get(GUEST_COOKIE)?.value).catch(() => null) : null;
   // Rally already has the basics from the website chat (however they signed in): straight into it.
