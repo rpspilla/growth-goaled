@@ -36,7 +36,7 @@ export default async function AdvisorConversationPage({ params }: { params: Prom
   const informedBy = (card: { sources?: { id: string; how: string }[] }) =>
     (card.sources ?? []).flatMap((x) => {
       const a = sources.get(x.id);
-      return a ? [{ title: a.title, cro: a.cro ?? "Rally Collective", how: x.how }] : [];
+      return a ? [{ title: a.title, cro: a.cro ?? "Rally Collective Brain", how: x.how }] : [];
     });
   const names = new Map(projects.map((p) => [p.id, p.name]));
 
@@ -46,7 +46,7 @@ export default async function AdvisorConversationPage({ params }: { params: Prom
         <Link href={`/advisor/companies/${company.id}#whats-next`} className="link text-sm">← {company.name}: conversations</Link>
         <h1 className="font-display text-3xl mt-2" style={fg}>{view.conversation.title}</h1>
         <p className="text-sm mt-1" style={muted}>
-          {cro ? `With ${cro.name}'s AI CRO` : "With the Rally Collective"} · started {view.conversation.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+          {cro ? `With ${cro.name}'s CRO-Brain` : "With the Rally Collective Brain"} · started {view.conversation.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
         </p>
       </div>
 
@@ -57,7 +57,7 @@ export default async function AdvisorConversationPage({ params }: { params: Prom
             <li key={m.id} className="space-y-3">
               <div className="rounded-xl px-4 py-3" style={{ background: m.role === "user" ? "var(--muted)" : m.role === "advisor" ? "var(--green-muted)" : "transparent", border: m.role === "assistant" ? "1px solid var(--border)" : undefined }}>
                 <div className="text-sm font-semibold mb-1" style={{ color: m.role === "advisor" ? "var(--green)" : "var(--muted-foreground)" }}>
-                  {m.role === "user" ? "Founder" : m.role === "advisor" ? `Advisor${m.authorId && view.authors.get(m.authorId) ? ` · ${view.authors.get(m.authorId)}` : ""}` : cro ? `${cro.name}'s AI CRO` : "AI CRO"}
+                  {m.role === "user" ? "Founder" : m.role === "advisor" ? `Advisor${m.authorId && view.authors.get(m.authorId) ? ` · ${view.authors.get(m.authorId)}` : ""}` : cro ? `${cro.name}'s CRO-Brain` : "AI CRO"}
                 </div>
                 <div className="text-base whitespace-pre-wrap" style={fg}>{m.content}</div>
                 {m.role === "assistant" && (

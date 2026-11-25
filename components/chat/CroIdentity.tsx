@@ -54,11 +54,11 @@ export function CroIdentity({ cro, collective, size = "sm", action }: { cro: Cro
   const lg = size === "lg";
   const first = cro?.name.split(" ")[0];
   return (
-    <div className={`flex flex-wrap items-center ${lg ? "gap-x-5 gap-y-3" : "gap-3"} min-w-0`} aria-label={cro ? `Talking with ${cro.name}'s AI CRO` : "Talking with the Rally Collective"} role="group">
+    <div className={`flex flex-wrap items-center ${lg ? "gap-x-5 gap-y-3" : "gap-3"} min-w-0`} aria-label={cro ? `Talking with ${cro.name}'s CRO-Brain` : "Talking with the Rally Collective Brain"} role="group">
       {cro ? <Face name={cro.name} photoUrl={cro.photoUrl} size={lg ? 84 : 48} /> : <Faces cros={collective} size={lg ? 56 : 36} />}
       <div className="min-w-[12rem] flex-1 space-y-1">
         <div className="flex items-baseline gap-x-2 flex-wrap">
-          <span className={`font-semibold ${lg ? "text-lg" : "text-base"}`} style={{ color: "var(--foreground)" }}>{cro ? cro.name : "Rally Collective"}</span>
+          <span className={`font-semibold ${lg ? "text-lg" : "text-base"}`} style={{ color: "var(--foreground)" }}>{cro ? `${cro.name}'s CRO-Brain` : "Rally Collective Brain"}</span>
           {cro?.title && <span className="text-sm hidden sm:inline" style={{ color: "var(--muted-foreground)" }}>{cro.title}</span>}
           {!cro && <span className="text-sm hidden sm:inline" style={{ color: "var(--muted-foreground)" }}>{collective.length > 1 ? `The combined judgment of ${collective.length} CROs` : "Experienced operators. Different perspectives."}</span>}
         </div>

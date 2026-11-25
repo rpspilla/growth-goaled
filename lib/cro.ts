@@ -197,13 +197,13 @@ export function disagreements(chosen: RecordForRetrieval[]): { recordId: string;
   const disputes = chosen.flatMap((r) =>
     r.stances
       .filter((s) => s.stance === "disputes")
-      .map((s) => ({ recordId: r.id, title: r.title, heldBy: r.primaryCroName ?? "Rally Collective", disputedBy: s.croName, why: s.note })),
+      .map((s) => ({ recordId: r.id, title: r.title, heldBy: r.primaryCroName ?? "Rally Collective Brain", disputedBy: s.croName, why: s.note })),
   );
   // Confirmed conflicts between two chosen records, once per pair.
   const conflicts = chosen.flatMap((r) =>
     (r.conflicts ?? [])
       .filter((c) => byId.has(c.otherId) && r.id < c.otherId)
-      .map((c) => ({ recordId: r.id, title: r.title, heldBy: r.primaryCroName ?? "Rally Collective", disputedBy: byId.get(c.otherId)!.primaryCroName ?? "Rally Collective", why: c.why })),
+      .map((c) => ({ recordId: r.id, title: r.title, heldBy: r.primaryCroName ?? "Rally Collective Brain", disputedBy: byId.get(c.otherId)!.primaryCroName ?? "Rally Collective Brain", why: c.why })),
   );
   return [...disputes, ...conflicts];
 }

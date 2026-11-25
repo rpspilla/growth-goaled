@@ -121,7 +121,7 @@ export const nudgeLine = () => {
 
 /** The founder wants the network's view on a CRO's recommendation, without losing that CRO's. */
 export const secondOpinionLine = (p: { cro: string; card: unknown }) =>
-  `SECOND OPINION: the founder is talking to ${p.cro}'s AI CRO and asked for a second opinion from the Rally Collective on its latest recommendation (JSON): ${JSON.stringify(p.card)}. Answer as the Collective, once: say where the network agrees with ${p.cro}'s view, where it would differ and why, and what that means for this company. Respect ${p.cro}'s perspective (it stays the founder's main conversation); don't rewrite it. Give a card only if your recommendation differs; put the differing views in perspectives.`;
+  `SECOND OPINION: the founder is talking to ${p.cro}'s CRO-Brain and asked for a second opinion from the Rally Collective on its latest recommendation (JSON): ${JSON.stringify(p.card)}. Answer as the Collective, once: say where the network agrees with ${p.cro}'s view, where it would differ and why, and what that means for this company. Respect ${p.cro}'s perspective (it stays the founder's main conversation); don't rewrite it. Give a card only if your recommendation differs; put the differing views in perspectives.`;
 
 export class ChatError extends Error {}
 

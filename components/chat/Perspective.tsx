@@ -29,9 +29,9 @@ export function PerspectiveSwitch({ conversationId, current, cros, switchTo, str
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <label htmlFor="perspective" className="sr-only">Continue with</label>
           <select id="perspective" aria-label="Continue with" value={current?.id ?? ""} disabled={pending} onChange={(e) => go(e.target.value || null)} className="field py-1 text-sm">
-            <option value="">Rally Collective</option>
+            <option value="">Rally Collective Brain</option>
             {cros.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+              <option key={c.id} value={c.id}>{c.name}&apos;s CRO-Brain</option>
             ))}
           </select>
           {others.length > 0 && (
@@ -40,7 +40,7 @@ export function PerspectiveSwitch({ conversationId, current, cros, switchTo, str
               {others.map((c, i) => (
                 <span key={c.id}>
                   {i > 0 && ", "}
-                  <button type="button" className="link" disabled={pending} onClick={() => go(c.id)} aria-label={`Continue with ${c.name}'s AI CRO`}>{c.name}</button>
+                  <button type="button" className="link" disabled={pending} onClick={() => go(c.id)} aria-label={`Continue with ${c.name}'s CRO-Brain`}>{c.name}</button>
                 </span>
               ))}
             </span>

@@ -47,7 +47,7 @@ test("Rally: a founder starts from a suggestion, gets a short CRO answer with th
   await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/);
   await expect(page.getByRole("heading", { name: "Are we ready to hire our first salesperson?" })).toBeVisible();
   await expect(page.getByText(/Test mode: let's work through/)).toBeVisible();
-  await expect(page.getByRole("group", { name: "Talking with the Rally Collective" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Talking with the Rally Collective Brain" })).toBeVisible();
   await expect(page.getByText(/AI built on the documented expertise of the Rally Collective's CROs/)).toBeVisible();
   await expect(page.getByTestId("human-presence")).toHaveCount(0);
   await expect(page.getByRole("article", { name: "Recommendation" })).toHaveCount(0);

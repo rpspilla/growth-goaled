@@ -166,7 +166,7 @@ export default async function CompanyProjectsPage({ params, searchParams }: { pa
           {commitments.some((c) => c.projectId === p.id) && (
             <div className="space-y-3">
               <h3 className="font-semibold" style={fg}>
-                Commitments <span className="text-sm font-normal" style={muted}>· made by the founder with their AI CRO; they tick them off</span>
+                Commitments <span className="text-sm font-normal" style={muted}>· made by the founder with a CRO-Brain; they tick them off</span>
               </h3>
               <CommitmentList items={commitmentItems(commitments.filter((c) => c.projectId === p.id), names, today(), { withProject: false }).map((c) => ({ ...c, conversationId: null }))} label={`Commitments of ${p.name}`} />
             </div>

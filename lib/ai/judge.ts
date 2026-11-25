@@ -49,7 +49,7 @@ export async function judgeAnswer(input: JudgeInput): Promise<{ scores: Record<s
       {
         role: "user",
         content: [
-          `MODE: ${input.mode === "individual" ? `${input.cro?.name}'s AI CRO` : "Rally Collective"}`,
+          `MODE: ${input.mode === "individual" ? `${input.cro?.name}'s CRO-Brain` : "Rally Collective Brain"}`,
           `CRITERIA (JSON): ${JSON.stringify(criteria)}`,
           `SCENARIO: (${input.scenario.stage ?? "any stage"}) ${input.scenario.situation}\nQuestion: ${input.scenario.question}`,
           input.cro ? `CRO PROFILE (JSON): ${JSON.stringify(input.cro.profile)}` : "",

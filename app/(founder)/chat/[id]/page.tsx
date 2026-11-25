@@ -80,7 +80,7 @@ export default async function ConversationPage({ params, searchParams }: { param
   const informedBy = (card: { sources?: { id: string; how: string }[] }) =>
     (card.sources ?? []).flatMap((x) => {
       const a = sources.get(x.id);
-      return a ? [{ title: a.title, cro: a.cro ?? "Rally Collective", how: x.how }] : [];
+      return a ? [{ title: a.title, cro: a.cro ?? "Rally Collective Brain", how: x.how }] : [];
     });
   const asCro = (c: { id: string; name: string; slug: string }) => ({ id: c.id, name: c.name, slug: c.slug });
   const current = cro && cro.status === "published" ? cro : null;
@@ -88,7 +88,7 @@ export default async function ConversationPage({ params, searchParams }: { param
   const perspectives = new Set(view.messages.filter((m) => m.role === "assistant").map((m) => m.croId ?? "collective"));
   const labelAnswers = perspectives.size > 1;
   const perspectiveOf = (m: { croId: string | null; secondOpinion: boolean }) =>
-    m.secondOpinion ? "Second opinion from the Rally Collective" : m.croId ? `${view.cros.get(m.croId) ?? "A CRO"}'s AI CRO` : "Rally Collective";
+    m.secondOpinion ? "Second opinion from the Rally Collective Brain" : m.croId ? `${view.cros.get(m.croId) ?? "A CRO"}'s CRO-Brain` : "Rally Collective Brain";
   const trailingMessage = lastCardId ? view.messages.find((m) => m.recommendationId === lastCardId) : undefined;
   // Spoken answers: in the voice of the CRO who gave it, when they've set one up (lib/data/voice).
   // Answers without their own CRO's voice speak in Rally's (a CRO's, by their choice), if there is one.

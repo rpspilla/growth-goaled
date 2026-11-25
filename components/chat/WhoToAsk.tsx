@@ -25,15 +25,15 @@ export function WhoToAsk({ cros, collective, value, onChange }: { cros: CroCard[
         <button type="button" role="radio" aria-checked={!chosen} onClick={() => onChange("")} {...card(!chosen)}>
           <Faces cros={collective} size={36} />
           <span className="min-w-0">
-            <span className="block font-semibold" style={{ color: "var(--foreground)" }}>Rally Collective</span>
-            <span className="block text-sm" style={{ color: "var(--muted-foreground)" }}>{collective.length > 1 ? `${collective.length} CROs, different perspectives, one recommendation` : "Our CROs' combined expertise in one recommendation"}</span>
+            <span className="block font-semibold" style={{ color: "var(--foreground)" }}>Rally Collective Brain</span>
+            <span className="block text-sm" style={{ color: "var(--muted-foreground)" }}>{collective.length > 1 ? `All our CROs (${collective.length}): different perspectives, one recommendation` : "All our CROs' combined expertise in one recommendation"}</span>
           </span>
         </button>
         {cros.map((c) => (
           <button key={c.id} type="button" role="radio" aria-checked={c.id === value} onClick={() => onChange(c.id)} {...card(c.id === value)}>
             <Face name={c.name} photoUrl={c.photoUrl} size={44} />
             <span className="min-w-0">
-              <span className="block font-semibold" style={{ color: "var(--foreground)" }}>{c.name}</span>
+              <span className="block font-semibold" style={{ color: "var(--foreground)" }}>{c.name}&apos;s CRO-Brain</span>
               {c.title && <span className="block text-sm truncate" style={{ color: "var(--muted-foreground)" }}>{c.title}</span>}
               {c.expertise.length > 0 && <span className="block text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>{c.expertise.slice(0, 3).map(cap).join(" · ")}</span>}
             </span>

@@ -39,7 +39,7 @@ export default async function DecisionsPage() {
                   {d.status === "committed" ? "Committed" : "Saved"}
                 </span>
                 <span style={muted}>
-                  {d.croId ? (croName.get(d.croId) ?? "A CRO") : "Rally Collective"} · {d.at.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  {d.croId ? `${croName.get(d.croId) ?? "A CRO"}'s CRO-Brain` : "Rally Collective Brain"} · {d.at.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                 </span>
               </div>
               <h2 className="text-lg font-semibold" style={fg}>{d.takeaway}</h2>

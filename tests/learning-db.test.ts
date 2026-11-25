@@ -141,7 +141,7 @@ describe("the AI CRO quality report", () => {
     await committedCard(null, "Second");
     const report = await qualityReport();
     expect(report.topics).toEqual([expect.objectContaining({ label: "Who should my first GTM hire be?", conversations: 2, recommendations: 2, committed: 2, helpful: 1, worked: 1 })]);
-    expect(report.cros.map((c) => [c.label, c.conversations, c.worked])).toEqual(expect.arrayContaining([["Ana Alvarez's AI", 1, 1], ["Rally Collective", 1, 0]]));
+    expect(report.cros.map((c) => [c.label, c.conversations, c.worked])).toEqual(expect.arrayContaining([["Ana Alvarez's CRO-Brain", 1, 1], ["Rally Collective Brain", 1, 0]]));
     expect(report.records).toEqual([expect.objectContaining({ title: "Founders sell first", cro: "Ana Alvarez", worked: 1 })]);
     expect(report.records[0]!.uses).toBeGreaterThanOrEqual(1);
   });

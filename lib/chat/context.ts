@@ -149,7 +149,7 @@ async function earlierConversations(company: Company, current: string | null): P
       date: c.updatedAt.toISOString().slice(0, 10),
       question: c.title,
       // Whose perspective it was: a different CRO's advice is weighed as theirs, not repeated as this one's
-      perspective: c.cro ? `${c.cro}'s AI CRO` : "Rally Collective",
+      perspective: c.cro ? `${c.cro}'s CRO-Brain` : "Rally Collective Brain",
       takeaway: rec?.card.takeaway ?? null,
       recommendation: rec?.card.recommendation ?? null,
       committed: recs.some((r) => r.conversationId === c.id && r.status === "committed"),

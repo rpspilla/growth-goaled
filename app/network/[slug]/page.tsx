@@ -10,7 +10,7 @@ const fg = { color: "var(--foreground)" };
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const cro = await publishedCro((await params).slug);
-  return cro ? { title: `${cro.name} · Growth Goaled`, description: cro.headline ?? `Talk to ${cro.name}'s AI CRO.` } : { title: "Growth Goaled" };
+  return cro ? { title: `${cro.name} · Growth Goaled`, description: cro.headline ?? `Talk to ${cro.name}'s CRO-Brain.` } : { title: "Growth Goaled" };
 }
 
 /**
@@ -43,13 +43,13 @@ export default async function PublicCroPage({ params }: { params: Promise<{ slug
         </div>
       </header>
 
-      <section aria-label={`${first}'s AI CRO`} className="surface p-6 space-y-2" style={{ borderColor: "var(--green)" }}>
-        <h2 className="text-2xl font-semibold" style={fg}>Talk to {first}&apos;s AI CRO</h2>
+      <section aria-label={`${first}'s CRO-Brain`} className="surface p-6 space-y-2" style={{ borderColor: "var(--green)" }}>
+        <h2 className="text-2xl font-semibold" style={fg}>Talk to {first}&apos;s CRO-Brain</h2>
         <p className="text-base max-w-3xl" style={muted}>
           An AI built from {cro.name}&apos;s documented expertise, frameworks and judgment: not {first} in person. Ask about the growth decision in front of you; it&apos;s free to start.
           {cro.availableForAdvisory ? ` ${first} also takes on advisory work in person.` : ""}
         </p>
-        <Link href={`/sign-in?cro=${cro.slug}`} className="btn btn-primary inline-block">Talk to {first}&apos;s AI CRO</Link>
+        <Link href={`/sign-in?cro=${cro.slug}`} className="btn btn-primary inline-block">Talk to {first}&apos;s CRO-Brain</Link>
       </section>
 
       <div className="grid lg:grid-cols-2 gap-6">

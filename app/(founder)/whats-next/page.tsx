@@ -34,7 +34,7 @@ export default async function RallyPage({ searchParams }: { searchParams: Promis
   const shown = showCro === undefined ? conversations : await listConversations(company, 50, { cro: showCro });
   const croName = new Map(cros.map((c) => [c.id, c.name]));
   const askedOf = new Set(conversations.map((c) => c.croId));
-  const filters = [{ key: "", label: "All" }, ...(askedOf.has(null) ? [{ key: "collective", label: "Rally Collective" }] : []), ...cros.filter((c) => askedOf.has(c.id)).map((c) => ({ key: c.slug, label: c.name }))];
+  const filters = [{ key: "", label: "All" }, ...(askedOf.has(null) ? [{ key: "collective", label: "Rally Collective Brain" }] : []), ...cros.filter((c) => askedOf.has(c.id)).map((c) => ({ key: c.slug, label: c.name }))];
   const current = showCro === undefined ? "" : (show ?? "");
   const latest = conversations[0];
   const continueWith = latest && isRecent(latest.updatedAt) ? { id: latest.id, title: latest.title } : null;
@@ -77,7 +77,7 @@ export default async function RallyPage({ searchParams }: { searchParams: Promis
                 <Link href={`/chat/${c.id}`} className="flex items-center gap-4 px-4 py-3 hover:bg-[var(--muted)] rounded-xl">
                   <span className="flex-1 min-w-0">
                     <span className="block text-base truncate" style={{ color: "var(--foreground)" }}>{c.title}</span>
-                    <span className="block text-xs" style={{ color: "var(--muted-foreground)" }}>{c.croId ? (croName.get(c.croId) ?? "A CRO") : "Rally Collective"}</span>
+                    <span className="block text-xs" style={{ color: "var(--muted-foreground)" }}>{c.croId ? `${croName.get(c.croId) ?? "A CRO"}'s CRO-Brain` : "Rally Collective Brain"}</span>
                   </span>
                   <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>{c.updatedAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
                 </Link>

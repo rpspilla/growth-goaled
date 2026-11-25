@@ -307,13 +307,13 @@ describe("engagement: default, switching, second opinion, matching", () => {
     await sendMessage(founder, co, r.conversationId, "And what would you do?");
     const input = h.inputs.at(-1) as ChatInput;
     expect(input.intelligence?.mode === "individual" && input.intelligence.cro.name).toBe("Ben Brooks");
-    expect(input.history.find((t) => t.role === "assistant")!.content).toMatch(/^\[Earlier answer from Ana Alvarez's AI CRO\]/);
+    expect(input.history.find((t) => t.role === "assistant")!.content).toMatch(/^\[Earlier answer from Ana Alvarez's CRO-Brain\]/);
     const view = (await getConversation(co, r.conversationId))!;
     expect(view.messages.filter((m) => m.role === "assistant").map((m) => m.croId)).toEqual([anaCro, benCro]);
     expect(view.cros.get(anaCro)).toBe("Ana Alvarez");
     // Earlier conversations say whose perspective answered.
     const ctx = await chatContext(co, { compensation: false });
-    expect(ctx.earlierConversations[0]!.perspective).toBe("Ben Brooks's AI CRO");
+    expect(ctx.earlierConversations[0]!.perspective).toBe("Ben Brooks's CRO-Brain");
   });
 
   it("a second opinion is one Collective answer in the CRO's conversation, which stays with the CRO", async () => {

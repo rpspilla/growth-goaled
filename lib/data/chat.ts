@@ -212,7 +212,7 @@ export async function sendMessage(user: User, company: Company, conversationId: 
   // Whose perspective answers this turn: the conversation's (a CRO's AI or the Collective), or the
   // Collective once, for a second opinion. Earlier answers from another perspective are labelled.
   const perspective = opts.secondOpinion ? null : view.conversation.croId;
-  const label = (id: string | null) => (id ? `${view.cros.get(id) ?? "Another CRO"}'s AI CRO` : "the Rally Collective");
+  const label = (id: string | null) => (id ? `${view.cros.get(id) ?? "Another CRO"}'s CRO-Brain` : "the Rally Collective Brain");
   const history = [
     ...view.messages.map((m) => ({
       role: m.role,

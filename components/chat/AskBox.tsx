@@ -114,10 +114,10 @@ export function AskBox({
             <div className="flex items-center gap-2 flex-wrap text-sm">
               <span className="font-semibold" style={{ color: "var(--foreground)" }}>Ask</span>
               <select name="cro" defaultValue={cros.some((c) => c.id === defaultCroId) ? (defaultCroId ?? "") : ""} className="field py-1.5" aria-label="Who to ask">
-                <option value="">The Rally Collective (all our CROs){!defaultCroId ? " · your default" : ""}</option>
+                <option value="">The Rally Collective Brain (all our CROs){!defaultCroId ? " · your default" : ""}</option>
                 {cros.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name}&apos;s AI CRO{c.id === defaultCroId ? " · your default" : ""}
+                    {c.name}&apos;s CRO-Brain{c.id === defaultCroId ? " · your default" : ""}
                   </option>
                 ))}
               </select>

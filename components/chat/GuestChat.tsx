@@ -574,7 +574,7 @@ function CroPicker({ cros, croId, locked, choose, onError }: { cros: GuestViewDa
   if (locked) {
     return (
       <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-        {chosen ? `Talking to ${chosen.name}'s AI CRO: an AI built from ${chosen.name}'s documented expertise, not ${chosen.name.split(" ")[0]} in person.` : "Talking to the Rally Collective: our CROs' combined expertise."}
+        {chosen ? `Talking to ${chosen.name}'s CRO-Brain: an AI built from ${chosen.name}'s documented expertise, not ${chosen.name.split(" ")[0]} in person.` : "Talking to the Rally Collective Brain: all our CROs' combined expertise."}
       </p>
     );
   }
@@ -585,7 +585,7 @@ function CroPicker({ cros, croId, locked, choose, onError }: { cros: GuestViewDa
       if (!r.ok) onError(r.error ?? "That didn't work. Try again.");
       router.refresh();
     });
-  const options = [{ id: null as string | null, label: "The Rally Collective", title: "All our CROs' combined expertise" }, ...cros.map((c) => ({ id: c.id as string | null, label: `${c.name}'s AI CRO`, title: c.headline ?? `An AI built from ${c.name}'s documented expertise` }))];
+  const options = [{ id: null as string | null, label: "The Rally Collective Brain", title: "All our CROs' combined expertise" }, ...cros.map((c) => ({ id: c.id as string | null, label: `${c.name}'s CRO-Brain`, title: c.headline ?? `An AI built from ${c.name}'s documented expertise` }))];
   return (
     <div role="group" aria-label="Who to talk to" className="flex items-center gap-2 flex-wrap text-sm">
       <span className="font-semibold" style={{ color: "var(--foreground)" }}>Talk to</span>

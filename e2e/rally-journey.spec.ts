@@ -52,7 +52,7 @@ async function journey(browser: Browser, viewport: { width: number; height: numb
   await expect(page.getByText("An AI built on Jo's documented expertise and judgment, not Jo in person.")).toBeVisible();
   await page.getByRole("button", { name: "Ask", exact: true }).click();
   await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/);
-  await expect(page.getByRole("group", { name: "Talking with Jo Journey's AI CRO" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Talking with Jo Journey's CRO-Brain" })).toBeVisible();
   await expect(page.getByText(/Test mode \(Jo Journey's AI\)/).first()).toBeVisible();
   await page.getByLabel("Your reply").fill("Two of us sell today; $20k deals.");
   await page.getByRole("button", { name: "Send", exact: true }).click();
@@ -72,7 +72,7 @@ async function journey(browser: Browser, viewport: { width: number; height: numb
   await page.getByRole("radiogroup", { name: "Who to ask" }).getByRole("radio", { name: /Rally Collective/ }).click();
   await page.getByLabel(/^Ask /).fill("How should we structure AE commission?");
   await page.getByRole("button", { name: "Ask", exact: true }).click();
-  await expect(page.getByRole("group", { name: "Talking with the Rally Collective" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Talking with the Rally Collective Brain" })).toBeVisible();
 
   // 12. Previous conversations, all or by who answered.
   await page.locator('a[aria-label="Rally home"]:visible').first().click();
@@ -84,10 +84,10 @@ async function journey(browser: Browser, viewport: { width: number; height: numb
   await expect(list).not.toContainText("How should we structure AE commission?");
 
   // 13. Back into the Collective's conversation and switch to Jo without losing it.
-  await page.getByRole("navigation", { name: "Show conversations with" }).getByRole("link", { name: "Rally Collective" }).click();
+  await page.getByRole("navigation", { name: "Show conversations with" }).getByRole("link", { name: "Rally Collective Brain" }).click();
   await list.getByRole("link", { name: /How should we structure AE commission\?/ }).click();
-  await page.getByLabel("Continue with").selectOption({ label: "Jo Journey" });
-  await expect(page.getByRole("group", { name: "Talking with Jo Journey's AI CRO" })).toBeVisible();
+  await page.getByLabel("Continue with").selectOption({ label: "Jo Journey's CRO-Brain" });
+  await expect(page.getByRole("group", { name: "Talking with Jo Journey's CRO-Brain" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "How should we structure AE commission?" })).toBeVisible();
   // The page fits the screen: nothing scrolls sideways.
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);

@@ -36,9 +36,9 @@ export default async function EvalsPage() {
           <label className="block">
             <span className="label">Who answers</span>
             <select name="croId" defaultValue="" className="field mt-1" aria-label="Who answers">
-              <option value="">The Rally Collective</option>
+              <option value="">The Rally Collective Brain</option>
               {cros.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}&apos;s AI CRO</option>
+                <option key={c.id} value={c.id}>{c.name}&apos;s CRO-Brain</option>
               ))}
             </select>
           </label>
@@ -60,7 +60,7 @@ export default async function EvalsPage() {
           <ul aria-label="Evaluation runs" className="surface divide-y text-sm" style={{ borderColor: "var(--border)" }}>
             {runs.map(({ run, cro }) => (
               <li key={run.id} className="p-3 flex items-center gap-4 flex-wrap" style={{ borderColor: "var(--border)" }}>
-                <Link href={`/advisor/evals/${run.id}`} className="link font-semibold flex-1 min-w-[14rem]">{cro ? `${cro}'s AI CRO` : "Rally Collective"}</Link>
+                <Link href={`/advisor/evals/${run.id}`} className="link font-semibold flex-1 min-w-[14rem]">{cro ? `${cro}'s CRO-Brain` : "Rally Collective Brain"}</Link>
                 <span style={muted}>{run.scenarioIds.length} scenarios · {run.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} · {run.methodologyVersion}</span>
                 <span className="font-mono" style={fg}>{run.status === "done" ? `${mean(run.averages)} / 5` : run.status === "running" ? "Running" : "Failed"}</span>
               </li>

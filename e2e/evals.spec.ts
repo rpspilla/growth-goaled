@@ -20,10 +20,10 @@ test("run an evaluation of the Collective and read its scores", async ({ browser
   await expect(page.getByRole("heading", { name: "Evaluations" })).toBeVisible({ timeout: 120_000 });
 
   const form = page.getByRole("form", { name: "New evaluation run" });
-  await form.getByLabel("Who answers").selectOption({ label: "The Rally Collective" });
+  await form.getByLabel("Who answers").selectOption({ label: "The Rally Collective Brain" });
   await form.getByLabel("Scenarios").selectOption("3");
   await form.getByRole("button", { name: "Start the run" }).click();
-  await expect(page.getByRole("heading", { name: "Rally Collective" })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole("heading", { name: "Rally Collective Brain" })).toBeVisible({ timeout: 60_000 });
 
   const scenarios = page.getByRole("list", { name: "Scenario results" });
   await expect(scenarios.getByRole("listitem").filter({ hasText: "Should we hire two salespeople?" })).toContainText("Scored", { timeout: 90_000 });

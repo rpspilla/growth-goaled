@@ -28,7 +28,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!cro?.voiceId || (cro.userId !== user.id && user.role !== "admin")) return new Response("Not found", { status: 404 });
   const first = cro.name.split(" ")[0];
   try {
-    const audio = await speech(cro.voiceId, `Hi, this is ${first}'s AI CRO on Rally. Before you add pipeline, let's find out where deals are stalling, because that's usually where the growth is.`);
+    const audio = await speech(cro.voiceId, `Hi, this is ${first}'s CRO-Brain on Rally. Before you add pipeline, let's find out where deals are stalling, because that's usually where the growth is.`);
     return new Response(audio.body as BodyInit, { headers: { "Content-Type": audio.type, "Cache-Control": "no-store" } });
   } catch (err) {
     return new Response(err instanceof VoiceError ? err.message : "Couldn't play the sample.", { status: 502 });

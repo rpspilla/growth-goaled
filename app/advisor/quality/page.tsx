@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth/session";
 import { qualityReport, type QualityRow } from "@/lib/data/quality";
 
-export const metadata = { title: "AI CRO quality" };
+export const metadata = { title: "CRO-Brain quality" };
 
 const muted = { color: "var(--muted-foreground)" };
 const fg = { color: "var(--foreground)" };
@@ -50,7 +50,7 @@ export default async function QualityPage() {
   return (
     <div className="page space-y-8">
       <header>
-        <h1 className="font-display text-3xl" style={fg}>AI CRO quality</h1>
+        <h1 className="font-display text-3xl" style={fg}>CRO-Brain quality</h1>
         <p className="text-sm mt-1 max-w-3xl" style={muted}>
           What founders did with the advice: how often a recommendation became commitments, how they rated it, and how the commitments went. Pushed back means rated incorrect, incomplete, not relevant or disagree. Sample companies are left out.
         </p>

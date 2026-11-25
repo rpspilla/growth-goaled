@@ -23,8 +23,8 @@ export default async function CroDirectoryPage() {
     <div className="page space-y-8">
       <PageHeader title="Meet your CRO collective" subtitle="Experienced operators. Different perspectives. Ask them all at once, or one at a time. Each is an AI built on that CRO's documented expertise." />
 
-      <section aria-label="The Rally Collective" className="surface p-5 space-y-2">
-        <h2 className="text-xl font-semibold" style={fg}>The Rally Collective</h2>
+      <section aria-label="The Rally Collective Brain" className="surface p-5 space-y-2">
+        <h2 className="text-xl font-semibold" style={fg}>The Rally Collective Brain <span className="text-base font-normal" style={muted}>· all our CROs</span></h2>
         <p className="text-base" style={muted}>
           One recommendation that draws on the most relevant experience across our CROs. Where they see it differently, you&apos;ll hear why, and which view fits your company.
         </p>
@@ -57,7 +57,7 @@ export default async function CroDirectoryPage() {
               <div className="flex items-center gap-4 flex-wrap">
                 <Link href={`/whats-next?with=${c.slug}`} className="btn btn-primary text-sm py-1.5">Ask {c.name.split(" ")[0]}</Link>
                 <Link href={`/cros/${c.slug}`} className="link text-sm">View profile</Link>
-                <DefaultCroButton croId={c.id} isDefault={company.defaultCroId === c.id} label={`${c.name}'s AI CRO`} set={setDefaultCroAction} />
+                <DefaultCroButton croId={c.id} isDefault={company.defaultCroId === c.id} label={`${c.name}'s CRO-Brain`} set={setDefaultCroAction} />
               </div>
             </li>
           ))}
